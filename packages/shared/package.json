@@ -1,13 +1,15 @@
 {
-      "name": "@pkpkdupr/shared",
-      "version": "0.0.1",
-      "private": true,
-      "exports": {
-          "./*": "./src/*.ts"
-      },
-      "typesVersions": {
-          "*": {
-              "*": ["./src/*.ts"]
-          }
-      }
+    "name": "@pkpkdupr/shared",
+    "version": "0.0.1",
+    "private": true,
+    "exports": {
+        "./*": "./src/*.ts"
+    },
+    "typesVersions": {
+        "*": {
+            "*": [
+                "./src/*.ts"
+            ]
+        }
+    }
 }
