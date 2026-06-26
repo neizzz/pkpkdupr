@@ -1,11 +1,12 @@
 import { Player } from "./player.js";
 
 export type MatchType = "Singles" | "Doubles";
-export type MatchStatus =
-  | "scheduled"
-  | "in_progress"
-  | "completed"
-  | "cancelled";
+export type MatchStatus = "completed";
+// TODO: 추후에 예정, 진행중, 취소 상태를 추가
+//   | "scheduled"
+//   | "in_progress"
+//   | "completed"
+//   | "cancelled";
 
 export interface Team {
   id: string;
