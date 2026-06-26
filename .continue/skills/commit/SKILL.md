@@ -1,12 +1,12 @@
 ---
 name: commit
-description: 커밋하기, 코드 저장, git commit, push before committing
+description: 커밋하기, 코드 저장, git commit
 argument-hint: "[커밋 메시지 / 생략 시 변경사항 분석 후 자동 생성]"
 ---
 
 # Commit
 
-프로젝트 변경사항을 커밋 및 푸시합니다.
+프로젝트 변경사항을 커밋합니다.
 
 ## Conventions
 
@@ -63,15 +63,12 @@ pnpm lint
 
 실패하면 오류를 수정한 후 재시도합니다. 린트가 실패하면 커밋하지 않고 오류 내용을 알려줍니다.
 
-### 3. stage → commit → push
+### 3. stage → commit
 
 ```bash
 git add -A
 git commit -m "feat: message"
-git push
 ```
-
-push할 원격 브랜치가 없으면 `git push -u origin <current-branch>`로 upstream을 설정합니다. 여러 로컬 커밋이 있으면 전체를 한 번에 푸시합니다.
 
 ## 주의사항
 
