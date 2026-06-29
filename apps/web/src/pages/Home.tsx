@@ -54,7 +54,6 @@ const Home: React.FC = () => {
                      <Button
                          onPress={handleLogout}
                          className="mt-4 w-full bg-default-200 text-default-700"
-                         variant="flat"
                          fullWidth
                      >
                          로그아웃

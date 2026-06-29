@@ -194,10 +194,12 @@ const AdminDashboard: React.FC = () => {
         prev.map((item) => (item.id === data.player.id ? data.player : item)),
       );
       setStatusDrafts((prev) => ({ ...prev, [playerId]: data.player.status }));
-      if (data.log) {
+      const nextLog = data.log;
+
+      if (nextLog) {
         setStatusLogsByPlayerId((prev) => ({
           ...prev,
-          [playerId]: [data.log, ...(prev[playerId] ?? [])],
+          [playerId]: [nextLog, ...(prev[playerId] ?? [])],
         }));
         setSuccess(
           `${data.player.username} 회원 상태가 ${statusLabelMap[data.player.status]}로 변경되었습니다.`,
