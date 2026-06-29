@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  # 🔒 Reverse Proxy & SSL (Let's Encrypt) - 포트 80 없이 TLS-ALPN 방식 사용
+  proxy:
+    image: linuxserver/swag:latest
+    container_name: pkpkdupr-proxy
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./data/certs:/config
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Seoul
+      - URL=${DOMAIN:-pkpkdupr.duckdns.org}
+      - VALIDATION=TLS-ALPN # Port 80 없어도 되는 ACME v2 방식
+      - SUBDOMAINS= # 현재는 기본 도메인만 사용하므로 비워둠
+    ports:
+      - "443:443"
+    networks:
+      - pkpkdupr-network
+
+    # 🌐 Web Application (Internal Only)
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: pkpkdupr-web-app
+    depends_on:
+      - proxy
+    networks:
+      - pkpkdupr-network
+
+    # ⚙️ API Server (Internal Only)
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: pkpkdupr-api-server
+    environment:
+      - DB_HOST=db-server
+    depends_on:
+      - db-server
+    networks:
+      - pkpkdupr-network
+
+    # 💾 Database Server (SQLite)
+  db-server:
+    build:
+      context: .
+      dockerfile: apps/db-server/Dockerfile
+    container_name: pkpkdupr-db-server
+    volumes:
+      - ./data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
+    networks:
+      - pkpkdupr-network
+
+networks:
+  pkpkdupr-network:
+    driver: bridge
