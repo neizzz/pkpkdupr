@@ -1,31 +1,50 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-// Player 테이블
-export const players = sqliteTable('players', {
-  id: text('id').primaryKey(),
-  username: text('username').notNull().unique(),
-  duprRating: integer('dupr_rating').notNull(),
-  gender: text('gender').notNull(), // 'M' | 'F'
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+export const players = sqliteTable("players", {
+  id: text("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  duprRating: text("dupr_rating").notNull(),
+  gender: text("gender").notNull(),
+  status: text("status").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  isFirstLogin: integer("is_first_login", { mode: "boolean" }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
-// Match 테이블
-export const matches = sqliteTable('matches', {
-  id: text('id').primaryKey(),
-  type: text('type').notNull(), // 'Singles' | 'Doubles'
-  status: text('status').notNull(), // 'completed' 등
-  location: text('location').notNull(),
-  scheduledAt: integer('scheduled_at', { mode: 'timestamp' }).notNull(),
-  completedAt: integer('completed_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+export const playerCreationLogs = sqliteTable("player_creation_logs", {
+  id: text("id").primaryKey(),
+  playerId: text("player_id").notNull(),
+  createdByPlayerId: text("created_by_player_id"),
+  createdByUsername: text("created_by_username").notNull(),
+  creationSource: text("creation_source").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
 
-// MatchScore 테이블 (간략화)
-export const matchScores = sqliteTable('match_scores', {
-    id: text('id').primaryKey(),
-    matchId: text('match_id').notNull(),
-    teamA: integer('team_a').notNull(),
-    teamB: integer('t_b').notNull(),
+export const playerStatusChangeLogs = sqliteTable("player_status_change_logs", {
+  id: text("id").primaryKey(),
+  playerId: text("player_id").notNull(),
+  previousStatus: text("previous_status").notNull(),
+  nextStatus: text("next_status").notNull(),
+  changedByPlayerId: text("changed_by_player_id").notNull(),
+  changedByUsername: text("changed_by_username").notNull(),
+  changedAt: integer("changed_at", { mode: "timestamp" }).notNull(),
+});
+
+export const matches = sqliteTable("matches", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  status: text("status").notNull(),
+  location: text("location").notNull(),
+  scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const matchScores = sqliteTable("match_scores", {
+  id: text("id").primaryKey(),
+  matchId: text("match_id").notNull(),
+  teamA: integer("team_a").notNull(),
+  teamB: integer("t_b").notNull(),
 });

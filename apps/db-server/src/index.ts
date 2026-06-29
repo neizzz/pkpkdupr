@@ -1,14 +1,258 @@
-import express from 'express';
+import express from "express";
+import { getDb, getDbClient } from "./db/client";
+import { PlayerRepository, type CreateStoredPlayerInput } from "./repositories/PlayerRepository";
+import {
+  PlayerCreationLogRepository,
+  type CreatePlayerCreationLogInput,
+} from "./repositories/PlayerCreationLogRepository";
+import {
+  PlayerStatusChangeLogRepository,
+  type CreatePlayerStatusChangeLogInput,
+} from "./repositories/PlayerStatusChangeLogRepository";
 
 const app = express();
-const port = 5001;
+const port = Number(process.env.PORT || 5001);
+const db = getDb();
+const client = getDbClient();
+const playerRepository = new PlayerRepository(db);
+const playerCreationLogRepository = new PlayerCreationLogRepository(db);
+const playerStatusChangeLogRepository = new PlayerStatusChangeLogRepository(db);
 
 app.use(express.json());
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'DB Server is running' });
+const safeExec = async (sql: string) => {
+  try {
+    await client.execute(sql);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes("duplicate column name") ||
+      message.includes("already exists")
+    ) {
+      return;
+    }
+    throw error;
+  }
+};
+
+const initSchema = async () => {
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS players (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      dupr_rating TEXT NOT NULL,
+      gender TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      password_hash TEXT NOT NULL DEFAULT '',
+      is_first_login INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  await safeExec(`ALTER TABLE players ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
+  await safeExec(`ALTER TABLE players ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`);
+  await safeExec(`ALTER TABLE players ADD COLUMN is_first_login INTEGER NOT NULL DEFAULT 1`);
+  await client.execute(`UPDATE players SET status = 'inactive' WHERE status = 'deleted'`);
+  await client.execute(`UPDATE players SET status = 'active' WHERE status IS NULL OR status = ''`);
+
+  await client.execute(`
+    UPDATE players
+    SET dupr_rating = '{"total":' ||
+      CASE WHEN trim(CAST(dupr_rating AS TEXT)) = '' THEN '1000' ELSE CAST(dupr_rating AS TEXT) END ||
+      ',"doubles":{"mixed":' ||
+      CASE WHEN trim(CAST(dupr_rating AS TEXT)) = '' THEN '1000' ELSE CAST(dupr_rating AS TEXT) END ||
+      ',"men":' ||
+      CASE WHEN trim(CAST(dupr_rating AS TEXT)) = '' THEN '1000' ELSE CAST(dupr_rating AS TEXT) END ||
+      ',"women":' ||
+      CASE WHEN trim(CAST(dupr_rating AS TEXT)) = '' THEN '1000' ELSE CAST(dupr_rating AS TEXT) END ||
+      '},"singles":' ||
+      CASE WHEN trim(CAST(dupr_rating AS TEXT)) = '' THEN '1000' ELSE CAST(dupr_rating AS TEXT) END ||
+      '}'
+    WHERE typeof(dupr_rating) IN ('integer', 'real')
+       OR (typeof(dupr_rating) = 'text' AND trim(dupr_rating) != '' AND substr(trim(dupr_rating), 1, 1) != '{')
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS player_creation_logs (
+      id TEXT PRIMARY KEY,
+      player_id TEXT NOT NULL,
+      created_by_player_id TEXT,
+      created_by_username TEXT NOT NULL,
+      creation_source TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS player_status_change_logs (
+      id TEXT PRIMARY KEY,
+      player_id TEXT NOT NULL,
+      previous_status TEXT NOT NULL,
+      next_status TEXT NOT NULL,
+      changed_by_player_id TEXT NOT NULL,
+      changed_by_username TEXT NOT NULL,
+      changed_at INTEGER NOT NULL
+    )
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS matches (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      location TEXT NOT NULL,
+      scheduled_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS match_scores (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      team_a INTEGER NOT NULL,
+      t_b INTEGER NOT NULL
+    )
+  `);
+};
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", message: "DB Server is running" });
 });
 
-app.listen(port, () => {
-  console.log(`[DB-SERVER] Listening at http://localhost:${port}`);
+app.get("/internal/players", async (_req, res) => {
+  try {
+    res.json(await playerRepository.findAll());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/players/by-username/:username", async (req, res) => {
+  try {
+    const player = await playerRepository.findByUsername(req.params.username);
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/players/:id", async (req, res) => {
+  try {
+    const player = await playerRepository.findById(req.params.id);
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/players", async (req, res) => {
+  try {
+    const player = await playerRepository.create(req.body as CreateStoredPlayerInput);
+    res.json(player);
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message.includes("UNIQUE") || message.includes("unique")) {
+      return res.status(409).json({ error: "중복된 사용자명입니다." });
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/internal/players/init-admin", async (req, res) => {
+  try {
+    const player = await playerRepository.initAdminIfMissing(
+      req.body as CreateStoredPlayerInput,
+    );
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/players/:id/status", async (req, res) => {
+  try {
+    const player = await playerRepository.updateStatus(req.params.id, req.body.status);
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/players/:id/password", async (req, res) => {
+  try {
+    const player = await playerRepository.updatePassword(
+      req.params.id,
+      req.body.passwordHash,
+      req.body.isFirstLogin,
+    );
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/player-creation-logs", async (_req, res) => {
+  try {
+    res.json(await playerCreationLogRepository.findAll());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/player-creation-logs", async (req, res) => {
+  try {
+    const log = await playerCreationLogRepository.create(
+      req.body as CreatePlayerCreationLogInput,
+    );
+    res.json(log);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/player-status-change-logs", async (_req, res) => {
+  try {
+    res.json(await playerStatusChangeLogRepository.findAll());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/player-status-change-logs", async (req, res) => {
+  try {
+    const log = await playerStatusChangeLogRepository.create(
+      req.body as CreatePlayerStatusChangeLogInput,
+    );
+    res.json(log);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+const start = async () => {
+  await initSchema();
+  app.listen(port, () => {
+    console.log(`[DB-SERVER] Listening at http://localhost:${port}`);
+  });
+};
+
+start().catch((error) => {
+  console.error("[DB-SERVER] Failed to start", error);
+  process.exit(1);
 });

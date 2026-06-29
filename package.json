@@ -1,22 +1,24 @@
 {
    "name": "pkpkdupr",
-   "version": "0.0.1",
-   "private": true,
-   "description": "Pickleball DUPR System - Monorepo with pnpm",
-   "scripts": {
-       "dev": "pnpm -r --parallel dev",
-       "dev:web": "pnpm --filter @pkpkdupr/web dev",
-       "dev:api": "pnpm --filter @pkpkdupr/api dev",
-       "build": "pnpm -r build",
-       "build:web": "pnpm --filter @pkpkdupr/web build",
-       "build:api": "pnpm --filter @pkpkdupr/api build",
-       "lint": "pnpm -r lint",
-       "clean": "pnpm -r --parallel clean"
+    "version": "0.0.1",
+    "private": true,
+    "description": "Pickleball DUPR System - Monorepo with pnpm",
+    "scripts": {
+        "dev": "pnpm -r --parallel dev",
+        "dev:web": "pnpm --filter @pkpkdupr/web dev",
+        "dev:api": "pnpm --filter @pkpkdupr/api dev",
+        "dev:admin": "pnpm --filter @pkpkdupr/admin-web dev",
+        "build": "pnpm -r build",
+        "build:web": "pnpm --filter @pkpkdupr/web build",
+        "build:api": "pnpm --filter @pkpkdupr/api build",
+        "build:admin": "pnpm --filter @pkpkdupr/admin-web build",
+        "lint": "pnpm -r lint",
+        "clean": "pnpm -r --parallel clean"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.3"
    },
-   "devDependencies": {
-       "typescript": "^5.3.3"
-   },
-   "engines": {
+    "engines": {
        "pnpm": ">=8.0.0"
    }
 }
