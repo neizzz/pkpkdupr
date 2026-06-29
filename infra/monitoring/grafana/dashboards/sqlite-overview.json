@@ -1,0 +1,110 @@
+{
+  "title": "SQLite DB Overview",
+  "uid": "sqlite-overview",
+  "version": 1,
+  "revision": 1,
+  "schemaVersion": 39,
+  "tags": ["sqlite", "pkpkdupr"],
+  "timezone": "Asia/Seoul",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "panels": [
+    {
+      "id": 1,
+      "title": "DB Exporter Status",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "up{job=\"sqlite_exporter\"}",
+        "legendFormat": "{{instance}}"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "green", "value": 1}
+            ]
+          },
+          "mappings": [
+            {"options": {"1": "UP"}, "type": "value"},
+            {"options": {"0": "DOWN"}, "type": "value"}
+          ]
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Database File Size",
+      "type": "gauge",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [{
+        "expr": "sqlite_database_size_bytes{database=\"db.sqlite\"}",
+        "legendFormat": "文件大小"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 52428800},
+              {"color": "red", "value": 104857600}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Table Row Counts",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {
+          "expr": "sqlite_table_info{metric=\"pages\", database=\"db.sqlite\"}",
+          "legendFormat": "{{table}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"}
+      },
+      "options": {"showHeader": true}
+    },
+    {
+      "id": 4,
+      "title": "Database Size Trend",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [{
+        "expr": "sqlite_database_size_bytes{database=\"db.sqlite\"}",
+        "legendFormat": "DB Size"
+      }],
+      "fieldConfig": {
+        "defaults": {"unit": "bytes"}
+      }
+    },
+    {
+      "id": 5,
+      "title": "Tables Metadata",
+      "type": "table",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "targets": [
+        {
+          "expr": "sqlite_table_info{metric=\"columns\", database=\"db.sqlite\"}",
+          "legendFormat": "{{table}}"
+        },
+        {
+          "expr": "sqlite_table_info{metric=\"indexes\", database=\"db.sqlite\"}",
+          "legendFormat": "{{table}}"
+        }
+      ],
+      "options": {"showHeader": true}
+    }
+  ],
+  "templating": {"list": []},
+  "annotations": {"list": []}
+}

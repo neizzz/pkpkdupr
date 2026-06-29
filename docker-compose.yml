@@ -1,61 +1,119 @@
 version: "3.8"
 
 services:
-  # 🔒 Reverse Proxy & SSL (Let's Encrypt) - 포트 80 없이 TLS-ALPN 방식 사용
+   # 🔒 Reverse Proxy & SSL (Let's Encrypt) - 포트 80 없이 TLS-ALPN 방식 사용
   proxy:
     image: linuxserver/swag:latest
     container_name: pkpkdupr-proxy
     cap_add:
-      - NET_ADMIN
+        - NET_ADMIN
     volumes:
-      - ./data/certs:/config
+        - ./data/certs:/config
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Asia/Seoul
-      - URL=${DOMAIN:-pkpkdupr.duckdns.org}
-      - VALIDATION=TLS-ALPN # Port 80 없어도 되는 ACME v2 방식
-      - SUBDOMAINS= # 현재는 기본 도메인만 사용하므로 비워둠
+        - PUID=1000
+        - PGID=1000
+        - TZ=Asia/Seoul
+        - URL=${DOMAIN:-pkpkdupr.duckdns.org}
+        - VALIDATION=TLS-ALPN # Port 80 없어도 되는 ACME v2 방식
+        - SUBDOMAINS= # 현재는 기본 도메인만 사용하므로 비워둠
     ports:
-      - "443:443"
+        - "443:443"
     networks:
-      - pkpkdupr-network
+        - pkpkdupr-network
 
-    # 🌐 Web Application (Internal Only)
+   # 🌐 Web Application (Internal Only)
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     container_name: pkpkdupr-web-app
     depends_on:
-      - proxy
+        - proxy
     networks:
-      - pkpkdupr-network
+        - pkpkdupr-network
 
-    # ⚙️ API Server (Internal Only)
+   # ⚙️ API Server (Internal Only)
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: pkpkdupr-api-server
     environment:
-      - DB_HOST=db-server
+        - DB_HOST=db-server
     depends_on:
-      - db-server
+        - db-server
     networks:
-      - pkpkdupr-network
+        - pkpkdupr-network
 
-    # 💾 Database Server (SQLite)
+   # 💾 Database Server (SQLite)
   db-server:
     build:
       context: .
       dockerfile: apps/db-server/Dockerfile
     container_name: pkpkdupr-db-server
     volumes:
-      - ./data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
+        - ./data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
     networks:
-      - pkpkdupr-network
+        - pkpkdupr-network
+
+   # 📊 SQLite Exporter (Sidecar for Prometheus metrics)
+  db-exporter:
+    image: justwatchcom/sqlite_exporter:latest
+    container_name: pkpkdupr-db-exporter
+    command: /data/db.sqlite
+    volumes:
+         - ./data/db:/data:ro
+    expose:
+        - "9235"
+    depends_on:
+        - db-server
+    networks:
+        - pkpkdupr-network
+
+   # 📊 Prometheus
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: pkpkdupr-prometheus
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+        - ./infra/monitoring/prometheus:/etc/prometheus:ro
+        - prometheus-data:/prometheus
+    command:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--storage.tsdb.retention.time=30d'
+        - '--web.enable-lifecycle'
+    expose:
+        - "9090"
+    networks:
+        - pkpkdupr-network
+
+   # 📊 Grafana
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: pkpkdupr-grafana
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+        - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+        - ./infra/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+        - grafana-data:/var/lib/grafana
+    environment:
+        - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+        - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
+        - GF_USERS_ALLOW_SIGN_UP=false
+        - GF_SERVER_ROOT_URL=http://localhost/
+        - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    expose:
+        - "3000"
+    depends_on:
+        - prometheus
+    networks:
+        - pkpkdupr-network
 
 networks:
   pkpkdupr-network:
     driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
