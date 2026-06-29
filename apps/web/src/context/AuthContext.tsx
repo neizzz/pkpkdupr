@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { PlayerDupr } from '@pkpkdupr/shared/player';
 
-export interface PlayerInfo {
+interface PlayerInfo {
     id: string;
     username?: string;
-    duprRating?: number;
+    duprRating?: PlayerDupr;
     gender?: 'M' | 'F';
 }
 
@@ -11,7 +12,6 @@ interface AuthContextType {
     token: string | null;
     player: PlayerInfo | null;
     login: (username: string, password: string) => Promise<void>;
-    register: (username: string, password: string, gender: 'M' | 'F') => Promise<void>;
     logout: () => void;
 }
 
@@ -26,59 +26,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (storedToken) {
             setToken(storedToken);
             fetchMe(storedToken);
-        }
-    }, []);
+         }
+     }, []);
 
     const fetchMe = async (accessToken: string) => {
         try {
             const res = await fetch('/api/me', {
                 headers: { Authorization: `Bearer ${accessToken}` },
-            });
+             });
             if (res.ok) {
-                setPlayer(await res.json());
-            }
-        } catch {
+                const data = await res.json();
+                setPlayer(data);
+             }
+         } catch {
             console.error('Failed to fetch user info');
-        }
-    };
+         }
+     };
 
     const login = async (username: string, password: string) => {
         const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password }),
-        });
-        if (!res.ok) throw new Error('로그인 실패');
+         });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || '로그인 실패');
+         }
         const data = await res.json();
         localStorage.setItem('token', data.accessToken);
         setToken(data.accessToken);
         fetchMe(data.accessToken);
-    };
-
-    const register = async (username: string, password: string, gender: 'M' | 'F') => {
-        const res = await fetch('/api/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password, gender }),
-        });
-        if (!res.ok) throw new Error('회원가입 실패');
-        const data = await res.json();
-        localStorage.setItem('token', data.accessToken);
-        setToken(data.accessToken);
-        setPlayer(data);
-    };
+     };
 
     const logout = () => {
         localStorage.removeItem('token');
         setToken(null);
         setPlayer(null);
-    };
+     };
 
     return (
-        <AuthContext.Provider value={{ token, player, login, register, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
+         <AuthContext.Provider value={{ token, player, login, logout }}>
+             {children}
+         </AuthContext.Provider>
+     );
 };
 
 export const useAuth = (): AuthContextType => {

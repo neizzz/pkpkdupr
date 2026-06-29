@@ -17,7 +17,8 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@pkpkdupr/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src"],
