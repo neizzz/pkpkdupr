@@ -40,9 +40,7 @@ const createDefaultDupr = (seed: number = 1000): PlayerDupr => ({
   singles: seed,
 });
 
-const createPlayer = (
-  input: Pick<Player, "username" | "gender">,
-): Player => {
+const createPlayer = (input: Pick<Player, "username" | "gender">): Player => {
   const now = new Date();
 
   return {
@@ -129,7 +127,10 @@ const groupByPlayerId = <T extends { playerId: string }>(items: T[]) =>
   }, {});
 
 export class AuthService {
-  private async dbRequest<T>(path: string, init?: DbRequestOptions): Promise<T> {
+  private async dbRequest<T>(
+    path: string,
+    init?: DbRequestOptions,
+  ): Promise<T> {
     const retries = init?.retries ?? 0;
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -144,7 +145,9 @@ export class AuthService {
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || `DB 서버 요청 실패: ${res.status}`);
+          throw new Error(
+            errorData.error || `DB 서버 요청 실패: ${res.status}`,
+          );
         }
 
         if (res.status === 204) {
@@ -156,7 +159,9 @@ export class AuthService {
         if (attempt === retries) {
           throw error;
         }
-        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 300 * (attempt + 1)),
+        );
       }
     }
 
@@ -164,14 +169,18 @@ export class AuthService {
   }
 
   async verifyToken(accessToken: string): Promise<{ playerId: string }> {
-    const decoded = require("jsonwebtoken").verify(accessToken, JWT_SECRET) as { playerId: string };
+    const decoded = require("jsonwebtoken").verify(accessToken, JWT_SECRET) as {
+      playerId: string;
+    };
     if (!decoded || !decoded.playerId) {
       throw new Error("Invalid token");
     }
     return decoded;
   }
 
-  private async getStoredPlayerById(playerId: string): Promise<StoredPlayerRecord | undefined> {
+  private async getStoredPlayerById(
+    playerId: string,
+  ): Promise<StoredPlayerRecord | undefined> {
     try {
       const player = await this.dbRequest<any>(`/internal/players/${playerId}`);
       return hydratePlayer(player);
@@ -183,7 +192,9 @@ export class AuthService {
     }
   }
 
-  private async getStoredPlayerByUsername(username: string): Promise<StoredPlayerRecord | undefined> {
+  private async getStoredPlayerByUsername(
+    username: string,
+  ): Promise<StoredPlayerRecord | undefined> {
     try {
       const player = await this.dbRequest<any>(
         `/internal/players/by-username/${encodeURIComponent(username)}`,
@@ -222,17 +233,26 @@ export class AuthService {
     changedByUsername: string;
     changedAt: Date;
   }): Promise<PlayerStatusChangeLog> {
-    const log = await this.dbRequest<any>("/internal/player-status-change-logs", {
-      method: "POST",
-      body: JSON.stringify({
-        id: buildId("player-status-log"),
-        ...input,
-      }),
-    });
+    const log = await this.dbRequest<any>(
+      "/internal/player-status-change-logs",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          id: buildId("player-status-log"),
+          ...input,
+        }),
+      },
+    );
     return hydrateStatusChangeLog(log);
   }
 
-  async register({ username, password, gender }: UserCredentials): Promise<Player & { accessToken: string; isFirstLogin: boolean }> {
+  async register({
+    username,
+    password,
+    gender,
+  }: UserCredentials): Promise<
+    Player & { accessToken: string; isFirstLogin: boolean }
+  > {
     const duplicate = await this.getStoredPlayerByUsername(username);
     if (duplicate) {
       throw new Error("중복된 사용자명입니다.");
@@ -260,11 +280,22 @@ export class AuthService {
       createdAt: hydratedPlayer.createdAt,
     });
 
-    const accessToken = createAccessToken({ playerId: hydratedPlayer.id, isAdmin });
-    return { ...hydratedPlayer, accessToken, isFirstLogin: true, isAdmin } as any;
+    const accessToken = createAccessToken({
+      playerId: hydratedPlayer.id,
+      isAdmin,
+    });
+    return {
+      ...hydratedPlayer,
+      accessToken,
+      isFirstLogin: true,
+      isAdmin,
+    } as any;
   }
 
-  async login(username: string, password: string): Promise<{ accessToken: string; isFirstLogin: boolean; isAdmin: boolean }> {
+  async login(
+    username: string,
+    password: string,
+  ): Promise<{ accessToken: string; isFirstLogin: boolean; isAdmin: boolean }> {
     const stored = await this.getStoredPlayerByUsername(username);
     if (!stored) {
       throw new Error("아이디 또는 비밀번호가 틀렸습니다.");
@@ -286,7 +317,11 @@ export class AuthService {
     if (!stored) {
       return undefined;
     }
-    const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...player } = stored;
+    const {
+      passwordHash: _passwordHash,
+      isFirstLogin: _isFirstLogin,
+      ...player
+    } = stored;
     return player;
   }
 
@@ -305,8 +340,11 @@ export class AuthService {
   async getAllPlayers(): Promise<Player[]> {
     const players = await this.dbRequest<any[]>("/internal/players");
     return players.map((record) => {
-      const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...player } =
-        hydratePlayer(record);
+      const {
+        passwordHash: _passwordHash,
+        isFirstLogin: _isFirstLogin,
+        ...player
+      } = hydratePlayer(record);
       return player;
     });
   }
@@ -331,7 +369,11 @@ export class AuthService {
     }
 
     if (stored.status === nextStatus) {
-      const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...player } = stored;
+      const {
+        passwordHash: _passwordHash,
+        isFirstLogin: _isFirstLogin,
+        ...player
+      } = stored;
       return { player, log: null };
     }
 
@@ -351,7 +393,11 @@ export class AuthService {
       changedAt: updated.updatedAt,
     });
 
-    const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...player } = updated;
+    const {
+      passwordHash: _passwordHash,
+      isFirstLogin: _isFirstLogin,
+      ...player
+    } = updated;
     return { player, log };
   }
 
@@ -360,15 +406,23 @@ export class AuthService {
     return groupByPlayerId(logs.map(hydrateCreationLog));
   }
 
-  async getPlayerStatusLogs(): Promise<Record<string, PlayerStatusChangeLog[]>> {
-    const logs = await this.dbRequest<any[]>("/internal/player-status-change-logs");
+  async getPlayerStatusLogs(): Promise<
+    Record<string, PlayerStatusChangeLog[]>
+  > {
+    const logs = await this.dbRequest<any[]>(
+      "/internal/player-status-change-logs",
+    );
     return groupByPlayerId(logs.map(hydrateStatusChangeLog));
   }
 
   async initAdmin(): Promise<Player> {
     const existing = await this.getStoredPlayerByUsername("admin");
     if (existing) {
-      const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...player } = existing;
+      const {
+        passwordHash: _passwordHash,
+        isFirstLogin: _isFirstLogin,
+        ...player
+      } = existing;
       return player;
     }
 
@@ -395,8 +449,11 @@ export class AuthService {
       createdAt: created.createdAt,
     }).catch(() => undefined);
 
-    const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...publicPlayer } =
-      created;
+    const {
+      passwordHash: _passwordHash,
+      isFirstLogin: _isFirstLogin,
+      ...publicPlayer
+    } = created;
     return publicPlayer;
   }
 
@@ -404,7 +461,9 @@ export class AuthService {
     credentials: UserCredentials,
     createdByPlayerId: string,
   ): Promise<Player> {
-    const duplicate = await this.getStoredPlayerByUsername(credentials.username);
+    const duplicate = await this.getStoredPlayerByUsername(
+      credentials.username,
+    );
     if (duplicate) {
       throw new Error("중복된 사용자명입니다.");
     }
@@ -439,8 +498,11 @@ export class AuthService {
       createdAt: created.createdAt,
     });
 
-    const { passwordHash: _passwordHash, isFirstLogin: _isFirstLogin, ...publicPlayer } =
-      created;
+    const {
+      passwordHash: _passwordHash,
+      isFirstLogin: _isFirstLogin,
+      ...publicPlayer
+    } = created;
     return publicPlayer;
   }
 }
