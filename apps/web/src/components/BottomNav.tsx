@@ -1,75 +1,176 @@
-import React, { useState } from 'react';
-import { Tabs, Modal, useOverlayState } from '@heroui/react';
-import { IoQrCodeSharp } from 'react-icons/io5';
-import QrCode from 'react-qr-code';
-import Match from '@/pages/Match';
-import Player from '@/pages/Player';
-import Me from '@/pages/Me';
+import React, { useState } from "react";
+import {
+  Button,
+  Dropdown,
+  Label,
+  Modal,
+  Tabs,
+  useOverlayState,
+} from "@heroui/react";
+import {
+  IoAdd,
+  IoPeopleOutline,
+  IoPersonCircleOutline,
+  IoQrCodeSharp,
+  IoTennisballOutline,
+} from "react-icons/io5";
+import QrCode from "react-qr-code";
+import Match from "@/pages/Match";
+import Members from "@/pages/Members";
+import Me from "@/pages/Me";
+
+type TabKey = "match" | "members" | "me";
 
 const BottomNav: React.FC = () => {
-    const [selected, setSelected] = useState('match');
-    const qrState = useOverlayState();
+  const [selectedTab, setSelectedTab] = useState<TabKey>("me");
+  const [isGlobalMenuOpen, setIsGlobalMenuOpen] = useState(false);
+  const qrState = useOverlayState({ defaultOpen: false });
 
-    const renderPage = () => {
-        switch (selected) {
-            case 'match': return <Match />;
-            case 'player': return <Player />;
-            case 'me': return <Me />;
-            default: return <Match />;
-         }
-     };
+  const handleGlobalAction = (key: React.Key) => {
+    switch (String(key)) {
+      case "qr":
+        qrState.open();
+        break;
+      case "match":
+        setSelectedTab("match");
+        break;
+      case "members":
+        setSelectedTab("members");
+        break;
+      default:
+        break;
+    }
 
-    return (<Tabs.Root selectedKey={selected} onSelectionChange={(key) => setSelected(String(key))}>
-                  <div className="flex flex-col h-screen max-w-[430px] mx-auto">
-                      {/* 페이지 내용 영역 */}
-<div className="flex-1 overflow-y-auto pb-20">{
-                        renderPage()
-                     }</div>
+    setIsGlobalMenuOpen(false);
+  };
 
-                      {/* 하단 네비게이션 */}
-                      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 z-50">
-                          <div className="flex items-end justify-around px-2 pb-2 pt-1">
-                              {/* 좌측 탭 */}
-                                <div className="flex gap-6">
-                                    <Tabs.Tab key="match" className={`flex flex-col items-center gap-0.5 pb-1 ${selected === 'match' ? 'text-blue-600' : 'text-gray-500'}`}>
-                                        <span className="text-xs font-medium">Match</span>
-                                    </Tabs.Tab>
-                                </div>
+  return (
+    <Tabs
+      selectedKey={selectedTab}
+      onSelectionChange={(key) => setSelectedTab(String(key) as TabKey)}
+      className="relative flex h-screen min-h-screen flex-col overflow-hidden bg-white"
+    >
+      <div className="min-h-0 flex-1 overflow-y-auto bg-gray-50">
+        <Tabs.Panel id="match" className="min-h-full">
+          <Match />
+        </Tabs.Panel>
+        <Tabs.Panel id="members" className="min-h-full">
+          <Members />
+        </Tabs.Panel>
+        <Tabs.Panel id="me" className="min-h-full">
+          <Me />
+        </Tabs.Panel>
+      </div>
 
-                              {/* 중앙 QR 버튼 */}
-<div className="flex flex-col items-center -mt-6">
-                                  <button
-                                    onClick={qrState.open}
-                                    className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-                                  >
-                                      <IoQrCodeSharp size={28} color="white" />
-                                  </button>
-                              </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-32 bg-gradient-to-t from-white/95 via-white/75 to-transparent"
+      />
 
-                              {/* 우측 탭 */}
-                                 <div className="flex gap-6">
-                                     <Tabs.Tab key="player" className={`flex flex-col items-center gap-0.5 pb-1 ${selected === 'player' ? 'text-blue-600' : 'text-gray-500'}`}>
-                                         <span className="text-xs font-medium">Player</span>
-                                     </Tabs.Tab>
-                                     <Tabs.Tab key="me" className={`flex flex-col items-center gap-0.5 pb-1 ${selected === 'me' ? 'text-blue-600' : 'text-gray-500'}`}>
-                                         <span className="text-xs font-medium">Me</span>
-                                     </Tabs.Tab>
-                                 </div>
-                          </div>
-                      </div>
+      <div className="absolute inset-x-0 bottom-0 z-20 flex items-end gap-3 px-4 pb-3 pt-2">
+        <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
+          <Tabs.List
+            aria-label="Bottom navigation"
+            className="grid grid-cols-3 gap-1 *:min-w-0"
+          >
+            <Tabs.Tab
+              id="match"
+              className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+            >
+              <div className="flex flex-col items-center gap-0.5 py-1">
+                <IoTennisballOutline className="text-base" />
+                <span className="text-[11px] leading-none">Match</span>
+              </div>
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab
+              id="members"
+              className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+            >
+              <div className="flex flex-col items-center gap-0.5 py-1">
+                <IoPeopleOutline className="text-base" />
+                <span className="text-[11px] leading-none">Members</span>
+              </div>
+              <Tabs.Indicator />
+            </Tabs.Tab>
+            <Tabs.Tab
+              id="me"
+              className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+            >
+              <div className="flex flex-col items-center gap-0.5 py-1">
+                <IoPersonCircleOutline className="text-base" />
+                <span className="text-[11px] leading-none">Me</span>
+              </div>
+              <Tabs.Indicator />
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.ListContainer>
 
-                      {/* QR Code Modal */}
-                        <Modal.Root state={qrState}>
-                              <Modal.Container placement="center" size="sm">
-                                  <Modal.Body className="rounded-2xl p-6 flex flex-col items-center gap-4">
-                                      <Modal.CloseTrigger className="absolute top-3 right-3" />
-                                      <p className="text-sm font-semibold text-gray-800">My Player ID</p>
-                                      <QrCode value="player-001" size={180} bgColor="#ffffff" fgColor="#1e40af" />
-                                  </Modal.Body>
-                              </Modal.Container>
-                          </Modal.Root>
-                  </div>
-              </Tabs.Root>);
+        <Dropdown isOpen={isGlobalMenuOpen} onOpenChange={setIsGlobalMenuOpen}>
+          <Dropdown.Trigger>
+            <Button
+              isIconOnly
+              aria-label="Global plus menu"
+              className={`shrink-0 rounded-full text-white shadow-lg transition-colors ${
+                isGlobalMenuOpen
+                  ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
+                  : "bg-[#409eff] hover:bg-[#409eff]/90"
+              }`}
+            >
+              <IoAdd
+                size={20}
+                className={`transition-transform duration-200 ${
+                  isGlobalMenuOpen ? "rotate-45" : "rotate-0"
+                }`}
+              />
+            </Button>
+          </Dropdown.Trigger>
+          <Dropdown.Popover
+            className="min-w-[180px] border border-amber-200 bg-[rgba(255,205,0,0.93)]"
+            offset={12}
+            placement="top end"
+          >
+            <Dropdown.Menu onAction={handleGlobalAction}>
+              <Dropdown.Item id="qr" textValue="QR code">
+                <IoQrCodeSharp className="size-4 shrink-0 text-amber-700" />
+                <Label>QR 코드</Label>
+              </Dropdown.Item>
+              <Dropdown.Item id="match" textValue="Go to Match">
+                <Label>Match로 이동</Label>
+              </Dropdown.Item>
+              <Dropdown.Item id="members" textValue="Go to Members">
+                <Label>Members로 이동</Label>
+              </Dropdown.Item>
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown>
+      </div>
+
+      <Modal>
+        <Modal.Backdrop isOpen={qrState.isOpen} onOpenChange={qrState.setOpen}>
+          <Modal.Container placement="center" size="sm">
+            <Modal.Dialog
+              aria-label="My Player ID QR code"
+              className="mx-4 w-full max-w-sm rounded-2xl"
+            >
+              <Modal.CloseTrigger />
+              <Modal.Header className="items-center pb-2 text-center">
+                <Modal.Heading>My Player ID</Modal.Heading>
+              </Modal.Header>
+              <Modal.Body className="flex items-center justify-center pb-6 pt-2">
+                <QrCode
+                  value="player-001"
+                  size={180}
+                  bgColor="#ffffff"
+                  fgColor="#a16207"
+                />
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
+    </Tabs>
+  );
 };
 
 export default BottomNav;

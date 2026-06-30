@@ -15,7 +15,7 @@ const Home: React.FC = () => {
     return (
            <div className="min-h-screen flex items-center justify-center bg-gray-100">
                <div className="text-center px-6">
-                   <h1 className="text-4xl font-bold text-blue-600 mb-4">🏓 PkpkDupr</h1>
+                   <h1 className="mb-4 text-4xl font-bold text-[#409eff]">🏓 PkpkDupr</h1>
                    <p className="text-lg text-gray-700 mb-8">Pickleball DUPR System에 오신 것을 환영합니다!</p>
 
                    {player ? (
@@ -29,7 +29,7 @@ const Home: React.FC = () => {
                                    <>
                                        <div className="flex items-center justify-between">
                                              <span className="text-gray-500 text-sm">DUPR Total</span>
-                                           <span className="font-semibold text-blue-600">{player.duprRating.total}</span>
+                                           <span className="font-semibold text-[#409eff]">{player.duprRating.total}</span>
                                        </div>
                                        <div className="flex items-center justify-between text-sm text-gray-500">
                                            <span>Singles</span>
@@ -63,7 +63,7 @@ const Home: React.FC = () => {
                        <div className="space-y-3">
                            <Link
                               to="/login"
-                              className="block w-full max-w-[320px] mx-auto py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                              className="mx-auto block w-full max-w-[320px] rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-[#409eff]/90"
                                 >
                               로그인
                            </Link>

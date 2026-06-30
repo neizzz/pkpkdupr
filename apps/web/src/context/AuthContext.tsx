@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { PlayerDupr } from '@pkpkdupr/shared/player';
 
-interface PlayerInfo {
+export interface PlayerInfo {
     id: string;
     username?: string;
     duprRating?: PlayerDupr;
@@ -11,6 +11,8 @@ interface PlayerInfo {
 interface AuthContextType {
     token: string | null;
     player: PlayerInfo | null;
+    isLoading: boolean;
+    isAuthenticated: boolean;
     login: (username: string, password: string) => Promise<void>;
     logout: () => void;
 }
@@ -20,12 +22,17 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [token, setToken] = useState<string | null>(null);
     const [player, setPlayer] = useState<PlayerInfo | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const storedToken = localStorage.getItem('token');
         if (storedToken) {
             setToken(storedToken);
-            fetchMe(storedToken);
+            void fetchMe(storedToken).finally(() => {
+                setIsLoading(false);
+            });
+         } else {
+            setIsLoading(false);
          }
      }, []);
 
@@ -37,10 +44,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (res.ok) {
                 const data = await res.json();
                 setPlayer(data);
+                return data;
              }
+            localStorage.removeItem('token');
+            setToken(null);
+            setPlayer(null);
          } catch {
             console.error('Failed to fetch user info');
+            localStorage.removeItem('token');
+            setToken(null);
+            setPlayer(null);
          }
+        return null;
      };
 
     const login = async (username: string, password: string) => {
@@ -56,7 +71,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const data = await res.json();
         localStorage.setItem('token', data.accessToken);
         setToken(data.accessToken);
-        fetchMe(data.accessToken);
+        setIsLoading(true);
+        await fetchMe(data.accessToken);
+        setIsLoading(false);
      };
 
     const logout = () => {
@@ -66,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      };
 
     return (
-         <AuthContext.Provider value={{ token, player, login, logout }}>
+         <AuthContext.Provider value={{ token, player, isLoading, isAuthenticated: !!token, login, logout }}>
              {children}
          </AuthContext.Provider>
      );

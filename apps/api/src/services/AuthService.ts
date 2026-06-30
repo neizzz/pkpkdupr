@@ -349,6 +349,13 @@ export class AuthService {
     });
   }
 
+  async getPublicPlayers(): Promise<Player[]> {
+    const players = await this.getAllPlayers();
+    return players.filter(
+      (player) => player.status === "active" && player.username !== "admin",
+    );
+  }
+
   async updatePlayerStatus(
     playerId: string,
     nextStatus: PlayerStatus,

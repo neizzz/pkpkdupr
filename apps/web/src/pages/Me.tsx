@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
+import MemberProfile from "@/components/MemberProfile";
+import { useAuth } from "@/context/AuthContext";
 
 const Me: React.FC = () => {
-    return (
-        <div className="flex items-center justify-center h-full p-4">
-            <p className="text-gray-500 text-lg">Me 페이지입니다</p>
-        </div>
-    );
+  const { player } = useAuth();
+
+  return <MemberProfile player={player} isMe />;
 };
 
 export default Me;

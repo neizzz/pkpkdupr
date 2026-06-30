@@ -88,6 +88,25 @@ app.get('/api/me', async (req, res) => {
     }
 });
 
+app.get('/api/players', async (req, res) => {
+    try {
+        const header = req.headers.authorization;
+        if (!header?.startsWith('Bearer ')) {
+            return res.status(401).json({ error: '토큰이 필요합니다.' });
+        }
+        const token = header.split(' ')[1];
+        const decoded = decodeToken(token);
+        if (!decoded) {
+            return res.status(403).json({ error: '유효하지 않거나 만료된 토큰입니다.' });
+        }
+
+        const players = await authService.getPublicPlayers();
+        res.json(players);
+    } catch (err) {
+        res.status(500).json({ error: (err as Error).message });
+    }
+});
+
 app.post('/api/change-password', async (req, res) => {
     try {
         const header = req.headers.authorization;
