@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import DefaultProfileAvatar from "@/components/DefaultProfileAvatar";
+import Avatar from "@/components/Avatar";
 import MemberProfile from "@/components/MemberProfile";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
@@ -76,7 +76,7 @@ const Members: React.FC = () => {
   }
 
   return (
-    <div className="min-h-full p-4">
+    <div className="min-h-full p-2">
       <div className="mx-auto flex w-full h-full flex-col gap-4">
         <h2 className="text-2xl font-bold text-amber-950">Members</h2>
 
@@ -102,7 +102,11 @@ const Members: React.FC = () => {
                   onClick={() => setSelectedMemberId(member.id)}
                   className="flex min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center shadow-sm transition-colors hover:bg-amber-50"
                 >
-                  <DefaultProfileAvatar size="sm" />
+                  <Avatar
+                    size="sm"
+                    avatarUrl={member.avatarUrl}
+                    name={member.username}
+                  />
                   <div className="mt-3 min-w-0">
                     <p className="truncate font-semibold text-amber-950">
                       {member.username}

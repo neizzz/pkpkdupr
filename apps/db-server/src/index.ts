@@ -9,6 +9,11 @@ import {
   PlayerStatusChangeLogRepository,
   type CreatePlayerStatusChangeLogInput,
 } from "./repositories/PlayerStatusChangeLogRepository";
+import {
+  getDevMockUsernames,
+  isDevMockDataEnabled,
+  TestDataRepository,
+} from "./repositories/TestDataRepository";
 
 const app = express();
 const port = Number(process.env.PORT || 5001);
@@ -17,6 +22,12 @@ const client = getDbClient();
 const playerRepository = new PlayerRepository(db);
 const playerCreationLogRepository = new PlayerCreationLogRepository(db);
 const playerStatusChangeLogRepository = new PlayerStatusChangeLogRepository(db);
+const testDataRepository = new TestDataRepository(
+  db,
+  playerRepository,
+  playerCreationLogRepository,
+  playerStatusChangeLogRepository,
+);
 
 app.use(express.json());
 
@@ -33,6 +44,11 @@ const safeExec = async (sql: string) => {
     }
     throw error;
   }
+};
+
+const hasColumn = async (tableName: string, columnName: string) => {
+  const result = await client.execute(`PRAGMA table_info(${tableName})`);
+  return result.rows.some((row) => String((row as { name?: unknown }).name) === columnName);
 };
 
 const initSchema = async () => {
@@ -99,7 +115,7 @@ const initSchema = async () => {
   await client.execute(`
     CREATE TABLE IF NOT EXISTS matches (
       id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('mixed-doubles', 'men-doubles', 'women-doubles', 'singles')),
       status TEXT NOT NULL,
       location TEXT NOT NULL,
       scheduled_at INTEGER NOT NULL,
@@ -110,13 +126,57 @@ const initSchema = async () => {
   `);
 
   await client.execute(`
+    UPDATE matches
+    SET type = CASE
+      WHEN type = 'Doubles' THEN 'mixed-doubles'
+      WHEN type = 'MixedDoubles' THEN 'mixed-doubles'
+      WHEN type = 'Mixed Doubles' THEN 'mixed-doubles'
+      WHEN type = 'MenDoubles' THEN 'men-doubles'
+      WHEN type = 'Men Doubles' THEN 'men-doubles'
+      WHEN type = 'WomenDoubles' THEN 'women-doubles'
+      WHEN type = 'Women Doubles' THEN 'women-doubles'
+      WHEN type = 'Singles' THEN 'singles'
+      ELSE type
+    END
+    WHERE type IN (
+      'Doubles',
+      'MixedDoubles',
+      'Mixed Doubles',
+      'MenDoubles',
+      'Men Doubles',
+      'WomenDoubles',
+      'Women Doubles',
+      'Singles'
+    )
+  `);
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS match_scores (
       id TEXT PRIMARY KEY,
       match_id TEXT NOT NULL,
-      team_a INTEGER NOT NULL,
-      t_b INTEGER NOT NULL
+      score_a INTEGER NOT NULL,
+      score_b INTEGER NOT NULL
     )
   `);
+
+  await safeExec(`ALTER TABLE match_scores ADD COLUMN score_a INTEGER`);
+  await safeExec(`ALTER TABLE match_scores ADD COLUMN score_b INTEGER`);
+
+  if (await hasColumn("match_scores", "team_a")) {
+    await client.execute(`
+      UPDATE match_scores
+      SET score_a = COALESCE(score_a, team_a)
+      WHERE score_a IS NULL
+    `);
+  }
+
+  if (await hasColumn("match_scores", "t_b")) {
+    await client.execute(`
+      UPDATE match_scores
+      SET score_b = COALESCE(score_b, t_b)
+      WHERE score_b IS NULL
+    `);
+  }
 };
 
 app.get("/health", (_req, res) => {
@@ -247,6 +307,15 @@ app.post("/internal/player-status-change-logs", async (req, res) => {
 
 const start = async () => {
   await initSchema();
+  if (isDevMockDataEnabled()) {
+    await testDataRepository.seedDevMockData();
+    console.log(
+      "[DB-SERVER] Dev mock data seeded",
+      getDevMockUsernames()
+        .map(({ username, status }) => `${username}(${status})`)
+        .join(", "),
+    );
+  }
   app.listen(port, () => {
     console.log(`[DB-SERVER] Listening at http://localhost:${port}`);
   });

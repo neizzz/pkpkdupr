@@ -1,6 +1,21 @@
 import { Player } from "./player.js";
 
-export type MatchType = "Singles" | "Doubles";
+export const matchTypeValues = [
+  "mixed-doubles",
+  "men-doubles",
+  "women-doubles",
+  "singles",
+] as const;
+
+export type MatchType = (typeof matchTypeValues)[number];
+
+export const matchTypeLabels: Record<MatchType, string> = {
+  "mixed-doubles": "Mixed Doubles",
+  "men-doubles": "Men Doubles",
+  "women-doubles": "Women Doubles",
+  singles: "Singles",
+};
+
 export type MatchStatus = "created" | "completed" | "cancelled";
 
 export interface Team {
@@ -9,30 +24,25 @@ export interface Team {
   players: Player[];
 }
 
-/** 한 경기(Set/Game)의 스코어 기록 */
+/** 한 세트/게임의 상세 스코어 기록 */
 export interface MatchScore {
-  // Team A가 해당 게임에서 취득한 최종 점수
-  teamA: number;
-  // Team B가 해당 게임에서 취득한 최종 점수
-  teamB: number;
-  // 경기 내 각 세트의 상세 스코어 (scoreA, scoreB = 해당 세트의 A팀/B팀 득점)
-  games: Array<{
-    scoreA: number;
-    scoreB: number;
-  }>;
+  // 해당 세트/게임에서 A팀이 취득한 최종 점수
+  scoreA: number;
+  // 해당 세트/게임에서 B팀이 취득한 최종 점수
+  scoreB: number;
 }
 
 export interface Match {
   id: string;
   type: MatchType;
+  creatorPlayerId: string;
   status: MatchStatus;
   teams: [Team, Team];
   scores?: MatchScore[];
   location: string;
-  // TODO: 예약 기능이 들어오면, completedAt은 optional이 됨.
-  //   scheduledAt: Date;
+  scheduledAt: Date;
   createdAt: Date;
-  completedAt: Date;
+  completedAt: Date | null;
   updatedAt: Date;
 }
 

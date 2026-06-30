@@ -6,8 +6,17 @@ import {
   PlayerStatus,
   PlayerStatusChangeLog,
 } from "@pkpkdupr/shared/player";
+import type {
+  PlayerQrPublicPlayer,
+  PlayerQrTokenResponse,
+  VerifyPlayerQrTokenResponse,
+} from "@pkpkdupr/shared/qr";
 import bcrypt from "bcryptjs";
 import { createAccessToken, JWT_SECRET } from "../config/jwt";
+import {
+  createPlayerQrToken as createPlayerQrTokenPayload,
+  verifyPlayerQrPayload,
+} from "./playerQrToken";
 
 const SALT_ROUNDS = 10;
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
@@ -19,6 +28,11 @@ interface StoredPlayerRecord extends Player {
 
 interface DbRequestOptions extends RequestInit {
   retries?: number;
+}
+
+interface RetryOperationOptions {
+  retries: number;
+  baseDelayMs?: number;
 }
 
 export interface UserCredentials {
@@ -126,7 +140,56 @@ const groupByPlayerId = <T extends { playerId: string }>(items: T[]) =>
     return acc;
   }, {});
 
+const toPlayerQrPublicPlayer = (player: Player): PlayerQrPublicPlayer => ({
+  id: player.id,
+  username: player.username,
+  gender: player.gender,
+  avatarUrl: player.avatarUrl,
+  duprRating: player.duprRating,
+});
+
+const isRetryableDbBootstrapError = (error: unknown) => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const cause = (error as Error & { cause?: unknown }).cause;
+  if (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    (cause as { code?: string }).code === "ECONNREFUSED"
+  ) {
+    return true;
+  }
+
+  return error.message.includes("fetch failed");
+};
+
 export class AuthService {
+  private async retryOperation<T>(
+    operation: () => Promise<T>,
+    options: RetryOperationOptions,
+  ): Promise<T> {
+    const { retries, baseDelayMs = 300 } = options;
+
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (!isRetryableDbBootstrapError(error) || attempt === retries) {
+          throw error;
+        }
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, baseDelayMs * (attempt + 1)),
+        );
+      }
+    }
+
+    throw new Error("DB 서버 요청 실패");
+  }
+
   private async dbRequest<T>(
     path: string,
     init?: DbRequestOptions,
@@ -325,6 +388,35 @@ export class AuthService {
     return player;
   }
 
+  async createPlayerQrToken(
+    playerId: string,
+  ): Promise<PlayerQrTokenResponse> {
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+    if (stored.status !== "active" || stored.username === "admin") {
+      throw new Error("QR 코드를 생성할 수 없는 계정입니다.");
+    }
+
+    return createPlayerQrTokenPayload(stored.id);
+  }
+
+  async verifyPlayerQrToken(
+    payload: string,
+  ): Promise<VerifyPlayerQrTokenResponse> {
+    const playerId = verifyPlayerQrPayload(payload);
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+    if (stored.status !== "active" || stored.username === "admin") {
+      throw new Error("유효하지 않은 플레이어 QR 코드입니다.");
+    }
+
+    return { player: toPlayerQrPublicPlayer(stored) };
+  }
+
   async changePassword(playerId: string, newPassword: string): Promise<void> {
     const stored = await this.getStoredPlayerById(playerId);
     if (!stored) {
@@ -423,7 +515,10 @@ export class AuthService {
   }
 
   async initAdmin(): Promise<Player> {
-    const existing = await this.getStoredPlayerByUsername("admin");
+    const existing = await this.retryOperation(
+      () => this.getStoredPlayerByUsername("admin"),
+      { retries: 20 },
+    );
     if (existing) {
       const {
         passwordHash: _passwordHash,
@@ -437,15 +532,19 @@ export class AuthService {
     const player = createPlayer({ username: "admin", gender: "M" });
 
     const created = hydratePlayer(
-      await this.dbRequest<any>("/internal/players/init-admin", {
-        method: "POST",
-        body: JSON.stringify({
-          ...player,
-          passwordHash,
-          isFirstLogin: true,
-        }),
-        retries: 10,
-      }),
+      await this.retryOperation(
+        () =>
+          this.dbRequest<any>("/internal/players/init-admin", {
+            method: "POST",
+            body: JSON.stringify({
+              ...player,
+              passwordHash,
+              isFirstLogin: true,
+            }),
+            retries: 10,
+          }),
+        { retries: 20 },
+      ),
     );
 
     await this.insertCreationLog({

@@ -6,6 +6,7 @@ export interface PlayerInfo {
     username?: string;
     duprRating?: PlayerDupr;
     gender?: 'M' | 'F';
+    avatarUrl?: string;
 }
 
 interface AuthContextType {
