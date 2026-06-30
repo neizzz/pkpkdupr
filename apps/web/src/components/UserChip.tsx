@@ -8,12 +8,14 @@ interface UserChipProps {
   player: Pick<Player, "username" | "avatarUrl" | "gender">;
   onRemove?: () => void;
   removeLabel?: string;
+  isMe?: boolean;
 }
 
 const UserChip: React.FC<UserChipProps> = ({
   player,
   onRemove,
   removeLabel,
+  isMe = false,
 }) => {
   const genderBgClass =
     player.gender === "M"
@@ -35,6 +37,7 @@ const UserChip: React.FC<UserChipProps> = ({
           avatarUrl={player.avatarUrl}
           name={player.username}
           className={`bg-white/80 ${genderAvatarClass}`}
+          isMe={isMe}
         />
         <span className="truncate text-sm font-medium text-current">
           {player.username}

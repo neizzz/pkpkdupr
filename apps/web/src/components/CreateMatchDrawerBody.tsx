@@ -344,6 +344,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   key={member.id}
                   player={member}
                   onRemove={() => handleRemoveMatchMember(member.id)}
+                  isMe={member.id === player?.id}
                 />
               ))
             ) : (
@@ -422,7 +423,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                                 : "cursor-pointer opacity-100"
                             }`}
                           >
-                            <UserChip player={member} />
+                            <UserChip
+                              player={member}
+                              isMe={member.id === player?.id}
+                            />
                           </button>
                         );
                       })}

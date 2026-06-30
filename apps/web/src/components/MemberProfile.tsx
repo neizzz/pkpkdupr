@@ -32,7 +32,12 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
         )}
 
         <div className="flex items-start gap-4">
-          <Avatar size="md" avatarUrl={player?.avatarUrl} name={displayName} />
+          <Avatar
+            size="md"
+            avatarUrl={player?.avatarUrl}
+            name={displayName}
+            isMe={isMe}
+          />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">

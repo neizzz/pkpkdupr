@@ -1,5 +1,5 @@
 import React from "react";
-import { Avatar as HeroAvatar } from "@heroui/react";
+import { Avatar as HeroAvatar, Badge } from "@heroui/react";
 import { IoPerson } from "react-icons/io5";
 
 interface AvatarProps {
@@ -7,6 +7,7 @@ interface AvatarProps {
   name?: string;
   size?: "xs" | "sm" | "md" | "lg";
   className?: string;
+  isMe?: boolean;
 }
 
 const sizeClassMap: Record<NonNullable<AvatarProps["size"]>, string> = {
@@ -33,8 +34,9 @@ const Avatar: React.FC<AvatarProps> = ({
   name,
   size = "md",
   className,
+  isMe = false,
 }) => {
-  return (
+  const avatar = (
     <HeroUiAvatar
       size={size}
       className={[
@@ -54,6 +56,25 @@ const Avatar: React.FC<AvatarProps> = ({
         <IoPerson className={iconSizeMap[size]} />
       </HeroUiAvatar.Fallback>
     </HeroUiAvatar>
+  );
+
+  if (!isMe) {
+    return avatar;
+  }
+
+  return (
+    <Badge.Anchor>
+      {avatar}
+      <Badge
+        color="accent"
+        size={size === "xs" ? "sm" : "md"}
+        className="rounded-full px-1.5 py-0 shadow-md shadow-white"
+      >
+        <Badge.Label className="text-4 font-semibold leading-none">
+          ME
+        </Badge.Label>
+      </Badge>
+    </Badge.Anchor>
   );
 };
 

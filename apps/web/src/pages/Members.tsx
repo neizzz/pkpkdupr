@@ -106,6 +106,7 @@ const Members: React.FC = () => {
                     size="sm"
                     avatarUrl={member.avatarUrl}
                     name={member.username}
+                    isMe={member.id === player?.id}
                   />
                   <div className="mt-3 min-w-0">
                     <p className="truncate font-semibold text-amber-950">

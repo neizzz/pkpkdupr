@@ -93,7 +93,11 @@ const Match: React.FC<MatchProps> = ({ match, currentPlayerId }) => {
               </p>
               <div className="mt-2 flex flex-col gap-2">
                 {team.players.map((teamPlayer) => (
-                  <UserChip key={teamPlayer.id} player={teamPlayer} />
+                  <UserChip
+                    key={teamPlayer.id}
+                    player={teamPlayer}
+                    isMe={teamPlayer.id === currentPlayerId}
+                  />
                 ))}
               </div>
             </div>
