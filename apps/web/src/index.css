@@ -1,7 +1,20 @@
 @import "tailwindcss";
 @import "@heroui/styles";
 
+@theme {
+  --color-border: #e6e6e6;
+  --color-divider: #e6e6e6;
+}
+
 @layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-border);
+  }
+
   * {
     margin: 0;
     padding: 0;

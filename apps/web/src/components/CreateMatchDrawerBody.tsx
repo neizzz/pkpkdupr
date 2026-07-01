@@ -631,7 +631,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 return (
                   <div
                     key={typedTeamIndex}
-                    className="rounded-2xl border border-amber-200 bg-white px-3 py-3"
+                    className="rounded-2xl border border-border bg-white px-3 py-3"
                   >
                     <p className="text-xs font-semibold uppercase tracking-wide text-amber-700/70">
                       Team {typedTeamIndex === 0 ? "A" : "B"}
@@ -711,7 +711,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               </Button>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-3xl border border-amber-100 bg-slate-950">
+            <div className="mt-4 overflow-hidden rounded-3xl border border-border bg-slate-950">
               {qrScannerStatus === "scanning" ? (
                 <div className="relative">
                   <video

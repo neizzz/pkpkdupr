@@ -575,7 +575,7 @@ const BottomNav: React.FC = () => {
               />
             </Button>
             <Dropdown.Popover
-              className="relative min-w-[180px] overflow-hidden border border-amber-200 bg-white"
+              className="relative min-w-[180px] overflow-hidden border border-border bg-white"
               offset={12}
               placement="top end"
             >

@@ -86,7 +86,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             {duprItems.map((item) => (
               <Card
                 key={item.label}
-                className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-3 py-3 shadow-sm ring-1 ring-amber-100/70"
+                className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-3 py-3 shadow-sm ring-1 ring-border"
               >
                 <p className="text-xs text-amber-700/80">{item.label}</p>
                 <p

@@ -270,7 +270,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
         </div>
       </form>
 
-      <div className="h-px bg-amber-100" />
+      <div className="h-px bg-divider" />
 
       <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
         <h3 className="bs-text-title text-amber-950">패스워드 변경</h3>
@@ -281,7 +281,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           minLength={6}
           value={newPassword}
           onChange={(event) => setNewPassword(event.target.value)}
-          className="w-full rounded-2xl border border-amber-100 px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
+          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
         />
         <input
           type="password"
@@ -289,7 +289,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           minLength={6}
           value={confirmPassword}
           onChange={(event) => setConfirmPassword(event.target.value)}
-          className="w-full rounded-2xl border border-amber-100 px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
+          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
         />
 
         <div className="flex justify-end">
