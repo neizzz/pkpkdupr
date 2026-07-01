@@ -59,6 +59,7 @@ const initSchema = async () => {
       dupr_rating TEXT NOT NULL,
       gender TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
+      avatar_url TEXT,
       password_hash TEXT NOT NULL DEFAULT '',
       is_first_login INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL,
@@ -67,6 +68,7 @@ const initSchema = async () => {
   `);
 
   await safeExec(`ALTER TABLE players ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
+  await safeExec(`ALTER TABLE players ADD COLUMN avatar_url TEXT`);
   await safeExec(`ALTER TABLE players ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`);
   await safeExec(`ALTER TABLE players ADD COLUMN is_first_login INTEGER NOT NULL DEFAULT 1`);
   await client.execute(`UPDATE players SET status = 'inactive' WHERE status = 'deleted'`);
@@ -258,6 +260,20 @@ app.patch("/internal/players/:id/password", async (req, res) => {
       req.body.passwordHash,
       req.body.isFirstLogin,
     );
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/players/:id/profile", async (req, res) => {
+  try {
+    const player = await playerRepository.updateProfile(req.params.id, {
+      avatarUrl: req.body.avatarUrl ?? null,
+    });
     if (!player) {
       return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
     }

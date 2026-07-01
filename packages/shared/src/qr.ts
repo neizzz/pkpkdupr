@@ -20,3 +20,12 @@ export type PlayerQrPublicPlayer = Pick<
 export interface VerifyPlayerQrTokenResponse {
   player: PlayerQrPublicPlayer;
 }
+
+export interface DevPlayerQrToken {
+  player: PlayerQrPublicPlayer;
+  payload: string;
+}
+
+export interface DevPlayerQrTokenListResponse {
+  players: DevPlayerQrToken[];
+}

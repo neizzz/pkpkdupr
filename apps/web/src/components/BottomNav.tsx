@@ -1,12 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  Button,
-  Drawer,
-  Dropdown,
-  Label,
-  Tabs,
-  useOverlayState,
-} from "@heroui/react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Button, Dropdown, Label, Tabs } from "@heroui/react";
 import {
   IoAdd,
   IoAddCircleOutline,
@@ -16,32 +15,350 @@ import {
   IoTennisballOutline,
 } from "react-icons/io5";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
-import QrCode from "react-qr-code";
+import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
+import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
 import { useAuth } from "@/context/AuthContext";
+import {
+  TabNavigationProvider,
+  type TabDepthEntry,
+  type TabDepthStacks,
+  type TabKey,
+} from "@/context/TabNavigationContext";
 import Matches from "@/pages/Matches";
 import Members from "@/pages/Members";
 import Me from "@/pages/Me";
 
-type TabKey = "match" | "members" | "me";
+const TAB_KEYS: TabKey[] = ["match", "members", "me"];
 
-const formatRemainingTime = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
+const emptyDepthStacks = (): TabDepthStacks => ({
+  match: [],
+  members: [],
+  me: [],
+});
 
-  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+const emptyScrollPositions = (): Record<TabKey, number> => ({
+  match: 0,
+  members: 0,
+  me: 0,
+});
+
+const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
+
+interface TabDepthHistoryState {
+  [HISTORY_DEPTH_STATE_KEY]: true;
+  tabKey: TabKey;
+  depthId: string;
+  sequence: number;
+}
+
+const isTabDepthHistoryState = (
+  state: unknown,
+): state is TabDepthHistoryState => {
+  if (!state || typeof state !== "object") return false;
+
+  const maybeState = state as Partial<TabDepthHistoryState>;
+  return (
+    maybeState[HISTORY_DEPTH_STATE_KEY] === true &&
+    typeof maybeState.depthId === "string" &&
+    TAB_KEYS.includes(maybeState.tabKey as TabKey)
+  );
 };
 
 const BottomNav: React.FC = () => {
   const { token } = useAuth();
   const [selectedTab, setSelectedTab] = useState<TabKey>("me");
+  const [depthStacks, setDepthStacks] =
+    useState<TabDepthStacks>(emptyDepthStacks);
   const [isGlobalMenuOpen, setIsGlobalMenuOpen] = useState(false);
+  const [globalMenuTabKey, setGlobalMenuTabKey] = useState<TabKey>("me");
+  const [isQrOpen, setIsQrOpen] = useState(false);
+  const [qrTabKey, setQrTabKey] = useState<TabKey>("me");
+  const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
+  const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("me");
   const [qrToken, setQrToken] = useState<PlayerQrTokenResponse | null>(null);
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrRemainingSeconds, setQrRemainingSeconds] = useState(0);
-  const qrState = useOverlayState({ defaultOpen: false });
-  const createMatchState = useOverlayState({ defaultOpen: false });
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const selectedTabRef = useRef<TabKey>(selectedTab);
+  const depthEntriesRef = useRef<Record<TabKey, TabDepthEntry[]>>({
+    match: [],
+    members: [],
+    me: [],
+  });
+  const scrollPositionsRef = useRef<Record<TabKey, number>>(
+    emptyScrollPositions(),
+  );
+  const historySequenceRef = useRef(0);
+  const afterCloseCallbacksRef = useRef(new Map<string, () => void>());
+  const closingDepthKeysRef = useRef(new Set<string>());
+
+  const depthCallbackKey = (tabKey: TabKey, depthId: string) =>
+    `${tabKey}:${depthId}`;
+
+  const syncDepthStacks = useCallback(() => {
+    setDepthStacks({
+      match: depthEntriesRef.current.match.map((entry) => entry.id),
+      members: depthEntriesRef.current.members.map((entry) => entry.id),
+      me: depthEntriesRef.current.me.map((entry) => entry.id),
+    });
+  }, []);
+
+  const getScrollTop = useCallback(
+    () => scrollContainerRef.current?.scrollTop ?? 0,
+    [],
+  );
+
+  const saveScrollPosition = useCallback(
+    (tabKey = selectedTabRef.current) => {
+      scrollPositionsRef.current[tabKey] = getScrollTop();
+    },
+    [getScrollTop],
+  );
+
+  const restoreScrollTop = useCallback((tabKey = selectedTabRef.current) => {
+    window.requestAnimationFrame(() => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer) return;
+
+      scrollContainer.scrollTop = scrollPositionsRef.current[tabKey] ?? 0;
+    });
+  }, []);
+
+  const scrollToTop = useCallback((behavior: ScrollBehavior = "smooth") => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior });
+  }, []);
+
+  const removeDepthEntry = useCallback(
+    (tabKey: TabKey, depthId: string) => {
+      const stack = depthEntriesRef.current[tabKey];
+      const targetEntry = stack.find((entry) => entry.id === depthId);
+
+      if (!targetEntry) return false;
+
+      depthEntriesRef.current = {
+        ...depthEntriesRef.current,
+        [tabKey]: stack.filter((entry) => entry.id !== depthId),
+      };
+      syncDepthStacks();
+      targetEntry.onClose();
+
+      const callbackKey = depthCallbackKey(tabKey, depthId);
+      closingDepthKeysRef.current.delete(callbackKey);
+      const afterClose = afterCloseCallbacksRef.current.get(callbackKey);
+      if (afterClose) {
+        afterCloseCallbacksRef.current.delete(callbackKey);
+        afterClose();
+      }
+
+      return true;
+    },
+    [syncDepthStacks],
+  );
+
+  const isCurrentHistoryDepth = useCallback(
+    (tabKey: TabKey, depthId: string) => {
+      const historyState = window.history.state;
+
+      return (
+        isTabDepthHistoryState(historyState) &&
+        historyState.tabKey === tabKey &&
+        historyState.depthId === depthId
+      );
+    },
+    [],
+  );
+
+  const pushDepth = useCallback(
+    (tabKey: TabKey, entry: TabDepthEntry) => {
+      const stack = depthEntriesRef.current[tabKey];
+      const existingEntry = stack.find(
+        (stackEntry) => stackEntry.id === entry.id,
+      );
+
+      if (!existingEntry) {
+        depthEntriesRef.current = {
+          ...depthEntriesRef.current,
+          [tabKey]: [...stack, entry],
+        };
+        syncDepthStacks();
+        historySequenceRef.current += 1;
+        window.history.pushState(
+          {
+            [HISTORY_DEPTH_STATE_KEY]: true,
+            tabKey,
+            depthId: entry.id,
+            sequence: historySequenceRef.current,
+          } satisfies TabDepthHistoryState,
+          "",
+          window.location.href,
+        );
+      }
+
+      return () => {
+        const currentStack = depthEntriesRef.current[tabKey];
+        if (!currentStack.some((stackEntry) => stackEntry.id === entry.id)) {
+          return;
+        }
+
+        depthEntriesRef.current = {
+          ...depthEntriesRef.current,
+          [tabKey]: currentStack.filter(
+            (stackEntry) => stackEntry.id !== entry.id,
+          ),
+        };
+        syncDepthStacks();
+      };
+    },
+    [syncDepthStacks],
+  );
+
+  const closeDepth = useCallback(
+    (tabKey: TabKey, depthId: string, afterClose?: () => void) => {
+      const stack = depthEntriesRef.current[tabKey];
+      if (!stack.some((entry) => entry.id === depthId)) return false;
+
+      if (afterClose) {
+        afterCloseCallbacksRef.current.set(
+          depthCallbackKey(tabKey, depthId),
+          afterClose,
+        );
+      }
+
+      const callbackKey = depthCallbackKey(tabKey, depthId);
+      if (isCurrentHistoryDepth(tabKey, depthId)) {
+        if (!closingDepthKeysRef.current.has(callbackKey)) {
+          closingDepthKeysRef.current.add(callbackKey);
+          window.history.back();
+        }
+        return true;
+      }
+
+      return removeDepthEntry(tabKey, depthId);
+    },
+    [isCurrentHistoryDepth, removeDepthEntry],
+  );
+
+  const requestCloseTopDepth = useCallback(
+    (tabKey = selectedTabRef.current) => {
+      const stack = depthEntriesRef.current[tabKey];
+      const topEntry = stack[stack.length - 1];
+      if (!topEntry) return false;
+
+      return closeDepth(tabKey, topEntry.id);
+    },
+    [closeDepth],
+  );
+
+  const selectTab = useCallback(
+    (nextTab: TabKey) => {
+      const currentTab = selectedTabRef.current;
+      if (nextTab === currentTab) return;
+
+      saveScrollPosition(currentTab);
+      selectedTabRef.current = nextTab;
+      setSelectedTab(nextTab);
+      restoreScrollTop(nextTab);
+    },
+    [restoreScrollTop, saveScrollPosition],
+  );
+
+  const handleSelectionChange = useCallback(
+    (key: React.Key) => {
+      selectTab(String(key) as TabKey);
+    },
+    [selectTab],
+  );
+
+  const handleActiveTabClick = useCallback(
+    (tabKey: TabKey) => {
+      if (selectedTabRef.current !== tabKey) return;
+
+      if (getScrollTop() > 0) {
+        scrollToTop("smooth");
+        return;
+      }
+
+      requestCloseTopDepth(tabKey);
+    },
+    [getScrollTop, requestCloseTopDepth, scrollToTop],
+  );
+
+  const openGlobalMenu = useCallback(() => {
+    const tabKey = selectedTabRef.current;
+    setGlobalMenuTabKey(tabKey);
+    pushDepth(tabKey, {
+      id: "global-menu",
+      kind: "dropdown",
+      onClose: () => setIsGlobalMenuOpen(false),
+    });
+    setIsGlobalMenuOpen(true);
+  }, [pushDepth]);
+
+  const openQrSheet = useCallback(() => {
+    const tabKey = selectedTabRef.current;
+    setQrTabKey(tabKey);
+    pushDepth(tabKey, {
+      id: "qr-sheet",
+      kind: "bottom-sheet",
+      onClose: () => setIsQrOpen(false),
+    });
+    setIsQrOpen(true);
+  }, [pushDepth]);
+
+  const openCreateMatchSheet = useCallback(() => {
+    const tabKey = selectedTabRef.current;
+    setCreateMatchTabKey(tabKey);
+    pushDepth(tabKey, {
+      id: "create-match-sheet",
+      kind: "bottom-sheet",
+      onClose: () => setIsCreateMatchOpen(false),
+    });
+    setIsCreateMatchOpen(true);
+  }, [pushDepth]);
+
+  const handleGlobalMenuOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) {
+        openGlobalMenu();
+        return;
+      }
+
+      if (!closeDepth(globalMenuTabKey, "global-menu")) {
+        setIsGlobalMenuOpen(false);
+      }
+    },
+    [closeDepth, globalMenuTabKey, openGlobalMenu],
+  );
+
+  const handleQrOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) {
+        openQrSheet();
+        return;
+      }
+
+      if (!closeDepth(qrTabKey, "qr-sheet")) {
+        setIsQrOpen(false);
+      }
+    },
+    [closeDepth, openQrSheet, qrTabKey],
+  );
+
+  const handleCreateMatchOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) {
+        openCreateMatchSheet();
+        return;
+      }
+
+      if (!closeDepth(createMatchTabKey, "create-match-sheet")) {
+        setIsCreateMatchOpen(false);
+      }
+    },
+    [closeDepth, createMatchTabKey, openCreateMatchSheet],
+  );
 
   const loadPlayerQrToken = useCallback(async () => {
     if (!token) {
@@ -76,14 +393,44 @@ const BottomNav: React.FC = () => {
     }
   }, [token]);
 
-  useEffect(() => {
-    if (qrState.isOpen) {
-      void loadPlayerQrToken();
+  const handleRefreshPlayerQrToken = useCallback(() => {
+    if (qrToken && qrRemainingSeconds > 60) {
+      return;
     }
-  }, [loadPlayerQrToken, qrState.isOpen]);
+
+    void loadPlayerQrToken();
+  }, [loadPlayerQrToken, qrRemainingSeconds, qrToken]);
 
   useEffect(() => {
-    if (!qrState.isOpen || !qrToken) {
+    selectedTabRef.current = selectedTab;
+  }, [selectedTab]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const activeTab = selectedTabRef.current;
+      const activeStack = depthEntriesRef.current[activeTab];
+      const topEntry = activeStack[activeStack.length - 1];
+
+      if (!topEntry) return;
+
+      removeDepthEntry(activeTab, topEntry.id);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [removeDepthEntry]);
+
+  useEffect(() => {
+    if (isQrOpen) {
+      void loadPlayerQrToken();
+    }
+  }, [isQrOpen, loadPlayerQrToken]);
+
+  useEffect(() => {
+    if (!isQrOpen || !qrToken) {
       return;
     }
 
@@ -100,92 +447,117 @@ const BottomNav: React.FC = () => {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [qrState.isOpen, qrToken]);
+  }, [isQrOpen, qrToken]);
 
   const handleGlobalAction = (key: React.Key) => {
-    switch (String(key)) {
-      case "qr":
-        qrState.open();
-        break;
-      case "create-match":
-        createMatchState.open();
-        break;
-      default:
-        break;
-    }
+    const action = () => {
+      switch (String(key)) {
+        case "qr":
+          openQrSheet();
+          break;
+        case "create-match":
+          openCreateMatchSheet();
+          break;
+        default:
+          break;
+      }
+    };
 
-    setIsGlobalMenuOpen(false);
+    if (!closeDepth(globalMenuTabKey, "global-menu", action)) {
+      setIsGlobalMenuOpen(false);
+      action();
+    }
   };
 
   const handleCreateMatch = () => {
-    createMatchState.close();
-    setSelectedTab("match");
+    if (
+      !closeDepth(createMatchTabKey, "create-match-sheet", () =>
+        selectTab("match"),
+      )
+    ) {
+      setIsCreateMatchOpen(false);
+      selectTab("match");
+    }
   };
 
+  const navigationContextValue = useMemo(
+    () => ({
+      selectedTab,
+      depthStacks,
+      pushDepth,
+      closeDepth,
+      requestCloseTopDepth,
+      saveScrollPosition,
+      restoreScrollTop,
+      scrollToTop,
+      getScrollTop,
+    }),
+    [
+      closeDepth,
+      depthStacks,
+      getScrollTop,
+      pushDepth,
+      requestCloseTopDepth,
+      restoreScrollTop,
+      saveScrollPosition,
+      scrollToTop,
+      selectedTab,
+    ],
+  );
+
   return (
-    <Tabs
-      selectedKey={selectedTab}
-      onSelectionChange={(key) => setSelectedTab(String(key) as TabKey)}
-      className="relative flex h-screen min-h-screen flex-col overflow-hidden bg-white"
-    >
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <Tabs.Panel id="match" className="min-h-full bg-gray-50">
-          <Matches />
-        </Tabs.Panel>
-        <Tabs.Panel id="members" className="min-h-full bg-gray-50">
-          <Members />
-        </Tabs.Panel>
-        <Tabs.Panel id="me" className="min-h-full bg-white">
-          <Me />
-        </Tabs.Panel>
-      </div>
+    <TabNavigationProvider value={navigationContextValue}>
+      <Tabs
+        selectedKey={selectedTab}
+        onSelectionChange={handleSelectionChange}
+        className="relative flex h-screen min-h-screen flex-col overflow-hidden bg-white"
+      >
+        <div className="fixed inset-x-0 bottom-0 z-20 flex items-end gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+          <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
+            <Tabs.List
+              aria-label="Bottom navigation"
+              className="grid grid-cols-3 gap-1 *:min-w-0"
+            >
+              <Tabs.Tab
+                id="match"
+                onClick={() => handleActiveTabClick("match")}
+                className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+              >
+                <div className="flex flex-col items-center gap-0.5 py-1">
+                  <IoTennisballOutline className="text-base" />
+                  <span className="text-[11px] leading-none">Matches</span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab
+                id="members"
+                onClick={() => handleActiveTabClick("members")}
+                className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+              >
+                <div className="flex flex-col items-center gap-0.5 py-1">
+                  <IoPeopleOutline className="text-base" />
+                  <span className="text-[11px] leading-none">Members</span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab
+                id="me"
+                onClick={() => handleActiveTabClick("me")}
+                className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+              >
+                <div className="flex flex-col items-center gap-0.5 py-1">
+                  <IoPersonCircleOutline className="text-base" />
+                  <span className="text-[11px] leading-none">Me</span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
 
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-22 bg-gradient-to-t from-white/95 via-white/75 to-transparent"
-      />
-
-      <div className="absolute inset-x-0 bottom-0 z-20 flex items-end gap-3 px-4 pb-3 pt-2">
-        <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
-          <Tabs.List
-            aria-label="Bottom navigation"
-            className="grid grid-cols-3 gap-1 *:min-w-0"
+          <Dropdown
+            isOpen={isGlobalMenuOpen}
+            onOpenChange={handleGlobalMenuOpenChange}
           >
-            <Tabs.Tab
-              id="match"
-              className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
-            >
-              <div className="flex flex-col items-center gap-0.5 py-1">
-                <IoTennisballOutline className="text-base" />
-                <span className="text-[11px] leading-none">Matches</span>
-              </div>
-              <Tabs.Indicator />
-            </Tabs.Tab>
-            <Tabs.Tab
-              id="members"
-              className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
-            >
-              <div className="flex flex-col items-center gap-0.5 py-1">
-                <IoPeopleOutline className="text-base" />
-                <span className="text-[11px] leading-none">Members</span>
-              </div>
-              <Tabs.Indicator />
-            </Tabs.Tab>
-            <Tabs.Tab
-              id="me"
-              className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
-            >
-              <div className="flex flex-col items-center gap-0.5 py-1">
-                <IoPersonCircleOutline className="text-base" />
-                <span className="text-[11px] leading-none">Me</span>
-              </div>
-              <Tabs.Indicator />
-            </Tabs.Tab>
-          </Tabs.List>
-        </Tabs.ListContainer>
-
-        <Dropdown isOpen={isGlobalMenuOpen} onOpenChange={setIsGlobalMenuOpen}>
-          <Dropdown.Trigger>
             <Button
               isIconOnly
               aria-label="Global plus menu"
@@ -202,115 +574,85 @@ const BottomNav: React.FC = () => {
                 }`}
               />
             </Button>
-          </Dropdown.Trigger>
-          <Dropdown.Popover
-            className="relative min-w-[180px] overflow-hidden border border-amber-200 bg-white"
-            offset={12}
-            placement="top end"
-          >
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-[rgba(255,205,0,0.15)]"
-            />
-            <Dropdown.Menu
-              onAction={handleGlobalAction}
-              className="relative z-10 bg-transparent"
+            <Dropdown.Popover
+              className="relative min-w-[180px] overflow-hidden border border-amber-200 bg-white"
+              offset={12}
+              placement="top end"
             >
-              <Dropdown.Item id="qr" textValue="QR code">
-                <IoQrCodeSharp className="size-4 shrink-0 text-amber-700" />
-                <Label>QR 코드</Label>
-              </Dropdown.Item>
-              <Dropdown.Item id="create-match" textValue="Create match">
-                <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
-                <Label>매치 생성</Label>
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown.Popover>
-        </Dropdown>
-      </div>
-
-      <Drawer.Backdrop
-        isOpen={qrState.isOpen}
-        onOpenChange={qrState.setOpen}
-        variant="blur"
-      >
-        <Drawer.Content
-          placement="bottom"
-          className="mx-auto w-full max-w-[430px]"
-        >
-          <Drawer.Dialog
-            aria-label="Player QR code"
-            className="rounded-t-3xl bg-white"
-          >
-            <Drawer.Handle />
-            <Drawer.CloseTrigger />
-            <Drawer.Body className="flex flex-col items-center justify-center gap-4 pb-6 pt-6 text-center">
-              {qrToken ? (
-                <>
-                  <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-amber-100">
-                    <QrCode
-                      value={qrToken.payload}
-                      size={180}
-                      bgColor="#ffffff"
-                      fgColor="#a16207"
-                    />
-                  </div>
-                  <p
-                    className={`text-sm font-semibold ${
-                      qrRemainingSeconds > 0
-                        ? "text-amber-800"
-                        : "text-red-500"
-                    }`}
-                  >
-                    {qrRemainingSeconds > 0
-                      ? `남은 시간 ${formatRemainingTime(qrRemainingSeconds)}`
-                      : "QR 코드가 만료되었습니다."}
-                  </p>
-                </>
-              ) : (
-                <div className="flex min-h-[220px] items-center justify-center">
-                  <p className="text-sm text-amber-700/70">
-                    {isQrLoading ? "QR 코드를 생성 중입니다..." : qrError}
-                  </p>
-                </div>
-              )}
-
-              {qrError && qrToken ? (
-                <p className="text-xs text-red-500">{qrError}</p>
-              ) : null}
-
-              <Button
-                size="sm"
-                onPress={() => void loadPlayerQrToken()}
-                isDisabled={isQrLoading}
-                className="rounded-full bg-[#409eff] px-4 text-white disabled:bg-slate-200 disabled:text-slate-400"
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[rgba(255,205,0,0.07)]"
+              />
+              <Dropdown.Menu
+                onAction={handleGlobalAction}
+                className="relative z-10 bg-transparent"
               >
-                {isQrLoading ? "갱신 중..." : "새로고침"}
-              </Button>
-            </Drawer.Body>
-          </Drawer.Dialog>
-        </Drawer.Content>
-      </Drawer.Backdrop>
+                <Dropdown.Item id="qr" textValue="QR code">
+                  <IoQrCodeSharp className="size-4 shrink-0 text-amber-700" />
+                  <Label>QR 코드</Label>
+                </Dropdown.Item>
+                <Dropdown.Item id="create-match" textValue="Create match">
+                  <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
+                  <Label>매치 생성</Label>
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown.Popover>
+          </Dropdown>
+        </div>
 
-      <Drawer.Backdrop
-        isOpen={createMatchState.isOpen}
-        onOpenChange={createMatchState.setOpen}
-        variant="blur"
-      >
-        <Drawer.Content
-          placement="bottom"
-          className="mx-auto w-full max-w-[430px]"
-        >
-          <Drawer.Dialog
-            aria-label="Create match"
-            className="rounded-t-3xl bg-white"
+        <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto">
+          <Tabs.Panel
+            id="match"
+            className="min-h-full bg-gray-50 pb-[calc(4rem+env(safe-area-inset-bottom))]"
           >
-            <Drawer.CloseTrigger />
-            <CreateMatchDrawerBody onCreateMatch={handleCreateMatch} />
-          </Drawer.Dialog>
-        </Drawer.Content>
-      </Drawer.Backdrop>
-    </Tabs>
+            <Matches />
+          </Tabs.Panel>
+          <Tabs.Panel
+            id="members"
+            className="min-h-full bg-gray-50 pb-[calc(4rem+env(safe-area-inset-bottom))]"
+          >
+            <Members />
+          </Tabs.Panel>
+          <Tabs.Panel
+            id="me"
+            className="min-h-full bg-white pb-[calc(4rem+env(safe-area-inset-bottom))]"
+          >
+            <Me />
+          </Tabs.Panel>
+          {/* <div
+            aria-hidden="true"
+            className="h-[calc(5.5rem+env(safe-area-inset-bottom))] shrink-0"
+          /> */}
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-white/95 via-white/75 to-transparent"
+        />
+
+        <BottomSheet
+          isOpen={isQrOpen}
+          onOpenChange={handleQrOpenChange}
+          ariaLabel="Player QR code"
+        >
+          <PlayerQrSheetBody
+            qrToken={qrToken}
+            qrRemainingSeconds={qrRemainingSeconds}
+            qrError={qrError}
+            isQrLoading={isQrLoading}
+            onRefresh={handleRefreshPlayerQrToken}
+          />
+        </BottomSheet>
+
+        <BottomSheet
+          isOpen={isCreateMatchOpen}
+          onOpenChange={handleCreateMatchOpenChange}
+          ariaLabel="Create match"
+        >
+          <CreateMatchDrawerBody onCreateMatch={handleCreateMatch} />
+        </BottomSheet>
+      </Tabs>
+    </TabNavigationProvider>
   );
 };
 

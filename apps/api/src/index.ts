@@ -157,6 +157,15 @@ app.get("/api/player-qr-token", async (req, res) => {
   }
 });
 
+app.get("/api/dev/player-qr-tokens", async (_req, res) => {
+  try {
+    const result = await authService.getDevPlayerQrTokens();
+    res.json(result);
+  } catch (err) {
+    res.status(404).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/player-qr-token/verify", async (req, res) => {
   try {
     if (!getAuthPayload(req, res)) {
@@ -218,6 +227,31 @@ app.post("/api/change-password", async (req, res) => {
     }
     await authService.changePassword(decoded.playerId, newPassword);
     res.json({ message: "비밀번호가 변경되었습니다." });
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.patch("/api/me/profile", async (req, res) => {
+  try {
+    const decoded = getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const { avatarUrl } = req.body as { avatarUrl?: string | null };
+    if (
+      typeof avatarUrl === "string" &&
+      avatarUrl.trim().length > 0 &&
+      avatarUrl.trim().length > 2048
+    ) {
+      return res.status(400).json({ error: "프로필 이미지 URL이 너무 깁니다." });
+    }
+
+    const player = await authService.updatePlayerProfile(decoded.playerId, {
+      avatarUrl,
+    });
+    res.json(player);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

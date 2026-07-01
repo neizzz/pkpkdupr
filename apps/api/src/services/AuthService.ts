@@ -7,6 +7,7 @@ import {
   PlayerStatusChangeLog,
 } from "@pkpkdupr/shared/player";
 import type {
+  DevPlayerQrTokenListResponse,
   PlayerQrPublicPlayer,
   PlayerQrTokenResponse,
   VerifyPlayerQrTokenResponse,
@@ -14,12 +15,16 @@ import type {
 import bcrypt from "bcryptjs";
 import { createAccessToken, JWT_SECRET } from "../config/jwt";
 import {
+  createDevPlayerQrPayload,
   createPlayerQrToken as createPlayerQrTokenPayload,
+  isDevPlayerQrPayload,
+  verifyDevPlayerQrPayload,
   verifyPlayerQrPayload,
 } from "./playerQrToken";
 
 const SALT_ROUNDS = 10;
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
+const DEV_MOCK_DATA_ENABLED = process.env.ENABLE_DEV_MOCK_DATA === "true";
 
 interface StoredPlayerRecord extends Player {
   passwordHash: string;
@@ -115,6 +120,7 @@ const normalizeDuprRating = (value: unknown): PlayerDupr => {
 
 const hydratePlayer = (record: any): StoredPlayerRecord => ({
   ...record,
+  avatarUrl: record.avatarUrl ?? undefined,
   duprRating: normalizeDuprRating(record.duprRating),
   status: record.status === "deleted" ? "inactive" : record.status,
   createdAt: toDate(record.createdAt),
@@ -147,6 +153,9 @@ const toPlayerQrPublicPlayer = (player: Player): PlayerQrPublicPlayer => ({
   avatarUrl: player.avatarUrl,
   duprRating: player.duprRating,
 });
+
+const isActiveDevPlayer = (player: Player) =>
+  player.status === "active" && player.username.startsWith("dev_");
 
 const isRetryableDbBootstrapError = (error: unknown) => {
   if (!(error instanceof Error)) {
@@ -405,16 +414,45 @@ export class AuthService {
   async verifyPlayerQrToken(
     payload: string,
   ): Promise<VerifyPlayerQrTokenResponse> {
-    const playerId = verifyPlayerQrPayload(payload);
+    const playerId =
+      DEV_MOCK_DATA_ENABLED && isDevPlayerQrPayload(payload)
+        ? verifyDevPlayerQrPayload(payload)
+        : verifyPlayerQrPayload(payload);
     const stored = await this.getStoredPlayerById(playerId);
     if (!stored) {
       throw new Error("사용자를 찾을 수 없습니다.");
     }
-    if (stored.status !== "active" || stored.username === "admin") {
+    if (
+      stored.status !== "active" ||
+      stored.username === "admin" ||
+      (isDevPlayerQrPayload(payload) && !isActiveDevPlayer(stored))
+    ) {
       throw new Error("유효하지 않은 플레이어 QR 코드입니다.");
     }
 
     return { player: toPlayerQrPublicPlayer(stored) };
+  }
+
+  async getDevPlayerQrTokens(): Promise<DevPlayerQrTokenListResponse> {
+    if (!DEV_MOCK_DATA_ENABLED) {
+      throw new Error("Dev mock data mode is not enabled.");
+    }
+
+    const players = (await this.getAllPlayers())
+      .filter(isActiveDevPlayer)
+      .sort((a, b) => {
+        if (a.gender !== b.gender) {
+          return a.gender === "M" ? -1 : 1;
+        }
+        return a.username.localeCompare(b.username);
+      });
+
+    return {
+      players: players.map((player) => ({
+        player: toPlayerQrPublicPlayer(player),
+        payload: createDevPlayerQrPayload(player.id),
+      })),
+    };
   }
 
   async changePassword(playerId: string, newPassword: string): Promise<void> {
@@ -427,6 +465,35 @@ export class AuthService {
       method: "PATCH",
       body: JSON.stringify({ passwordHash, isFirstLogin: false }),
     });
+  }
+
+  async updatePlayerProfile(
+    playerId: string,
+    input: { avatarUrl?: string | null },
+  ): Promise<Player> {
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+
+    const avatarUrl =
+      typeof input.avatarUrl === "string" && input.avatarUrl.trim()
+        ? input.avatarUrl.trim()
+        : null;
+
+    const updated = hydratePlayer(
+      await this.dbRequest<any>(`/internal/players/${playerId}/profile`, {
+        method: "PATCH",
+        body: JSON.stringify({ avatarUrl }),
+      }),
+    );
+
+    const {
+      passwordHash: _passwordHash,
+      isFirstLogin: _isFirstLogin,
+      ...player
+    } = updated;
+    return player;
   }
 
   async getAllPlayers(): Promise<Player[]> {

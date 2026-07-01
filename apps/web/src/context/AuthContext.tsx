@@ -15,6 +15,7 @@ interface AuthContextType {
     isLoading: boolean;
     isAuthenticated: boolean;
     login: (username: string, password: string) => Promise<void>;
+    updateProfile: (input: { avatarUrl?: string | null }) => Promise<PlayerInfo>;
     logout: () => void;
 }
 
@@ -77,6 +78,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
      };
 
+    const updateProfile = async (input: { avatarUrl?: string | null }) => {
+        if (!token) {
+            throw new Error('로그인이 필요합니다.');
+        }
+
+        const res = await fetch('/api/me/profile', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(input),
+         });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || '프로필 변경 실패');
+         }
+        const data = await res.json();
+        setPlayer(data);
+        return data;
+     };
+
     const logout = () => {
         localStorage.removeItem('token');
         setToken(null);
@@ -84,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      };
 
     return (
-         <AuthContext.Provider value={{ token, player, isLoading, isAuthenticated: !!token, login, logout }}>
+         <AuthContext.Provider value={{ token, player, isLoading, isAuthenticated: !!token, login, updateProfile, logout }}>
              {children}
          </AuthContext.Provider>
      );

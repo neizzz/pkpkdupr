@@ -5,6 +5,7 @@ import { JWT_SECRET } from "../config/jwt";
 const QR_TOKEN_VERSION = "1";
 const QR_TOKEN_SCHEME = "pkpkdupr:";
 const QR_TOKEN_HOST = "player-qr";
+const DEV_QR_TOKEN_HOST = "player-qr-dev";
 const QR_TOKEN_STEP_MS = 15 * 60 * 1000;
 const QR_TOTP_SECRET = process.env.QR_TOTP_SECRET || JWT_SECRET;
 
@@ -17,12 +18,29 @@ const getStepExpiresAtMs = (step: number): number =>
 const createPlayerQrMessage = (playerId: string, step: number): string =>
   `player-qr:v${QR_TOKEN_VERSION}:${playerId}:${step}`;
 
+const createDevPlayerQrMessage = (playerId: string): string =>
+  `player-qr-dev:v${QR_TOKEN_VERSION}:${playerId}`;
+
 export const createPlayerQrCode = (
   playerId: string,
   step: number,
 ): string => {
   const digest = createHmac("sha256", QR_TOTP_SECRET)
     .update(createPlayerQrMessage(playerId, step))
+    .digest();
+  const offset = digest[digest.length - 1] & 0x0f;
+  const binary =
+    ((digest[offset] & 0x7f) << 24) |
+    (digest[offset + 1] << 16) |
+    (digest[offset + 2] << 8) |
+    digest[offset + 3];
+
+  return String(binary % 100_000_000).padStart(8, "0");
+};
+
+const createDevPlayerQrCode = (playerId: string): string => {
+  const digest = createHmac("sha256", QR_TOTP_SECRET)
+    .update(createDevPlayerQrMessage(playerId))
     .digest();
   const offset = digest[digest.length - 1] & 0x0f;
   const binary =
@@ -66,6 +84,24 @@ export const createPlayerQrToken = (
   };
 };
 
+export const createDevPlayerQrPayload = (playerId: string): string => {
+  const payloadParams = new URLSearchParams();
+  payloadParams.set("v", QR_TOKEN_VERSION);
+  payloadParams.set("playerId", playerId);
+  payloadParams.set("code", createDevPlayerQrCode(playerId));
+
+  return `${QR_TOKEN_SCHEME}//${DEV_QR_TOKEN_HOST}?${payloadParams.toString()}`;
+};
+
+export const isDevPlayerQrPayload = (payload: string): boolean => {
+  try {
+    const url = new URL(payload);
+    return url.protocol === QR_TOKEN_SCHEME && url.hostname === DEV_QR_TOKEN_HOST;
+  } catch {
+    return false;
+  }
+};
+
 export const verifyPlayerQrPayload = (
   payload: string,
   nowMs = Date.now(),
@@ -100,6 +136,37 @@ export const verifyPlayerQrPayload = (
   }
 
   const expectedCode = createPlayerQrCode(playerId, step);
+  if (!isSafeCodeEqual(code, expectedCode)) {
+    throw new Error("QR 코드가 유효하지 않습니다.");
+  }
+
+  return playerId;
+};
+
+export const verifyDevPlayerQrPayload = (payload: string): string => {
+  let url: URL;
+
+  try {
+    url = new URL(payload);
+  } catch {
+    throw new Error("QR 코드 형식이 올바르지 않습니다.");
+  }
+
+  const version = url.searchParams.get("v");
+  const playerId = url.searchParams.get("playerId");
+  const code = url.searchParams.get("code");
+
+  if (
+    url.protocol !== QR_TOKEN_SCHEME ||
+    url.hostname !== DEV_QR_TOKEN_HOST ||
+    version !== QR_TOKEN_VERSION ||
+    !playerId ||
+    !code?.match(/^\d{8}$/)
+  ) {
+    throw new Error("QR 코드 형식이 올바르지 않습니다.");
+  }
+
+  const expectedCode = createDevPlayerQrCode(playerId);
   if (!isSafeCodeEqual(code, expectedCode)) {
     throw new Error("QR 코드가 유효하지 않습니다.");
   }

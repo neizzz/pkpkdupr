@@ -13,6 +13,7 @@ export interface CreateStoredPlayerInput {
   duprRating: PlayerDupr;
   gender: "M" | "F";
   status: PlayerStatus;
+  avatarUrl?: string | null;
   passwordHash: string;
   isFirstLogin: boolean;
   createdAt: Date;
@@ -41,6 +42,7 @@ export class PlayerRepository {
   async create(data: CreateStoredPlayerInput): Promise<StoredPlayerRecord> {
     await this.db.insert(players).values({
       ...data,
+      avatarUrl: data.avatarUrl ?? null,
       duprRating: JSON.stringify(data.duprRating),
       createdAt: new Date(data.createdAt),
       updatedAt: new Date(data.updatedAt),
@@ -68,6 +70,17 @@ export class PlayerRepository {
     await this.db
       .update(players)
       .set({ passwordHash, isFirstLogin, updatedAt: new Date() })
+      .where(eq(players.id, id));
+    return await this.findById(id);
+  }
+
+  async updateProfile(
+    id: string,
+    data: { avatarUrl?: string | null },
+  ): Promise<StoredPlayerRecord | undefined> {
+    await this.db
+      .update(players)
+      .set({ avatarUrl: data.avatarUrl ?? null, updatedAt: new Date() })
       .where(eq(players.id, id));
     return await this.findById(id);
   }

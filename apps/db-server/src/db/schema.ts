@@ -7,6 +7,7 @@ export const players = sqliteTable("players", {
   duprRating: text("dupr_rating").notNull(),
   gender: text("gender").notNull(),
   status: text("status").notNull(),
+  avatarUrl: text("avatar_url"),
   passwordHash: text("password_hash").notNull(),
   isFirstLogin: integer("is_first_login", { mode: "boolean" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),

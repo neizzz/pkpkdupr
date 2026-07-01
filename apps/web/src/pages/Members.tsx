@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
 import MemberProfile from "@/components/MemberProfile";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
+import { useTabNavigation } from "@/context/TabNavigationContext";
 
 const getGenderLabel = (gender?: PlayerInfo["gender"]) => {
   if (gender === "M") return "Male";
@@ -18,6 +19,12 @@ const getGenderClassName = (gender?: PlayerInfo["gender"]) => {
 
 const Members: React.FC = () => {
   const { player, token } = useAuth();
+  const {
+    pushDepth,
+    restoreScrollTop,
+    saveScrollPosition,
+    scrollToTop,
+  } = useTabNavigation();
   const [members, setMembers] = useState<PlayerInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +69,22 @@ const Members: React.FC = () => {
     void loadMembers();
   }, [token]);
 
+  const closeMemberProfile = useCallback(() => {
+    setSelectedMemberId(null);
+    restoreScrollTop("members");
+  }, [restoreScrollTop]);
+
+  const openMemberProfile = (memberId: string) => {
+    saveScrollPosition("members");
+    pushDepth("members", {
+      id: `member-profile:${memberId}`,
+      kind: "member-profile",
+      onClose: closeMemberProfile,
+    });
+    setSelectedMemberId(memberId);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+  };
+
   const selectedMember =
     members.find((member) => member.id === selectedMemberId) || null;
 
@@ -70,7 +93,6 @@ const Members: React.FC = () => {
       <MemberProfile
         player={selectedMember}
         isMe={selectedMember.id === player?.id}
-        onBack={() => setSelectedMemberId(null)}
       />
     );
   }
@@ -99,7 +121,7 @@ const Members: React.FC = () => {
                 <button
                   key={member.id}
                   type="button"
-                  onClick={() => setSelectedMemberId(member.id)}
+                  onClick={() => openMemberProfile(member.id)}
                   className="flex min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center shadow-sm transition-colors hover:bg-amber-50"
                 >
                   <Avatar

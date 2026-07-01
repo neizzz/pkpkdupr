@@ -1,6 +1,7 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import DevQrs from "./pages/DevQrs";
 import Login from "./pages/Login";
 
 function AppRoutes() {
@@ -16,6 +17,10 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route
+        path="/dev/qrs"
+        element={import.meta.env.DEV ? <DevQrs /> : <Navigate to="/" replace />}
+      />
       <Route
         path="/"
         element={isAuthenticated ? <BottomNav /> : <Navigate to="/login" replace />}
@@ -33,9 +38,25 @@ function AppRoutes() {
 }
 
 function App() {
+  const location = useLocation();
+  const isFullWidthDevPage =
+    import.meta.env.DEV && location.pathname === "/dev/qrs";
+
   return (
-    <div className="min-h-screen flex justify-center bg-gray-900">
-      <div className="w-full max-w-[430px] bg-white min-h-screen shadow-lg">
+    <div
+      className={
+        isFullWidthDevPage
+          ? "min-h-screen bg-amber-50"
+          : "min-h-screen flex justify-center bg-gray-900"
+      }
+    >
+      <div
+        className={
+          isFullWidthDevPage
+            ? "w-full min-h-screen"
+            : "w-full max-w-[430px] bg-white min-h-screen shadow-lg"
+        }
+      >
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>
