@@ -18,28 +18,28 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
 }) => {
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
+  const genderDoublesLabel =
+    player?.gender === "F" ? "Women Doubles" : "Men Doubles";
+  const genderDoublesValue = player?.duprRating
+    ? player.gender === "F"
+      ? player.duprRating.doubles.women.toFixed(3)
+      : player.duprRating.doubles.men.toFixed(3)
+    : "-";
   const duprItems = [
     {
-      label: "Total",
-      value: player?.duprRating?.total?.toFixed(2) ?? "-",
-      valueClassName: "text-lg",
-    },
-    {
       label: "Singles",
-      value: player?.duprRating?.singles?.toFixed(2) ?? "-",
+      value: player?.duprRating?.singles?.toFixed(3) ?? "-",
       valueClassName: "text-lg",
     },
     {
       label: "Mixed Doubles",
-      value: player?.duprRating?.doubles.mixed?.toFixed(2) ?? "-",
+      value: player?.duprRating?.doubles.mixed?.toFixed(3) ?? "-",
       valueClassName: "text-lg",
     },
     {
-      label: "Men / Women",
-      value: player?.duprRating
-        ? `${player.duprRating.doubles.men.toFixed(2)} / ${player.duprRating.doubles.women.toFixed(2)}`
-        : "-",
-      valueClassName: "text-sm",
+      label: genderDoublesLabel,
+      value: genderDoublesValue,
+      valueClassName: "text-lg",
     },
   ];
 

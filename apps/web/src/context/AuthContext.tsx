@@ -16,6 +16,8 @@ interface AuthContextType {
     isAuthenticated: boolean;
     login: (username: string, password: string) => Promise<void>;
     updateProfile: (input: { avatarUrl?: string | null }) => Promise<PlayerInfo>;
+    uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
+    deleteAvatar: () => Promise<PlayerInfo>;
     logout: () => void;
 }
 
@@ -100,6 +102,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return data;
      };
 
+    const uploadAvatar = async (imageDataUrl: string) => {
+        if (!token) {
+            throw new Error('로그인이 필요합니다.');
+        }
+
+        const res = await fetch('/api/me/avatar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ imageDataUrl }),
+         });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || '프로필 이미지 업로드 실패');
+         }
+        const data = await res.json();
+        setPlayer(data);
+        return data;
+     };
+
+    const deleteAvatar = async () => {
+        if (!token) {
+            throw new Error('로그인이 필요합니다.');
+        }
+
+        const res = await fetch('/api/me/avatar', {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+         });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.error || '프로필 이미지 삭제 실패');
+         }
+        const data = await res.json();
+        setPlayer(data);
+        return data;
+     };
+
     const logout = () => {
         localStorage.removeItem('token');
         setToken(null);
@@ -107,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      };
 
     return (
-         <AuthContext.Provider value={{ token, player, isLoading, isAuthenticated: !!token, login, updateProfile, logout }}>
+         <AuthContext.Provider value={{ token, player, isLoading, isAuthenticated: !!token, login, updateProfile, uploadAvatar, deleteAvatar, logout }}>
              {children}
          </AuthContext.Provider>
      );

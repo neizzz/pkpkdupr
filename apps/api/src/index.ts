@@ -1,5 +1,8 @@
 import cors from "cors";
 import express from "express";
+import fs from "fs/promises";
+import { randomUUID } from "crypto";
+import path from "path";
 import { PlayerStatus } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
 import { decodeToken } from "./config/jwt";
@@ -13,9 +16,25 @@ import { AuthService } from "./services/AuthService";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const AVATAR_UPLOAD_ROUTE = "/uploads/avatars";
+const AVATAR_MAX_BYTES = 1024 * 1024;
+const AVATAR_MIME_TO_EXT: Record<string, "jpg" | "png" | "webp"> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+const defaultAvatarUploadDir =
+  path.basename(process.cwd()) === "api" &&
+  path.basename(path.dirname(process.cwd())) === "apps"
+    ? path.resolve(process.cwd(), "../../data/uploads/avatars")
+    : path.resolve(process.cwd(), "data/uploads/avatars");
+const avatarUploadDir = process.env.AVATAR_UPLOAD_DIR
+  ? path.resolve(process.env.AVATAR_UPLOAD_DIR)
+  : defaultAvatarUploadDir;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
+app.use(AVATAR_UPLOAD_ROUTE, express.static(avatarUploadDir));
 
 app.get("/metrics", async (_req, res) => {
   res.set("Content-Type", getMetricsContentType());
@@ -39,6 +58,58 @@ app.get("/api/ping", (_req, res) => {
 const authService = new AuthService();
 const matchRepository = new MatchRepository();
 const playerStatuses: PlayerStatus[] = ["active", "inactive"];
+
+const parseAvatarDataUrl = (value: unknown) => {
+  if (typeof value !== "string") {
+    throw new Error("이미지 데이터가 필요합니다.");
+  }
+
+  const match = value.match(
+    /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/,
+  );
+  if (!match) {
+    throw new Error("지원하지 않는 이미지 형식입니다.");
+  }
+
+  const [, mime, base64] = match;
+  const ext = AVATAR_MIME_TO_EXT[mime];
+  if (!ext) {
+    throw new Error("지원하지 않는 이미지 형식입니다.");
+  }
+
+  const buffer = Buffer.from(base64, "base64");
+  if (!buffer.length) {
+    throw new Error("이미지 데이터가 비어 있습니다.");
+  }
+
+  if (buffer.length > AVATAR_MAX_BYTES) {
+    throw new Error("프로필 이미지는 1MB 이하만 업로드할 수 있습니다.");
+  }
+
+  return { buffer, ext };
+};
+
+const getLocalAvatarPath = (avatarUrl?: string | null) => {
+  if (!avatarUrl?.startsWith(`${AVATAR_UPLOAD_ROUTE}/`)) {
+    return null;
+  }
+
+  const fileName = path.basename(avatarUrl);
+  if (!fileName || fileName !== avatarUrl.slice(AVATAR_UPLOAD_ROUTE.length + 1)) {
+    return null;
+  }
+
+  return path.join(avatarUploadDir, fileName);
+};
+
+const removeLocalAvatarIfExists = async (avatarUrl?: string | null) => {
+  const avatarPath = getLocalAvatarPath(avatarUrl);
+  if (!avatarPath) {
+    return;
+  }
+
+  await fs.unlink(avatarPath).catch(() => undefined);
+};
 
 const getAuthPayload = (req: express.Request, res: express.Response) => {
   const header = req.headers.authorization;
@@ -251,6 +322,66 @@ app.patch("/api/me/profile", async (req, res) => {
     const player = await authService.updatePlayerProfile(decoded.playerId, {
       avatarUrl,
     });
+    res.json(player);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/me/avatar", async (req, res) => {
+  let nextAvatarPath: string | null = null;
+
+  try {
+    const decoded = getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const previousPlayer = await authService.getPlayerById(decoded.playerId);
+    if (!previousPlayer) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+
+    const { imageDataUrl } = req.body as { imageDataUrl?: unknown };
+    const { buffer, ext } = parseAvatarDataUrl(imageDataUrl);
+    const fileName = `${decoded.playerId}-${Date.now()}-${randomUUID()}.${ext}`;
+    const avatarUrl = `${AVATAR_UPLOAD_ROUTE}/${fileName}`;
+    nextAvatarPath = path.join(avatarUploadDir, fileName);
+
+    await fs.mkdir(avatarUploadDir, { recursive: true });
+    await fs.writeFile(nextAvatarPath, buffer);
+
+    const player = await authService.updatePlayerProfile(decoded.playerId, {
+      avatarUrl,
+    });
+    await removeLocalAvatarIfExists(previousPlayer.avatarUrl);
+
+    res.json(player);
+  } catch (err) {
+    if (nextAvatarPath) {
+      await fs.unlink(nextAvatarPath).catch(() => undefined);
+    }
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.delete("/api/me/avatar", async (req, res) => {
+  try {
+    const decoded = getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const previousPlayer = await authService.getPlayerById(decoded.playerId);
+    if (!previousPlayer) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+
+    const player = await authService.updatePlayerProfile(decoded.playerId, {
+      avatarUrl: null,
+    });
+    await removeLocalAvatarIfExists(previousPlayer.avatarUrl);
+
     res.json(player);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
