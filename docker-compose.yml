@@ -40,6 +40,11 @@ services:
     container_name: pkpkdupr-api-server
     environment:
         - DB_HOST=db-server
+        - AVATAR_UPLOAD_DIR=/app/data/uploads/avatars
+    volumes:
+        # API가 /uploads/avatars/*로 서빙하는 프로필 이미지 영구 저장소입니다.
+        # 운영 reverse proxy는 /uploads/avatars/* 요청을 api:4000으로 전달해야 합니다.
+        - ./data/uploads/avatars:/app/data/uploads/avatars
     depends_on:
         - db-server
     networks:
