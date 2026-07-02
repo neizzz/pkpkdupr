@@ -16,4 +16,6 @@ datasources:
     editable: true
     jsonData:
       path: /var/lib/pkpkdupr/db/db.sqlite
-      pathOptions: mode=ro
+      # The datasource remains read-only, while the compose bind mount is
+      # writable enough for SQLite lock/WAL sidecar files during live dev writes.
+      pathOptions: mode=ro&_busy_timeout=5000

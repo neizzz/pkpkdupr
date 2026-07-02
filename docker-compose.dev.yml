@@ -23,11 +23,17 @@ services:
     ports:
       - "3300:3000"
     volumes:
-      - ./data/db:/var/lib/pkpkdupr/db:ro
+      # Keep the DB connection itself read-only via the SQLite datasource
+      # pathOptions, but mount the directory writable so SQLite can create
+      # transient WAL/SHM lock files when the app is writing concurrently.
+      # A read-only bind mount can surface as malformed/no-data responses in
+      # Grafana's SQLite plugin during dev refreshes.
+      - ./data/db:/var/lib/pkpkdupr/db
       - ./infra/monitoring/grafana/dev-provisioning/datasources:/etc/grafana/provisioning/datasources:ro
       - ./infra/monitoring/grafana/dev-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./infra/monitoring/grafana/dev-dashboards:/etc/grafana/dev-dashboards:ro
     environment:
       - GF_PATHS_PLUGINS=/opt/grafana-plugins
-      - GF_SERVER_ROOT_URL=http://localhost:3000/grafana/
+      - GF_SERVER_ROOT_URL=http://localhost:8080/grafana/
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_LIVE_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://neiz-office.fedev.kakao.com:8080,http://neiz-office.fedev.kakao.com,https://neiz-office.fedev.kakao.com
