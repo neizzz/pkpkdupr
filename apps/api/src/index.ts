@@ -4,8 +4,10 @@ import fs from "fs/promises";
 import { randomUUID } from "crypto";
 import path from "path";
 import {
+  MATCH_RESULT_MAX_SCORE_COUNT,
   matchTypeLabels,
   matchTypeValues,
+  type MatchScore,
   type MatchType,
 } from "@pkpkdupr/shared/match";
 import type { Player, PlayerStatus } from "@pkpkdupr/shared/player";
@@ -15,7 +17,7 @@ import {
   getMetricsSnapshot,
   metricsMiddleware,
 } from "./monitoring/metrics";
-import { MatchRepository } from "./repositories/MatchRepository";
+import { DbRequestError, MatchRepository } from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 
 const app = express();
@@ -73,6 +75,10 @@ type CreateMatchRequest = {
   scheduledAt?: string;
 };
 
+type SubmitMatchResultRequest = {
+  scores?: MatchScore[];
+};
+
 const isMatchType = (value: unknown): value is MatchType =>
   typeof value === "string" && matchTypeValues.includes(value as MatchType);
 
@@ -104,6 +110,35 @@ const validateCreateMatchTeams = (
     (team) =>
       team.length === 2 && team.every((player) => player.gender === "F"),
   );
+};
+
+const normalizeMatchScores = (scores: unknown): MatchScore[] => {
+  if (!Array.isArray(scores) || scores.length === 0) {
+    throw new Error("한 개 이상의 스코어가 필요합니다.");
+  }
+
+  if (scores.length > MATCH_RESULT_MAX_SCORE_COUNT) {
+    throw new Error(
+      `스코어는 최대 ${MATCH_RESULT_MAX_SCORE_COUNT}개까지 입력할 수 있습니다.`,
+    );
+  }
+
+  return scores.map((score, index) => {
+    const scoreA = Number((score as MatchScore | undefined)?.scoreA);
+    const scoreB = Number((score as MatchScore | undefined)?.scoreB);
+
+    if (
+      !Number.isInteger(scoreA) ||
+      !Number.isInteger(scoreB) ||
+      scoreA < 0 ||
+      scoreB < 0 ||
+      scoreA === scoreB
+    ) {
+      throw new Error(`${index + 1}번째 스코어가 유효하지 않습니다.`);
+    }
+
+    return { scoreA, scoreB };
+  });
 };
 
 const parseAvatarDataUrl = (value: unknown) => {
@@ -405,6 +440,9 @@ app.post("/api/matches", async (req, res) => {
       status: "created",
       teams: matchTeams,
       scores: [],
+      resultSubmittedByPlayerId: null,
+      resultSubmittedAt: null,
+      approvals: [],
       location: location?.trim() || "Court TBD",
       scheduledAt: scheduledDate,
       completedAt: null,
@@ -412,6 +450,69 @@ app.post("/api/matches", async (req, res) => {
 
     res.status(201).json(match);
   } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/matches/:matchId/result", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const { scores } = req.body as SubmitMatchResultRequest;
+    const normalizedScores = normalizeMatchScores(scores);
+    const match = await matchRepository.submitResult(
+      req.params.matchId,
+      decoded.playerId,
+      normalizedScores,
+    );
+
+    res.json(match);
+  } catch (err) {
+    if (err instanceof DbRequestError && err.status === 409) {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/matches/:matchId/approval", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const match = await matchRepository.approveResult(
+      req.params.matchId,
+      decoded.playerId,
+    );
+
+    res.json(match);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.delete("/api/matches/:matchId/approval", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const match = await matchRepository.cancelApproval(
+      req.params.matchId,
+      decoded.playerId,
+    );
+
+    res.json(match);
+  } catch (err) {
+    if (err instanceof DbRequestError && err.status === 409) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(400).json({ error: (err as Error).message });
   }
 });
@@ -578,6 +679,56 @@ app.patch("/api/admin/players/:playerId/status", requireAdmin, async (req, res) 
   }
 });
 
+app.post(
+  "/api/admin/players/:playerId/password-reset",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+
+      const { password } = req.body as { password?: unknown };
+      if (typeof password !== "string" || password.length < 6) {
+        return res
+          .status(400)
+          .json({ error: "임시 비밀번호는 6자 이상이어야 합니다." });
+      }
+
+      const player = await authService.resetPlayerPassword(
+        req.params.playerId,
+        password,
+        decoded.playerId,
+      );
+
+      res.json({ player });
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+app.post("/api/admin/ratings/recalculate", requireAdmin, async (_req, res) => {
+  try {
+    const { matches } = await matchRepository.findAll(0, 10000);
+    const completedMatches = matches.filter(
+      (match) => match.status === "completed",
+    );
+    const result = await authService.recalculateDuprRatings(completedMatches, {
+      source: "manual_recalculation",
+      sourceLogId: `manual-recalculation-${Date.now()}-${randomUUID()}`,
+    });
+
+    res.json({
+      ...result,
+      completedMatchCount: completedMatches.length,
+    });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/admin/players/:playerId/official-dupr", requireAdmin, async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -602,6 +753,35 @@ app.post("/api/admin/players/:playerId/official-dupr", requireAdmin, async (req,
     res.status(400).json({ error: (err as Error).message });
   }
 });
+
+app.post(
+  "/api/admin/players/:playerId/official-dupr/preview",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+
+      const { matches } = await matchRepository.findAll(0, 10000);
+      const result = await authService.previewOfficialDuprAdjustment(
+        {
+          playerId: req.params.playerId,
+          changedByPlayerId: decoded.playerId,
+          ratings: req.body.ratings,
+          confidence: req.body.confidence,
+          reason: req.body.reason,
+        },
+        matches.filter((match) => match.status === "completed"),
+      );
+
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
 
 app.post("/api/admin/register", requireAdmin, async (req, res) => {
   try {

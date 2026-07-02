@@ -1,23 +1,47 @@
-import React from "react";
-import { Card } from "@heroui/react";
-import type { Match as SharedMatch, MatchStatus } from "@pkpkdupr/shared/match";
-import { matchTypeLabels } from "@pkpkdupr/shared/match";
+import React, { useEffect, useMemo, useState } from "react";
+import { Button, Card } from "@heroui/react";
+import type {
+  Match as SharedMatch,
+  MatchScore,
+  MatchStatus,
+} from "@pkpkdupr/shared/match";
+import {
+  MATCH_RESULT_MAX_SCORE_COUNT,
+  matchTypeLabels,
+} from "@pkpkdupr/shared/match";
 import UserChip from "@/components/UserChip";
 
 export type MatchInfo = Omit<
   SharedMatch,
-  "scheduledAt" | "createdAt" | "updatedAt" | "completedAt"
+  | "scheduledAt"
+  | "createdAt"
+  | "updatedAt"
+  | "completedAt"
+  | "resultSubmittedAt"
+  | "approvals"
 > & {
   scheduledAt: string;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  resultSubmittedAt: string | null;
+  approvals: Array<{
+    playerId: string;
+    approvedAt: string;
+  }>;
 };
 
 interface MatchProps {
   match: MatchInfo;
   currentPlayerId?: string;
   nowMs?: number;
+  onSubmitResult?: (matchId: string, scores: MatchScore[]) => Promise<void>;
+  onApproveResult?: (matchId: string) => Promise<void>;
+  onCancelApproval?: (matchId: string) => Promise<void>;
+  isOnline?: boolean;
+  isSubmittingResult?: boolean;
+  isApprovingResult?: boolean;
+  isCancellingApproval?: boolean;
 }
 
 const RECENT_MATCH_THRESHOLD_MS = 10 * 60 * 1000;
@@ -27,12 +51,14 @@ const titleChipClassName =
 
 const statusLabelMap: Record<MatchStatus, string> = {
   created: "예정",
+  "pending-approval": "합의중",
   completed: "완료",
   cancelled: "취소",
 };
 
 const statusBadgeClassMap: Record<MatchStatus, string> = {
   created: "bg-sky-100 text-sky-700",
+  "pending-approval": "bg-violet-100 text-violet-700",
   completed: "bg-emerald-100 text-emerald-700",
   cancelled: "bg-slate-200 text-slate-700",
 };
@@ -54,6 +80,11 @@ const getScoreLabel = (scores?: MatchInfo["scores"]) => {
   return scores.map((score) => `${score.scoreA}:${score.scoreB}`).join(" · ");
 };
 
+const getTeamSetScore = (scores: MatchInfo["scores"], teamIndex: 0 | 1) =>
+  (scores ?? []).filter((score) =>
+    teamIndex === 0 ? score.scoreA > score.scoreB : score.scoreB > score.scoreA,
+  ).length;
+
 const getAgeMs = (value: string, nowMs: number) => {
   const timestamp = new Date(value).getTime();
 
@@ -64,25 +95,163 @@ const getAgeMs = (value: string, nowMs: number) => {
   return nowMs - timestamp;
 };
 
+const createEmptyScoreRow = () => ({ scoreA: "", scoreB: "" });
+
 const Match: React.FC<MatchProps> = ({
   match,
   currentPlayerId,
   nowMs = Date.now(),
+  onSubmitResult,
+  onApproveResult,
+  onCancelApproval,
+  isOnline = true,
+  isSubmittingResult = false,
+  isApprovingResult = false,
+  isCancellingApproval = false,
 }) => {
+  const [scoreRows, setScoreRows] = useState(() => [createEmptyScoreRow()]);
+  const [resultError, setResultError] = useState<string | null>(null);
+  const [isResultFormOpen, setIsResultFormOpen] = useState(false);
   const isMyMatch = match.teams.some((team) =>
     team.players.some((teamPlayer) => teamPlayer.id === currentPlayerId),
   );
   const isCompletedMatch = match.status === "completed";
+  const isPendingApprovalMatch = match.status === "pending-approval";
+  const isCreator = match.creatorPlayerId === currentPlayerId;
+  const hasResultScores = !!match.scores?.length;
+  const teamSetScores = [
+    getTeamSetScore(match.scores, 0),
+    getTeamSetScore(match.scores, 1),
+  ] as const;
+  const canSubmitResult =
+    (match.status === "created" || match.status === "pending-approval") &&
+    isCreator &&
+    isOnline &&
+    !!onSubmitResult;
+  const approvedPlayerIds = useMemo(
+    () => new Set(match.approvals.map((approval) => approval.playerId)),
+    [match.approvals],
+  );
+  const participantIds = useMemo(
+    () => match.teams.flatMap((team) => team.players.map((player) => player.id)),
+    [match.teams],
+  );
+  const hasApproved = !!currentPlayerId && approvedPlayerIds.has(currentPlayerId);
+  const canApproveResult =
+    isPendingApprovalMatch &&
+    isMyMatch &&
+    !hasApproved &&
+    isOnline &&
+    !!onApproveResult;
+  const canCancelApproval =
+    isPendingApprovalMatch &&
+    isMyMatch &&
+    hasApproved &&
+    isOnline &&
+    !!onCancelApproval;
   const createdAgeMs = getAgeMs(match.createdAt, nowMs);
   const isRecentlyCreated =
     createdAgeMs >= 0 && createdAgeMs <= RECENT_MATCH_THRESHOLD_MS;
+  const resultActionLabel = hasResultScores ? "결과 수정" : "결과 입력";
+  const shouldShowResultForm =
+    canSubmitResult && (!hasResultScores || isResultFormOpen);
+  const canAddScoreRow = scoreRows.length < MATCH_RESULT_MAX_SCORE_COUNT;
+
+  useEffect(() => {
+    setScoreRows(
+      match.scores?.length
+        ? match.scores.map((score) => ({
+            scoreA: String(score.scoreA),
+            scoreB: String(score.scoreB),
+          }))
+        : [createEmptyScoreRow()],
+    );
+    setResultError(null);
+    setIsResultFormOpen(false);
+  }, [match.id, match.scores]);
+
+  const updateScoreRow = (
+    index: number,
+    field: keyof ReturnType<typeof createEmptyScoreRow>,
+    value: string,
+  ) => {
+    setScoreRows((rows) =>
+      rows.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, [field]: value } : row,
+      ),
+    );
+  };
+
+  const handleSubmitResult = async () => {
+    if (!onSubmitResult) {
+      return;
+    }
+
+    try {
+      if (scoreRows.length > MATCH_RESULT_MAX_SCORE_COUNT) {
+        throw new Error(
+          `스코어는 최대 ${MATCH_RESULT_MAX_SCORE_COUNT}개까지 입력할 수 있어요.`,
+        );
+      }
+
+      const scores = scoreRows.map((row, index) => {
+        const scoreA = Number(row.scoreA);
+        const scoreB = Number(row.scoreB);
+
+        if (
+          !Number.isInteger(scoreA) ||
+          !Number.isInteger(scoreB) ||
+          scoreA < 0 ||
+          scoreB < 0 ||
+          scoreA === scoreB
+        ) {
+          throw new Error(`${index + 1}번째 스코어를 확인해주세요.`);
+        }
+
+        return { scoreA, scoreB };
+      });
+
+      setResultError(null);
+      await onSubmitResult(match.id, scores);
+    } catch (err) {
+      setResultError(
+        err instanceof Error ? err.message : "결과를 입력하지 못했어요.",
+      );
+    }
+  };
+
+  const handleApproveResult = async () => {
+    if (!onApproveResult) {
+      return;
+    }
+
+    try {
+      setResultError(null);
+      await onApproveResult(match.id);
+    } catch (err) {
+      setResultError(
+        err instanceof Error ? err.message : "결과를 승인하지 못했어요.",
+      );
+    }
+  };
+
+  const handleCancelApproval = async () => {
+    if (!onCancelApproval) {
+      return;
+    }
+
+    try {
+      setResultError(null);
+      await onCancelApproval(match.id);
+    } catch (err) {
+      setResultError(
+        err instanceof Error ? err.message : "합의를 취소하지 못했어요.",
+      );
+    }
+  };
 
   return (
-    <Card
-      className={`rounded-3xl bg-white/95 p-3 shadow-sm ${
-        isMyMatch ? "ring-2 ring-[#409eff]/20" : ""
-      }`}
-    >
+    <Card className="rounded-3xl bg-white/95 p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
@@ -111,40 +280,201 @@ const Match: React.FC<MatchProps> = ({
         </div>
       </div>
 
-      <div className="mt-1 grid grid-cols-2 gap-3">
-        {match.teams.map((team, index) => (
-          <div key={team.id} className="rounded-2xl bg-gray-50 px-3 py-3">
-            <div>
-              <p
-                className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
-              >
-                Team {index + 1}
-              </p>
-              <div className="mt-2 flex flex-col gap-2">
-                {team.players.map((teamPlayer) => (
-                  <UserChip
-                    key={teamPlayer.id}
-                    player={teamPlayer}
-                    isMe={teamPlayer.id === currentPlayerId}
-                  />
-                ))}
-              </div>
-            </div>
+      <div className="mt-3">
+        <div
+          className={`relative ${hasResultScores ? "h-10" : ""}`}
+        >
+          <div className="grid h-full grid-cols-2 items-center gap-3">
+            <p
+              className={`text-center text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
+              Team A
+            </p>
+            <p
+              className={`text-center text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
+              Team B
+            </p>
           </div>
-        ))}
+          {hasResultScores ? (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-10 -translate-y-1/2 text-amber-950">
+              <span className="absolute right-1/2 top-1/2 -translate-y-1/2 pr-3 text-4xl font-black leading-none tracking-tight">
+                {teamSetScores[0]}
+              </span>
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-bold leading-none text-[#888]">
+                :
+              </span>
+              <span className="absolute left-1/2 top-1/2 -translate-y-1/2 pl-3 text-4xl font-black leading-none tracking-tight">
+                {teamSetScores[1]}
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 justify-items-center gap-3">
+          {match.teams.map((team) => (
+            <div
+              key={team.id}
+              className="flex min-w-0 flex-col items-center gap-2 text-center"
+            >
+              {team.players.map((teamPlayer) => (
+                <UserChip
+                  key={teamPlayer.id}
+                  player={teamPlayer}
+                  isMe={teamPlayer.id === currentPlayerId}
+                  endAdornment={
+                    teamPlayer.id === match.creatorPlayerId ? (
+                      <span aria-label="매치 생성자" role="img">
+                        👑
+                      </span>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {isCompletedMatch ? (
-        <div className="mt-1 rounded-2xl bg-amber-50 px-3 py-3">
+      {isCompletedMatch || isPendingApprovalMatch ? (
+        <button
+          type="button"
+          className={`mt-1 w-full rounded-2xl bg-amber-50 px-3 py-3 text-left ${
+            canSubmitResult ? "cursor-pointer transition-colors hover:bg-amber-100/70" : ""
+          }`}
+          onClick={() => {
+            if (canSubmitResult) {
+              setIsResultFormOpen((value) => !value);
+            }
+          }}
+        >
           <p
             className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
           >
             Score
           </p>
-          <p className="mt-1 text-sm font-semibold text-amber-950">
+          <p className="mt-1 text-lg font-bold leading-tight text-amber-950">
             {getScoreLabel(match.scores)}
           </p>
+          {isPendingApprovalMatch || canSubmitResult ? (
+            <div className="mt-2 flex items-center justify-between gap-3 text-xs font-medium text-[#888]">
+              {isPendingApprovalMatch ? (
+                <span>
+                  승인 {match.approvals.length}/{participantIds.length}
+                </span>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              {canSubmitResult ? (
+                <span className="font-semibold text-[#409eff]">
+                  {isResultFormOpen ? "닫기" : "수정"}
+                </span>
+              ) : hasApproved ? (
+                <span className="font-semibold text-emerald-600">승인 완료</span>
+              ) : null}
+            </div>
+          ) : null}
+        </button>
+      ) : null}
+
+      {shouldShowResultForm ? (
+        <div className="mt-2 rounded-2xl border border-border bg-white px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
+            {hasResultScores ? "Edit Result" : "Result"}
+          </p>
+          <div className="mt-2 flex flex-col gap-2">
+            {scoreRows.map((row, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="w-10 shrink-0 text-xs font-semibold text-[#888]">
+                  G{index + 1}
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={row.scoreA}
+                  onChange={(event) =>
+                    updateScoreRow(index, "scoreA", event.target.value)
+                  }
+                  className="min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-amber-950 outline-none focus:ring-2 focus:ring-[#409eff]/40"
+                  placeholder="Team A"
+                />
+                <span className="text-sm font-semibold text-[#888]">:</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={row.scoreB}
+                  onChange={(event) =>
+                    updateScoreRow(index, "scoreB", event.target.value)
+                  }
+                  className="min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-amber-950 outline-none focus:ring-2 focus:ring-[#409eff]/40"
+                  placeholder="Team B"
+                />
+              </div>
+            ))}
+          </div>
+          {resultError ? (
+            <p className="mt-2 text-xs font-medium text-red-500">
+              {resultError}
+            </p>
+          ) : null}
+          <div className="mt-3 flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="rounded-2xl text-[#409eff]"
+              onPress={() => {
+                setScoreRows((rows) =>
+                  rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
+                    ? rows
+                    : [...rows, createEmptyScoreRow()],
+                );
+              }}
+              isDisabled={isSubmittingResult || !canAddScoreRow}
+            >
+              세트 추가
+            </Button>
+            <Button
+              size="sm"
+              className="rounded-2xl bg-[#409eff] font-semibold text-white"
+              onPress={() => void handleSubmitResult()}
+              isDisabled={isSubmittingResult}
+            >
+              {resultActionLabel}
+            </Button>
+          </div>
         </div>
+      ) : null}
+
+      {canApproveResult || canCancelApproval ? (
+        <div className="mt-2 flex justify-end gap-2">
+          {canCancelApproval ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="rounded-2xl text-amber-700"
+              onPress={() => void handleCancelApproval()}
+              isDisabled={isCancellingApproval}
+            >
+              합의 취소
+            </Button>
+          ) : null}
+          {canApproveResult ? (
+            <Button
+              size="sm"
+              className="rounded-2xl bg-[#409eff] font-semibold text-white"
+              onPress={() => void handleApproveResult()}
+              isDisabled={isApprovingResult}
+            >
+              결과 승인
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {!shouldShowResultForm && resultError ? (
+        <p className="mt-2 text-xs font-medium text-red-500">{resultError}</p>
       ) : null}
 
       <p className={`mt-1 text-right text-xs font-medium ${subTextClassName}`}>

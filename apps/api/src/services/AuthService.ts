@@ -1,20 +1,27 @@
 import {
   OfficialDuprAdjustmentLog,
+  OfficialDuprAdjustmentImpact,
+  OfficialDuprAdjustmentPreview,
   Player,
   PlayerCreationLog,
   PlayerCreationSource,
   PlayerDupr,
   PlayerDuprMetrics,
+  PlayerRatingChangeLog,
+  PlayerRatingChangeSource,
   PlayerStatus,
   PlayerStatusChangeLog,
   StoredPlayerDupr,
   computeTotalDuprRating,
+  createDefaultPlayerDupr,
+  createDefaultPlayerDuprMetrics,
   getDuprMetricByCategory,
   getDuprRatingByCategory,
   normalizeNullablePlayerDupr,
   normalizePlayerDupr,
   normalizeStoredPlayerDupr,
   normalizeDuprRatingValue,
+  roundDuprRating,
   setDuprMetricByCategory,
   setDuprRatingByCategory,
 } from "@pkpkdupr/shared/player";
@@ -134,6 +141,14 @@ const hydrateOfficialDuprAdjustmentLog = (
   createdAt: toDate(record.createdAt),
 });
 
+const hydratePlayerRatingChangeLog = (record: any): PlayerRatingChangeLog => ({
+  ...record,
+  previousRating: normalizePlayerDupr(record.previousRating),
+  nextRating: normalizePlayerDupr(record.nextRating),
+  delta: record.delta as PlayerDupr,
+  createdAt: toDate(record.createdAt),
+});
+
 const groupByPlayerId = <T extends { playerId: string }>(items: T[]) =>
   items.reduce<Record<string, T[]>>((acc, item) => {
     acc[item.playerId] = [...(acc[item.playerId] ?? []), item];
@@ -187,6 +202,25 @@ type OfficialDuprConfidencePatch = NonNullable<
   OfficialDuprAdjustmentLog["confidence"]
 >;
 type OfficialDuprAccuracyPatch = OfficialDuprAdjustmentLog["preUpdateAccuracy"];
+
+interface OfficialDuprAdjustmentDraft {
+  ratings: OfficialDuprRatingPatch;
+  confidence: OfficialDuprConfidencePatch;
+  nextRating: PlayerDupr;
+  nextMetrics: PlayerDuprMetrics;
+  preUpdateAccuracy: OfficialDuprAccuracyPatch;
+}
+
+interface DuprRecalculationResult {
+  players: StoredPlayerRecord[];
+  stateByPlayerId: Map<string, StoredPlayerDupr>;
+  relatedMatchCountByPlayerId: Map<string, number>;
+}
+
+interface RecalculateDuprRatingsOptions {
+  source?: PlayerRatingChangeSource;
+  sourceLogId?: string;
+}
 
 const duprPatchEntries = [
   {
@@ -299,12 +333,29 @@ const buildWinnerTeamIndex = (match: Match): 0 | 1 | null => {
   return points[0] > points[1] ? 0 : 1;
 };
 
-const hasDuprRatingChange = (nextRating: PlayerDupr, previousRating: PlayerDupr) =>
-  nextRating.total !== previousRating.total ||
-  nextRating.singles !== previousRating.singles ||
-  nextRating.doubles.mixed !== previousRating.doubles.mixed ||
-  nextRating.doubles.men !== previousRating.doubles.men ||
-  nextRating.doubles.women !== previousRating.doubles.women;
+const buildDuprDelta = (
+  nextRating: PlayerDupr,
+  previousRating: PlayerDupr,
+): PlayerDupr => ({
+  total: roundDuprRating(nextRating.total - previousRating.total),
+  singles: roundDuprRating(nextRating.singles - previousRating.singles),
+  doubles: {
+    mixed: roundDuprRating(
+      nextRating.doubles.mixed - previousRating.doubles.mixed,
+    ),
+    men: roundDuprRating(nextRating.doubles.men - previousRating.doubles.men),
+    women: roundDuprRating(
+      nextRating.doubles.women - previousRating.doubles.women,
+    ),
+  },
+});
+
+const hasDuprChange = (delta: PlayerDupr) =>
+  delta.total !== 0 ||
+  delta.singles !== 0 ||
+  delta.doubles.mixed !== 0 ||
+  delta.doubles.men !== 0 ||
+  delta.doubles.women !== 0;
 
 const hasDuprMetricChange = (
   nextMetrics: PlayerDuprMetrics,
@@ -327,7 +378,7 @@ const hasStoredDuprStateChange = (
   nextState: StoredPlayerDupr,
   previousState: StoredPlayerDupr,
 ) =>
-  hasDuprRatingChange(nextState.rating, previousState.rating) ||
+  hasDuprChange(buildDuprDelta(nextState.rating, previousState.rating)) ||
   hasDuprMetricChange(nextState.metrics, previousState.metrics);
 
 export class AuthService {
@@ -519,6 +570,22 @@ export class AuthService {
     return hydrateStatusChangeLog(log);
   }
 
+  private async insertPlayerRatingChangeLog(
+    input: Omit<PlayerRatingChangeLog, "id">,
+  ): Promise<PlayerRatingChangeLog> {
+    const log = await this.dbRequest<any>(
+      "/internal/player-rating-change-logs",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          id: buildId("player-rating-change-log"),
+          ...input,
+        }),
+      },
+    );
+    return hydratePlayerRatingChangeLog(log);
+  }
+
   async register({
     username,
     password,
@@ -672,6 +739,40 @@ export class AuthService {
     });
   }
 
+  async resetPlayerPassword(
+    playerId: string,
+    newPassword: string,
+    resetByPlayerId: string,
+  ): Promise<Player> {
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+
+    const resetBy = await this.getStoredPlayerById(resetByPlayerId);
+    if (!resetBy) {
+      throw new Error("비밀번호 초기화 요청자를 찾을 수 없습니다.");
+    }
+
+    if (stored.username === "admin") {
+      throw new Error("기본 관리자 계정 비밀번호는 이 기능으로 초기화할 수 없습니다.");
+    }
+
+    if (typeof newPassword !== "string" || newPassword.length < 6) {
+      throw new Error("임시 비밀번호는 6자 이상이어야 합니다.");
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const updated = hydratePlayer(
+      await this.dbRequest<any>(`/internal/players/${playerId}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ passwordHash, isFirstLogin: true }),
+      }),
+    );
+
+    return toPublicPlayer(updated);
+  }
+
   async updatePlayerProfile(
     playerId: string,
     input: { avatarUrl?: string | null },
@@ -783,25 +884,13 @@ export class AuthService {
     );
   }
 
-  async applyOfficialDuprAdjustment(
+  private buildOfficialDuprAdjustmentDraft(
+    stored: StoredPlayerRecord,
     input: {
-      playerId: string;
-      changedByPlayerId: string;
       ratings?: OfficialDuprRatingPatch;
       confidence?: OfficialDuprConfidencePatch;
-      reason?: string | null;
     },
-    completedMatches: Match[],
-  ): Promise<{ player: Player; log: OfficialDuprAdjustmentLog }> {
-    const stored = await this.getStoredPlayerById(input.playerId);
-    if (!stored) {
-      throw new Error("사용자를 찾을 수 없습니다.");
-    }
-    const changedBy = await this.getStoredPlayerById(input.changedByPlayerId);
-    if (!changedBy) {
-      throw new Error("공식 DUPR 반영 요청자를 찾을 수 없습니다.");
-    }
-
+  ): OfficialDuprAdjustmentDraft {
     let nextRating = stored.duprState.rating;
     let nextMetrics = stored.duprState.metrics;
     const ratings: OfficialDuprRatingPatch = {};
@@ -852,57 +941,65 @@ export class AuthService {
       throw new Error("반영할 공식 DUPR 종목이 필요합니다.");
     }
 
-    const updated = await this.updateStoredPlayerDuprState(stored.id, {
-      rating: nextRating,
-      metrics: nextMetrics,
-    });
-
-    const log = hydrateOfficialDuprAdjustmentLog(
-      await this.dbRequest<any>("/internal/official-dupr-adjustment-logs", {
-        method: "POST",
-        body: JSON.stringify({
-          id: buildId("official-dupr-log"),
-          playerId: stored.id,
-          changedByPlayerId: changedBy.id,
-          changedByUsername: changedBy.username,
-          ratings,
-          confidence,
-          previousRating: stored.duprState.rating,
-          nextRating,
-          preUpdateAccuracy,
-          reason: input.reason?.trim() || null,
-          createdAt: new Date(),
-        } satisfies OfficialDuprAdjustmentLog),
-      }),
-    );
-
-    await this.recalculateDuprRatings(completedMatches);
-    const recalculated = await this.getStoredPlayerById(updated.id);
-
     return {
-      player: toPublicPlayer(recalculated ?? updated),
-      log,
+      ratings,
+      confidence,
+      nextRating: {
+        ...nextRating,
+        total: computeTotalDuprRating(nextRating),
+      },
+      nextMetrics,
+      preUpdateAccuracy,
     };
   }
 
-  async recalculateDuprRatings(completedMatches: Match[]): Promise<void> {
+  private buildOfficialDuprAdjustmentLog(input: {
+    stored: StoredPlayerRecord;
+    changedBy: StoredPlayerRecord;
+    draft: OfficialDuprAdjustmentDraft;
+    reason?: string | null;
+    id?: string;
+    createdAt?: Date;
+  }): OfficialDuprAdjustmentLog {
+    return {
+      id: input.id ?? buildId("official-dupr-log"),
+      playerId: input.stored.id,
+      changedByPlayerId: input.changedBy.id,
+      changedByUsername: input.changedBy.username,
+      ratings: input.draft.ratings,
+      confidence: input.draft.confidence,
+      previousRating: input.stored.duprState.rating,
+      nextRating: input.draft.nextRating,
+      preUpdateAccuracy: input.draft.preUpdateAccuracy,
+      reason: input.reason?.trim() || null,
+      createdAt: input.createdAt ?? new Date(),
+    };
+  }
+
+  private async calculateDuprRecalculation(
+    completedMatches: Match[],
+    additionalLogs: OfficialDuprAdjustmentLog[] = [],
+  ): Promise<DuprRecalculationResult> {
     const players = (await this.dbRequest<any[]>("/internal/players")).map(
       hydratePlayer,
     );
-    const logs = await this.getOfficialDuprAdjustmentLogs();
+    const storedLogs = await this.getOfficialDuprAdjustmentLogs();
+    const logs = [...storedLogs, ...additionalLogs].sort(
+      (a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
     const stateByPlayerId = new Map<string, StoredPlayerDupr>(
       players.map((player) => [
         player.id,
         {
-          rating: player.duprState.rating,
-          metrics: player.duprState.metrics,
+          rating: createDefaultPlayerDupr(),
+          metrics: createDefaultPlayerDuprMetrics(),
         },
       ]),
     );
-    const playerById = new Map(players.map((player) => [player.id, player]));
     const correctionWeightByPlayerId: Record<string, number> = {};
 
-    for (const log of [...logs].reverse()) {
+    for (const log of logs) {
       const state = stateByPlayerId.get(log.playerId);
       if (!state) {
         continue;
@@ -945,6 +1042,7 @@ export class AuthService {
       });
     }
 
+    const relatedMatchCountByPlayerId = new Map<string, number>();
     const replayMatches = completedMatches
       .filter((match) => match.status === "completed" && match.completedAt)
       .sort(
@@ -980,6 +1078,13 @@ export class AuthService {
         continue;
       }
 
+      participants.forEach((participant) => {
+        relatedMatchCountByPlayerId.set(
+          participant.playerId,
+          (relatedMatchCountByPlayerId.get(participant.playerId) ?? 0) + 1,
+        );
+      });
+
       const replayResult = this.ratingService.replayMatch(
         {
           type: match.type,
@@ -994,13 +1099,194 @@ export class AuthService {
       });
     }
 
-    for (const [playerId, state] of stateByPlayerId.entries()) {
+    return { players, stateByPlayerId, relatedMatchCountByPlayerId };
+  }
+
+  private buildOfficialDuprImpacts(
+    result: DuprRecalculationResult,
+  ): OfficialDuprAdjustmentImpact[] {
+    return result.players
+      .map((player) => {
+        const nextState = result.stateByPlayerId.get(player.id);
+        if (!nextState) {
+          return null;
+        }
+        const delta = buildDuprDelta(nextState.rating, player.duprState.rating);
+        if (!hasDuprChange(delta)) {
+          return null;
+        }
+
+        return {
+          playerId: player.id,
+          username: player.username,
+          previousRating: player.duprState.rating,
+          nextRating: nextState.rating,
+          delta,
+          relatedMatchCount: result.relatedMatchCountByPlayerId.get(player.id) ?? 0,
+        };
+      })
+      .filter((impact): impact is OfficialDuprAdjustmentImpact => Boolean(impact))
+      .sort((a, b) => {
+        const totalDelta = Math.abs(b.delta.total) - Math.abs(a.delta.total);
+        if (totalDelta !== 0) {
+          return totalDelta;
+        }
+        return a.username.localeCompare(b.username);
+      });
+  }
+
+  private getChangedDuprStates(
+    result: DuprRecalculationResult,
+  ): Array<[string, StoredPlayerDupr]> {
+    const playerById = new Map(
+      result.players.map((player) => [player.id, player]),
+    );
+    return [...result.stateByPlayerId.entries()].filter(([playerId, state]) => {
       const player = playerById.get(playerId);
-      if (!player || !hasStoredDuprStateChange(state, player.duprState)) {
-        continue;
-      }
+      return player ? hasStoredDuprStateChange(state, player.duprState) : false;
+    });
+  }
+
+  async previewOfficialDuprAdjustment(
+    input: {
+      playerId: string;
+      changedByPlayerId: string;
+      ratings?: OfficialDuprRatingPatch;
+      confidence?: OfficialDuprConfidencePatch;
+      reason?: string | null;
+    },
+    completedMatches: Match[],
+  ): Promise<OfficialDuprAdjustmentPreview> {
+    const stored = await this.getStoredPlayerById(input.playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+    const changedBy = await this.getStoredPlayerById(input.changedByPlayerId);
+    if (!changedBy) {
+      throw new Error("공식 DUPR 반영 요청자를 찾을 수 없습니다.");
+    }
+
+    const draft = this.buildOfficialDuprAdjustmentDraft(stored, input);
+    const previewLog = this.buildOfficialDuprAdjustmentLog({
+      stored,
+      changedBy,
+      draft,
+      reason: input.reason,
+      id: "official-dupr-preview",
+    });
+    const recalculation = await this.calculateDuprRecalculation(completedMatches, [
+      previewLog,
+    ]);
+
+    return {
+      player: toPublicPlayer(stored),
+      impacts: this.buildOfficialDuprImpacts(recalculation),
+    };
+  }
+
+  async applyOfficialDuprAdjustment(
+    input: {
+      playerId: string;
+      changedByPlayerId: string;
+      ratings?: OfficialDuprRatingPatch;
+      confidence?: OfficialDuprConfidencePatch;
+      reason?: string | null;
+    },
+    completedMatches: Match[],
+  ): Promise<{
+    player: Player;
+    log: OfficialDuprAdjustmentLog;
+    ratingChangeLogs: PlayerRatingChangeLog[];
+  }> {
+    const stored = await this.getStoredPlayerById(input.playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+    const changedBy = await this.getStoredPlayerById(input.changedByPlayerId);
+    if (!changedBy) {
+      throw new Error("공식 DUPR 반영 요청자를 찾을 수 없습니다.");
+    }
+
+    const draft = this.buildOfficialDuprAdjustmentDraft(stored, input);
+    const pendingLog = this.buildOfficialDuprAdjustmentLog({
+      stored,
+      changedBy,
+      draft,
+      reason: input.reason,
+    });
+    const log = hydrateOfficialDuprAdjustmentLog(
+      await this.dbRequest<any>("/internal/official-dupr-adjustment-logs", {
+        method: "POST",
+        body: JSON.stringify(pendingLog satisfies OfficialDuprAdjustmentLog),
+      }),
+    );
+
+    const recalculation = await this.calculateDuprRecalculation(completedMatches);
+    const impacts = this.buildOfficialDuprImpacts(recalculation);
+
+    for (const [playerId, state] of this.getChangedDuprStates(recalculation)) {
       await this.updateStoredPlayerDuprState(playerId, state);
     }
+
+    const createdAt = new Date();
+    const ratingChangeLogs = await Promise.all(
+      impacts.map((impact) =>
+        this.insertPlayerRatingChangeLog({
+          playerId: impact.playerId,
+          source: "official_adjustment_recalculation",
+          sourceLogId: log.id,
+          previousRating: impact.previousRating,
+          nextRating: impact.nextRating,
+          delta: impact.delta,
+          createdAt,
+        }),
+      ),
+    );
+    const recalculated = await this.getStoredPlayerById(stored.id);
+
+    return {
+      player: toPublicPlayer(recalculated ?? stored),
+      log,
+      ratingChangeLogs,
+    };
+  }
+
+  async recalculateDuprRatings(
+    completedMatches: Match[],
+    options: RecalculateDuprRatingsOptions = {},
+  ): Promise<{
+    ratingChangeLogs: PlayerRatingChangeLog[];
+    changedPlayerCount: number;
+  }> {
+    const recalculation = await this.calculateDuprRecalculation(completedMatches);
+    const impacts = this.buildOfficialDuprImpacts(recalculation);
+
+    for (const [playerId, state] of this.getChangedDuprStates(recalculation)) {
+      await this.updateStoredPlayerDuprState(playerId, state);
+    }
+
+    const createdAt = new Date();
+    const ratingChangeLogs =
+      options.source && options.sourceLogId
+        ? await Promise.all(
+            impacts.map((impact) =>
+              this.insertPlayerRatingChangeLog({
+                playerId: impact.playerId,
+                source: options.source!,
+                sourceLogId: options.sourceLogId!,
+                previousRating: impact.previousRating,
+                nextRating: impact.nextRating,
+                delta: impact.delta,
+                createdAt,
+              }),
+            ),
+          )
+        : [];
+
+    return {
+      ratingChangeLogs,
+      changedPlayerCount: impacts.length,
+    };
   }
 
   async initAdmin(): Promise<Player> {

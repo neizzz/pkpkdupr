@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@heroui/react";
+import type { MatchScore } from "@pkpkdupr/shared/match";
 import { useAuth } from "@/context/AuthContext";
 import Match, { type MatchInfo } from "@/components/Match";
 import TabPanelStatus from "@/components/TabPanelStatus";
@@ -31,6 +32,11 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [notice, setNotice] = useState<string | null>(null);
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [pendingMatchAction, setPendingMatchAction] = useState<{
+    matchId: string;
+    type: "submit-result" | "approve-result" | "cancel-approval";
+  } | null>(null);
+
   const loadMatches = useCallback(async () => {
     if (!token) {
       setMatches([]);
@@ -111,6 +117,97 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     );
   }, [isMyMatchOnly, matches, player?.id]);
 
+  const handleSubmitResult = useCallback(
+    async (matchId: string, scores: MatchScore[]) => {
+      if (!token) {
+        throw new Error("로그인이 필요해요.");
+      }
+      if (!isOnline) {
+        throw new Error("오프라인에서는 결과를 입력할 수 없습니다. 온라인 연결이 필요합니다.");
+      }
+
+      try {
+        setPendingMatchAction({ matchId, type: "submit-result" });
+        const res = await fetch(`/api/matches/${matchId}/result`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ scores }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "결과를 입력하지 못했어요.");
+        }
+
+        await loadMatches();
+      } finally {
+        setPendingMatchAction(null);
+      }
+    },
+    [isOnline, loadMatches, token],
+  );
+
+  const handleApproveResult = useCallback(
+    async (matchId: string) => {
+      if (!token) {
+        throw new Error("로그인이 필요해요.");
+      }
+      if (!isOnline) {
+        throw new Error("오프라인에서는 결과를 승인할 수 없습니다. 온라인 연결이 필요합니다.");
+      }
+
+      try {
+        setPendingMatchAction({ matchId, type: "approve-result" });
+        const res = await fetch(`/api/matches/${matchId}/approval`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "결과를 승인하지 못했어요.");
+        }
+
+        await loadMatches();
+      } finally {
+        setPendingMatchAction(null);
+      }
+    },
+    [isOnline, loadMatches, token],
+  );
+
+  const handleCancelApproval = useCallback(
+    async (matchId: string) => {
+      if (!token) {
+        throw new Error("로그인이 필요해요.");
+      }
+      if (!isOnline) {
+        throw new Error("오프라인에서는 합의를 취소할 수 없습니다. 온라인 연결이 필요합니다.");
+      }
+
+      try {
+        setPendingMatchAction({ matchId, type: "cancel-approval" });
+        const res = await fetch(`/api/matches/${matchId}/approval`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "합의를 취소하지 못했어요.");
+        }
+
+        await loadMatches();
+      } finally {
+        setPendingMatchAction(null);
+      }
+    },
+    [isOnline, loadMatches, token],
+  );
+
   return (
     <div className="flex min-h-full p-2">
       <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
@@ -170,6 +267,22 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                 match={match}
                 currentPlayerId={player?.id}
                 nowMs={nowMs}
+                onSubmitResult={handleSubmitResult}
+                onApproveResult={handleApproveResult}
+                onCancelApproval={handleCancelApproval}
+                isOnline={isOnline}
+                isSubmittingResult={
+                  pendingMatchAction?.matchId === match.id &&
+                  pendingMatchAction.type === "submit-result"
+                }
+                isApprovingResult={
+                  pendingMatchAction?.matchId === match.id &&
+                  pendingMatchAction.type === "approve-result"
+                }
+                isCancellingApproval={
+                  pendingMatchAction?.matchId === match.id &&
+                  pendingMatchAction.type === "cancel-approval"
+                }
               />
             ))}
           </div>

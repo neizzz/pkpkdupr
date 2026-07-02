@@ -16,7 +16,13 @@ export const matchTypeLabels: Record<MatchType, string> = {
   singles: "Singles",
 };
 
-export type MatchStatus = "created" | "completed" | "cancelled";
+export const MATCH_RESULT_MAX_SCORE_COUNT = 7;
+
+export type MatchStatus =
+  | "created"
+  | "pending-approval"
+  | "completed"
+  | "cancelled";
 
 export interface Team {
   id: string;
@@ -30,6 +36,11 @@ export interface MatchScore {
   scoreB: number;
 }
 
+export interface MatchResultApproval {
+  playerId: string;
+  approvedAt: Date;
+}
+
 export interface Match {
   id: string;
   type: MatchType;
@@ -37,6 +48,9 @@ export interface Match {
   status: MatchStatus;
   teams: [Team, Team];
   scores?: MatchScore[];
+  resultSubmittedByPlayerId: string | null;
+  resultSubmittedAt: Date | null;
+  approvals: MatchResultApproval[];
   location?: string;
   scheduledAt: Date;
   createdAt: Date;

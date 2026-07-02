@@ -64,6 +64,35 @@ export interface OfficialDuprAdjustmentLog {
   createdAt: Date;
 }
 
+export type PlayerRatingChangeSource =
+  | "official_adjustment_recalculation"
+  | "manual_recalculation";
+
+export interface PlayerRatingChangeLog {
+  id: string;
+  playerId: string;
+  source: PlayerRatingChangeSource;
+  sourceLogId: string;
+  previousRating: PlayerDupr;
+  nextRating: PlayerDupr;
+  delta: PlayerDupr;
+  createdAt: Date;
+}
+
+export interface OfficialDuprAdjustmentImpact {
+  playerId: string;
+  username: string;
+  previousRating: PlayerDupr;
+  nextRating: PlayerDupr;
+  delta: PlayerDupr;
+  relatedMatchCount: number;
+}
+
+export interface OfficialDuprAdjustmentPreview {
+  player: Player;
+  impacts: OfficialDuprAdjustmentImpact[];
+}
+
 export const DUPR_DEFAULT_RATING = 3.5;
 export const DUPR_MIN_RATING = 2;
 export const DUPR_MAX_RATING = 8;

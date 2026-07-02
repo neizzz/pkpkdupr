@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import type {
+  OfficialDuprAdjustmentPreview,
   Player,
   PlayerCreationLog,
   PlayerCreationSource,
+  PlayerRatingChangeLog,
   PlayerStatus,
   PlayerStatusChangeLog,
 } from "@pkpkdupr/shared/player";
@@ -41,6 +43,13 @@ const PROTECTED_ADMIN_USERNAME = "admin";
 const formatDupr = (value?: number | null) =>
   typeof value === "number" ? value.toFixed(3) : "NR";
 
+const formatDuprDelta = (value?: number) => {
+  if (typeof value !== "number") {
+    return "-";
+  }
+  return `${value > 0 ? "+" : ""}${value.toFixed(3)}`;
+};
+
 const AdminDashboard: React.FC = () => {
   const { player, isAdmin, logout, token } = useAuth();
   const navigate = useNavigate();
@@ -52,7 +61,12 @@ const AdminDashboard: React.FC = () => {
   const [statusDrafts, setStatusDrafts] = useState<Record<string, PlayerStatus>>(
     {},
   );
+  const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>(
+    {},
+  );
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
+  const [resettingPasswordPlayerId, setResettingPasswordPlayerId] =
+    useState<string | null>(null);
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [gender, setGender] = useState<"M" | "F">("M");
@@ -70,6 +84,12 @@ const AdminDashboard: React.FC = () => {
     men: "",
     women: "",
   });
+  const [officialPreview, setOfficialPreview] =
+    useState<OfficialDuprAdjustmentPreview | null>(null);
+  const [isPreviewingOfficialDupr, setIsPreviewingOfficialDupr] =
+    useState(false);
+  const [isApplyingOfficialDupr, setIsApplyingOfficialDupr] = useState(false);
+  const [isRecalculatingRatings, setIsRecalculatingRatings] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -240,8 +260,150 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handlePasswordReset = async (playerId: string) => {
+    const targetPlayer = players.find((item) => item.id === playerId);
+    if (targetPlayer?.username === PROTECTED_ADMIN_USERNAME) {
+      setError("admin 계정 비밀번호는 이 화면에서 초기화할 수 없습니다.");
+      setSuccess(null);
+      return;
+    }
+
+    const password = passwordDrafts[playerId] ?? "";
+    if (password.length < 6) {
+      setError("임시 비밀번호는 6자 이상이어야 합니다.");
+      setSuccess(null);
+      return;
+    }
+
+    try {
+      setResettingPasswordPlayerId(playerId);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch(`/api/admin/players/${playerId}/password-reset`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "비밀번호 초기화 실패");
+      }
+
+      const data = (await res.json()) as { player: PlayerInfo };
+      setPlayers((prev) =>
+        prev.map((item) => (item.id === data.player.id ? data.player : item)),
+      );
+      setPasswordDrafts((prev) => ({ ...prev, [playerId]: "" }));
+      setSuccess(`${data.player.username} 회원의 비밀번호가 초기화되었습니다.`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setResettingPasswordPlayerId(null);
+    }
+  };
+
+  const handleRecalculateRatings = async () => {
+    try {
+      setIsRecalculatingRatings(true);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch("/api/admin/ratings/recalculate", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "레이팅 재계산 실패");
+      }
+
+      const data = (await res.json()) as {
+        changedPlayerCount: number;
+        completedMatchCount: number;
+        ratingChangeLogs: PlayerRatingChangeLog[];
+      };
+      await loadDashboardData();
+      setSuccess(
+        `레이팅 재계산이 완료되었습니다. 완료 매치 ${data.completedMatchCount}개 기준, ${data.changedPlayerCount}명 변동 (${data.ratingChangeLogs.length}건 기록).`,
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setIsRecalculatingRatings(false);
+    }
+  };
+
+  const buildOfficialDuprPayload = () => ({
+    ratings: {
+      singles: Number(officialRatings.singles),
+      doubles: {
+        mixed: Number(officialRatings.mixed),
+        men: Number(officialRatings.men),
+        women: Number(officialRatings.women),
+      },
+    },
+    confidence: {
+      singles: Number(officialConfidence.singles),
+      doubles: {
+        mixed: Number(officialConfidence.mixed),
+        men: Number(officialConfidence.men),
+        women: Number(officialConfidence.women),
+      },
+    },
+    reason: officialReason,
+  });
+
   const handleOfficialDuprSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setSuccess(null);
+    setOfficialPreview(null);
+
+    if (!officialPlayerId) {
+      setError("공식 DUPR를 반영할 회원을 선택해주세요.");
+      return;
+    }
+
+    try {
+      setIsPreviewingOfficialDupr(true);
+      const res = await fetch(
+        `/api/admin/players/${officialPlayerId}/official-dupr/preview`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(buildOfficialDuprPayload()),
+        },
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "공식 DUPR 영향 미리보기 실패");
+      }
+
+      const data = (await res.json()) as OfficialDuprAdjustmentPreview;
+      setOfficialPreview(data);
+      setSuccess(
+        data.impacts.length > 0
+          ? `${data.impacts.length}명의 예상 점수 변동을 확인했습니다.`
+          : "예상 점수 변동이 없습니다.",
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setIsPreviewingOfficialDupr(false);
+    }
+  };
+
+  const handleOfficialDuprApply = async () => {
     setError(null);
     setSuccess(null);
 
@@ -250,24 +412,8 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
-    const ratings = {
-      singles: Number(officialRatings.singles),
-      doubles: {
-        mixed: Number(officialRatings.mixed),
-        men: Number(officialRatings.men),
-        women: Number(officialRatings.women),
-      },
-    };
-    const confidence = {
-      singles: Number(officialConfidence.singles),
-      doubles: {
-        mixed: Number(officialConfidence.mixed),
-        men: Number(officialConfidence.men),
-        women: Number(officialConfidence.women),
-      },
-    };
-
     try {
+      setIsApplyingOfficialDupr(true);
       const res = await fetch(
         `/api/admin/players/${officialPlayerId}/official-dupr`,
         {
@@ -276,11 +422,7 @@ const AdminDashboard: React.FC = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            ratings,
-            confidence,
-            reason: officialReason,
-          }),
+          body: JSON.stringify(buildOfficialDuprPayload()),
         },
       );
 
@@ -289,15 +431,23 @@ const AdminDashboard: React.FC = () => {
         throw new Error(errData.error || "공식 DUPR 반영 실패");
       }
 
-      const data = (await res.json()) as { player: PlayerInfo };
+      const data = (await res.json()) as {
+        player: PlayerInfo;
+        ratingChangeLogs: PlayerRatingChangeLog[];
+      };
       setPlayers((prev) =>
         prev.map((item) => (item.id === data.player.id ? data.player : item)),
       );
       setOfficialReason("");
+      setOfficialPreview(null);
       await loadDashboardData();
-      setSuccess("공식 DUPR 반영 및 전체 재계산이 완료되었습니다.");
+      setSuccess(
+        `공식 DUPR 반영 및 전체 재계산이 완료되었습니다. (${data.ratingChangeLogs.length}명 변동 기록)`,
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setIsApplyingOfficialDupr(false);
     }
   };
 
@@ -408,6 +558,27 @@ const AdminDashboard: React.FC = () => {
         </section>
 
         <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-700">
+                레이팅 재계산
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">
+                전체 완료 매치를 기준으로 모든 회원의 DUPR을 다시 계산합니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={isRecalculatingRatings}
+              onClick={() => void handleRecalculateRatings()}
+              className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:bg-emerald-300 transition-colors"
+            >
+              {isRecalculatingRatings ? "재계산 중..." : "전체 레이팅 재계산"}
+            </button>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
             공식 DUPR 수동 반영
           </h2>
@@ -422,7 +593,10 @@ const AdminDashboard: React.FC = () => {
               <select
                 required
                 value={officialPlayerId}
-                onChange={(e) => setOfficialPlayerId(e.target.value)}
+                onChange={(e) => {
+                  setOfficialPlayerId(e.target.value);
+                  setOfficialPreview(null);
+                }}
                 className="w-full px-4 py-2 border rounded-lg bg-white"
               >
                 <option value="">회원 선택</option>
@@ -440,7 +614,10 @@ const AdminDashboard: React.FC = () => {
               <input
                 type="text"
                 value={officialReason}
-                onChange={(e) => setOfficialReason(e.target.value)}
+                onChange={(e) => {
+                  setOfficialReason(e.target.value);
+                  setOfficialPreview(null);
+                }}
                 placeholder="정식 DUPR 반영 사유"
                 className="w-full px-4 py-2 border rounded-lg"
               />
@@ -469,6 +646,7 @@ const AdminDashboard: React.FC = () => {
                         [key]: e.target.value,
                       }))
                     }
+                    onInput={() => setOfficialPreview(null)}
                     className="w-full px-4 py-2 border rounded-lg"
                   />
                 </div>
@@ -491,20 +669,121 @@ const AdminDashboard: React.FC = () => {
                         [key]: e.target.value,
                       }))
                     }
+                    onInput={() => setOfficialPreview(null)}
                     className="w-full px-4 py-2 border rounded-lg"
                   />
                 </div>
               </React.Fragment>
             ))}
-            <div className="col-span-4">
+            <div className="col-span-4 flex flex-wrap items-center gap-3">
               <button
                 type="submit"
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+                disabled={isPreviewingOfficialDupr || isApplyingOfficialDupr}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-indigo-300 transition-colors"
               >
-                공식 DUPR 반영 및 전체 재계산
+                {isPreviewingOfficialDupr ? "미리보기 중..." : "영향 미리보기"}
               </button>
+              {officialPreview ? (
+                <button
+                  type="button"
+                  disabled={isApplyingOfficialDupr || isPreviewingOfficialDupr}
+                  onClick={handleOfficialDuprApply}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:bg-emerald-300 transition-colors"
+                >
+                  {isApplyingOfficialDupr ? "반영 중..." : "확정 반영"}
+                </button>
+              ) : null}
             </div>
           </form>
+          {officialPreview ? (
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-indigo-900">
+                    예상 점수 변동
+                  </h3>
+                  <p className="text-xs text-indigo-700">
+                    {officialPreview.player.username} 공식 DUPR 기준점 반영 후
+                    전체 완료 매치를 재계산한 결과입니다.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
+                  {officialPreview.impacts.length}명
+                </span>
+              </div>
+              {officialPreview.impacts.length === 0 ? (
+                <p className="text-sm text-gray-500">예상 변동이 없습니다.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b text-left text-indigo-800">
+                        <th className="pb-2">회원</th>
+                        <th className="pb-2">Total</th>
+                        <th className="pb-2">Singles</th>
+                        <th className="pb-2">Mixed</th>
+                        <th className="pb-2">Men</th>
+                        <th className="pb-2">Women</th>
+                        <th className="pb-2">관련 매치</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {officialPreview.impacts.map((impact) => (
+                        <tr key={impact.playerId} className="border-b last:border-0">
+                          <td className="py-2 font-semibold text-gray-800">
+                            {impact.username}
+                          </td>
+                          {[
+                            ["total", impact.nextRating.total, impact.delta.total],
+                            [
+                              "singles",
+                              impact.nextRating.singles,
+                              impact.delta.singles,
+                            ],
+                            [
+                              "mixed",
+                              impact.nextRating.doubles.mixed,
+                              impact.delta.doubles.mixed,
+                            ],
+                            [
+                              "men",
+                              impact.nextRating.doubles.men,
+                              impact.delta.doubles.men,
+                            ],
+                            [
+                              "women",
+                              impact.nextRating.doubles.women,
+                              impact.delta.doubles.women,
+                            ],
+                          ].map(([key, nextValue, deltaValue]) => (
+                            <td key={key} className="py-2">
+                              <span className="font-medium text-gray-800">
+                                {formatDupr(nextValue as number)}
+                              </span>
+                              <span
+                                className={`ml-1 ${
+                                  (deltaValue as number) > 0
+                                    ? "text-emerald-600"
+                                    : (deltaValue as number) < 0
+                                      ? "text-red-500"
+                                      : "text-gray-400"
+                                }`}
+                              >
+                                ({formatDuprDelta(deltaValue as number)})
+                              </span>
+                            </td>
+                          ))}
+                          <td className="py-2 text-gray-600">
+                            {impact.relatedMatchCount}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : null}
         </section>
 
         <section className="bg-white rounded-xl shadow-sm mt-2 p-6 space-y-4">
@@ -526,6 +805,7 @@ const AdminDashboard: React.FC = () => {
                     <th className="pb-2">성별</th>
                     <th className="pb-2">현재 상태</th>
                     <th className="pb-2">상태 변경</th>
+                    <th className="pb-2">비밀번호 초기화</th>
                     <th className="pb-2">생성 로그</th>
                     <th className="pb-2 pr-2">상태 로그</th>
                   </tr>
@@ -537,6 +817,8 @@ const AdminDashboard: React.FC = () => {
                     const latestCreationLog = creationLogs[0];
                     const draftStatus = statusDrafts[p.id] ?? p.status;
                     const isSaving = savingPlayerId === p.id;
+                    const isResettingPassword = resettingPasswordPlayerId === p.id;
+                    const passwordDraft = passwordDrafts[p.id] ?? "";
                     const isDirty = draftStatus !== p.status;
                     const isProtectedAdminAccount =
                       p.username === PROTECTED_ADMIN_USERNAME;
@@ -594,6 +876,45 @@ const AdminDashboard: React.FC = () => {
                               </span>
                             ) : null}
                           </div>
+                        </td>
+                        <td className="py-3 min-w-[260px]">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="password"
+                              minLength={6}
+                              placeholder="임시 비밀번호"
+                              value={passwordDraft}
+                              disabled={isProtectedAdminAccount}
+                              onChange={(e) =>
+                                setPasswordDrafts((prev) => ({
+                                  ...prev,
+                                  [p.id]: e.target.value,
+                                }))
+                              }
+                              className="w-32 border rounded-lg px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                            />
+                            <button
+                              type="button"
+                              disabled={
+                                isProtectedAdminAccount ||
+                                isResettingPassword ||
+                                passwordDraft.length < 6
+                              }
+                              onClick={() => void handlePasswordReset(p.id)}
+                              className="px-3 py-2 rounded-lg bg-orange-600 text-white disabled:bg-slate-300"
+                            >
+                              {isResettingPassword ? "초기화 중..." : "초기화"}
+                            </button>
+                          </div>
+                          {isProtectedAdminAccount ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                              admin 계정은 변경 불가
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-xs text-gray-400">
+                              초기화 후 첫 로그인 상태가 됩니다.
+                            </p>
+                          )}
                         </td>
                         <td className="py-3 min-w-[240px] text-xs text-gray-600">
                           {!latestCreationLog ? (

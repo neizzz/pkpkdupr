@@ -14,9 +14,19 @@ import {
   type CreatePlayerStatusChangeLogInput,
 } from "./repositories/PlayerStatusChangeLogRepository";
 import {
+  PlayerRatingChangeLogRepository,
+  type CreatePlayerRatingChangeLogInput,
+} from "./repositories/PlayerRatingChangeLogRepository";
+import {
   OfficialDuprAdjustmentLogRepository,
   type CreateOfficialDuprAdjustmentLogInput,
 } from "./repositories/OfficialDuprAdjustmentLogRepository";
+import {
+  CompletedMatchApprovalCancelError,
+  CompletedMatchResultEditError,
+  MatchRepository,
+  type CreateMatchInput,
+} from "./repositories/MatchRepository";
 import {
   getDevMockUsernames,
   isDevMockDataEnabled,
@@ -30,10 +40,13 @@ const client = getDbClient();
 const playerRepository = new PlayerRepository(db);
 const playerCreationLogRepository = new PlayerCreationLogRepository(db);
 const playerStatusChangeLogRepository = new PlayerStatusChangeLogRepository(db);
+const playerRatingChangeLogRepository = new PlayerRatingChangeLogRepository(db);
 const officialDuprAdjustmentLogRepository =
   new OfficialDuprAdjustmentLogRepository(db);
+const matchRepository = new MatchRepository(db, client);
 const testDataRepository = new TestDataRepository(
   db,
+  client,
   playerRepository,
   playerCreationLogRepository,
   playerStatusChangeLogRepository,
@@ -56,18 +69,9 @@ const safeExec = async (sql: string) => {
   }
 };
 
-type TableInfoRow = {
-  cid?: unknown;
-  name?: unknown;
-  type?: unknown;
-  notnull?: unknown;
-  dflt_value?: unknown;
-  pk?: unknown;
-};
-
 const getTableInfo = async (tableName: string) => {
   const result = await client.execute(`PRAGMA table_info(${tableName})`);
-  return result.rows as TableInfoRow[];
+  return result.rows as Array<Record<string, unknown>>;
 };
 
 const hasColumn = async (tableName: string, columnName: string) => {
@@ -76,13 +80,15 @@ const hasColumn = async (tableName: string, columnName: string) => {
 };
 
 const ensurePlayersDuprRatingNullable = async () => {
-  const rows = await getTableInfo("players");
-  const duprColumn = rows.find((row) => String(row.name) === "dupr_rating");
-  if (!duprColumn || Number(duprColumn.notnull) === 0) {
+  const duprColumn = (await getTableInfo("players")).find(
+    (row) => String(row.name) === "dupr_rating",
+  );
+  if (!duprColumn || Number(duprColumn.notnull ?? 0) === 0) {
     return;
   }
 
-  await client.execute("ALTER TABLE players RENAME TO players_legacy_not_null_dupr");
+  await client.execute(`DROP TABLE IF EXISTS players_notnull_dupr_backup`);
+  await client.execute(`ALTER TABLE players RENAME TO players_notnull_dupr_backup`);
   await client.execute(`
     CREATE TABLE players (
       id TEXT PRIMARY KEY,
@@ -121,19 +127,19 @@ const ensurePlayersDuprRatingNullable = async () => {
       is_first_login,
       created_at,
       updated_at
-    FROM players_legacy_not_null_dupr
+    FROM players_notnull_dupr_backup
   `);
-  await client.execute("DROP TABLE players_legacy_not_null_dupr");
+  await client.execute(`DROP TABLE players_notnull_dupr_backup`);
 };
 
 const initSchema = async () => {
   await client.execute(`
-    CREATE TABLE IF NOT EXISTS players (
-      id TEXT PRIMARY KEY,
-      username TEXT NOT NULL UNIQUE,
-      dupr_rating TEXT,
-      gender TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'active',
+	    CREATE TABLE IF NOT EXISTS players (
+	      id TEXT PRIMARY KEY,
+	      username TEXT NOT NULL UNIQUE,
+	      dupr_rating TEXT,
+	      gender TEXT NOT NULL,
+	      status TEXT NOT NULL DEFAULT 'active',
       avatar_url TEXT,
       password_hash TEXT NOT NULL DEFAULT '',
       is_first_login INTEGER NOT NULL DEFAULT 1,
@@ -191,17 +197,37 @@ const initSchema = async () => {
   `);
 
   await client.execute(`
+    CREATE TABLE IF NOT EXISTS player_rating_change_logs (
+      id TEXT PRIMARY KEY,
+      player_id TEXT NOT NULL,
+      source TEXT NOT NULL,
+      source_log_id TEXT NOT NULL,
+      previous_rating_json TEXT NOT NULL,
+      next_rating_json TEXT NOT NULL,
+      delta_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS matches (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL CHECK (type IN ('mixed-doubles', 'men-doubles', 'women-doubles', 'singles')),
+      creator_player_id TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL,
       location TEXT NOT NULL,
       scheduled_at INTEGER NOT NULL,
       completed_at INTEGER,
+      result_submitted_by_player_id TEXT,
+      result_submitted_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
   `);
+
+  await safeExec(`ALTER TABLE matches ADD COLUMN creator_player_id TEXT NOT NULL DEFAULT ''`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_at INTEGER`);
 
   await client.execute(`
     UPDATE matches
@@ -266,6 +292,31 @@ const initSchema = async () => {
   `);
 
   await client.execute(`
+    UPDATE matches
+    SET creator_player_id = COALESCE(
+      NULLIF(creator_player_id, ''),
+      (
+        SELECT player_id
+        FROM match_participants
+        WHERE match_participants.match_id = matches.id
+        ORDER BY team_index ASC, id ASC
+        LIMIT 1
+      ),
+      ''
+    )
+    WHERE creator_player_id IS NULL OR creator_player_id = ''
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS match_result_approvals (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      player_id TEXT NOT NULL,
+      approved_at INTEGER NOT NULL
+    )
+  `);
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS official_dupr_adjustment_logs (
       id TEXT PRIMARY KEY,
       player_id TEXT NOT NULL,
@@ -294,8 +345,6 @@ const initSchema = async () => {
 
     await playerRepository.updateDuprState(
       player.id,
-      // PlayerRepository stores legacy and new shapes in the same column.
-      // Rewriting on boot keeps old numeric and pre-metrics JSON rows compatible.
       normalizeStoredPlayerDupr(player.duprRating),
     );
   }
@@ -418,6 +467,87 @@ app.patch("/internal/players/:id/dupr-state", async (req, res) => {
   }
 });
 
+app.get("/internal/matches", async (req, res) => {
+  try {
+    const page = Number(req.query.page ?? 0);
+    const limit = Number(req.query.limit ?? 20);
+    const playerId =
+      typeof req.query.playerId === "string" ? req.query.playerId : undefined;
+
+    res.json(await matchRepository.findAll(page, limit, playerId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/matches/:id", async (req, res) => {
+  try {
+    const match = await matchRepository.findById(req.params.id);
+    if (!match) {
+      return res.status(404).json({ error: "매치를 찾을 수 없습니다." });
+    }
+    res.json(match);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/matches", async (req, res) => {
+  try {
+    const match = await matchRepository.create(req.body as CreateMatchInput);
+    res.json(match);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/matches/:id/result", async (req, res) => {
+  try {
+    const match = await matchRepository.submitResult(
+      req.params.id,
+      req.body.submittedByPlayerId,
+      req.body.scores,
+      req.body.approvalId,
+      req.body.submittedAt ? new Date(req.body.submittedAt) : new Date(),
+    );
+    res.json(match);
+  } catch (error) {
+    if (error instanceof CompletedMatchResultEditError) {
+      return res.status(409).json({ error: error.message });
+    }
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/matches/:id/approvals", async (req, res) => {
+  try {
+    const match = await matchRepository.approveResult(
+      req.params.id,
+      req.body.playerId,
+      req.body.approvalId,
+      req.body.approvedAt ? new Date(req.body.approvedAt) : new Date(),
+    );
+    res.json(match);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.delete("/internal/matches/:id/approvals/:playerId", async (req, res) => {
+  try {
+    const match = await matchRepository.cancelApproval(
+      req.params.id,
+      req.params.playerId,
+    );
+    res.json(match);
+  } catch (error) {
+    if (error instanceof CompletedMatchApprovalCancelError) {
+      return res.status(409).json({ error: error.message });
+    }
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
 app.get("/internal/player-creation-logs", async (_req, res) => {
   try {
     res.json(await playerCreationLogRepository.findAll());
@@ -449,6 +579,25 @@ app.post("/internal/player-status-change-logs", async (req, res) => {
   try {
     const log = await playerStatusChangeLogRepository.create(
       req.body as CreatePlayerStatusChangeLogInput,
+    );
+    res.json(log);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/player-rating-change-logs", async (_req, res) => {
+  try {
+    res.json(await playerRatingChangeLogRepository.findAll());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/player-rating-change-logs", async (req, res) => {
+  try {
+    const log = await playerRatingChangeLogRepository.create(
+      req.body as CreatePlayerRatingChangeLogInput,
     );
     res.json(log);
   } catch (error) {

@@ -1,192 +1,159 @@
-import type { Match, MatchScore, Team } from "@pkpkdupr/shared/match";
-import { Player, PlayerDupr } from "@pkpkdupr/shared/player";
+import type { Match, MatchScore } from "@pkpkdupr/shared/match";
 
-const cloneScores = (scores?: MatchScore[]): MatchScore[] | undefined =>
-  scores?.map(({ scoreA, scoreB }) => ({ scoreA, scoreB }));
+const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
 
-const cloneDupr = (duprRating: PlayerDupr): PlayerDupr => ({
-  total: duprRating.total,
-  doubles: {
-    mixed: duprRating.doubles.mixed,
-    men: duprRating.doubles.men,
-    women: duprRating.doubles.women,
-  },
-  singles: duprRating.singles,
-});
+export class DbRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "DbRequestError";
+  }
+}
 
-const clonePlayer = (player: Player): Player => ({
-  ...player,
-  duprRating: player.duprRating ? cloneDupr(player.duprRating) : null,
-  createdAt: new Date(player.createdAt),
-  updatedAt: new Date(player.updatedAt),
-});
+const toDateOrNull = (value: string | Date | null | undefined) =>
+  value == null ? null : new Date(value);
 
-const cloneTeam = (team: Team): Team => ({
-  ...team,
-  players: team.players.map(clonePlayer),
-});
-
-const cloneMatch = (match: Match): Match => ({
-  ...match,
-  teams: [cloneTeam(match.teams[0]), cloneTeam(match.teams[1])],
-  scores: cloneScores(match.scores),
-  scheduledAt: new Date(match.scheduledAt),
-  completedAt: match.completedAt ? new Date(match.completedAt) : null,
-  createdAt: new Date(match.createdAt),
-  updatedAt: new Date(match.updatedAt),
-});
-
-const createDupr = (total: number): PlayerDupr => ({
-  total,
-  doubles: {
-    mixed: total + 0.012,
-    men: total - 0.008,
-    women: total + 0.004,
-  },
-  singles: total - 0.016,
-});
-
-const createPlayer = (
-  id: string,
-  username: string,
-  gender: Player["gender"],
-  totalRating: number,
-  status: Player["status"] = "active",
-): Player => {
-  const createdAt = new Date("2026-06-01T09:00:00+09:00");
-
-  return {
-    id,
-    username,
-    gender,
-    status,
-    duprRating: createDupr(totalRating),
-    createdAt,
-    updatedAt: createdAt,
-  };
-};
-
-const mockPlayers = {
-  alice: createPlayer("dev-player-alice", "dev_alice", "F", 3.62),
-  bob: createPlayer("dev-player-bob", "dev_bob", "M", 4.11),
-  chris: createPlayer(
-    "dev-player-chris",
-    "dev_chris_inactive",
-    "M",
-    2.98,
-    "inactive",
+const hydrateMatch = (record: any): Match => ({
+  ...record,
+  teams: [
+    {
+      ...record.teams[0],
+      players: record.teams[0].players.map((player: any) => ({
+        ...player,
+        createdAt: new Date(player.createdAt),
+        updatedAt: new Date(player.updatedAt),
+      })),
+    },
+    {
+      ...record.teams[1],
+      players: record.teams[1].players.map((player: any) => ({
+        ...player,
+        createdAt: new Date(player.createdAt),
+        updatedAt: new Date(player.updatedAt),
+      })),
+    },
+  ],
+  scores: record.scores?.map(({ scoreA, scoreB }: MatchScore) => ({
+    scoreA,
+    scoreB,
+  })),
+  resultSubmittedByPlayerId: record.resultSubmittedByPlayerId ?? null,
+  resultSubmittedAt: toDateOrNull(record.resultSubmittedAt),
+  approvals: (record.approvals ?? []).map(
+    (approval: { playerId: string; approvedAt: string | Date }) => ({
+      playerId: approval.playerId,
+      approvedAt: new Date(approval.approvedAt),
+    }),
   ),
-  admin: createPlayer("admin-player", "admin", "M", 4.35),
-};
-
-const mockMatches: Match[] = [
-  {
-    id: "dev-match-open-play-001",
-    type: "mixed-doubles",
-    creatorPlayerId: mockPlayers.alice.id,
-    status: "completed",
-    teams: [
-      {
-        id: "dev-team-sunrise",
-        name: "Sunrise",
-        players: [mockPlayers.alice, mockPlayers.bob],
-      },
-      {
-        id: "dev-team-smash",
-        name: "Smash Bros",
-        players: [mockPlayers.admin, mockPlayers.chris],
-      },
-    ],
-    scores: [
-      { scoreA: 11, scoreB: 8 },
-      { scoreA: 11, scoreB: 6 },
-    ],
-    location: "Dev Court A",
-    scheduledAt: new Date("2026-06-05T19:00:00+09:00"),
-    completedAt: new Date("2026-06-05T20:10:00+09:00"),
-    createdAt: new Date("2026-06-05T18:00:00+09:00"),
-    updatedAt: new Date("2026-06-05T20:10:00+09:00"),
-  },
-  {
-    id: "dev-match-ladder-002",
-    type: "singles",
-    creatorPlayerId: mockPlayers.alice.id,
-    status: "created",
-    teams: [
-      {
-        id: "dev-team-alice",
-        name: "Alice",
-        players: [mockPlayers.alice],
-      },
-      {
-        id: "dev-team-admin",
-        name: "Admin",
-        players: [mockPlayers.admin],
-      },
-    ],
-    scores: [],
-    location: "Dev Court B",
-    scheduledAt: new Date("2026-06-07T09:30:00+09:00"),
-    completedAt: null,
-    createdAt: new Date("2026-06-06T13:20:00+09:00"),
-    updatedAt: new Date("2026-06-06T13:20:00+09:00"),
-  },
-  {
-    id: "dev-match-cancelled-003",
-    type: "mixed-doubles",
-    creatorPlayerId: mockPlayers.bob.id,
-    status: "cancelled",
-    teams: [
-      {
-        id: "dev-team-north",
-        name: "North Court",
-        players: [mockPlayers.bob, mockPlayers.admin],
-      },
-      {
-        id: "dev-team-south",
-        name: "South Court",
-        players: [mockPlayers.alice, mockPlayers.chris],
-      },
-    ],
-    scores: [],
-    location: "Dev Court C",
-    scheduledAt: new Date("2026-06-08T20:00:00+09:00"),
-    completedAt: null,
-    createdAt: new Date("2026-06-07T10:00:00+09:00"),
-    updatedAt: new Date("2026-06-07T18:10:00+09:00"),
-  },
-];
+  scheduledAt: new Date(record.scheduledAt),
+  completedAt: toDateOrNull(record.completedAt),
+  createdAt: new Date(record.createdAt),
+  updatedAt: new Date(record.updatedAt),
+});
 
 /**
- * MatchRepository - 경기 데이터 저장소
- *
- * 모든 경기의 CRUD 작업을 담당합니다.
+ * MatchRepository - API 서버에서 DB 서버의 match 저장소를 호출합니다.
  */
 export class MatchRepository {
+  private async dbRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const res = await fetch(`${DB_SERVER_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers ?? {}),
+      },
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new DbRequestError(
+        errorData.error || `DB 서버 요청 실패: ${res.status}`,
+        res.status,
+      );
+    }
+
+    return (await res.json()) as T;
+  }
+
   /** ID로 단일 경기 조회 */
   async findById(matchId: string): Promise<Match | undefined> {
-    const match = mockMatches.find((item) => item.id === matchId);
-    return match ? cloneMatch(match) : undefined;
+    try {
+      return hydrateMatch(
+        await this.dbRequest<any>(`/internal/matches/${matchId}`),
+      );
+    } catch (error) {
+      if ((error as Error).message.includes("찾을 수 없습니다")) {
+        return undefined;
+      }
+      throw error;
+    }
   }
 
   /** 신규 경기 추가 */
   async create(
     match: Omit<Match, "id" | "createdAt" | "updatedAt"> & { id?: string },
   ): Promise<Match> {
-    const now = new Date();
-    const nextMatch: Match = {
-      ...match,
-      id: match.id ?? `match-${Date.now()}`,
-      teams: [cloneTeam(match.teams[0]), cloneTeam(match.teams[1])],
-      scores: cloneScores(match.scores),
-      scheduledAt: new Date(match.scheduledAt),
-      completedAt: match.completedAt ? new Date(match.completedAt) : null,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const id = match.id ?? `match-${Date.now()}`;
+    const created = await this.dbRequest<any>("/internal/matches", {
+      method: "POST",
+      body: JSON.stringify({
+        id,
+        ...match,
+        resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
+        resultSubmittedAt: match.resultSubmittedAt ?? null,
+        approvals: match.approvals ?? [],
+      }),
+    });
 
-    mockMatches.unshift(nextMatch);
-    return cloneMatch(nextMatch);
+    return hydrateMatch(created);
+  }
+
+  async submitResult(
+    matchId: string,
+    submittedByPlayerId: string,
+    scores: MatchScore[],
+  ): Promise<Match> {
+    const updated = await this.dbRequest<any>(
+      `/internal/matches/${matchId}/result`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          submittedByPlayerId,
+          scores,
+          approvalId: `${matchId}-approval-${submittedByPlayerId}`,
+          submittedAt: new Date(),
+        }),
+      },
+    );
+
+    return hydrateMatch(updated);
+  }
+
+  async approveResult(matchId: string, playerId: string): Promise<Match> {
+    const updated = await this.dbRequest<any>(
+      `/internal/matches/${matchId}/approvals`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          playerId,
+          approvalId: `${matchId}-approval-${playerId}`,
+          approvedAt: new Date(),
+        }),
+      },
+    );
+
+    return hydrateMatch(updated);
+  }
+
+  async cancelApproval(matchId: string, playerId: string): Promise<Match> {
+    const updated = await this.dbRequest<any>(
+      `/internal/matches/${matchId}/approvals/${playerId}`,
+      { method: "DELETE" },
+    );
+
+    return hydrateMatch(updated);
   }
 
   /** 특정 플레이어의 경기 이력 조회 */
@@ -195,34 +162,30 @@ export class MatchRepository {
     page: number = 0,
     limit: number = 20,
   ): Promise<{ matches: Match[]; total: number }> {
-    const filteredMatches = mockMatches.filter((match) =>
-      match.teams.some((team) =>
-        team.players.some((player) => player.id === playerId),
-      ),
-    );
-
-    const start = page * limit;
-    const pagedMatches = filteredMatches
-      .slice(start, start + limit)
-      .map(cloneMatch);
-
-    return {
-      matches: pagedMatches,
-      total: filteredMatches.length,
-    };
+    return await this.findAll(page, limit, playerId);
   }
 
   /** 모든 경기 목록 */
   async findAll(
     page: number = 0,
     limit: number = 20,
+    playerId?: string,
   ): Promise<{ matches: Match[]; total: number }> {
-    const start = page * limit;
-    const pagedMatches = mockMatches.slice(start, start + limit).map(cloneMatch);
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (playerId) {
+      params.set("playerId", playerId);
+    }
+
+    const result = await this.dbRequest<{ matches: any[]; total: number }>(
+      `/internal/matches?${params.toString()}`,
+    );
 
     return {
-      matches: pagedMatches,
-      total: mockMatches.length,
+      matches: result.matches.map(hydrateMatch),
+      total: result.total,
     };
   }
 }

@@ -128,7 +128,10 @@ export class PlayerRepository {
   async clearDuprState(id: string): Promise<StoredPlayerRecord | undefined> {
     await this.db
       .update(players)
-      .set({ duprRating: null, updatedAt: new Date() })
+      .set({
+        duprRating: null,
+        updatedAt: new Date(),
+      })
       .where(eq(players.id, id));
     return await this.findById(id);
   }

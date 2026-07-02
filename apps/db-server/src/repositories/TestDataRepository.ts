@@ -2,6 +2,7 @@ import type { PlayerDupr } from "@pkpkdupr/shared/player";
 import { eq } from "drizzle-orm";
 import {
   matchParticipants,
+  matchResultApprovals,
   matches,
   matchScores,
   playerCreationLogs,
@@ -156,20 +157,26 @@ const mockMatches = [
   {
     id: "dev-match-open-play-001",
     type: "mixed-doubles",
+    creatorPlayerId: "dev-player-alice",
     status: "completed",
     location: "Dev Court A",
     scheduledAt: new Date("2026-06-05T19:00:00+09:00"),
     completedAt: new Date("2026-06-05T20:10:00+09:00"),
+    resultSubmittedByPlayerId: "dev-player-alice",
+    resultSubmittedAt: new Date("2026-06-05T20:05:00+09:00"),
     createdAt: new Date("2026-06-05T18:00:00+09:00"),
     updatedAt: new Date("2026-06-05T20:10:00+09:00"),
   },
   {
     id: "dev-match-ladder-002",
     type: "singles",
+    creatorPlayerId: "dev-player-alice",
     status: "created",
     location: "Dev Court B",
     scheduledAt: new Date("2026-06-07T09:30:00+09:00"),
     completedAt: null,
+    resultSubmittedByPlayerId: null,
+    resultSubmittedAt: null,
     createdAt: new Date("2026-06-06T13:20:00+09:00"),
     updatedAt: new Date("2026-06-06T13:20:00+09:00"),
   },
@@ -229,6 +236,18 @@ const mockMatchParticipants = [
   },
 ];
 
+const mockMatchResultApprovals = [
+  "dev-player-alice",
+  "dev-player-bob",
+  "dev-player-cara",
+  "dev-player-finn",
+].map((playerId) => ({
+  id: `dev-match-open-play-001-approval-${playerId}`,
+  matchId: "dev-match-open-play-001",
+  playerId,
+  approvedAt: new Date("2026-06-05T20:10:00+09:00"),
+}));
+
 const isUniqueConstraintError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("UNIQUE") || message.includes("unique");
@@ -237,6 +256,7 @@ const isUniqueConstraintError = (error: unknown) => {
 export class TestDataRepository {
   constructor(
     private db: any,
+    private client: any,
     private playerRepository: PlayerRepository,
     private playerCreationLogRepository: PlayerCreationLogRepository,
     private playerStatusChangeLogRepository: PlayerStatusChangeLogRepository,
@@ -268,6 +288,10 @@ export class TestDataRepository {
 
     for (const participant of mockMatchParticipants) {
       await this.createMatchParticipantIfMissing(participant);
+    }
+
+    for (const approval of mockMatchResultApprovals) {
+      await this.createMatchResultApprovalIfMissing(approval);
     }
   }
 
@@ -341,12 +365,39 @@ export class TestDataRepository {
     }
 
     try {
-      await this.db.insert(matchScores).values(data);
+      await this.insertMatchScore(data);
     } catch (error) {
       if (!isUniqueConstraintError(error)) {
         throw error;
       }
     }
+  }
+
+  private async insertMatchScore(data: (typeof mockMatchScores)[number]) {
+    const result = await this.client.execute(`PRAGMA table_info(match_scores)`);
+    const columns = new Set(
+      result.rows.map((row: { name?: unknown }) => String(row.name)),
+    );
+    const insertColumns = ["id", "match_id"];
+    const args: Array<string | number> = [data.id, data.matchId];
+    const addColumn = (column: string, value: number) => {
+      if (!columns.has(column)) {
+        return;
+      }
+      insertColumns.push(column);
+      args.push(value);
+    };
+
+    addColumn("score_a", data.scoreA);
+    addColumn("score_b", data.scoreB);
+    addColumn("team_a", data.scoreA);
+    addColumn("team_b", data.scoreB);
+    addColumn("t_b", data.scoreB);
+
+    await this.client.execute({
+      sql: `INSERT INTO match_scores (${insertColumns.join(", ")}) VALUES (${insertColumns.map(() => "?").join(", ")})`,
+      args,
+    });
   }
 
   private async createMatchParticipantIfMissing(
@@ -363,6 +414,27 @@ export class TestDataRepository {
 
     try {
       await this.db.insert(matchParticipants).values(data);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  private async createMatchResultApprovalIfMissing(
+    data: (typeof mockMatchResultApprovals)[number],
+  ) {
+    const existing = await this.db
+      .select()
+      .from(matchResultApprovals)
+      .where(eq(matchResultApprovals.id, data.id))
+      .get();
+    if (existing) {
+      return;
+    }
+
+    try {
+      await this.db.insert(matchResultApprovals).values(data);
     } catch (error) {
       if (!isUniqueConstraintError(error)) {
         throw error;

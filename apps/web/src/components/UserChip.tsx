@@ -9,6 +9,7 @@ interface UserChipProps {
   onRemove?: () => void;
   removeLabel?: string;
   isMe?: boolean;
+  endAdornment?: React.ReactNode;
 }
 
 const UserChip: React.FC<UserChipProps> = ({
@@ -16,6 +17,7 @@ const UserChip: React.FC<UserChipProps> = ({
   onRemove,
   removeLabel,
   isMe = false,
+  endAdornment,
 }) => {
   const genderBgClass =
     player.gender === "M"
@@ -29,7 +31,7 @@ const UserChip: React.FC<UserChipProps> = ({
   return (
     <Chip
       variant="secondary"
-      className={`h-6 max-w-full overflow-hidden rounded-full px-0 ${onRemove ? "pr-1" : "pr-3"} shadow-none ${genderBgClass}`}
+      className={`relative h-6 w-30 overflow-hidden rounded-full px-0 ${onRemove ? "pr-1" : "pr-3"} shadow-none ${genderBgClass}`}
     >
       <div className="flex min-w-0 max-w-full items-center gap-1">
         <Avatar
@@ -42,6 +44,11 @@ const UserChip: React.FC<UserChipProps> = ({
         <span className="min-w-0 truncate text-sm font-medium text-current">
           {player.username}
         </span>
+        {endAdornment ? (
+          <span className="absolute right-[6px] shrink-0 leading-none">
+            {endAdornment}
+          </span>
+        ) : null}
         {onRemove ? (
           <button
             type="button"
