@@ -1,3 +1,4 @@
+import { Spinner } from "@heroui/react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
@@ -11,7 +12,12 @@ function AppRoutes() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-gray-500">로딩 중...</p>
+        <Spinner
+          aria-label="앱 로딩 중"
+          className="text-[#409eff]"
+          color="current"
+          size="md"
+        />
       </div>
     );
   }

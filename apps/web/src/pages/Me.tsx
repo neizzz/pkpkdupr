@@ -5,6 +5,7 @@ import BottomSheet from "@/components/BottomSheet";
 import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
+import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
@@ -14,6 +15,7 @@ const Me: React.FC = () => {
   const { closeDepth, pushDepth } = useTabNavigation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
+  const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
 
   const closeSettings = useCallback(() => {
     setIsSettingsOpen(false);
@@ -22,12 +24,15 @@ const Me: React.FC = () => {
   useEffect(() => {
     if (!token || !player?.id) {
       setMatchStats(createEmptyMatchStats());
+      setIsMatchStatsLoading(false);
       return;
     }
 
     const abortController = new AbortController();
 
     const loadMatchStats = async () => {
+      setIsMatchStatsLoading(true);
+
       try {
         const searchParams = new URLSearchParams({
           playerId: player.id,
@@ -53,6 +58,10 @@ const Me: React.FC = () => {
       } catch {
         if (!abortController.signal.aborted) {
           setMatchStats(createEmptyMatchStats());
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsMatchStatsLoading(false);
         }
       }
     };
@@ -97,12 +106,16 @@ const Me: React.FC = () => {
 
   return (
     <>
-      <MemberProfile
-        player={player}
-        isMe
-        headerAction={settingsButton}
-        matchStats={matchStats}
-      />
+      {isMatchStatsLoading ? (
+        <TabPanelStatus ariaLabel="내 프로필 로딩 중" isLoading />
+      ) : (
+        <MemberProfile
+          player={player}
+          isMe
+          headerAction={settingsButton}
+          matchStats={matchStats}
+        />
+      )}
 
       <BottomSheet
         isOpen={isSettingsOpen}
