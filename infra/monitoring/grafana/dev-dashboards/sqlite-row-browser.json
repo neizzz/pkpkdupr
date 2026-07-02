@@ -1,0 +1,510 @@
+{
+  "title": "SQLite Row Browser",
+  "uid": "sqlite-row-browser",
+  "version": 5,
+  "revision": 5,
+  "schemaVersion": 39,
+  "tags": [
+    "sqlite",
+    "rows",
+    "pkpkdupr",
+    "dev"
+  ],
+  "timezone": "Asia/Seoul",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 10,
+      "title": "Database File Size",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT (SELECT page_count FROM pragma_page_count()) * (SELECT page_size FROM pragma_page_size()) AS database_size_bytes;",
+          "queryText": "SELECT (SELECT page_count FROM pragma_page_count()) * (SELECT page_size FROM pragma_page_size()) AS database_size_bytes;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 11,
+      "title": "Players Count",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS players_count FROM players;",
+          "queryText": "SELECT COUNT(*) AS players_count FROM players;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 12,
+      "title": "Creation Logs Count",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS player_creation_logs_count FROM player_creation_logs;",
+          "queryText": "SELECT COUNT(*) AS player_creation_logs_count FROM player_creation_logs;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 13,
+      "title": "Status Change Logs Count",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS player_status_change_logs_count FROM player_status_change_logs;",
+          "queryText": "SELECT COUNT(*) AS player_status_change_logs_count FROM player_status_change_logs;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 14,
+      "title": "Matches Count",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS matches_count FROM matches;",
+          "queryText": "SELECT COUNT(*) AS matches_count FROM matches;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 15,
+      "title": "Match Scores Count",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT COUNT(*) AS match_scores_count FROM match_scores;",
+          "queryText": "SELECT COUNT(*) AS match_scores_count FROM match_scores;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 1,
+      "title": "Players",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT id, username, gender, status, is_first_login, datetime(created_at, 'unixepoch', 'localtime') AS created_at, datetime(updated_at, 'unixepoch', 'localtime') AS updated_at FROM players ORDER BY created_at DESC LIMIT 200;",
+          "queryText": "SELECT id, username, gender, status, is_first_login, datetime(created_at, 'unixepoch', 'localtime') AS created_at, datetime(updated_at, 'unixepoch', 'localtime') AS updated_at FROM players ORDER BY created_at DESC LIMIT 200;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Player Creation Logs",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT id, player_id, created_by_player_id, created_by_username, creation_source, datetime(created_at, 'unixepoch', 'localtime') AS created_at FROM player_creation_logs ORDER BY created_at DESC LIMIT 200;",
+          "queryText": "SELECT id, player_id, created_by_player_id, created_by_username, creation_source, datetime(created_at, 'unixepoch', 'localtime') AS created_at FROM player_creation_logs ORDER BY created_at DESC LIMIT 200;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Player Status Change Logs",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT id, player_id, previous_status, next_status, changed_by_player_id, changed_by_username, datetime(changed_at, 'unixepoch', 'localtime') AS changed_at FROM player_status_change_logs ORDER BY changed_at DESC LIMIT 200;",
+          "queryText": "SELECT id, player_id, previous_status, next_status, changed_by_player_id, changed_by_username, datetime(changed_at, 'unixepoch', 'localtime') AS changed_at FROM player_status_change_logs ORDER BY changed_at DESC LIMIT 200;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Matches",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT id, type, status, location, datetime(scheduled_at, 'unixepoch', 'localtime') AS scheduled_at, datetime(completed_at, 'unixepoch', 'localtime') AS completed_at, datetime(created_at, 'unixepoch', 'localtime') AS created_at, datetime(updated_at, 'unixepoch', 'localtime') AS updated_at FROM matches ORDER BY scheduled_at DESC LIMIT 200;",
+          "queryText": "SELECT id, type, status, location, datetime(scheduled_at, 'unixepoch', 'localtime') AS scheduled_at, datetime(completed_at, 'unixepoch', 'localtime') AS completed_at, datetime(created_at, 'unixepoch', 'localtime') AS created_at, datetime(updated_at, 'unixepoch', 'localtime') AS updated_at FROM matches ORDER BY scheduled_at DESC LIMIT 200;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Match Scores",
+      "type": "table",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "datasource": {
+        "type": "frser-sqlite-datasource",
+        "uid": "sqlite_dev_db"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "frser-sqlite-datasource",
+            "uid": "sqlite_dev_db"
+          },
+          "queryType": "table",
+          "rawQueryText": "SELECT id, match_id, team_a, t_b AS team_b FROM match_scores ORDER BY match_id ASC, id ASC LIMIT 200;",
+          "queryText": "SELECT id, match_id, team_a, t_b AS team_b FROM match_scores ORDER BY match_id ASC, id ASC LIMIT 200;",
+          "timeColumns": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

@@ -1,0 +1,7 @@
+global:
+  scrape_timeout: 10s
+  busy_timeout: 1000ms
+
+databases:
+  - name: "db.sqlite"
+    path: "/data/db.sqlite"

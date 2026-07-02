@@ -1,0 +1,33 @@
+services:
+  prometheus:
+    command:
+      - "--config.file=/etc/prometheus/prometheus.dev.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    user: "0:0"
+    volumes:
+      - ./infra/monitoring/prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.dev.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  db-server:
+    environment:
+      - ENABLE_DEV_MOCK_DATA=true
+
+  grafana:
+    build:
+      context: .
+      dockerfile: infra/monitoring/grafana/Dockerfile.dev
+    image: pkpkdupr-grafana-dev
+    ports:
+      - "3300:3000"
+    volumes:
+      - ./data/db:/var/lib/pkpkdupr/db:ro
+      - ./infra/monitoring/grafana/dev-provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infra/monitoring/grafana/dev-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infra/monitoring/grafana/dev-dashboards:/etc/grafana/dev-dashboards:ro
+    environment:
+      - GF_PATHS_PLUGINS=/opt/grafana-plugins
+      - GF_SERVER_ROOT_URL=http://localhost:3000/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true

@@ -39,7 +39,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: pkpkdupr-api-server
     environment:
-        - DB_HOST=db-server
+        - DB_SERVER_URL=http://db-server:5001
         - AVATAR_UPLOAD_DIR=/app/data/uploads/avatars
     volumes:
         # API가 /uploads/avatars/*로 서빙하는 프로필 이미지 영구 저장소입니다.
@@ -47,6 +47,8 @@ services:
         - ./data/uploads/avatars:/app/data/uploads/avatars
     depends_on:
         - db-server
+    expose:
+        - "4000"
     networks:
         - pkpkdupr-network
 
@@ -56,20 +58,29 @@ services:
       context: .
       dockerfile: apps/db-server/Dockerfile
     container_name: pkpkdupr-db-server
+    environment:
+        - DB_FILE_PATH=file:/app/data/db.sqlite
     volumes:
         - ./data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
+    expose:
+        - "5001"
     networks:
         - pkpkdupr-network
 
-   # 📊 SQLite Exporter (Sidecar for Prometheus metrics)
+  # 📊 SQLite Exporter (Sidecar for Prometheus metrics)
   db-exporter:
-    image: justwatchcom/sqlite_exporter:latest
+    build:
+      context: .
+      dockerfile: infra/monitoring/sqlite-exporter/Dockerfile
     container_name: pkpkdupr-db-exporter
-    command: /data/db.sqlite
     volumes:
          - ./data/db:/data:ro
+         - ./infra/monitoring/sqlite-exporter/config.yml:/etc/sqlite_exporter/config.yml:ro
+    command:
+        - --config.file=/etc/sqlite_exporter/config.yml
+        - --web.listen-address=:9697
     expose:
-        - "9235"
+        - "9697"
     depends_on:
         - db-server
     networks:
@@ -100,14 +111,14 @@ services:
     user: "${UID:-1000}:${GID:-1000}"
     volumes:
         - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-        - ./infra/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+        - ./infra/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
         - grafana-data:/var/lib/grafana
     environment:
         - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
         - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
         - GF_USERS_ALLOW_SIGN_UP=false
-        - GF_SERVER_ROOT_URL=http://localhost/
-        - GF_SERVER_SERVE_FROM_SUB_PATH=true
+        - GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL:-http://localhost/}
+        - GF_SERVER_SERVE_FROM_SUB_PATH=${GF_SERVER_SERVE_FROM_SUB_PATH:-true}
     expose:
         - "3000"
     depends_on:

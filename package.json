@@ -4,7 +4,9 @@
     "private": true,
     "description": "Pickleball DUPR System - Monorepo with pnpm",
     "scripts": {
-        "dev": "pnpm -r --parallel dev",
+        "dev": "mkdir -p data/db && ENABLE_DEV_MOCK_DATA=true DB_FILE_PATH=file:$PWD/data/db/db.sqlite pnpm -r --parallel dev",
+        "dev:monitoring": "mkdir -p data/db && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-deps prometheus grafana db-exporter",
+        "dev:monitoring:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml stop grafana prometheus db-exporter",
         "dev:web": "pnpm --filter @pkpkdupr/web dev",
         "dev:api": "pnpm --filter @pkpkdupr/api dev",
         "dev:admin": "pnpm --filter @pkpkdupr/admin-web dev",
