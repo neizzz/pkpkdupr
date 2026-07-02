@@ -1,12 +1,9 @@
 import React from "react";
 import { Card } from "@heroui/react";
 import type { MatchType } from "@pkpkdupr/shared/match";
+import { matchTypeLabels, matchTypeValues } from "@pkpkdupr/shared/match";
 import Avatar from "@/components/Avatar";
 import type { PlayerInfo } from "@/context/AuthContext";
-import {
-  formatRating,
-  getCompositeDoublesRating,
-} from "@/utils/dupr";
 
 export type MemberProfileMatchStats = Record<
   MatchType,
@@ -24,6 +21,8 @@ interface MemberProfileProps {
   matchStats?: MemberProfileMatchStats;
 }
 
+const formatRating = (rating?: number | null) => rating?.toFixed(3) ?? "NR";
+
 const MemberProfile: React.FC<MemberProfileProps> = ({
   player,
   memberName,
@@ -33,36 +32,24 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
 }) => {
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
-  const sameGenderDoublesType: MatchType =
+  const genderDoublesType: MatchType =
     player?.gender === "F" ? "women-doubles" : "men-doubles";
-  const doublesStats = matchStats
-    ? {
-        wins:
-          matchStats["mixed-doubles"].wins +
-          matchStats[sameGenderDoublesType].wins,
-        losses:
-          matchStats["mixed-doubles"].losses +
-          matchStats[sameGenderDoublesType].losses,
-      }
-    : undefined;
 
-  const duprItems = [
-    {
-      key: "singles",
-      label: "S",
-      rating: formatRating(player?.duprRating?.singles),
-      stats: matchStats?.singles,
-    },
-    {
-      key: "doubles",
-      label: "D",
-      rating: formatRating(
-        getCompositeDoublesRating(player?.duprRating, player?.gender),
-      ),
-      stats: doublesStats,
-    },
-  ].map((item) => {
-    const stats = item.stats;
+  const ratingByMatchType: Record<MatchType, string> = {
+    singles: formatRating(player?.duprRating?.singles),
+    "mixed-doubles": formatRating(player?.duprRating?.doubles.mixed),
+    "men-doubles": formatRating(player?.duprRating?.doubles.men),
+    "women-doubles": formatRating(player?.duprRating?.doubles.women),
+  };
+
+  const hiddenGenderDoublesType: MatchType =
+    genderDoublesType === "men-doubles" ? "women-doubles" : "men-doubles";
+  const displayedRatingTypes: MatchType[] = matchStats
+    ? matchTypeValues.filter((type) => type !== hiddenGenderDoublesType)
+    : ["singles", "mixed-doubles", genderDoublesType];
+
+  const duprItems = displayedRatingTypes.map((type) => {
+    const stats = matchStats?.[type];
     const playedCount = stats ? stats.wins + stats.losses : 0;
     const winRate =
       stats && playedCount > 0
@@ -72,13 +59,13 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
           : "-";
 
     return {
-      key: item.key,
-      label: item.label,
-      rating: item.rating,
+      type,
+      label: matchTypeLabels[type],
+      rating: ratingByMatchType[type],
       cards: [
         {
           label: "Rating",
-          value: item.rating,
+          value: ratingByMatchType[type],
         },
         {
           label: "승률",
@@ -136,7 +123,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
           {matchStats ? (
             <div className="mt-4 flex flex-col gap-4">
               {duprItems.map((item) => (
-                <div key={item.key}>
+                <div key={item.type}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
                     {item.label}
                   </p>
@@ -150,7 +137,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             <div className="mt-4 grid grid-cols-2 gap-3">
               {duprItems.map((item) => (
                 <Card
-                  key={item.key}
+                  key={item.type}
                   className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-4 py-5 shadow-sm"
                 >
                   <p className="text-lg font-semibold leading-[0.85] text-amber-950">
