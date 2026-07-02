@@ -615,10 +615,21 @@ export class AuthService {
     };
   }
 
-  async changePassword(playerId: string, newPassword: string): Promise<void> {
+  async changePassword(
+    playerId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
     const stored = await this.getStoredPlayerById(playerId);
     if (!stored) {
       throw new Error("사용자를 찾을 수 없습니다.");
+    }
+    const isValidCurrentPassword = await bcrypt.compare(
+      currentPassword,
+      stored.passwordHash,
+    );
+    if (!isValidCurrentPassword) {
+      throw new Error("현재 패스워드가 올바르지 않습니다.");
     }
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await this.dbRequest(`/internal/players/${playerId}/password`, {

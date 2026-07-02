@@ -422,14 +422,21 @@ app.post("/api/change-password", async (req, res) => {
     if (!decoded) {
       return;
     }
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ error: "현재 패스워드를 입력해주세요." });
+    }
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ error: "비밀번호는 6자 이상이어야 합니다." });
     }
-    await authService.changePassword(decoded.playerId, newPassword);
+    await authService.changePassword(
+      decoded.playerId,
+      currentPassword,
+      newPassword,
+    );
     res.json({ message: "비밀번호가 변경되었습니다." });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

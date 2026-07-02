@@ -66,8 +66,14 @@ const ProfileSettingsSheetBody: React.FC = () => {
   const [selectedAvatarDataUrl, setSelectedAvatarDataUrl] = useState<
     string | null
   >(null);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPasswordValidationError, setCurrentPasswordValidationError] =
+    useState<string | null>(null);
+  const [passwordSubmitError, setPasswordSubmitError] = useState<string | null>(
+    null,
+  );
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -84,6 +90,28 @@ const ProfileSettingsSheetBody: React.FC = () => {
     setMessage(null);
     setError(null);
   };
+
+  const newPasswordValidationError =
+    newPassword.length > 0 && newPassword.length < 6
+      ? "새 패스워드는 6자 이상이어야 합니다."
+      : null;
+  const confirmPasswordValidationError =
+    confirmPassword.length > 0 && newPassword !== confirmPassword
+      ? "새 패스워드 확인이 일치하지 않습니다."
+      : null;
+  const passwordValidationMessage =
+    currentPasswordValidationError ||
+    newPasswordValidationError ||
+    confirmPasswordValidationError ||
+    passwordSubmitError;
+  const isPasswordChangeDisabled =
+    isSavingPassword ||
+    !currentPassword ||
+    !newPassword ||
+    !confirmPassword ||
+    !!currentPasswordValidationError ||
+    !!newPasswordValidationError ||
+    !!confirmPasswordValidationError;
 
   const handleSelectAvatar = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -165,13 +193,20 @@ const ProfileSettingsSheetBody: React.FC = () => {
       return;
     }
 
+    setPasswordSubmitError(null);
+
+    if (!currentPassword) {
+      setCurrentPasswordValidationError("현재 패스워드를 입력해주세요.");
+      return;
+    }
+
     if (newPassword.length < 6) {
-      setError("비밀번호는 6자 이상이어야 합니다.");
+      setError("새 패스워드는 6자 이상이어야 합니다.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError("비밀번호 확인이 일치하지 않습니다.");
+      setError("새 패스워드 확인이 일치하지 않습니다.");
       return;
     }
 
@@ -183,7 +218,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ newPassword }),
+        body: JSON.stringify({ currentPassword, newPassword }),
       });
 
       if (!res.ok) {
@@ -191,13 +226,19 @@ const ProfileSettingsSheetBody: React.FC = () => {
         throw new Error(errorData.error || "비밀번호 변경 실패");
       }
 
+      setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setCurrentPasswordValidationError(null);
       setMessage("비밀번호가 변경되었습니다.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "비밀번호를 변경하지 못했습니다.",
-      );
+      const nextError =
+        err instanceof Error ? err.message : "비밀번호를 변경하지 못했습니다.";
+      if (nextError.includes("현재 패스워드")) {
+        setCurrentPasswordValidationError(nextError);
+      } else {
+        setPasswordSubmitError(nextError);
+      }
     } finally {
       setIsSavingPassword(false);
     }
@@ -277,10 +318,25 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
         <input
           type="password"
+          placeholder="현재 패스워드"
+          value={currentPassword}
+          onChange={(event) => {
+            setCurrentPassword(event.target.value);
+            setCurrentPasswordValidationError(null);
+            setPasswordSubmitError(null);
+          }}
+          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
+        />
+
+        <input
+          type="password"
           placeholder="새 패스워드"
           minLength={6}
           value={newPassword}
-          onChange={(event) => setNewPassword(event.target.value)}
+          onChange={(event) => {
+            setNewPassword(event.target.value);
+            setPasswordSubmitError(null);
+          }}
           className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
         />
         <input
@@ -288,15 +344,21 @@ const ProfileSettingsSheetBody: React.FC = () => {
           placeholder="새 패스워드 확인"
           minLength={6}
           value={confirmPassword}
-          onChange={(event) => setConfirmPassword(event.target.value)}
+          onChange={(event) => {
+            setConfirmPassword(event.target.value);
+            setPasswordSubmitError(null);
+          }}
           className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
         />
 
-        <div className="flex justify-end">
+        <div className="flex items-end justify-between gap-3">
+          <p className="bs-text-caption min-h-4 text-error">
+            {passwordValidationMessage}
+          </p>
           <Button
             type="submit"
             className="rounded-2xl bg-[#409eff] px-6 text-white"
-            isDisabled={isSavingPassword}
+            isDisabled={isPasswordChangeDisabled}
           >
             {isSavingPassword ? "변경 중..." : "변경"}
           </Button>
