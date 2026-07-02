@@ -27,18 +27,14 @@ const Home: React.FC = () => {
                                </div>
                                {player.duprRating != null && (
                                    <>
-                                       <div className="flex items-center justify-between">
-                                             <span className="text-gray-500 text-sm">DUPR Total</span>
-                                           <span className="font-semibold text-[#409eff]">{player.duprRating.total}</span>
-                                       </div>
                                        <div className="flex items-center justify-between text-sm text-gray-500">
                                            <span>Singles</span>
-                                           <span>{player.duprRating.singles}</span>
+                                           <span>{player.duprRating.singles.toFixed(3)}</span>
                                        </div>
                                        <div className="flex items-center justify-between text-sm text-gray-500">
                                            <span>Doubles</span>
                                            <span>
-                                             Mx {player.duprRating.doubles.mixed} · Men {player.duprRating.doubles.men} · Women {player.duprRating.doubles.women}
+                                             Mx {player.duprRating.doubles.mixed.toFixed(3)} · Men {player.duprRating.doubles.men.toFixed(3)} · Women {player.duprRating.doubles.women.toFixed(3)}
                                            </span>
                                        </div>
                                    </>

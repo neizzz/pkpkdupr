@@ -36,6 +36,11 @@ const creationSourceLabelMap: Record<PlayerCreationSource, string> = {
   bootstrap: "초기 관리자 생성",
 };
 
+const PROTECTED_ADMIN_USERNAME = "admin";
+
+const formatDupr = (value?: number) =>
+  typeof value === "number" ? value.toFixed(3) : "-";
+
 const AdminDashboard: React.FC = () => {
   const { player, isAdmin, logout, token } = useAuth();
   const navigate = useNavigate();
@@ -51,6 +56,20 @@ const AdminDashboard: React.FC = () => {
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [gender, setGender] = useState<"M" | "F">("M");
+  const [officialPlayerId, setOfficialPlayerId] = useState("");
+  const [officialReason, setOfficialReason] = useState("");
+  const [officialRatings, setOfficialRatings] = useState({
+    singles: "",
+    mixed: "",
+    men: "",
+    women: "",
+  });
+  const [officialConfidence, setOfficialConfidence] = useState({
+    singles: "",
+    mixed: "",
+    men: "",
+    women: "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -161,6 +180,13 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleStatusChange = async (playerId: string) => {
+    const targetPlayer = players.find((item) => item.id === playerId);
+    if (targetPlayer?.username === PROTECTED_ADMIN_USERNAME) {
+      setError("admin 계정의 상태는 변경할 수 없습니다.");
+      setSuccess(null);
+      return;
+    }
+
     const nextStatus = statusDrafts[playerId];
     if (!nextStatus) {
       return;
@@ -214,6 +240,67 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleOfficialDuprSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
+
+    if (!officialPlayerId) {
+      setError("공식 DUPR를 반영할 회원을 선택해주세요.");
+      return;
+    }
+
+    const ratings = {
+      singles: Number(officialRatings.singles),
+      doubles: {
+        mixed: Number(officialRatings.mixed),
+        men: Number(officialRatings.men),
+        women: Number(officialRatings.women),
+      },
+    };
+    const confidence = {
+      singles: Number(officialConfidence.singles),
+      doubles: {
+        mixed: Number(officialConfidence.mixed),
+        men: Number(officialConfidence.men),
+        women: Number(officialConfidence.women),
+      },
+    };
+
+    try {
+      const res = await fetch(
+        `/api/admin/players/${officialPlayerId}/official-dupr`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ratings,
+            confidence,
+            reason: officialReason,
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "공식 DUPR 반영 실패");
+      }
+
+      const data = (await res.json()) as { player: PlayerInfo };
+      setPlayers((prev) =>
+        prev.map((item) => (item.id === data.player.id ? data.player : item)),
+      );
+      setOfficialReason("");
+      await loadDashboardData();
+      setSuccess("공식 DUPR 반영 및 전체 재계산이 완료되었습니다.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    }
+  };
+
   if (!token || !isAdmin) return null;
 
   const genderLabel = player?.gender === "M" ? "남" : "여";
@@ -246,7 +333,7 @@ const AdminDashboard: React.FC = () => {
           </h2>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+            <div className="bg-error/10 border border-error/20 text-error px-4 py-2 rounded text-sm">
               {error}
             </div>
           )}
@@ -320,6 +407,106 @@ const AdminDashboard: React.FC = () => {
           </form>
         </section>
 
+        <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
+            공식 DUPR 수동 반영
+          </h2>
+          <form
+            onSubmit={handleOfficialDuprSubmit}
+            className="grid grid-cols-4 gap-4 items-end"
+          >
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                회원
+              </label>
+              <select
+                required
+                value={officialPlayerId}
+                onChange={(e) => setOfficialPlayerId(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg bg-white"
+              >
+                <option value="">회원 선택</option>
+                {players.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.username}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                사유
+              </label>
+              <input
+                type="text"
+                value={officialReason}
+                onChange={(e) => setOfficialReason(e.target.value)}
+                placeholder="정식 DUPR 반영 사유"
+                className="w-full px-4 py-2 border rounded-lg"
+              />
+            </div>
+            {[
+              ["singles", "Singles"],
+              ["mixed", "Mixed"],
+              ["men", "Men"],
+              ["women", "Women"],
+            ].map(([key, label]) => (
+              <React.Fragment key={key}>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label} Rating
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={2}
+                    max={8}
+                    step={0.001}
+                    value={officialRatings[key as keyof typeof officialRatings]}
+                    onChange={(e) =>
+                      setOfficialRatings((prev) => ({
+                        ...prev,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {label} Confidence
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={
+                      officialConfidence[key as keyof typeof officialConfidence]
+                    }
+                    onChange={(e) =>
+                      setOfficialConfidence((prev) => ({
+                        ...prev,
+                        [key]: e.target.value,
+                      }))
+                    }
+                    className="w-full px-4 py-2 border rounded-lg"
+                  />
+                </div>
+              </React.Fragment>
+            ))}
+            <div className="col-span-4">
+              <button
+                type="submit"
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+              >
+                공식 DUPR 반영 및 전체 재계산
+              </button>
+            </div>
+          </form>
+        </section>
+
         <section className="bg-white rounded-xl shadow-sm mt-2 p-6 space-y-4">
           <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
             회원 목록 ({players.length})
@@ -351,11 +538,22 @@ const AdminDashboard: React.FC = () => {
                     const draftStatus = statusDrafts[p.id] ?? p.status;
                     const isSaving = savingPlayerId === p.id;
                     const isDirty = draftStatus !== p.status;
+                    const isProtectedAdminAccount =
+                      p.username === PROTECTED_ADMIN_USERNAME;
 
                     return (
                       <tr key={p.id} className="border-b align-top hover:bg-gray-50">
                         <td className="py-3 pl-2 font-medium">{p.username}</td>
-                        <td className="py-3 text-blue-600">{p.duprRating.total}</td>
+                        <td className="py-3 text-blue-600">
+                          <div className="space-y-1 text-xs">
+                            <div>S {formatDupr(p.duprRating.singles)}</div>
+                            <div>Mx {formatDupr(p.duprRating.doubles.mixed)}</div>
+                            <div>
+                              Men {formatDupr(p.duprRating.doubles.men)} / Women{" "}
+                              {formatDupr(p.duprRating.doubles.women)}
+                            </div>
+                          </div>
+                        </td>
                         <td className="py-3">{p.gender === "M" ? "남" : "여"}</td>
                         <td className="py-3">
                           <span
@@ -368,25 +566,33 @@ const AdminDashboard: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <select
                               value={draftStatus}
+                              disabled={isProtectedAdminAccount}
                               onChange={(e) =>
                                 setStatusDrafts((prev) => ({
                                   ...prev,
                                   [p.id]: e.target.value as PlayerStatus,
                                 }))
                               }
-                              className="border rounded-lg px-3 py-2 bg-white"
+                              className="border rounded-lg px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400"
                             >
                               <option value="active">active</option>
                               <option value="inactive">inactive</option>
                             </select>
                             <button
                               type="button"
-                              disabled={!isDirty || isSaving}
+                              disabled={
+                                isProtectedAdminAccount || !isDirty || isSaving
+                              }
                               onClick={() => handleStatusChange(p.id)}
                               className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:bg-slate-300"
                             >
                               {isSaving ? "저장 중..." : "저장"}
                             </button>
+                            {isProtectedAdminAccount ? (
+                              <span className="text-xs text-slate-500">
+                                admin 계정은 변경 불가
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                         <td className="py-3 min-w-[240px] text-xs text-gray-600">

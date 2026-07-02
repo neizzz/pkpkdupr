@@ -1,6 +1,7 @@
 import type { PlayerDupr } from "@pkpkdupr/shared/player";
 import { eq } from "drizzle-orm";
 import {
+  matchParticipants,
   matches,
   matchScores,
   playerCreationLogs,
@@ -19,11 +20,11 @@ const DEV_PASSWORD_HASH =
 const createDupr = (total: number): PlayerDupr => ({
   total,
   doubles: {
-    mixed: total + 12,
-    men: total - 8,
-    women: total + 4,
+    mixed: total + 0.012,
+    men: total - 0.008,
+    women: total + 0.004,
   },
-  singles: total - 16,
+  singles: total - 0.016,
 });
 
 const mockPlayers: CreateStoredPlayerInput[] = [
@@ -32,7 +33,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_alice",
     gender: "F",
     status: "active",
-    duprRating: createDupr(3620),
+    duprRating: createDupr(3.62),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-01T09:00:00+09:00"),
@@ -43,7 +44,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_bob",
     gender: "M",
     status: "active",
-    duprRating: createDupr(4110),
+    duprRating: createDupr(4.11),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T10:30:00+09:00"),
@@ -54,7 +55,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_cara",
     gender: "F",
     status: "active",
-    duprRating: createDupr(3490),
+    duprRating: createDupr(3.49),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T11:00:00+09:00"),
@@ -65,7 +66,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_dana",
     gender: "F",
     status: "active",
-    duprRating: createDupr(3770),
+    duprRating: createDupr(3.77),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T11:30:00+09:00"),
@@ -76,7 +77,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_ella",
     gender: "F",
     status: "active",
-    duprRating: createDupr(3920),
+    duprRating: createDupr(3.92),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T12:00:00+09:00"),
@@ -87,7 +88,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_finn",
     gender: "M",
     status: "active",
-    duprRating: createDupr(4050),
+    duprRating: createDupr(4.05),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T12:30:00+09:00"),
@@ -98,7 +99,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_gabe",
     gender: "M",
     status: "active",
-    duprRating: createDupr(3860),
+    duprRating: createDupr(3.86),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T13:00:00+09:00"),
@@ -109,7 +110,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_hugo",
     gender: "M",
     status: "active",
-    duprRating: createDupr(4210),
+    duprRating: createDupr(4.21),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-02T13:30:00+09:00"),
@@ -120,7 +121,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "dev_chris_inactive",
     gender: "M",
     status: "inactive",
-    duprRating: createDupr(2980),
+    duprRating: createDupr(2.98),
     passwordHash: DEV_PASSWORD_HASH,
     isFirstLogin: false,
     createdAt: new Date("2026-06-03T14:15:00+09:00"),
@@ -189,6 +190,45 @@ const mockMatchScores = [
   },
 ];
 
+const mockMatchParticipants = [
+  {
+    id: "dev-match-open-play-001-team-0-alice",
+    matchId: "dev-match-open-play-001",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-match-open-play-001-team-0-bob",
+    matchId: "dev-match-open-play-001",
+    teamIndex: 0,
+    playerId: "dev-player-bob",
+  },
+  {
+    id: "dev-match-open-play-001-team-1-cara",
+    matchId: "dev-match-open-play-001",
+    teamIndex: 1,
+    playerId: "dev-player-cara",
+  },
+  {
+    id: "dev-match-open-play-001-team-1-finn",
+    matchId: "dev-match-open-play-001",
+    teamIndex: 1,
+    playerId: "dev-player-finn",
+  },
+  {
+    id: "dev-match-ladder-002-team-0-alice",
+    matchId: "dev-match-ladder-002",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-match-ladder-002-team-1-hugo",
+    matchId: "dev-match-ladder-002",
+    teamIndex: 1,
+    playerId: "dev-player-hugo",
+  },
+];
+
 const isUniqueConstraintError = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("UNIQUE") || message.includes("unique");
@@ -224,6 +264,10 @@ export class TestDataRepository {
 
     for (const score of mockMatchScores) {
       await this.createMatchScoreIfMissing(score);
+    }
+
+    for (const participant of mockMatchParticipants) {
+      await this.createMatchParticipantIfMissing(participant);
     }
   }
 
@@ -298,6 +342,27 @@ export class TestDataRepository {
 
     try {
       await this.db.insert(matchScores).values(data);
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  private async createMatchParticipantIfMissing(
+    data: (typeof mockMatchParticipants)[number],
+  ) {
+    const existing = await this.db
+      .select()
+      .from(matchParticipants)
+      .where(eq(matchParticipants.id, data.id))
+      .get();
+    if (existing) {
+      return;
+    }
+
+    try {
+      await this.db.insert(matchParticipants).values(data);
     } catch (error) {
       if (!isUniqueConstraintError(error)) {
         throw error;

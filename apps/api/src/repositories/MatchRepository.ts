@@ -1,4 +1,4 @@
-import { Match, MatchScore, Team } from "@pkpkdupr/shared/match";
+import type { Match, MatchScore, Team } from "@pkpkdupr/shared/match";
 import { Player, PlayerDupr } from "@pkpkdupr/shared/player";
 
 const cloneScores = (scores?: MatchScore[]): MatchScore[] | undefined =>
@@ -39,11 +39,11 @@ const cloneMatch = (match: Match): Match => ({
 const createDupr = (total: number): PlayerDupr => ({
   total,
   doubles: {
-    mixed: total + 12,
-    men: total - 8,
-    women: total + 4,
+    mixed: total + 0.012,
+    men: total - 0.008,
+    women: total + 0.004,
   },
-  singles: total - 16,
+  singles: total - 0.016,
 });
 
 const createPlayer = (
@@ -67,16 +67,16 @@ const createPlayer = (
 };
 
 const mockPlayers = {
-  alice: createPlayer("dev-player-alice", "dev_alice", "F", 3620),
-  bob: createPlayer("dev-player-bob", "dev_bob", "M", 4110),
+  alice: createPlayer("dev-player-alice", "dev_alice", "F", 3.62),
+  bob: createPlayer("dev-player-bob", "dev_bob", "M", 4.11),
   chris: createPlayer(
     "dev-player-chris",
     "dev_chris_inactive",
     "M",
-    2980,
+    2.98,
     "inactive",
   ),
-  admin: createPlayer("admin-player", "admin", "M", 4350),
+  admin: createPlayer("admin-player", "admin", "M", 4.35),
 };
 
 const mockMatches: Match[] = [
@@ -174,13 +174,19 @@ export class MatchRepository {
     match: Omit<Match, "id" | "createdAt" | "updatedAt"> & { id?: string },
   ): Promise<Match> {
     const now = new Date();
-    return {
+    const nextMatch: Match = {
       ...match,
       id: match.id ?? `match-${Date.now()}`,
+      teams: [cloneTeam(match.teams[0]), cloneTeam(match.teams[1])],
       scores: cloneScores(match.scores),
+      scheduledAt: new Date(match.scheduledAt),
+      completedAt: match.completedAt ? new Date(match.completedAt) : null,
       createdAt: now,
       updatedAt: now,
     };
+
+    mockMatches.unshift(nextMatch);
+    return cloneMatch(nextMatch);
   }
 
   /** 특정 플레이어의 경기 이력 조회 */

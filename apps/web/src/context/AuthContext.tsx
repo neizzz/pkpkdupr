@@ -14,7 +14,7 @@ interface AuthContextType {
     player: PlayerInfo | null;
     isLoading: boolean;
     isAuthenticated: boolean;
-    login: (username: string, password: string) => Promise<void>;
+    login: (username: string, password: string, rememberMe?: boolean) => Promise<void>;
     updateProfile: (input: { avatarUrl?: string | null }) => Promise<PlayerInfo>;
     uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
     deleteAvatar: () => Promise<PlayerInfo>;
@@ -22,6 +22,10 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+type MeResponse = PlayerInfo & {
+    accessToken?: string;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [token, setToken] = useState<string | null>(null);
@@ -46,9 +50,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 headers: { Authorization: `Bearer ${accessToken}` },
              });
             if (res.ok) {
-                const data = await res.json();
-                setPlayer(data);
-                return data;
+                const data = (await res.json()) as MeResponse;
+                const { accessToken: refreshedAccessToken, ...playerInfo } = data;
+                if (refreshedAccessToken) {
+                    localStorage.setItem('token', refreshedAccessToken);
+                    setToken(refreshedAccessToken);
+                }
+                setPlayer(playerInfo);
+                return playerInfo;
              }
             localStorage.removeItem('token');
             setToken(null);
@@ -62,11 +71,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
      };
 
-    const login = async (username: string, password: string) => {
+    const login = async (username: string, password: string, rememberMe = false) => {
         const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ username, password, rememberMe }),
          });
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));

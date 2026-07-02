@@ -23,15 +23,15 @@ const UserChip: React.FC<UserChipProps> = ({
       : "bg-[#f8626c]/10 text-[#f8626c]";
   const genderAvatarClass =
     player.gender === "M"
-      ? "border-1 border-[#409eff]/60 shadow-[0_0_0_1px_rgba(64,158,255,0.16)]"
-      : "border-1 border-[#f8626c]/60 shadow-[0_0_0_1px_rgba(248,98,108,0.16)]";
+      ? "border-1 border-[#409eff]/15 shadow-[0_0_0_1px_rgba(64,158,255,0.16)]"
+      : "border-1 border-[#f8626c]/15 shadow-[0_0_0_1px_rgba(248,98,108,0.16)]";
 
   return (
     <Chip
       variant="secondary"
-      className={`h-6 overflow-hidden rounded-full px-0 ${onRemove ? "pr-1" : "pr-3"} shadow-none ${genderBgClass}`}
+      className={`h-6 max-w-full overflow-hidden rounded-full px-0 ${onRemove ? "pr-1" : "pr-3"} shadow-none ${genderBgClass}`}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 max-w-full items-center gap-1">
         <Avatar
           size="xs"
           avatarUrl={player.avatarUrl}
@@ -39,7 +39,7 @@ const UserChip: React.FC<UserChipProps> = ({
           className={`bg-white/80 ${genderAvatarClass}`}
           isMe={isMe}
         />
-        <span className="truncate text-sm font-medium text-current">
+        <span className="min-w-0 truncate text-sm font-medium text-current">
           {player.username}
         </span>
         {onRemove ? (
@@ -50,7 +50,7 @@ const UserChip: React.FC<UserChipProps> = ({
               event.stopPropagation();
               onRemove();
             }}
-            className="ml-0.5 rounded-full p-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
+            className="ml-0.5 shrink-0 rounded-full p-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
           >
             <IoClose className="size-3.5" />
           </button>

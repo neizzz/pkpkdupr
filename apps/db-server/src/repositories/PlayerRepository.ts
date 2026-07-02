@@ -1,4 +1,11 @@
-import type { Player, PlayerDupr, PlayerStatus } from "@pkpkdupr/shared/player";
+import {
+  normalizeStoredPlayerDupr,
+  serializeStoredPlayerDupr,
+  type Player,
+  type PlayerDupr,
+  type PlayerStatus,
+  type StoredPlayerDupr,
+} from "@pkpkdupr/shared/player";
 import { desc, eq } from "drizzle-orm";
 import { players } from "../db/schema";
 
@@ -18,6 +25,7 @@ export interface CreateStoredPlayerInput {
   isFirstLogin: boolean;
   createdAt: Date;
   updatedAt: Date;
+  duprState?: StoredPlayerDupr;
 }
 
 export class PlayerRepository {
@@ -40,12 +48,15 @@ export class PlayerRepository {
   }
 
   async create(data: CreateStoredPlayerInput): Promise<StoredPlayerRecord> {
+    const { duprState, ...storedData } = data;
     await this.db.insert(players).values({
-      ...data,
-      avatarUrl: data.avatarUrl ?? null,
-      duprRating: JSON.stringify(data.duprRating),
-      createdAt: new Date(data.createdAt),
-      updatedAt: new Date(data.updatedAt),
+      ...storedData,
+      avatarUrl: storedData.avatarUrl ?? null,
+      duprRating: serializeStoredPlayerDupr(
+        duprState ?? normalizeStoredPlayerDupr(storedData.duprRating),
+      ),
+      createdAt: new Date(storedData.createdAt),
+      updatedAt: new Date(storedData.updatedAt),
     });
     const created = await this.findById(data.id);
     if (!created) {
@@ -91,5 +102,19 @@ export class PlayerRepository {
       return existing;
     }
     return await this.create(data);
+  }
+
+  async updateDuprState(
+    id: string,
+    duprState: StoredPlayerDupr,
+  ): Promise<StoredPlayerRecord | undefined> {
+    await this.db
+      .update(players)
+      .set({
+        duprRating: serializeStoredPlayerDupr(duprState),
+        updatedAt: new Date(),
+      })
+      .where(eq(players.id, id));
+    return await this.findById(id);
   }
 }

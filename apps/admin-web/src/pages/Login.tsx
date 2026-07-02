@@ -30,7 +30,7 @@ const Login: React.FC = () => {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
+          <div className="bg-error/10 border border-error/20 text-error px-4 py-2 rounded text-sm">
             {error}
           </div>
         )}

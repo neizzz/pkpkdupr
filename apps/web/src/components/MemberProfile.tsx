@@ -48,7 +48,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
       <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
         <div className="flex items-start gap-4">
           <Avatar
-            size="md"
+            size="sm"
             avatarUrl={player?.avatarUrl}
             name={displayName}
             isMe={isMe}
@@ -57,26 +57,14 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-amber-400">
-                  {isMe ? "My Profile" : "Member Profile"}
-                </p>
                 <h2 className="mt-1 truncate text-2xl font-bold text-amber-950">
                   {displayName}
                 </h2>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {isMe && (
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    ME
-                  </span>
-                )}
                 {headerAction}
               </div>
             </div>
-
-            <p className="mt-3 text-sm text-amber-700/80">
-              멤버의 기본 프로필과 DUPR 정보를 확인할 수 있어요.
-            </p>
           </div>
         </div>
 

@@ -50,3 +50,27 @@ export const matchScores = sqliteTable("match_scores", {
   scoreA: integer("score_a").notNull(),
   scoreB: integer("score_b").notNull(),
 });
+
+export const matchParticipants = sqliteTable("match_participants", {
+  id: text("id").primaryKey(),
+  matchId: text("match_id").notNull(),
+  teamIndex: integer("team_index").notNull(),
+  playerId: text("player_id").notNull(),
+});
+
+export const officialDuprAdjustmentLogs = sqliteTable(
+  "official_dupr_adjustment_logs",
+  {
+    id: text("id").primaryKey(),
+    playerId: text("player_id").notNull(),
+    changedByPlayerId: text("changed_by_player_id").notNull(),
+    changedByUsername: text("changed_by_username").notNull(),
+    ratingsJson: text("ratings_json").notNull(),
+    confidenceJson: text("confidence_json").notNull(),
+    previousRatingJson: text("previous_rating_json").notNull(),
+    nextRatingJson: text("next_rating_json").notNull(),
+    preUpdateAccuracyJson: text("pre_update_accuracy_json").notNull(),
+    reason: text("reason"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+);

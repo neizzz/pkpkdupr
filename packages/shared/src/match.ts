@@ -26,9 +26,7 @@ export interface Team {
 
 /** 한 세트/게임의 상세 스코어 기록 */
 export interface MatchScore {
-  // 해당 세트/게임에서 A팀이 취득한 최종 점수
   scoreA: number;
-  // 해당 세트/게임에서 B팀이 취득한 최종 점수
   scoreB: number;
 }
 
@@ -39,7 +37,7 @@ export interface Match {
   status: MatchStatus;
   teams: [Team, Team];
   scores?: MatchScore[];
-  location: string;
+  location?: string;
   scheduledAt: Date;
   createdAt: Date;
   completedAt: Date | null;

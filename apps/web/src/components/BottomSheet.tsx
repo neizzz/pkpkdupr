@@ -1,5 +1,4 @@
 import React from "react";
-import { Drawer } from "@heroui/react";
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -7,6 +6,7 @@ interface BottomSheetProps {
   ariaLabel: string;
   children: React.ReactElement | React.ReactElement[];
   className?: string;
+  isDismissable?: boolean;
 }
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -15,27 +15,46 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   ariaLabel,
   children,
   className,
-}) => (
-  <Drawer.Backdrop
-    isOpen={isOpen}
-    onOpenChange={onOpenChange}
-    variant="blur"
-  >
-    <Drawer.Content
-      placement="bottom"
-      className="mx-auto w-full max-w-[430px]"
+  isDismissable = true,
+}) => {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (isDismissable && event.target === event.currentTarget) {
+          onOpenChange(false);
+        }
+      }}
     >
-      <Drawer.Dialog
-        aria-label={ariaLabel}
-        className={["rounded-t-3xl bg-white", className]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <Drawer.CloseTrigger />
-        {children as any}
-      </Drawer.Dialog>
-    </Drawer.Content>
-  </Drawer.Backdrop>
-);
+      <div className="relative mx-auto w-full max-w-[430px]">
+        <button
+          type="button"
+          aria-label="Close"
+          onClick={() => onOpenChange(false)}
+          className="absolute -top-10 right-4 z-10 flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-50"
+        >
+          ×
+        </button>
+        <section
+          role="dialog"
+          aria-label={ariaLabel}
+          className={[
+            "relative w-full rounded-t-3xl bg-white pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl",
+            className,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          {children}
+        </section>
+      </div>
+    </div>
+  );
+};
 
 export default BottomSheet;

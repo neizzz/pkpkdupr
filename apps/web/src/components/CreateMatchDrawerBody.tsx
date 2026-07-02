@@ -1,5 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button, Drawer } from "@heroui/react";
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import { IoQrCodeSharp } from "react-icons/io5";
@@ -7,17 +12,22 @@ import type { MatchType } from "@pkpkdupr/shared/match";
 import { matchTypeLabels } from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
+import Avatar from "@/components/Avatar";
 import UserChip from "@/components/UserChip";
 import { useAuth } from "@/context/AuthContext";
 
-type MatchMember = Pick<Player, "id" | "username" | "gender" | "avatarUrl">;
+type MatchMember = Pick<Player, "id" | "username" | "gender" | "avatarUrl"> & {
+  duprRating?: Player["duprRating"];
+};
 type MatchTeams = [MatchMember[], MatchMember[]];
 type TeamIndex = 0 | 1;
 type QrScannerStatus = "idle" | "scanning" | "verifying" | "confirm" | "error";
 
 const normalizeMatchMember = (
   value:
-    | Partial<Pick<Player, "id" | "username" | "gender" | "avatarUrl">>
+    | Partial<
+        Pick<Player, "id" | "username" | "gender" | "avatarUrl" | "duprRating">
+      >
     | null
     | undefined,
 ): MatchMember | null => {
@@ -30,8 +40,16 @@ const normalizeMatchMember = (
     username: value.username || value.id,
     gender: value.gender,
     avatarUrl: value.avatarUrl,
+    duprRating:
+      "duprRating" in value && value.duprRating ? value.duprRating : undefined,
   };
 };
+
+const getGenderLabel = (gender: MatchMember["gender"]) =>
+  gender === "M" ? "Male" : "Female";
+
+const getGenderClassName = (gender: MatchMember["gender"]) =>
+  gender === "M" ? "text-[#409eff]" : "text-[#f8626c]";
 
 const mergeUniqueMembers = (members: MatchMember[]) => {
   const seen = new Set<string>();
@@ -44,6 +62,20 @@ const mergeUniqueMembers = (members: MatchMember[]) => {
     return true;
   });
 };
+
+const areSameMatchMembers = (a: MatchMember[], b: MatchMember[]) =>
+  a.length === b.length &&
+  a.every((member, index) => {
+    const target = b[index];
+
+    return (
+      !!target &&
+      member.id === target.id &&
+      member.username === target.username &&
+      member.gender === target.gender &&
+      member.avatarUrl === target.avatarUrl
+    );
+  });
 
 const resolveMatchType = (members: MatchMember[]): MatchType | null => {
   if (members.length === 2) {
@@ -198,7 +230,10 @@ const getCameraErrorMessage = (error: unknown) => {
       return "카메라 권한이 필요해요. 브라우저 권한을 허용한 뒤 다시 시도해주세요.";
     }
 
-    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+    if (
+      error.name === "NotFoundError" ||
+      error.name === "DevicesNotFoundError"
+    ) {
       return "사용 가능한 카메라를 찾지 못했어요.";
     }
 
@@ -211,11 +246,15 @@ const getCameraErrorMessage = (error: unknown) => {
 };
 
 interface CreateMatchDrawerBodyProps {
-  onCreateMatch: () => void;
+  onCreateMatch: () => void | Promise<void>;
+  onCancel: () => void;
+  onQrScannerOpenChange?: (isOpen: boolean) => void;
 }
 
 const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   onCreateMatch,
+  onCancel,
+  onQrScannerOpenChange,
 }) => {
   const { player, token } = useAuth();
   const [, setMatchMemberCandidates] = useState<MatchMember[]>([]);
@@ -233,23 +272,27 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const [pendingQrMember, setPendingQrMember] = useState<MatchMember | null>(
     null,
   );
+  const [isCreatingMatch, setIsCreatingMatch] = useState(false);
+  const [createMatchError, setCreateMatchError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const lastScannedPayloadRef = useRef<string | null>(null);
   const selectedMatchMembersRef = useRef<MatchMember[]>(selectedMatchMembers);
+  const currentPlayerMember = useMemo(
+    () => normalizeMatchMember(player),
+    [player],
+  );
   const selectedMatchType = useMemo(
     () => resolveMatchType(selectedMatchMembers),
     [selectedMatchMembers],
   );
   const canCreateMatch = areTeamsValid(teams, selectedMatchType);
   const canAddMatchMember = !!token && selectedMatchMembers.length < 4;
-  const hasTeams = !!selectedMatchType && teams.some((team) => team.length > 0);
 
   useEffect(() => {
     let isCancelled = false;
 
     const loadMatchMemberCandidates = async () => {
-      const currentPlayerMember = normalizeMatchMember(player);
       const nextMembers: MatchMember[] = currentPlayerMember
         ? [currentPlayerMember]
         : [];
@@ -283,11 +326,32 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [player, token]);
+  }, [currentPlayerMember, token]);
+
+  useEffect(() => {
+    if (!currentPlayerMember) {
+      return;
+    }
+
+    setSelectedMatchMembers((prev) => {
+      const next = mergeUniqueMembers([
+        currentPlayerMember,
+        ...prev.filter((member) => member.id !== currentPlayerMember.id),
+      ]).slice(0, 4);
+
+      if (areSameMatchMembers(prev, next)) {
+        return prev;
+      }
+
+      selectedMatchMembersRef.current = next;
+      return next;
+    });
+  }, [currentPlayerMember]);
 
   useEffect(() => {
     setSelectedSwapMemberId(null);
     setTeams(buildInitialTeams(selectedMatchMembers, selectedMatchType));
+    setCreateMatchError(null);
   }, [selectedMatchMembers, selectedMatchType]);
 
   useEffect(() => {
@@ -305,12 +369,13 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   const closeQrScanner = useCallback(() => {
     stopQrScanner();
+    onQrScannerOpenChange?.(false);
     setIsQrScannerOpen(false);
     setQrScannerStatus("idle");
     setQrScannerError(null);
     setPendingQrMember(null);
     lastScannedPayloadRef.current = null;
-  }, [stopQrScanner]);
+  }, [onQrScannerOpenChange, stopQrScanner]);
 
   const showQrScannerError = useCallback((message: string) => {
     setQrScannerStatus("error");
@@ -347,9 +412,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || "QR 코드를 검증하지 못했어요.",
-          );
+          throw new Error(errorData.error || "QR 코드를 검증하지 못했어요.");
         }
 
         const data = (await res.json()) as VerifyPlayerQrTokenResponse;
@@ -363,7 +426,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             (member) => member.id === nextMember.id,
           )
         ) {
-          showQrScannerError(`${nextMember.username}님은 이미 추가된 멤버예요.`);
+          showQrScannerError(
+            `${nextMember.username}님은 이미 추가된 멤버예요.`,
+          );
           return;
         }
 
@@ -458,6 +523,13 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   useEffect(() => stopQrScanner, [stopQrScanner]);
 
+  useEffect(
+    () => () => {
+      onQrScannerOpenChange?.(false);
+    },
+    [onQrScannerOpenChange],
+  );
+
   const handleAddMatchMemberByQr = () => {
     if (!token) {
       return;
@@ -467,6 +539,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return;
     }
 
+    onQrScannerOpenChange?.(true);
     setIsQrScannerOpen(true);
     setQrScannerStatus("scanning");
     setQrScannerError(null);
@@ -487,6 +560,8 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return;
     }
 
+    const nextMember = pendingQrMember;
+
     if (selectedMatchMembersRef.current.length >= 4) {
       showQrScannerError("매치 멤버는 최대 4명까지 추가할 수 있어요.");
       return;
@@ -494,21 +569,29 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
     if (
       selectedMatchMembersRef.current.some(
-        (member) => member.id === pendingQrMember.id,
+        (member) => member.id === nextMember.id,
       )
     ) {
-      showQrScannerError(`${pendingQrMember.username}님은 이미 추가된 멤버예요.`);
+      showQrScannerError(`${nextMember.username}님은 이미 추가된 멤버예요.`);
       return;
     }
 
-    setSelectedMatchMembers((prev) => [...prev, pendingQrMember]);
+    selectedMatchMembersRef.current = [
+      ...selectedMatchMembersRef.current,
+      nextMember,
+    ];
+    setSelectedMatchMembers((prev) => [...prev, nextMember]);
     setMatchMemberCandidates((prev) =>
-      mergeUniqueMembers([...prev, pendingQrMember]),
+      mergeUniqueMembers([...prev, nextMember]),
     );
-    closeQrScanner();
+    handleRetryQrScan();
   };
 
   const handleRemoveMatchMember = (memberId: string) => {
+    if (memberId === currentPlayerMember?.id) {
+      return;
+    }
+
     setSelectedMatchMembers((prev) =>
       prev.filter((member) => member.id !== memberId),
     );
@@ -530,7 +613,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return;
     }
 
-    if (!canSwapMembers(teams, selectedMatchType, selectedSwapMemberId, member)) {
+    if (
+      !canSwapMembers(teams, selectedMatchType, selectedSwapMemberId, member)
+    ) {
       return;
     }
 
@@ -558,273 +643,379 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     setSelectedSwapMemberId(null);
   };
 
-  return (
-    <>
-      <Drawer.Body className="flex flex-col gap-5 pb-4">
-        <section>
-          {/* <div className="flex items-start justify-between gap-3 mt-8"> */}
-          <div className="relative mt-8">
-            <div>
-              <p className="text-sm font-semibold text-amber-950">멤버</p>
-            </div>
-            <Button
-              size="sm"
-              onPress={handleAddMatchMemberByQr}
-              isDisabled={!canAddMatchMember || isQrScannerOpen}
-              className="absolute top-1 right-0 shrink-0 rounded-full bg-[#409eff] px-3 text-white disabled:bg-slate-200 disabled:text-slate-400"
-            >
-              <IoQrCodeSharp className="size-4" />
-              멤버 추가
-            </Button>
-          </div>
+  const handleCreateMatchPress = async () => {
+    if (!token) {
+      setCreateMatchError("로그인이 필요해요.");
+      return;
+    }
 
-          <div className="flex min-h-10 flex-wrap gap-2">
-            {selectedMatchMembers.length > 0 ? (
-              selectedMatchMembers.map((member) => (
+    if (!selectedMatchType || !areTeamsValid(teams, selectedMatchType)) {
+      setCreateMatchError("유효한 팀 구성이 필요해요.");
+      return;
+    }
+
+    try {
+      setIsCreatingMatch(true);
+      setCreateMatchError(null);
+
+      const res = await fetch("/api/matches", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: selectedMatchType,
+          teams: teams.map((team, teamIndex) => ({
+            name: `Team ${teamIndex === 0 ? "A" : "B"}`,
+            playerIds: team.map((member) => member.id),
+          })),
+          location: "Court TBD",
+          scheduledAt: new Date().toISOString(),
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "매치를 생성하지 못했어요.");
+      }
+
+      await onCreateMatch();
+    } catch (err) {
+      setCreateMatchError(
+        err instanceof Error ? err.message : "매치를 생성하지 못했어요.",
+      );
+    } finally {
+      setIsCreatingMatch(false);
+    }
+  };
+
+  const qrScannerPanel = (
+    <div className="mt-6 flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <p className="bs-text-title text-amber-950">현재 멤버</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedMatchMembers.length > 0 ? (
+            selectedMatchMembers.map((member) => {
+              const isMe = member.id === currentPlayerMember?.id;
+
+              return (
                 <UserChip
                   key={member.id}
                   player={member}
-                  onRemove={() => handleRemoveMatchMember(member.id)}
-                  isMe={member.id === player?.id}
+                  onRemove={
+                    isMe ? undefined : () => handleRemoveMatchMember(member.id)
+                  }
+                  isMe={isMe}
                 />
-              ))
-            ) : (
-              <p className="mt-2 text-sm text-amber-700/70">
-                아직 추가된 멤버가 없어요.
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section>
-          <p className="text-sm font-semibold text-amber-950">매치 타입</p>
-          {selectedMatchType ? (
-            <div className="mt-2 rounded-2xl border border-[#409eff] bg-[#409eff]/10 px-3 py-2 text-sm font-semibold text-[#409eff]">
-              {matchTypeLabels[selectedMatchType]}
-            </div>
+              );
+            })
           ) : (
-            <p className="mt-2 text-sm text-red-500">
-              유효한 성별 구성이 필요해요.
+            <p className="bs-text-body text-amber-700/70">
+              아직 추가된 멤버가 없어요.
             </p>
           )}
-        </section>
+        </div>
+      </div>
 
-        {hasTeams ? (
-          <section>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-amber-950">팀</p>
-              {selectedSwapMemberId ? (
-                <p className="text-xs text-amber-700/70">
-                  교체할 상대 팀 멤버를 선택하세요.
-                </p>
-              ) : (
-                <p className="text-xs text-amber-700/70">
-                  멤버를 탭해서 팀을 교체할 수 있어요.
-                </p>
-              )}
-            </div>
-
-            <div className="mt-2 grid grid-cols-2 gap-3">
-              {teams.map((team, teamIndex) => {
-                const typedTeamIndex = teamIndex as TeamIndex;
-
-                return (
-                  <div
-                    key={typedTeamIndex}
-                    className="rounded-2xl border border-border bg-white px-3 py-3"
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700/70">
-                      Team {typedTeamIndex === 0 ? "A" : "B"}
-                    </p>
-                    <div className="mt-2 flex flex-col gap-2">
-                      {team.map((member) => {
-                        const isSelected = selectedSwapMemberId === member.id;
-                        const isSwappable = canSwapMembers(
-                          teams,
-                          selectedMatchType,
-                          selectedSwapMemberId,
-                          member,
-                        );
-                        const isClickable =
-                          !selectedSwapMemberId || isSelected || isSwappable;
-
-                        return (
-                          <button
-                            key={member.id}
-                            type="button"
-                            disabled={!isClickable}
-                            onClick={() => handleTeamMemberPress(member)}
-                            className={`w-fit rounded-full transition ${
-                              isSelected
-                                ? "ring-2 ring-[#409eff] ring-offset-2"
-                                : ""
-                            } ${
-                              selectedSwapMemberId && !isSelected && !isSwappable
-                                ? "cursor-not-allowed opacity-35"
-                                : "cursor-pointer opacity-100"
-                            }`}
-                          >
-                            <UserChip
-                              player={member}
-                              isMe={member.id === player?.id}
-                            />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+      <div className="overflow-hidden rounded-3xl border border-border bg-slate-950">
+        {qrScannerStatus === "scanning" ? (
+          <div className="relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              className="aspect-square w-full bg-slate-950 object-cover"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-8 rounded-3xl border-2 border-white/80 shadow-[0_0_0_999px_rgba(0,0,0,0.22)]"
+            />
+            <p className="bs-text-caption absolute inset-x-0 bottom-4 mx-auto w-fit rounded-full bg-black/55 px-3 py-1 font-semibold text-white">
+              QR 코드를 스캔 중입니다.
+            </p>
+          </div>
         ) : null}
-      </Drawer.Body>
-      <Drawer.Footer className="pt-0">
-        <Button
-          className="w-full rounded-2xl bg-[#409eff] py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
-          isDisabled={!canCreateMatch}
-          onPress={onCreateMatch}
-        >
-          매치 생성
-        </Button>
-      </Drawer.Footer>
 
-      {isQrScannerOpen
-        ? createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/45 px-4 pb-4 pt-16">
-          <div className="w-full max-w-[430px] rounded-3xl bg-white p-4 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-base font-bold text-amber-950">
-                  QR 멤버 추가
+        {qrScannerStatus === "verifying" ? (
+          <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-white px-5 text-center">
+            <div className="size-10 animate-spin rounded-full border-[3px] border-[#409eff]/20 border-t-[#409eff]" />
+            <p className="bs-text-title text-amber-950">
+              QR 코드를 확인 중입니다...
+            </p>
+          </div>
+        ) : null}
+
+        {qrScannerStatus === "confirm" && pendingQrMember ? (
+          <div className="flex aspect-square w-full flex-col items-center justify-center gap-4 bg-white px-5 text-center">
+            <div className="flex w-full max-w-[180px] min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center shadow-sm ring-1 ring-border">
+              <Avatar
+                size="sm"
+                avatarUrl={pendingQrMember.avatarUrl}
+                name={pendingQrMember.username}
+                isMe={pendingQrMember.id === player?.id}
+              />
+              <div className="mt-3 min-w-0">
+                <p className="truncate font-semibold text-amber-950">
+                  {pendingQrMember.username}
                 </p>
-                <p className="mt-1 text-xs text-amber-700/70">
-                  멤버의 QR 코드를 카메라에 맞춰주세요.
+                <p
+                  className={`mt-1 text-xs font-medium ${getGenderClassName(
+                    pendingQrMember.gender,
+                  )}`}
+                >
+                  {getGenderLabel(pendingQrMember.gender)}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-amber-950">
+                  {pendingQrMember.duprRating?.total?.toFixed(2) ?? "-"}
                 </p>
               </div>
-              <Button
-                size="sm"
-                onPress={closeQrScanner}
-                className="rounded-full px-3"
-              >
-                닫기
-              </Button>
             </div>
-
-            <div className="mt-4 overflow-hidden rounded-3xl border border-border bg-slate-950">
-              {qrScannerStatus === "scanning" ? (
-                <div className="relative">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    playsInline
-                    className="aspect-[3/4] w-full bg-slate-950 object-cover"
-                  />
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-8 rounded-3xl border-2 border-white/80 shadow-[0_0_0_999px_rgba(0,0,0,0.22)]"
-                  />
-                  <p className="absolute inset-x-0 bottom-4 mx-auto w-fit rounded-full bg-black/55 px-3 py-1 text-xs font-semibold text-white">
-                    QR 코드를 스캔 중입니다.
-                  </p>
-                </div>
-              ) : null}
-
-              {qrScannerStatus === "verifying" ? (
-                <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-white px-5 text-center">
-                  <div className="size-10 animate-spin rounded-full border-[3px] border-[#409eff]/20 border-t-[#409eff]" />
-                  <p className="text-sm font-semibold text-amber-950">
-                    QR 코드를 확인 중입니다...
-                  </p>
-                </div>
-              ) : null}
-
-              {qrScannerStatus === "confirm" && pendingQrMember ? (
-                <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 bg-white px-5 text-center">
-                  <UserChip
-                    player={pendingQrMember}
-                    isMe={pendingQrMember.id === player?.id}
-                  />
-                  <div>
-                    <p className="text-base font-bold text-amber-950">
-                      {pendingQrMember.username}님을 매치 멤버로 추가할까요?
-                    </p>
-                    <p className="mt-2 text-xs text-amber-700/70">
-                      추가하면 현재 매치 멤버 목록에 반영됩니다.
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-
-              {qrScannerStatus === "error" ? (
-                <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-white px-5 text-center">
-                  <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-500">
-                    스캔 실패
-                  </div>
-                  <p className="text-sm font-semibold text-amber-950">
-                    {qrScannerError}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              {qrScannerStatus === "confirm" ? (
-                <>
-                  <Button
-                    className="flex-1 rounded-2xl bg-slate-100 text-slate-700"
-                    onPress={handleRetryQrScan}
-                  >
-                    다시 스캔
-                  </Button>
-                  <Button
-                    className="flex-1 rounded-2xl bg-slate-100 text-slate-700"
-                    onPress={closeQrScanner}
-                  >
-                    취소
-                  </Button>
-                  <Button
-                    className="flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
-                    onPress={handleConfirmQrMember}
-                  >
-                    추가
-                  </Button>
-                </>
-              ) : null}
-
-              {qrScannerStatus === "error" ? (
-                <>
-                  <Button
-                    className="flex-1 rounded-2xl bg-slate-100 text-slate-700"
-                    onPress={closeQrScanner}
-                  >
-                    닫기
-                  </Button>
-                  <Button
-                    className="flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
-                    onPress={handleRetryQrScan}
-                  >
-                    다시 스캔
-                  </Button>
-                </>
-              ) : null}
-
-              {qrScannerStatus === "scanning" ||
-              qrScannerStatus === "verifying" ? (
-                <Button
-                  className="w-full rounded-2xl bg-slate-100 text-slate-700"
-                  onPress={closeQrScanner}
-                >
-                  취소
-                </Button>
-              ) : null}
+            <div>
+              <p className="bs-text-head text-amber-950">
+                {pendingQrMember.username}님을 매치 멤버로 추가할까요?
+              </p>
+              <p className="bs-text-caption mt-2 text-amber-700/70">
+                추가하면 현재 매치 멤버 목록에 반영됩니다.
+              </p>
             </div>
           </div>
-        </div>,
-        document.body,
-          )
-        : null}
+        ) : null}
+
+        {qrScannerStatus === "error" ? (
+          <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-white px-5 text-center">
+            <div className="bs-text-caption rounded-full bg-error/10 px-3 py-1 font-bold text-error">
+              스캔 실패
+            </div>
+            <p className="bs-text-title text-error">{qrScannerError}</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex gap-2">
+        {qrScannerStatus === "confirm" ? (
+          <>
+            <Button
+              className="flex-1 rounded-2xl bg-red-50 font-semibold text-red-500"
+              onPress={handleRetryQrScan}
+            >
+              취소
+            </Button>
+            <Button
+              className="flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
+              onPress={handleConfirmQrMember}
+            >
+              추가
+            </Button>
+          </>
+        ) : null}
+
+        {qrScannerStatus === "error" ? (
+          <>
+            <Button
+              className="flex-1 rounded-2xl bg-slate-100 text-slate-700"
+              onPress={closeQrScanner}
+            >
+              닫기
+            </Button>
+            <Button
+              className="flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
+              onPress={handleRetryQrScan}
+            >
+              다시 스캔
+            </Button>
+          </>
+        ) : null}
+
+        {qrScannerStatus === "scanning" || qrScannerStatus === "verifying" ? (
+          <Button
+            className="w-full rounded-2xl bg-[#409eff] font-semibold text-white"
+            onPress={closeQrScanner}
+          >
+            완료
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <Drawer.Body className="flex flex-col gap-5 px-5 pb-4">
+        {isQrScannerOpen ? (
+          qrScannerPanel
+        ) : (
+          <>
+            <section className="flex flex-col gap-2">
+              <div className="relative flex items-start justify-between gap-3 mt-8">
+                <div>
+                  <p className="bs-text-title text-amber-950">멤버</p>
+                </div>
+                <button
+                  type="button"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleAddMatchMemberByQr();
+                  }}
+                  disabled={!canAddMatchMember || isQrScannerOpen}
+                  className="absolute right-0 -top-2 flex shrink-0 items-center gap-1 rounded-full bg-[#409eff] px-4 py-2 text-sm font-medium text-white disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  <IoQrCodeSharp className="size-4" />
+                  멤버 추가
+                </button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {selectedMatchMembers.length > 0 ? (
+                  selectedMatchMembers.map((member) => {
+                    const isMe = member.id === currentPlayerMember?.id;
+
+                    return (
+                      <UserChip
+                        key={member.id}
+                        player={member}
+                        onRemove={
+                          isMe
+                            ? undefined
+                            : () => handleRemoveMatchMember(member.id)
+                        }
+                        isMe={isMe}
+                      />
+                    );
+                  })
+                ) : (
+                  <p className="bs-text-body text-amber-700/70">
+                    아직 추가된 멤버가 없어요.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <p className="bs-text-title text-amber-950">매치 타입</p>
+              {selectedMatchType ? (
+                <div className="bs-text-title rounded-2xl border border-[#409eff] bg-[#409eff]/10 px-3 py-2 text-[#409eff]">
+                  {matchTypeLabels[selectedMatchType]}
+                </div>
+              ) : (
+                <p className="bs-text-body text-error">
+                  유효한 성별 구성이 필요해요.
+                </p>
+              )}
+            </section>
+
+            <section className="flex flex-col gap-2">
+              {selectedMatchType ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="bs-text-title text-amber-950">팀 구성</p>
+                  {selectedSwapMemberId ? (
+                    <p className="bs-text-caption text-amber-700/70">
+                      교체할 상대 팀 멤버를 선택하세요.
+                    </p>
+                  ) : (
+                    <p className="bs-text-caption text-amber-700/70">
+                      멤버를 탭해서 팀을 교체할 수 있어요.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="bs-text-title text-amber-950">팀 구성</p>
+                  <p className="bs-text-body text-error">
+                    유효한 성별 구성이 필요해요.
+                  </p>
+                </>
+              )}
+
+              {selectedMatchType ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {teams.map((team, teamIndex) => {
+                    const typedTeamIndex = teamIndex as TeamIndex;
+
+                    return (
+                      <div
+                        key={typedTeamIndex}
+                        className="rounded-2xl border border-border bg-white px-3 py-3"
+                      >
+                        <p className="bs-text-caption font-semibold uppercase tracking-wide text-amber-700/70">
+                          Team {typedTeamIndex === 0 ? "A" : "B"}
+                        </p>
+                        <div className="mt-2 flex flex-col gap-2">
+                          {team.map((member) => {
+                            const isSelected =
+                              selectedSwapMemberId === member.id;
+                            const isSwappable = canSwapMembers(
+                              teams,
+                              selectedMatchType,
+                              selectedSwapMemberId,
+                              member,
+                            );
+                            const isClickable =
+                              !selectedSwapMemberId ||
+                              isSelected ||
+                              isSwappable;
+
+                            return (
+                              <button
+                                key={member.id}
+                                type="button"
+                                disabled={!isClickable}
+                                onClick={() => handleTeamMemberPress(member)}
+                                className={`w-fit rounded-full transition ${
+                                  isSelected
+                                    ? "ring-2 ring-[#409eff] ring-offset-2"
+                                    : ""
+                                } ${
+                                  selectedSwapMemberId &&
+                                  !isSelected &&
+                                  !isSwappable
+                                    ? "cursor-not-allowed opacity-35"
+                                    : "cursor-pointer opacity-100"
+                                }`}
+                              >
+                                <UserChip
+                                  player={member}
+                                  isMe={member.id === player?.id}
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </section>
+          </>
+        )}
+      </Drawer.Body>
+      {!isQrScannerOpen ? (
+        <Drawer.Footer className="flex flex-col gap-2 px-5 pt-0">
+          {createMatchError ? (
+            <p className="bs-text-body text-error">{createMatchError}</p>
+          ) : null}
+          <div className="grid w-full grid-cols-3 gap-2">
+            <Button
+              className="w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
+              isDisabled={isCreatingMatch}
+              onPress={onCancel}
+            >
+              취소
+            </Button>
+            <Button
+              className="col-span-2 w-full rounded-2xl bg-[#409eff] py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+              isDisabled={!canCreateMatch || isCreatingMatch}
+              onPress={handleCreateMatchPress}
+            >
+              {isCreatingMatch ? "생성 중..." : "매치 생성"}
+            </Button>
+          </div>
+        </Drawer.Footer>
+      ) : null}
     </>
   );
 };

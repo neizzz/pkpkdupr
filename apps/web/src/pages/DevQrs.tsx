@@ -149,7 +149,7 @@ const DevQrs: React.FC = () => {
             Dev QR 목록을 불러오는 중입니다...
           </div>
         ) : error ? (
-          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm font-semibold text-red-500 shadow-sm">
+          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm font-semibold text-error shadow-sm">
             {error}
           </div>
         ) : (

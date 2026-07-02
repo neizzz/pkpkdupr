@@ -13,15 +13,15 @@ interface AvatarProps {
 const sizeClassMap: Record<NonNullable<AvatarProps["size"]>, string> = {
   xs: "h-6 w-6",
   sm: "h-12 w-12",
-  md: "h-20 w-20",
+  md: "h-18 w-18",
   lg: "h-24 w-24",
 };
 
 const iconSizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
-  xs: "text-sm",
+  xs: "text-md",
   sm: "text-2xl",
-  md: "text-4xl",
-  lg: "text-5xl",
+  md: "text-3xl",
+  lg: "text-4xl",
 };
 
 const HeroUiAvatar = HeroAvatar as React.ComponentType<any> & {
@@ -58,7 +58,7 @@ const Avatar: React.FC<AvatarProps> = ({
     </HeroUiAvatar>
   );
 
-  if (!isMe) {
+  if (!isMe || size === "xs") {
     return avatar;
   }
 
@@ -67,10 +67,15 @@ const Avatar: React.FC<AvatarProps> = ({
       {avatar}
       <Badge
         color="accent"
-        size={size === "xs" ? "sm" : "md"}
-        className="rounded-full px-1.5 py-0 shadow-md shadow-white"
+        size={size === "sm" ? "sm" : "md"}
+        placement="top-left"
+        className={[
+          "rounded-full py-0 border-2 border-white",
+          size === "sm" ? "px-0.5" : "px-1.5",
+          size === "sm" ? "py-0.5" : "py-0",
+        ].join(" ")}
       >
-        <Badge.Label className="text-4 font-semibold leading-none">
+        <Badge.Label className="text-6 font-semibold leading-none">
           ME
         </Badge.Label>
       </Badge>

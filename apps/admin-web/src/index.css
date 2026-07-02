@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @theme {
+  --color-error: #F8626c;
   --color-border: #e6e6e6;
   --color-divider: #e6e6e6;
 }

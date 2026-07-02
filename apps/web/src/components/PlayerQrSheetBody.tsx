@@ -41,8 +41,8 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
             />
           </div>
           <p
-            className={`text-sm font-semibold ${
-              qrRemainingSeconds > 0 ? "text-amber-800" : "text-red-500"
+            className={`bs-text-title ${
+              qrRemainingSeconds > 0 ? "text-amber-800" : "text-error"
             }`}
           >
             {qrRemainingSeconds > 0
@@ -52,14 +52,16 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
         </>
       ) : (
         <div className="flex min-h-[220px] items-center justify-center">
-          <p className="text-sm text-amber-700/70">
+          <p
+            className={`bs-text-body ${isQrLoading ? "text-amber-700/70" : "text-error"}`}
+          >
             {isQrLoading ? "QR 코드를 생성 중입니다..." : qrError}
           </p>
         </div>
       )}
 
       {qrError && qrToken ? (
-        <p className="text-xs text-red-500">{qrError}</p>
+        <p className="bs-text-caption text-error">{qrError}</p>
       ) : null}
 
       <Button

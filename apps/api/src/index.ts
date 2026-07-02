@@ -3,16 +3,20 @@ import express from "express";
 import fs from "fs/promises";
 import { randomUUID } from "crypto";
 import path from "path";
-import { PlayerStatus } from "@pkpkdupr/shared/player";
+import {
+  matchTypeLabels,
+  matchTypeValues,
+  type MatchType,
+} from "@pkpkdupr/shared/match";
+import type { Player, PlayerStatus } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
-import { decodeToken } from "./config/jwt";
 import {
   getMetricsContentType,
   getMetricsSnapshot,
   metricsMiddleware,
 } from "./monitoring/metrics";
 import { MatchRepository } from "./repositories/MatchRepository";
-import { AuthService } from "./services/AuthService";
+import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -58,6 +62,49 @@ app.get("/api/ping", (_req, res) => {
 const authService = new AuthService();
 const matchRepository = new MatchRepository();
 const playerStatuses: PlayerStatus[] = ["active", "inactive"];
+
+type CreateMatchRequest = {
+  type?: MatchType;
+  teams?: [
+    { name?: string; playerIds?: string[] },
+    { name?: string; playerIds?: string[] },
+  ];
+  location?: string;
+  scheduledAt?: string;
+};
+
+const isMatchType = (value: unknown): value is MatchType =>
+  typeof value === "string" && matchTypeValues.includes(value as MatchType);
+
+const isMixedDoublesTeamValid = (players: Player[]) =>
+  players.length === 2 &&
+  players.some((player) => player.gender === "M") &&
+  players.some((player) => player.gender === "F");
+
+const validateCreateMatchTeams = (
+  matchType: MatchType,
+  teams: [Player[], Player[]],
+) => {
+  if (matchType === "singles") {
+    return teams.every((team) => team.length === 1);
+  }
+
+  if (matchType === "mixed-doubles") {
+    return teams.every(isMixedDoublesTeamValid);
+  }
+
+  if (matchType === "men-doubles") {
+    return teams.every(
+      (team) =>
+        team.length === 2 && team.every((player) => player.gender === "M"),
+    );
+  }
+
+  return teams.every(
+    (team) =>
+      team.length === 2 && team.every((player) => player.gender === "F"),
+  );
+};
 
 const parseAvatarDataUrl = (value: unknown) => {
   if (typeof value !== "string") {
@@ -111,36 +158,47 @@ const removeLocalAvatarIfExists = async (avatarUrl?: string | null) => {
   await fs.unlink(avatarPath).catch(() => undefined);
 };
 
-const getAuthPayload = (req: express.Request, res: express.Response) => {
+const getBearerToken = (req: express.Request, res: express.Response) => {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     res.status(401).json({ error: "토큰이 필요합니다." });
     return null;
   }
-  const token = header.split(" ")[1];
-  const decoded = decodeToken(token);
-  if (!decoded) {
-    res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
-    return null;
-  }
-  return decoded;
+  return header.split(" ")[1];
 };
 
-const requireAdmin = (
+const getAuthSession = async (
+  req: express.Request,
+  res: express.Response,
+): Promise<AuthenticatedSession | null> => {
+  const token = getBearerToken(req, res);
+  if (!token) {
+    return null;
+  }
+
+  try {
+    return await authService.authenticateAccessToken(token);
+  } catch (err) {
+    res.status(403).json({ error: (err as Error).message });
+    return null;
+  }
+};
+
+const getAuthPayload = async (req: express.Request, res: express.Response) => {
+  const session = await getAuthSession(req, res);
+  return session?.payload ?? null;
+};
+
+const requireAdmin = async (
   req: express.Request,
   res: express.Response,
   next: express.NextFunction,
 ) => {
-  const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "토큰이 필요합니다." });
+  const session = await getAuthSession(req, res);
+  if (!session) {
+    return;
   }
-  const token = header.split(" ")[1];
-  const decoded = decodeToken(token);
-  if (!decoded) {
-    return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
-  }
-  if (!decoded.isAdmin) {
+  if (!session.payload.isAdmin) {
     return res.status(403).json({ error: "관리자 권한이 필요합니다." });
   }
   next();
@@ -163,11 +221,11 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, rememberMe } = req.body;
     if (!username || !password) {
       return res.status(400).json({ error: "username과 password는 필수입니다." });
     }
-    const result = await authService.login(username, password);
+    const result = await authService.login(username, password, rememberMe === true);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -176,20 +234,14 @@ app.post("/api/login", async (req, res) => {
 
 app.get("/api/me", async (req, res) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "토큰이 필요합니다." });
+    const session = await getAuthSession(req, res);
+    if (!session) {
+      return;
     }
-    const token = header.split(" ")[1];
-    const decoded = decodeToken(token);
-    if (!decoded) {
-      return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
-    }
-    const player = await authService.getPlayerById(decoded.playerId);
-    if (!player) {
-      return res.json({ playerId: decoded.playerId });
-    }
-    res.json(player);
+    res.json({
+      ...session.player,
+      accessToken: session.refreshedAccessToken,
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -197,14 +249,9 @@ app.get("/api/me", async (req, res) => {
 
 app.get("/api/players", async (req, res) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "토큰이 필요합니다." });
-    }
-    const token = header.split(" ")[1];
-    const decoded = decodeToken(token);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
-      return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
+      return;
     }
 
     const players = await authService.getPublicPlayers();
@@ -216,7 +263,7 @@ app.get("/api/players", async (req, res) => {
 
 app.get("/api/player-qr-token", async (req, res) => {
   try {
-    const decoded = getAuthPayload(req, res);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
       return;
     }
@@ -239,7 +286,7 @@ app.get("/api/dev/player-qr-tokens", async (_req, res) => {
 
 app.post("/api/player-qr-token/verify", async (req, res) => {
   try {
-    if (!getAuthPayload(req, res)) {
+    if (!(await getAuthPayload(req, res))) {
       return;
     }
 
@@ -257,14 +304,9 @@ app.post("/api/player-qr-token/verify", async (req, res) => {
 
 app.get("/api/matches", async (req, res) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "토큰이 필요합니다." });
-    }
-    const token = header.split(" ")[1];
-    const decoded = decodeToken(token);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
-      return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
+      return;
     }
 
     const page = Number(req.query.page ?? 0);
@@ -281,16 +323,104 @@ app.get("/api/matches", async (req, res) => {
   }
 });
 
+app.post("/api/matches", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const { type, teams, location, scheduledAt } =
+      req.body as CreateMatchRequest;
+    if (!isMatchType(type)) {
+      return res.status(400).json({ error: "유효한 매치 타입이 필요합니다." });
+    }
+
+    if (!teams || teams.length !== 2) {
+      return res.status(400).json({ error: "두 팀 구성이 필요합니다." });
+    }
+
+    const creator = await authService.getPlayerById(decoded.playerId);
+    if (
+      !creator ||
+      creator.status !== "active" ||
+      creator.username === "admin"
+    ) {
+      return res.status(403).json({ error: "매치를 생성할 수 없는 계정입니다." });
+    }
+
+    const publicPlayers = await authService.getPublicPlayers();
+    const playersById = new Map<string, Player>(
+      [creator, ...publicPlayers].map((player) => [player.id, player]),
+    );
+    const flatPlayerIds = teams.flatMap((team) => team.playerIds ?? []);
+    if (!flatPlayerIds.includes(decoded.playerId)) {
+      return res
+        .status(400)
+        .json({ error: "매치 멤버에 본인이 포함되어야 합니다." });
+    }
+
+    const uniquePlayerIds = new Set(flatPlayerIds);
+    if (uniquePlayerIds.size !== flatPlayerIds.length) {
+      return res.status(400).json({ error: "중복된 멤버가 있습니다." });
+    }
+
+    const matchTeams = teams.map((team, teamIndex) => {
+      const playerIds = team.playerIds ?? [];
+      const players = playerIds.map((playerId) => playersById.get(playerId));
+
+      if (players.some((player) => !player)) {
+        throw new Error("유효하지 않은 멤버가 포함되어 있습니다.");
+      }
+
+      return {
+        id: `team-${Date.now()}-${teamIndex === 0 ? "a" : "b"}`,
+        name: team.name?.trim() || `Team ${teamIndex === 0 ? "A" : "B"}`,
+        players: players as Player[],
+      };
+    }) as [
+      { id: string; name: string; players: Player[] },
+      { id: string; name: string; players: Player[] },
+    ];
+
+    if (
+      !validateCreateMatchTeams(type, [
+        matchTeams[0].players,
+        matchTeams[1].players,
+      ])
+    ) {
+      return res.status(400).json({
+        error: `${matchTypeLabels[type]}에 맞는 유효한 팀 구성이 필요합니다.`,
+      });
+    }
+
+    const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
+    if (Number.isNaN(scheduledDate.getTime())) {
+      return res.status(400).json({ error: "유효한 경기 시간이 필요합니다." });
+    }
+
+    const match = await matchRepository.create({
+      type,
+      creatorPlayerId: decoded.playerId,
+      status: "created",
+      teams: matchTeams,
+      scores: [],
+      location: location?.trim() || "Court TBD",
+      scheduledAt: scheduledDate,
+      completedAt: null,
+    });
+
+    res.status(201).json(match);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/change-password", async (req, res) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "토큰이 필요합니다." });
-    }
-    const token = header.split(" ")[1];
-    const decoded = decodeToken(token);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
-      return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
+      return;
     }
     const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
@@ -305,7 +435,7 @@ app.post("/api/change-password", async (req, res) => {
 
 app.patch("/api/me/profile", async (req, res) => {
   try {
-    const decoded = getAuthPayload(req, res);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
       return;
     }
@@ -332,7 +462,7 @@ app.post("/api/me/avatar", async (req, res) => {
   let nextAvatarPath: string | null = null;
 
   try {
-    const decoded = getAuthPayload(req, res);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
       return;
     }
@@ -367,7 +497,7 @@ app.post("/api/me/avatar", async (req, res) => {
 
 app.delete("/api/me/avatar", async (req, res) => {
   try {
-    const decoded = getAuthPayload(req, res);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
       return;
     }
@@ -417,15 +547,9 @@ app.get("/api/admin/player-status-logs", requireAdmin, async (_req, res) => {
 
 app.patch("/api/admin/players/:playerId/status", requireAdmin, async (req, res) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "토큰이 필요합니다." });
-    }
-
-    const token = header.split(" ")[1];
-    const decoded = decodeToken(token);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
-      return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
+      return;
     }
 
     const { status } = req.body as { status?: PlayerStatus };
@@ -447,16 +571,36 @@ app.patch("/api/admin/players/:playerId/status", requireAdmin, async (req, res) 
   }
 });
 
+app.post("/api/admin/players/:playerId/official-dupr", requireAdmin, async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const { matches } = await matchRepository.findAll(0, 10000);
+    const result = await authService.applyOfficialDuprAdjustment(
+      {
+        playerId: req.params.playerId,
+        changedByPlayerId: decoded.playerId,
+        ratings: req.body.ratings,
+        confidence: req.body.confidence,
+        reason: req.body.reason,
+      },
+      matches.filter((match) => match.status === "completed"),
+    );
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/admin/register", requireAdmin, async (req, res) => {
   try {
-    const header = req.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "토큰이 필요합니다." });
-    }
-    const token = header.split(" ")[1];
-    const decoded = decodeToken(token);
+    const decoded = await getAuthPayload(req, res);
     if (!decoded) {
-      return res.status(403).json({ error: "유효하지 않거나 만료된 토큰입니다." });
+      return;
     }
 
     const { username, password, gender } = req.body;

@@ -1,4 +1,5 @@
 import express from "express";
+import { normalizeStoredPlayerDupr } from "@pkpkdupr/shared/player";
 import { getDb, getDbClient } from "./db/client";
 import { PlayerRepository, type CreateStoredPlayerInput } from "./repositories/PlayerRepository";
 import {
@@ -9,6 +10,10 @@ import {
   PlayerStatusChangeLogRepository,
   type CreatePlayerStatusChangeLogInput,
 } from "./repositories/PlayerStatusChangeLogRepository";
+import {
+  OfficialDuprAdjustmentLogRepository,
+  type CreateOfficialDuprAdjustmentLogInput,
+} from "./repositories/OfficialDuprAdjustmentLogRepository";
 import {
   getDevMockUsernames,
   isDevMockDataEnabled,
@@ -22,6 +27,8 @@ const client = getDbClient();
 const playerRepository = new PlayerRepository(db);
 const playerCreationLogRepository = new PlayerCreationLogRepository(db);
 const playerStatusChangeLogRepository = new PlayerStatusChangeLogRepository(db);
+const officialDuprAdjustmentLogRepository =
+  new OfficialDuprAdjustmentLogRepository(db);
 const testDataRepository = new TestDataRepository(
   db,
   playerRepository,
@@ -179,6 +186,41 @@ const initSchema = async () => {
       WHERE score_b IS NULL
     `);
   }
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS match_participants (
+      id TEXT PRIMARY KEY,
+      match_id TEXT NOT NULL,
+      team_index INTEGER NOT NULL,
+      player_id TEXT NOT NULL
+    )
+  `);
+
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS official_dupr_adjustment_logs (
+      id TEXT PRIMARY KEY,
+      player_id TEXT NOT NULL,
+      changed_by_player_id TEXT NOT NULL,
+      changed_by_username TEXT NOT NULL,
+      ratings_json TEXT NOT NULL,
+      confidence_json TEXT NOT NULL,
+      previous_rating_json TEXT NOT NULL,
+      next_rating_json TEXT NOT NULL,
+      pre_update_accuracy_json TEXT NOT NULL,
+      reason TEXT,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  const storedPlayers = await playerRepository.findAll();
+  for (const player of storedPlayers) {
+    await playerRepository.updateDuprState(
+      player.id,
+      // PlayerRepository stores legacy and new shapes in the same column.
+      // Rewriting on boot keeps old numeric and pre-metrics JSON rows compatible.
+      normalizeStoredPlayerDupr(player.duprRating),
+    );
+  }
 };
 
 app.get("/health", (_req, res) => {
@@ -283,6 +325,21 @@ app.patch("/internal/players/:id/profile", async (req, res) => {
   }
 });
 
+app.patch("/internal/players/:id/dupr-state", async (req, res) => {
+  try {
+    const player = await playerRepository.updateDuprState(
+      req.params.id,
+      req.body.duprState,
+    );
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.get("/internal/player-creation-logs", async (_req, res) => {
   try {
     res.json(await playerCreationLogRepository.findAll());
@@ -314,6 +371,25 @@ app.post("/internal/player-status-change-logs", async (req, res) => {
   try {
     const log = await playerStatusChangeLogRepository.create(
       req.body as CreatePlayerStatusChangeLogInput,
+    );
+    res.json(log);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/official-dupr-adjustment-logs", async (_req, res) => {
+  try {
+    res.json(await officialDuprAdjustmentLogRepository.findAll());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/official-dupr-adjustment-logs", async (req, res) => {
+  try {
+    const log = await officialDuprAdjustmentLogRepository.create(
+      req.body as CreateOfficialDuprAdjustmentLogInput,
     );
     res.json(log);
   } catch (error) {

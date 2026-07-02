@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
 import MemberProfile from "@/components/MemberProfile";
+import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
@@ -98,23 +99,17 @@ const Members: React.FC = () => {
   }
 
   return (
-    <div className="min-h-full p-2">
-      <div className="mx-auto flex w-full h-full flex-col gap-4">
+    <div className="flex min-h-full p-2">
+      <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
         <h2 className="text-2xl font-bold text-amber-950">Members</h2>
 
-        <div>
+        <div className="flex flex-1 flex-col">
           {isLoading ? (
-            <div className="rounded-2xl bg-white/90 px-3 py-8 text-center text-sm text-amber-700/80 shadow-sm">
-              멤버 목록을 불러오는 중이에요.
-            </div>
+            <TabPanelStatus ariaLabel="멤버 목록 로딩 중" isLoading />
           ) : error ? (
-            <div className="rounded-2xl bg-white/90 px-3 py-8 text-center text-sm text-red-500 shadow-sm">
-              {error}
-            </div>
+            <TabPanelStatus message={error} tone="error" />
           ) : members.length === 0 ? (
-            <div className="rounded-2xl bg-white/90 px-3 py-8 text-center text-sm text-amber-700/80 shadow-sm">
-              현재 표시할 멤버가 없어요.
-            </div>
+            <TabPanelStatus message="현재 표시할 멤버가 없어요." />
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {members.map((member) => (
@@ -139,8 +134,11 @@ const Members: React.FC = () => {
                     >
                       {getGenderLabel(member.gender)}
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-amber-950">
-                      {member.duprRating?.total?.toFixed(2) ?? "-"}
+                    <p className="mt-2 text-xs font-semibold text-amber-950">
+                      S {member.duprRating?.singles?.toFixed(3) ?? "-"}
+                    </p>
+                    <p className="mt-1 text-xs text-amber-700/80">
+                      Mx {member.duprRating?.doubles.mixed?.toFixed(3) ?? "-"}
                     </p>
                   </div>
                 </button>

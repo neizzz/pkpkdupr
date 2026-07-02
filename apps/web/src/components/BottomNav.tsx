@@ -76,6 +76,8 @@ const BottomNav: React.FC = () => {
   const [qrTabKey, setQrTabKey] = useState<TabKey>("me");
   const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
   const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("me");
+  const [matchesReloadKey, setMatchesReloadKey] = useState(0);
+  const isCreateMatchQrScannerOpenRef = useRef(false);
   const [qrToken, setQrToken] = useState<PlayerQrTokenResponse | null>(null);
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -310,6 +312,7 @@ const BottomNav: React.FC = () => {
   const openCreateMatchSheet = useCallback(() => {
     const tabKey = selectedTabRef.current;
     setCreateMatchTabKey(tabKey);
+    isCreateMatchQrScannerOpenRef.current = false;
     pushDepth(tabKey, {
       id: "create-match-sheet",
       kind: "bottom-sheet",
@@ -350,6 +353,10 @@ const BottomNav: React.FC = () => {
     (isOpen: boolean) => {
       if (isOpen) {
         openCreateMatchSheet();
+        return;
+      }
+
+      if (isCreateMatchQrScannerOpenRef.current) {
         return;
       }
 
@@ -470,6 +477,8 @@ const BottomNav: React.FC = () => {
   };
 
   const handleCreateMatch = () => {
+    isCreateMatchQrScannerOpenRef.current = false;
+    setMatchesReloadKey((prev) => prev + 1);
     if (
       !closeDepth(createMatchTabKey, "create-match-sheet", () =>
         selectTab("match"),
@@ -479,6 +488,20 @@ const BottomNav: React.FC = () => {
       selectTab("match");
     }
   };
+
+  const handleCancelCreateMatch = () => {
+    isCreateMatchQrScannerOpenRef.current = false;
+    if (!closeDepth(createMatchTabKey, "create-match-sheet")) {
+      setIsCreateMatchOpen(false);
+    }
+  };
+
+  const handleCreateMatchQrScannerOpenChange = useCallback(
+    (isOpen: boolean) => {
+      isCreateMatchQrScannerOpenRef.current = isOpen;
+    },
+    [],
+  );
 
   const navigationContextValue = useMemo(
     () => ({
@@ -600,12 +623,15 @@ const BottomNav: React.FC = () => {
           </Dropdown>
         </div>
 
-        <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          ref={scrollContainerRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+        >
           <Tabs.Panel
             id="match"
             className="min-h-full bg-gray-50 pb-[calc(4rem+env(safe-area-inset-bottom))]"
           >
-            <Matches />
+            <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
@@ -627,7 +653,7 @@ const BottomNav: React.FC = () => {
 
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-white/95 via-white/75 to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-white via-white/100 to-transparent"
         />
 
         <BottomSheet
@@ -649,7 +675,11 @@ const BottomNav: React.FC = () => {
           onOpenChange={handleCreateMatchOpenChange}
           ariaLabel="Create match"
         >
-          <CreateMatchDrawerBody onCreateMatch={handleCreateMatch} />
+          <CreateMatchDrawerBody
+            onCreateMatch={handleCreateMatch}
+            onCancel={handleCancelCreateMatch}
+            onQrScannerOpenChange={handleCreateMatchQrScannerOpenChange}
+          />
         </BottomSheet>
       </Tabs>
     </TabNavigationProvider>
