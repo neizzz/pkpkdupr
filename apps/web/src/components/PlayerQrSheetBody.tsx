@@ -25,8 +25,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
   isQrLoading,
   onRefresh,
 }) => {
-  const canRefresh =
-    !isQrLoading && (!qrToken || qrRemainingSeconds <= 60);
+  const canRefresh = !isQrLoading && (!qrToken || qrRemainingSeconds <= 60);
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 pb-6 pt-6 text-center">
@@ -64,17 +63,19 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
         <p className="bs-text-caption text-error">{qrError}</p>
       ) : null}
 
-      <Button
-        size="sm"
-        onPress={() => {
-          if (!canRefresh) return;
-          void onRefresh();
-        }}
-        isDisabled={!canRefresh}
-        className="rounded-full bg-[#409eff] px-4 text-white disabled:bg-slate-200 disabled:text-slate-400"
-      >
-        {isQrLoading ? "갱신 중..." : "새로고침"}
-      </Button>
+      {canRefresh && (
+        <Button
+          size="sm"
+          onPress={() => {
+            if (!canRefresh) return;
+            void onRefresh();
+          }}
+          isDisabled={!canRefresh}
+          className="rounded-full bg-[#409eff] px-4 text-white disabled:bg-slate-200 disabled:text-slate-400"
+        >
+          {isQrLoading ? "갱신 중..." : "새로고침"}
+        </Button>
+      )}
     </div>
   );
 };
