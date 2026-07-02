@@ -5,10 +5,11 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button, Dropdown, Label, Tabs } from "@heroui/react";
+import { Button, Dropdown, Label, Separator, Tabs } from "@heroui/react";
 import {
   IoAdd,
   IoAddCircleOutline,
+  IoLogOutOutline,
   IoPeopleOutline,
   IoPersonCircleOutline,
   IoQrCodeSharp,
@@ -68,7 +69,7 @@ const isTabDepthHistoryState = (
 };
 
 const BottomNav: React.FC = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const isOnline = useOnlineStatus();
   const [selectedTab, setSelectedTab] = useState<TabKey>("me");
   const [depthStacks, setDepthStacks] =
@@ -477,6 +478,9 @@ const BottomNav: React.FC = () => {
           if (!isOnline) return;
           openCreateMatchSheet();
           break;
+        case "logout":
+          logout();
+          break;
         default:
           break;
       }
@@ -639,6 +643,11 @@ const BottomNav: React.FC = () => {
                 >
                   <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
                   <Label>매치 생성</Label>
+                </Dropdown.Item>
+                <Separator className="my-1" />
+                <Dropdown.Item id="logout" textValue="Logout">
+                  <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
+                  <Label className="text-[#f8626c]">로그아웃</Label>
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown.Popover>
