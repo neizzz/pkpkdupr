@@ -249,12 +249,14 @@ interface CreateMatchDrawerBodyProps {
   onCreateMatch: () => void | Promise<void>;
   onCancel: () => void;
   onQrScannerOpenChange?: (isOpen: boolean) => void;
+  isOnline?: boolean;
 }
 
 const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   onCreateMatch,
   onCancel,
   onQrScannerOpenChange,
+  isOnline = true,
 }) => {
   const { player, token } = useAuth();
   const [, setMatchMemberCandidates] = useState<MatchMember[]>([]);
@@ -286,8 +288,8 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     () => resolveMatchType(selectedMatchMembers),
     [selectedMatchMembers],
   );
-  const canCreateMatch = areTeamsValid(teams, selectedMatchType);
-  const canAddMatchMember = !!token && selectedMatchMembers.length < 4;
+  const canCreateMatch = isOnline && areTeamsValid(teams, selectedMatchType);
+  const canAddMatchMember = isOnline && !!token && selectedMatchMembers.length < 4;
 
   useEffect(() => {
     let isCancelled = false;
@@ -390,6 +392,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         showQrScannerError("로그인이 필요해요.");
         return;
       }
+      if (!isOnline) {
+        showQrScannerError("오프라인에서는 QR 코드를 검증할 수 없습니다. 온라인 연결이 필요합니다.");
+        return;
+      }
 
       if (selectedMatchMembersRef.current.length >= 4) {
         showQrScannerError("매치 멤버는 최대 4명까지 추가할 수 있어요.");
@@ -445,7 +451,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         );
       }
     },
-    [showQrScannerError, token],
+    [isOnline, showQrScannerError, token],
   );
 
   useEffect(() => {
@@ -646,6 +652,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const handleCreateMatchPress = async () => {
     if (!token) {
       setCreateMatchError("로그인이 필요해요.");
+      return;
+    }
+    if (!isOnline) {
+      setCreateMatchError("오프라인에서는 매치를 생성할 수 없습니다. 온라인 연결이 필요합니다.");
       return;
     }
 
@@ -1011,7 +1021,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               isDisabled={!canCreateMatch || isCreatingMatch}
               onPress={handleCreateMatchPress}
             >
-              {isCreatingMatch ? "생성 중..." : "매치 생성"}
+              {!isOnline ? "온라인 연결 필요" : isCreatingMatch ? "생성 중..." : "매치 생성"}
             </Button>
           </div>
         </Drawer.Footer>

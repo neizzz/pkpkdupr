@@ -18,6 +18,7 @@ import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
 import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import { useAuth } from "@/context/AuthContext";
 import {
   TabNavigationProvider,
@@ -25,6 +26,7 @@ import {
   type TabDepthStacks,
   type TabKey,
 } from "@/context/TabNavigationContext";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import Matches from "@/pages/Matches";
 import Members from "@/pages/Members";
 import Me from "@/pages/Me";
@@ -67,6 +69,7 @@ const isTabDepthHistoryState = (
 
 const BottomNav: React.FC = () => {
   const { token } = useAuth();
+  const isOnline = useOnlineStatus();
   const [selectedTab, setSelectedTab] = useState<TabKey>("me");
   const [depthStacks, setDepthStacks] =
     useState<TabDepthStacks>(emptyDepthStacks);
@@ -368,6 +371,13 @@ const BottomNav: React.FC = () => {
   );
 
   const loadPlayerQrToken = useCallback(async () => {
+    if (!isOnline) {
+      setQrToken(null);
+      setQrError("오프라인에서는 QR 코드를 생성할 수 없습니다. 온라인 연결이 필요합니다.");
+      setQrRemainingSeconds(0);
+      return;
+    }
+
     if (!token) {
       setQrToken(null);
       setQrError("로그인이 필요합니다.");
@@ -398,7 +408,7 @@ const BottomNav: React.FC = () => {
     } finally {
       setIsQrLoading(false);
     }
-  }, [token]);
+  }, [isOnline, token]);
 
   const handleRefreshPlayerQrToken = useCallback(() => {
     if (qrToken && qrRemainingSeconds > 60) {
@@ -460,9 +470,11 @@ const BottomNav: React.FC = () => {
     const action = () => {
       switch (String(key)) {
         case "qr":
+          if (!isOnline) return;
           openQrSheet();
           break;
         case "create-match":
+          if (!isOnline) return;
           openCreateMatchSheet();
           break;
         default:
@@ -535,6 +547,8 @@ const BottomNav: React.FC = () => {
         onSelectionChange={handleSelectionChange}
         className="relative flex h-screen min-h-screen flex-col overflow-hidden bg-white"
       >
+        <PwaInstallPrompt />
+
         <div className="fixed inset-x-0 bottom-0 z-20 flex items-end gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
@@ -610,11 +624,19 @@ const BottomNav: React.FC = () => {
                 onAction={handleGlobalAction}
                 className="relative z-10 bg-transparent"
               >
-                <Dropdown.Item id="qr" textValue="QR code">
+                <Dropdown.Item
+                  id="qr"
+                  textValue="QR code"
+                  isDisabled={!isOnline}
+                >
                   <IoQrCodeSharp className="size-4 shrink-0 text-amber-700" />
                   <Label>QR 코드</Label>
                 </Dropdown.Item>
-                <Dropdown.Item id="create-match" textValue="Create match">
+                <Dropdown.Item
+                  id="create-match"
+                  textValue="Create match"
+                  isDisabled={!isOnline}
+                >
                   <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
                   <Label>매치 생성</Label>
                 </Dropdown.Item>
@@ -679,6 +701,7 @@ const BottomNav: React.FC = () => {
             onCreateMatch={handleCreateMatch}
             onCancel={handleCancelCreateMatch}
             onQrScannerOpenChange={handleCreateMatchQrScannerOpenChange}
+            isOnline={isOnline}
           />
         </BottomSheet>
       </Tabs>

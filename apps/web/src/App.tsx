@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
+import OfflineBanner from "./components/OfflineBanner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import DevQrs from "./pages/DevQrs";
 import Login from "./pages/Login";
@@ -58,6 +59,7 @@ function App() {
         }
       >
         <AuthProvider>
+          <OfflineBanner />
           <AppRoutes />
         </AuthProvider>
       </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import Avatar from "@/components/Avatar";
 import { useAuth } from "@/context/AuthContext";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 const MAX_AVATAR_SIZE = 512;
 const AVATAR_JPEG_QUALITY = 0.85;
@@ -60,6 +61,7 @@ const resizeAvatarImage = async (file: File) => {
 
 const ProfileSettingsSheetBody: React.FC = () => {
   const { player, token, uploadAvatar, deleteAvatar } = useAuth();
+  const isOnline = useOnlineStatus();
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(
     player?.avatarUrl ?? "",
   );
@@ -106,6 +108,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
     passwordSubmitError;
   const isPasswordChangeDisabled =
     isSavingPassword ||
+    !isOnline ||
     !currentPassword ||
     !newPassword ||
     !confirmPassword ||
@@ -142,6 +145,11 @@ const ProfileSettingsSheetBody: React.FC = () => {
     event.preventDefault();
     clearFeedback();
 
+    if (!isOnline) {
+      setError("오프라인에서는 프로필 이미지를 변경할 수 없습니다. 온라인 연결이 필요합니다.");
+      return;
+    }
+
     if (!selectedAvatarDataUrl) {
       setError("먼저 갤러리에서 이미지를 선택해주세요.");
       return;
@@ -166,6 +174,12 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
   const handleDeleteAvatar = async () => {
     clearFeedback();
+
+    if (!isOnline) {
+      setError("오프라인에서는 프로필 이미지를 삭제할 수 없습니다. 온라인 연결이 필요합니다.");
+      return;
+    }
+
     setIsSavingProfile(true);
 
     try {
@@ -190,6 +204,10 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
     if (!token) {
       setError("로그인이 필요합니다.");
+      return;
+    }
+    if (!isOnline) {
+      setError("오프라인에서는 패스워드를 변경할 수 없습니다. 온라인 연결이 필요합니다.");
       return;
     }
 
@@ -258,6 +276,12 @@ const ProfileSettingsSheetBody: React.FC = () => {
         </div>
       )}
 
+      {!isOnline ? (
+        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-amber-700">
+          프로필 이미지와 패스워드 변경은 온라인 연결이 필요합니다.
+        </div>
+      ) : null}
+
       <form onSubmit={handleSaveProfile} className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
           <h3 className="bs-text-title text-amber-950">프로필 이미지 변경</h3>
@@ -283,7 +307,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
             variant="secondary"
             className="rounded-2xl text-amber-800"
             onPress={() => avatarInputRef.current?.click()}
-            isDisabled={isSavingProfile}
+            isDisabled={isSavingProfile || !isOnline}
           >
             갤러리에서 선택
           </Button>
@@ -293,7 +317,9 @@ const ProfileSettingsSheetBody: React.FC = () => {
             className="rounded-2xl text-red-600"
             onPress={handleDeleteAvatar}
             isDisabled={
-              isSavingProfile || (!player?.avatarUrl && !selectedAvatarDataUrl)
+              isSavingProfile ||
+              !isOnline ||
+              (!player?.avatarUrl && !selectedAvatarDataUrl)
             }
           >
             이미지 제거
@@ -304,7 +330,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           <Button
             type="submit"
             className="rounded-2xl bg-[#409eff] px-6 text-white"
-            isDisabled={isSavingProfile || !selectedAvatarDataUrl}
+            isDisabled={isSavingProfile || !isOnline || !selectedAvatarDataUrl}
           >
             {isSavingProfile ? "저장 중..." : "저장"}
           </Button>
@@ -320,6 +346,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           type="password"
           placeholder="현재 패스워드"
           value={currentPassword}
+          disabled={!isOnline}
           onChange={(event) => {
             setCurrentPassword(event.target.value);
             setCurrentPasswordValidationError(null);
@@ -333,6 +360,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           placeholder="새 패스워드"
           minLength={6}
           value={newPassword}
+          disabled={!isOnline}
           onChange={(event) => {
             setNewPassword(event.target.value);
             setPasswordSubmitError(null);
@@ -344,6 +372,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           placeholder="새 패스워드 확인"
           minLength={6}
           value={confirmPassword}
+          disabled={!isOnline}
           onChange={(event) => {
             setConfirmPassword(event.target.value);
             setPasswordSubmitError(null);

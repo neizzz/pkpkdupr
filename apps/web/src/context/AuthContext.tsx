@@ -22,9 +22,27 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+const CACHED_PLAYER_KEY = 'pkpkdupr:player';
+const ONLINE_REQUIRED_MESSAGE = '온라인 연결이 필요합니다.';
 
 type MeResponse = PlayerInfo & {
     accessToken?: string;
+};
+
+const isOnline = () =>
+    typeof navigator === 'undefined' ? true : navigator.onLine;
+
+const readCachedPlayer = (): PlayerInfo | null => {
+    try {
+        const cachedPlayer = localStorage.getItem(CACHED_PLAYER_KEY);
+        return cachedPlayer ? (JSON.parse(cachedPlayer) as PlayerInfo) : null;
+    } catch {
+        return null;
+    }
+};
+
+const persistPlayer = (playerInfo: PlayerInfo) => {
+    localStorage.setItem(CACHED_PLAYER_KEY, JSON.stringify(playerInfo));
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,6 +63,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      }, []);
 
     const fetchMe = async (accessToken: string) => {
+        const useCachedPlayer = () => {
+            const cachedPlayer = readCachedPlayer();
+            if (cachedPlayer) {
+                setPlayer(cachedPlayer);
+                return cachedPlayer;
+            }
+            return null;
+        };
+
         try {
             const res = await fetch('/api/me', {
                 headers: { Authorization: `Bearer ${accessToken}` },
@@ -57,13 +84,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     setToken(refreshedAccessToken);
                 }
                 setPlayer(playerInfo);
+                persistPlayer(playerInfo);
                 return playerInfo;
              }
+
+            if (!isOnline()) {
+                const cachedPlayer = useCachedPlayer();
+                if (cachedPlayer) {
+                    return cachedPlayer;
+                }
+            }
+
             localStorage.removeItem('token');
             setToken(null);
             setPlayer(null);
          } catch {
             console.error('Failed to fetch user info');
+            if (!isOnline()) {
+                const cachedPlayer = useCachedPlayer();
+                if (cachedPlayer) {
+                    return cachedPlayer;
+                }
+            }
             localStorage.removeItem('token');
             setToken(null);
             setPlayer(null);
@@ -72,6 +114,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      };
 
     const login = async (username: string, password: string, rememberMe = false) => {
+        if (!isOnline()) {
+            throw new Error('오프라인에서는 로그인할 수 없습니다. 온라인 연결이 필요합니다.');
+        }
+
         const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -93,6 +139,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!token) {
             throw new Error('로그인이 필요합니다.');
         }
+        if (!isOnline()) {
+            throw new Error(ONLINE_REQUIRED_MESSAGE);
+        }
 
         const res = await fetch('/api/me/profile', {
             method: 'PATCH',
@@ -108,12 +157,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
          }
         const data = await res.json();
         setPlayer(data);
+        persistPlayer(data);
         return data;
      };
 
     const uploadAvatar = async (imageDataUrl: string) => {
         if (!token) {
             throw new Error('로그인이 필요합니다.');
+        }
+        if (!isOnline()) {
+            throw new Error(ONLINE_REQUIRED_MESSAGE);
         }
 
         const res = await fetch('/api/me/avatar', {
@@ -130,12 +183,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
          }
         const data = await res.json();
         setPlayer(data);
+        persistPlayer(data);
         return data;
      };
 
     const deleteAvatar = async () => {
         if (!token) {
             throw new Error('로그인이 필요합니다.');
+        }
+        if (!isOnline()) {
+            throw new Error(ONLINE_REQUIRED_MESSAGE);
         }
 
         const res = await fetch('/api/me/avatar', {
@@ -148,11 +205,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
          }
         const data = await res.json();
         setPlayer(data);
+        persistPlayer(data);
         return data;
      };
 
     const logout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem(CACHED_PLAYER_KEY);
         setToken(null);
         setPlayer(null);
      };

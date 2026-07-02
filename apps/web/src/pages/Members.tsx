@@ -5,6 +5,20 @@ import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+
+const CACHED_MEMBERS_KEY = "pkpkdupr:members";
+const OFFLINE_FALLBACK_MESSAGE =
+  "최신 정보를 불러오지 못해 저장된 멤버 목록을 표시합니다.";
+
+const readCachedMembers = (): PlayerInfo[] | null => {
+  try {
+    const cachedMembers = localStorage.getItem(CACHED_MEMBERS_KEY);
+    return cachedMembers ? (JSON.parse(cachedMembers) as PlayerInfo[]) : null;
+  } catch {
+    return null;
+  }
+};
 
 const getGenderLabel = (gender?: PlayerInfo["gender"]) => {
   if (gender === "M") return "Male";
@@ -20,6 +34,7 @@ const getGenderClassName = (gender?: PlayerInfo["gender"]) => {
 
 const Members: React.FC = () => {
   const { player, token } = useAuth();
+  const isOnline = useOnlineStatus();
   const {
     pushDepth,
     restoreScrollTop,
@@ -29,6 +44,7 @@ const Members: React.FC = () => {
   const [members, setMembers] = useState<PlayerInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +58,7 @@ const Members: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
+        setNotice(null);
 
         const res = await fetch("/api/players", {
           headers: { Authorization: `Bearer ${token}` },
@@ -56,7 +73,18 @@ const Members: React.FC = () => {
 
         const data = (await res.json()) as PlayerInfo[];
         setMembers(data);
+        localStorage.setItem(CACHED_MEMBERS_KEY, JSON.stringify(data));
       } catch (err) {
+        if (!isOnline) {
+          const cachedMembers = readCachedMembers();
+          if (cachedMembers) {
+            setMembers(cachedMembers);
+            setNotice(OFFLINE_FALLBACK_MESSAGE);
+            setError(null);
+            return;
+          }
+        }
+
         setError(
           err instanceof Error
             ? err.message
@@ -68,7 +96,7 @@ const Members: React.FC = () => {
     };
 
     void loadMembers();
-  }, [token]);
+  }, [isOnline, token]);
 
   const closeMemberProfile = useCallback(() => {
     setSelectedMemberId(null);
@@ -101,7 +129,14 @@ const Members: React.FC = () => {
   return (
     <div className="flex min-h-full p-2">
       <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
-        <h2 className="text-2xl font-bold text-amber-950">Members</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-amber-950">Members</h2>
+          {notice ? (
+            <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              {notice}
+            </p>
+          ) : null}
+        </div>
 
         <div className="flex flex-1 flex-col">
           {isLoading ? (

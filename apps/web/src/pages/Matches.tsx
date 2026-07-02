@@ -1,62 +1,87 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@heroui/react";
 import { useAuth } from "@/context/AuthContext";
 import Match, { type MatchInfo } from "@/components/Match";
 import TabPanelStatus from "@/components/TabPanelStatus";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 interface MatchesProps {
   reloadKey?: number;
 }
 
+const CACHED_MATCHES_KEY = "pkpkdupr:matches";
+const OFFLINE_FALLBACK_MESSAGE =
+  "최신 정보를 불러오지 못해 저장된 매치 목록을 표시합니다.";
+
+const readCachedMatches = (): MatchInfo[] | null => {
+  try {
+    const cachedMatches = localStorage.getItem(CACHED_MATCHES_KEY);
+    return cachedMatches ? (JSON.parse(cachedMatches) as MatchInfo[]) : null;
+  } catch {
+    return null;
+  }
+};
+
 const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const { player, token } = useAuth();
+  const isOnline = useOnlineStatus();
   const [matches, setMatches] = useState<MatchInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const loadMatches = useCallback(async () => {
+    if (!token) {
+      setMatches([]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setNotice(null);
+
+      const res = await fetch("/api/matches", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "매치 목록을 불러오지 못했습니다.");
+      }
+
+      const data = (await res.json()) as {
+        matches: MatchInfo[];
+        total: number;
+      };
+      setMatches(data.matches);
+      localStorage.setItem(CACHED_MATCHES_KEY, JSON.stringify(data.matches));
+    } catch (err) {
+      if (!isOnline) {
+        const cachedMatches = readCachedMatches();
+        if (cachedMatches) {
+          setMatches(cachedMatches);
+          setNotice(OFFLINE_FALLBACK_MESSAGE);
+          setError(null);
+          return;
+        }
+      }
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "매치 목록을 불러오지 못했습니다.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isOnline, token]);
 
   useEffect(() => {
-    const loadMatches = async () => {
-      if (!token) {
-        setMatches([]);
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const res = await fetch("/api/matches", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(
-            errorData.error || "매치 목록을 불러오지 못했습니다.",
-          );
-        }
-
-        const data = (await res.json()) as {
-          matches: MatchInfo[];
-          total: number;
-        };
-        setMatches(data.matches);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "매치 목록을 불러오지 못했습니다.",
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     void loadMatches();
-  }, [reloadKey, token]);
+  }, [loadMatches, reloadKey]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 30_000);
@@ -118,6 +143,11 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
               </Switch.Content>
             </Switch>
           </div>
+          {notice ? (
+            <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              {notice}
+            </p>
+          ) : null}
         </div>
 
         {isLoading ? (
