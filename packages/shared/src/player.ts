@@ -157,6 +157,13 @@ export const createDefaultPlayerDupr = (
   };
 };
 
+export const isDefaultPlayerDupr = (rating: PlayerDupr) =>
+  rating.total === DUPR_DEFAULT_RATING &&
+  rating.singles === DUPR_DEFAULT_RATING &&
+  rating.doubles.mixed === DUPR_DEFAULT_RATING &&
+  rating.doubles.men === DUPR_DEFAULT_RATING &&
+  rating.doubles.women === DUPR_DEFAULT_RATING;
+
 export const normalizePlayerDupr = (value: unknown): PlayerDupr => {
   if (typeof value === "number" || typeof value === "string") {
     return createDefaultPlayerDupr(value);
@@ -190,6 +197,16 @@ export const normalizePlayerDupr = (value: unknown): PlayerDupr => {
     total: computeTotalDuprRating(rating),
   };
 };
+
+const isDefaultPlayerDuprMetrics = (metrics: PlayerDuprMetrics) =>
+  metrics.singles.confidence === 0 &&
+  metrics.singles.accuracy == null &&
+  metrics.doubles.mixed.confidence === 0 &&
+  metrics.doubles.mixed.accuracy == null &&
+  metrics.doubles.men.confidence === 0 &&
+  metrics.doubles.men.accuracy == null &&
+  metrics.doubles.women.confidence === 0 &&
+  metrics.doubles.women.accuracy == null;
 
 export const normalizeStoredPlayerDupr = (value: unknown): StoredPlayerDupr => {
   if (typeof value === "string") {
@@ -244,6 +261,26 @@ export const normalizeStoredPlayerDupr = (value: unknown): StoredPlayerDupr => {
     },
   };
 };
+
+export const shouldStorePlayerDuprAsNull = (value: unknown): boolean => {
+  if (value == null) {
+    return true;
+  }
+
+  if (typeof value === "string" && !value.trim()) {
+    return true;
+  }
+
+  const state = normalizeStoredPlayerDupr(value);
+  return (
+    isDefaultPlayerDupr(state.rating) && isDefaultPlayerDuprMetrics(state.metrics)
+  );
+};
+
+export const normalizeNullablePlayerDupr = (value: unknown): PlayerDupr | null =>
+  shouldStorePlayerDuprAsNull(value)
+    ? null
+    : normalizeStoredPlayerDupr(value).rating;
 
 export const serializeStoredPlayerDupr = (value: StoredPlayerDupr) =>
   JSON.stringify({
@@ -316,7 +353,7 @@ export const setDuprMetricByCategory = (
 export interface Player {
   id: string;
   username: string;
-  duprRating: PlayerDupr;
+  duprRating: PlayerDupr | null;
   gender: "M" | "F";
   status: PlayerStatus;
   //   birthYear?: number;

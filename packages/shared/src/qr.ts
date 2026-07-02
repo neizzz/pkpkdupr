@@ -1,4 +1,4 @@
-import type { Player, PlayerDupr } from "./player";
+import type { Player } from "./player";
 
 export interface PlayerQrTokenResponse {
   payload: string;
@@ -14,7 +14,7 @@ export type PlayerQrPublicPlayer = Pick<
   Player,
   "id" | "username" | "gender" | "avatarUrl"
 > & {
-  duprRating: PlayerDupr;
+  duprRating: Player["duprRating"];
 };
 
 export interface VerifyPlayerQrTokenResponse {

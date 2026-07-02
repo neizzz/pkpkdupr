@@ -40,10 +40,11 @@ const normalizeMatchMember = (
     username: value.username || value.id,
     gender: value.gender,
     avatarUrl: value.avatarUrl,
-    duprRating:
-      "duprRating" in value && value.duprRating ? value.duprRating : undefined,
+    duprRating: "duprRating" in value ? value.duprRating : undefined,
   };
 };
+
+const formatRating = (rating?: number | null) => rating?.toFixed(2) ?? "NR";
 
 const getGenderLabel = (gender: MatchMember["gender"]) =>
   gender === "M" ? "Male" : "Female";
@@ -778,7 +779,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   {getGenderLabel(pendingQrMember.gender)}
                 </p>
                 <p className="mt-2 text-sm font-semibold text-amber-950">
-                  {pendingQrMember.duprRating?.total?.toFixed(2) ?? "-"}
+                  {formatRating(pendingQrMember.duprRating?.total)}
                 </p>
               </div>
             </div>

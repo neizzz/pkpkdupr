@@ -4,7 +4,7 @@ import { matchTypeValues } from "@pkpkdupr/shared/match";
 export const players = sqliteTable("players", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
-  duprRating: text("dupr_rating").notNull(),
+  duprRating: text("dupr_rating"),
   gender: text("gender").notNull(),
   status: text("status").notNull(),
   avatarUrl: text("avatar_url"),

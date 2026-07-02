@@ -1,5 +1,8 @@
 import express from "express";
-import { normalizeStoredPlayerDupr } from "@pkpkdupr/shared/player";
+import {
+  normalizeStoredPlayerDupr,
+  shouldStorePlayerDuprAsNull,
+} from "@pkpkdupr/shared/player";
 import { getDb, getDbClient } from "./db/client";
 import { PlayerRepository, type CreateStoredPlayerInput } from "./repositories/PlayerRepository";
 import {
@@ -53,9 +56,74 @@ const safeExec = async (sql: string) => {
   }
 };
 
-const hasColumn = async (tableName: string, columnName: string) => {
+type TableInfoRow = {
+  cid?: unknown;
+  name?: unknown;
+  type?: unknown;
+  notnull?: unknown;
+  dflt_value?: unknown;
+  pk?: unknown;
+};
+
+const getTableInfo = async (tableName: string) => {
   const result = await client.execute(`PRAGMA table_info(${tableName})`);
-  return result.rows.some((row) => String((row as { name?: unknown }).name) === columnName);
+  return result.rows as TableInfoRow[];
+};
+
+const hasColumn = async (tableName: string, columnName: string) => {
+  const rows = await getTableInfo(tableName);
+  return rows.some((row) => String(row.name) === columnName);
+};
+
+const ensurePlayersDuprRatingNullable = async () => {
+  const rows = await getTableInfo("players");
+  const duprColumn = rows.find((row) => String(row.name) === "dupr_rating");
+  if (!duprColumn || Number(duprColumn.notnull) === 0) {
+    return;
+  }
+
+  await client.execute("ALTER TABLE players RENAME TO players_legacy_not_null_dupr");
+  await client.execute(`
+    CREATE TABLE players (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      dupr_rating TEXT,
+      gender TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      avatar_url TEXT,
+      password_hash TEXT NOT NULL DEFAULT '',
+      is_first_login INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+  await client.execute(`
+    INSERT INTO players (
+      id,
+      username,
+      dupr_rating,
+      gender,
+      status,
+      avatar_url,
+      password_hash,
+      is_first_login,
+      created_at,
+      updated_at
+    )
+    SELECT
+      id,
+      username,
+      dupr_rating,
+      gender,
+      status,
+      avatar_url,
+      password_hash,
+      is_first_login,
+      created_at,
+      updated_at
+    FROM players_legacy_not_null_dupr
+  `);
+  await client.execute("DROP TABLE players_legacy_not_null_dupr");
 };
 
 const initSchema = async () => {
@@ -63,7 +131,7 @@ const initSchema = async () => {
     CREATE TABLE IF NOT EXISTS players (
       id TEXT PRIMARY KEY,
       username TEXT NOT NULL UNIQUE,
-      dupr_rating TEXT NOT NULL,
+      dupr_rating TEXT,
       gender TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
       avatar_url TEXT,
@@ -78,6 +146,7 @@ const initSchema = async () => {
   await safeExec(`ALTER TABLE players ADD COLUMN avatar_url TEXT`);
   await safeExec(`ALTER TABLE players ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`);
   await safeExec(`ALTER TABLE players ADD COLUMN is_first_login INTEGER NOT NULL DEFAULT 1`);
+  await ensurePlayersDuprRatingNullable();
   await client.execute(`UPDATE players SET status = 'inactive' WHERE status = 'deleted'`);
   await client.execute(`UPDATE players SET status = 'active' WHERE status IS NULL OR status = ''`);
 
@@ -214,6 +283,15 @@ const initSchema = async () => {
 
   const storedPlayers = await playerRepository.findAll();
   for (const player of storedPlayers) {
+    if (player.duprRating == null) {
+      continue;
+    }
+
+    if (shouldStorePlayerDuprAsNull(player.duprRating)) {
+      await playerRepository.clearDuprState(player.id);
+      continue;
+    }
+
     await playerRepository.updateDuprState(
       player.id,
       // PlayerRepository stores legacy and new shapes in the same column.

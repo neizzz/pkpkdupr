@@ -16,7 +16,7 @@ const cloneDupr = (duprRating: PlayerDupr): PlayerDupr => ({
 
 const clonePlayer = (player: Player): Player => ({
   ...player,
-  duprRating: cloneDupr(player.duprRating),
+  duprRating: player.duprRating ? cloneDupr(player.duprRating) : null,
   createdAt: new Date(player.createdAt),
   updatedAt: new Date(player.updatedAt),
 });

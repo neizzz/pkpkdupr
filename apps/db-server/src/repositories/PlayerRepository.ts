@@ -1,6 +1,7 @@
 import {
   normalizeStoredPlayerDupr,
   serializeStoredPlayerDupr,
+  shouldStorePlayerDuprAsNull,
   type Player,
   type PlayerDupr,
   type PlayerStatus,
@@ -17,7 +18,7 @@ export interface StoredPlayerRecord extends Player {
 export interface CreateStoredPlayerInput {
   id: string;
   username: string;
-  duprRating: PlayerDupr;
+  duprRating: PlayerDupr | null;
   gender: "M" | "F";
   status: PlayerStatus;
   avatarUrl?: string | null;
@@ -49,12 +50,18 @@ export class PlayerRepository {
 
   async create(data: CreateStoredPlayerInput): Promise<StoredPlayerRecord> {
     const { duprState, ...storedData } = data;
+    const duprRating = duprState
+      ? serializeStoredPlayerDupr(duprState)
+      : shouldStorePlayerDuprAsNull(storedData.duprRating)
+        ? null
+        : serializeStoredPlayerDupr(
+            normalizeStoredPlayerDupr(storedData.duprRating),
+          );
+
     await this.db.insert(players).values({
       ...storedData,
       avatarUrl: storedData.avatarUrl ?? null,
-      duprRating: serializeStoredPlayerDupr(
-        duprState ?? normalizeStoredPlayerDupr(storedData.duprRating),
-      ),
+      duprRating,
       createdAt: new Date(storedData.createdAt),
       updatedAt: new Date(storedData.updatedAt),
     });
@@ -114,6 +121,14 @@ export class PlayerRepository {
         duprRating: serializeStoredPlayerDupr(duprState),
         updatedAt: new Date(),
       })
+      .where(eq(players.id, id));
+    return await this.findById(id);
+  }
+
+  async clearDuprState(id: string): Promise<StoredPlayerRecord | undefined> {
+    await this.db
+      .update(players)
+      .set({ duprRating: null, updatedAt: new Date() })
       .where(eq(players.id, id));
     return await this.findById(id);
   }

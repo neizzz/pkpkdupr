@@ -38,8 +38,8 @@ const creationSourceLabelMap: Record<PlayerCreationSource, string> = {
 
 const PROTECTED_ADMIN_USERNAME = "admin";
 
-const formatDupr = (value?: number) =>
-  typeof value === "number" ? value.toFixed(3) : "-";
+const formatDupr = (value?: number | null) =>
+  typeof value === "number" ? value.toFixed(3) : "NR";
 
 const AdminDashboard: React.FC = () => {
   const { player, isAdmin, logout, token } = useAuth();
@@ -546,11 +546,11 @@ const AdminDashboard: React.FC = () => {
                         <td className="py-3 pl-2 font-medium">{p.username}</td>
                         <td className="py-3 text-blue-600">
                           <div className="space-y-1 text-xs">
-                            <div>S {formatDupr(p.duprRating.singles)}</div>
-                            <div>Mx {formatDupr(p.duprRating.doubles.mixed)}</div>
+                            <div>S {formatDupr(p.duprRating?.singles)}</div>
+                            <div>Mx {formatDupr(p.duprRating?.doubles.mixed)}</div>
                             <div>
-                              Men {formatDupr(p.duprRating.doubles.men)} / Women{" "}
-                              {formatDupr(p.duprRating.doubles.women)}
+                              Men {formatDupr(p.duprRating?.doubles.men)} / Women{" "}
+                              {formatDupr(p.duprRating?.doubles.women)}
                             </div>
                           </div>
                         </td>

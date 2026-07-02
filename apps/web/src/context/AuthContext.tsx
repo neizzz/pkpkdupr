@@ -4,7 +4,7 @@ import type { PlayerDupr } from '@pkpkdupr/shared/player';
 export interface PlayerInfo {
     id: string;
     username?: string;
-    duprRating?: PlayerDupr;
+    duprRating?: PlayerDupr | null;
     gender?: 'M' | 'F';
     avatarUrl?: string;
 }

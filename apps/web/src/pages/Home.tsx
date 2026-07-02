@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@heroui/react';
 import { useAuth } from '../context/AuthContext';
 
+const formatRating = (rating?: number | null) => rating?.toFixed(3) ?? 'NR';
+
 const Home: React.FC = () => {
     const { player, logout } = useAuth();
     const navigate = useNavigate();
@@ -25,20 +27,16 @@ const Home: React.FC = () => {
                                    <span className="text-gray-500 text-sm">이름</span>
                                    <span className="font-semibold">{player.username || player.id}</span>
                                </div>
-                               {player.duprRating != null && (
-                                   <>
-                                       <div className="flex items-center justify-between text-sm text-gray-500">
-                                           <span>Singles</span>
-                                           <span>{player.duprRating.singles.toFixed(3)}</span>
-                                       </div>
-                                       <div className="flex items-center justify-between text-sm text-gray-500">
-                                           <span>Doubles</span>
-                                           <span>
-                                             Mx {player.duprRating.doubles.mixed.toFixed(3)} · Men {player.duprRating.doubles.men.toFixed(3)} · Women {player.duprRating.doubles.women.toFixed(3)}
-                                           </span>
-                                       </div>
-                                   </>
-                               )}
+                               <div className="flex items-center justify-between text-sm text-gray-500">
+                                   <span>Singles</span>
+                                   <span>{formatRating(player.duprRating?.singles)}</span>
+                               </div>
+                               <div className="flex items-center justify-between text-sm text-gray-500">
+                                   <span>Doubles</span>
+                                   <span>
+                                     Mx {formatRating(player.duprRating?.doubles.mixed)} · Men {formatRating(player.duprRating?.doubles.men)} · Women {formatRating(player.duprRating?.doubles.women)}
+                                   </span>
+                               </div>
                                {player.gender && (
                                    <div className="flex items-center justify-between">
                                         <span className="text-gray-500 text-sm">성별</span>

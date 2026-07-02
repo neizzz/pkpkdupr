@@ -3,15 +3,15 @@ import {
   Player,
   PlayerCreationLog,
   PlayerCreationSource,
+  PlayerDupr,
   PlayerDuprMetrics,
   PlayerStatus,
   PlayerStatusChangeLog,
   StoredPlayerDupr,
   computeTotalDuprRating,
-  createDefaultPlayerDupr,
-  createDefaultPlayerDuprMetrics,
   getDuprMetricByCategory,
   getDuprRatingByCategory,
+  normalizeNullablePlayerDupr,
   normalizePlayerDupr,
   normalizeStoredPlayerDupr,
   normalizeDuprRatingValue,
@@ -52,6 +52,7 @@ interface StoredPlayerRecord extends Player {
   passwordHash: string;
   isFirstLogin: boolean;
   duprMetrics: PlayerDuprMetrics;
+  duprState: StoredPlayerDupr;
 }
 
 interface DbRequestOptions extends RequestInit {
@@ -87,7 +88,7 @@ const createPlayer = (input: Pick<Player, "username" | "gender">): Player => {
   return {
     id: buildId("player"),
     username: input.username,
-    duprRating: createDefaultPlayerDupr(),
+    duprRating: null,
     gender: input.gender,
     status: "active",
     createdAt: now,
@@ -102,8 +103,9 @@ const hydratePlayer = (record: any): StoredPlayerRecord => {
   return {
     ...record,
     avatarUrl: record.avatarUrl ?? undefined,
-    duprRating: duprState.rating,
+    duprRating: normalizeNullablePlayerDupr(record.duprRating),
     duprMetrics: duprState.metrics,
+    duprState,
     status: record.status === "deleted" ? "inactive" : record.status,
     createdAt: toDate(record.createdAt),
     updatedAt: toDate(record.updatedAt),
@@ -143,6 +145,7 @@ const toPublicPlayer = (stored: StoredPlayerRecord): Player => {
     passwordHash: _passwordHash,
     isFirstLogin: _isFirstLogin,
     duprMetrics: _duprMetrics,
+    duprState: _duprState,
     ...player
   } = stored;
   return player;
@@ -295,6 +298,37 @@ const buildWinnerTeamIndex = (match: Match): 0 | 1 | null => {
   }
   return points[0] > points[1] ? 0 : 1;
 };
+
+const hasDuprRatingChange = (nextRating: PlayerDupr, previousRating: PlayerDupr) =>
+  nextRating.total !== previousRating.total ||
+  nextRating.singles !== previousRating.singles ||
+  nextRating.doubles.mixed !== previousRating.doubles.mixed ||
+  nextRating.doubles.men !== previousRating.doubles.men ||
+  nextRating.doubles.women !== previousRating.doubles.women;
+
+const hasDuprMetricChange = (
+  nextMetrics: PlayerDuprMetrics,
+  previousMetrics: PlayerDuprMetrics,
+) =>
+  nextMetrics.singles.confidence !== previousMetrics.singles.confidence ||
+  nextMetrics.singles.accuracy !== previousMetrics.singles.accuracy ||
+  nextMetrics.doubles.mixed.confidence !==
+    previousMetrics.doubles.mixed.confidence ||
+  nextMetrics.doubles.mixed.accuracy !==
+    previousMetrics.doubles.mixed.accuracy ||
+  nextMetrics.doubles.men.confidence !==
+    previousMetrics.doubles.men.confidence ||
+  nextMetrics.doubles.men.accuracy !== previousMetrics.doubles.men.accuracy ||
+  nextMetrics.doubles.women.confidence !==
+    previousMetrics.doubles.women.confidence ||
+  nextMetrics.doubles.women.accuracy !== previousMetrics.doubles.women.accuracy;
+
+const hasStoredDuprStateChange = (
+  nextState: StoredPlayerDupr,
+  previousState: StoredPlayerDupr,
+) =>
+  hasDuprRatingChange(nextState.rating, previousState.rating) ||
+  hasDuprMetricChange(nextState.metrics, previousState.metrics);
 
 export class AuthService {
   private ratingService = new RatingService();
@@ -768,8 +802,8 @@ export class AuthService {
       throw new Error("공식 DUPR 반영 요청자를 찾을 수 없습니다.");
     }
 
-    let nextRating = stored.duprRating;
-    let nextMetrics = stored.duprMetrics;
+    let nextRating = stored.duprState.rating;
+    let nextMetrics = stored.duprState.metrics;
     const ratings: OfficialDuprRatingPatch = {};
     const confidence: OfficialDuprConfidencePatch = {};
     const preUpdateAccuracy: OfficialDuprAccuracyPatch = {};
@@ -791,7 +825,7 @@ export class AuthService {
       const normalizedRating = normalizeDuprRatingValue(ratingValue);
       const normalizedConfidence = normalizeConfidenceValue(confidenceValue);
       const previousCategoryRating = getDuprRatingByCategory(
-        stored.duprRating,
+        stored.duprState.rating,
         entry.category,
       );
       const categoryAccuracy = this.ratingService.getAccuracy(
@@ -833,7 +867,7 @@ export class AuthService {
           changedByUsername: changedBy.username,
           ratings,
           confidence,
-          previousRating: stored.duprRating,
+          previousRating: stored.duprState.rating,
           nextRating,
           preUpdateAccuracy,
           reason: input.reason?.trim() || null,
@@ -860,11 +894,12 @@ export class AuthService {
       players.map((player) => [
         player.id,
         {
-          rating: player.duprRating,
-          metrics: player.duprMetrics ?? createDefaultPlayerDuprMetrics(),
+          rating: player.duprState.rating,
+          metrics: player.duprState.metrics,
         },
       ]),
     );
+    const playerById = new Map(players.map((player) => [player.id, player]));
     const correctionWeightByPlayerId: Record<string, number> = {};
 
     for (const log of [...logs].reverse()) {
@@ -960,6 +995,10 @@ export class AuthService {
     }
 
     for (const [playerId, state] of stateByPlayerId.entries()) {
+      const player = playerById.get(playerId);
+      if (!player || !hasStoredDuprStateChange(state, player.duprState)) {
+        continue;
+      }
       await this.updateStoredPlayerDuprState(playerId, state);
     }
   }
