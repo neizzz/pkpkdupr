@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
+import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { formatRating, getCompositeDoublesRating } from "@/utils/dupr";
+import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
 
 const CACHED_MEMBERS_KEY = "pkpkdupr:members";
 const OFFLINE_FALLBACK_MESSAGE =
@@ -18,18 +21,6 @@ const readCachedMembers = (): PlayerInfo[] | null => {
   } catch {
     return null;
   }
-};
-
-const getGenderLabel = (gender?: PlayerInfo["gender"]) => {
-  if (gender === "M") return "Male";
-  if (gender === "F") return "Female";
-  return "-";
-};
-
-const getGenderClassName = (gender?: PlayerInfo["gender"]) => {
-  if (gender === "M") return "text-[#409eff]";
-  if (gender === "F") return "text-[#f8626c]";
-  return "text-amber-700/80";
 };
 
 const Members: React.FC = () => {
@@ -46,6 +37,8 @@ const Members: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [selectedMemberMatchStats, setSelectedMemberMatchStats] =
+    useState(createEmptyMatchStats);
 
   useEffect(() => {
     const loadMembers = async () => {
@@ -98,6 +91,53 @@ const Members: React.FC = () => {
     void loadMembers();
   }, [isOnline, token]);
 
+  useEffect(() => {
+    if (!token || !selectedMemberId) {
+      setSelectedMemberMatchStats(createEmptyMatchStats());
+      return;
+    }
+
+    const abortController = new AbortController();
+
+    const loadSelectedMemberMatchStats = async () => {
+      setSelectedMemberMatchStats(createEmptyMatchStats());
+
+      try {
+        const searchParams = new URLSearchParams({
+          playerId: selectedMemberId,
+          limit: "1000",
+        });
+        const res = await fetch(`/api/matches?${searchParams.toString()}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: abortController.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error("매치 목록을 불러오지 못했습니다.");
+        }
+
+        const data = (await res.json()) as {
+          matches: MatchInfo[];
+          total: number;
+        };
+
+        if (!abortController.signal.aborted) {
+          setSelectedMemberMatchStats(
+            buildMatchStats(data.matches, selectedMemberId),
+          );
+        }
+      } catch {
+        if (!abortController.signal.aborted) {
+          setSelectedMemberMatchStats(createEmptyMatchStats());
+        }
+      }
+    };
+
+    void loadSelectedMemberMatchStats();
+
+    return () => abortController.abort();
+  }, [selectedMemberId, token]);
+
   const closeMemberProfile = useCallback(() => {
     setSelectedMemberId(null);
     restoreScrollTop("members");
@@ -122,6 +162,7 @@ const Members: React.FC = () => {
       <MemberProfile
         player={selectedMember}
         isMe={selectedMember.id === player?.id}
+        matchStats={selectedMemberMatchStats}
       />
     );
   }
@@ -147,37 +188,47 @@ const Members: React.FC = () => {
             <TabPanelStatus message="현재 표시할 멤버가 없어요." />
           ) : (
             <div className="grid grid-cols-2 gap-3">
-              {members.map((member) => (
-                <button
-                  key={member.id}
-                  type="button"
-                  onClick={() => openMemberProfile(member.id)}
-                  className="flex min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center shadow-sm transition-colors hover:bg-amber-50"
-                >
-                  <Avatar
-                    size="sm"
-                    avatarUrl={member.avatarUrl}
-                    name={member.username}
-                    isMe={member.id === player?.id}
-                  />
-                  <div className="mt-3 min-w-0">
-                    <p className="truncate font-semibold text-amber-950">
-                      {member.username}
-                    </p>
-                    <p
-                      className={`mt-1 text-xs font-medium ${getGenderClassName(member.gender)}`}
-                    >
-                      {getGenderLabel(member.gender)}
-                    </p>
-                    <p className="mt-2 text-xs font-semibold text-amber-950">
-                      S {member.duprRating?.singles?.toFixed(3) ?? "-"}
-                    </p>
-                    <p className="mt-1 text-xs text-amber-700/80">
-                      Mx {member.duprRating?.doubles.mixed?.toFixed(3) ?? "-"}
-                    </p>
-                  </div>
-                </button>
-              ))}
+              {members.map((member) => {
+                const rating = member.duprRating;
+                const doublesRating = getCompositeDoublesRating(
+                  rating,
+                  member.gender,
+                );
+
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => openMemberProfile(member.id)}
+                    className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-white/90 px-3 py-3 text-left shadow-sm transition-colors hover:bg-amber-50"
+                  >
+                    <Avatar
+                      size="sm"
+                      avatarUrl={member.avatarUrl}
+                      name={member.username}
+                      isMe={member.id === player?.id}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold text-amber-950">
+                          {member.username}
+                        </p>
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-[#888]">
+                        <span>S</span>
+                        <span className="tabular-nums">
+                          {formatRating(rating?.singles)}
+                        </span>
+                        <span>D</span>
+                        <span className="tabular-nums">
+                          {formatRating(doublesRating)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

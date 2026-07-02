@@ -1,13 +1,27 @@
 import React from "react";
 import { Card } from "@heroui/react";
+import type { MatchType } from "@pkpkdupr/shared/match";
 import Avatar from "@/components/Avatar";
 import type { PlayerInfo } from "@/context/AuthContext";
+import {
+  formatRating,
+  getCompositeDoublesRating,
+} from "@/utils/dupr";
+
+export type MemberProfileMatchStats = Record<
+  MatchType,
+  {
+    wins: number;
+    losses: number;
+  }
+>;
 
 interface MemberProfileProps {
   player: PlayerInfo | null;
   memberName?: string;
   isMe: boolean;
   headerAction?: React.ReactNode;
+  matchStats?: MemberProfileMatchStats;
 }
 
 const MemberProfile: React.FC<MemberProfileProps> = ({
@@ -15,33 +29,80 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   memberName,
   isMe,
   headerAction,
+  matchStats,
 }) => {
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
-  const genderDoublesLabel =
-    player?.gender === "F" ? "Women Doubles" : "Men Doubles";
-  const genderDoublesValue = player?.duprRating
-    ? player.gender === "F"
-      ? player.duprRating.doubles.women.toFixed(3)
-      : player.duprRating.doubles.men.toFixed(3)
-    : "-";
+  const sameGenderDoublesType: MatchType =
+    player?.gender === "F" ? "women-doubles" : "men-doubles";
+  const doublesStats = matchStats
+    ? {
+        wins:
+          matchStats["mixed-doubles"].wins +
+          matchStats[sameGenderDoublesType].wins,
+        losses:
+          matchStats["mixed-doubles"].losses +
+          matchStats[sameGenderDoublesType].losses,
+      }
+    : undefined;
+
   const duprItems = [
     {
-      label: "Singles",
-      value: player?.duprRating?.singles?.toFixed(3) ?? "-",
-      valueClassName: "text-lg",
+      key: "singles",
+      label: "S",
+      rating: formatRating(player?.duprRating?.singles),
+      stats: matchStats?.singles,
     },
     {
-      label: "Mixed Doubles",
-      value: player?.duprRating?.doubles.mixed?.toFixed(3) ?? "-",
-      valueClassName: "text-lg",
+      key: "doubles",
+      label: "D",
+      rating: formatRating(
+        getCompositeDoublesRating(player?.duprRating, player?.gender),
+      ),
+      stats: doublesStats,
     },
-    {
-      label: genderDoublesLabel,
-      value: genderDoublesValue,
-      valueClassName: "text-lg",
-    },
-  ];
+  ].map((item) => {
+    const stats = item.stats;
+    const playedCount = stats ? stats.wins + stats.losses : 0;
+    const winRate =
+      stats && playedCount > 0
+        ? `${Math.round((stats.wins / playedCount) * 100)}%`
+        : stats
+          ? "0%"
+          : "-";
+
+    return {
+      key: item.key,
+      label: item.label,
+      rating: item.rating,
+      cards: [
+        {
+          label: "Rating",
+          value: item.rating,
+        },
+        {
+          label: "승률",
+          value: winRate,
+        },
+        {
+          label: "승-패",
+          value: stats ? `${stats.wins}-${stats.losses}` : "-",
+        },
+      ],
+    };
+  });
+
+  const renderStatCard = (card: { label: string; value: string }) => (
+    <Card
+      key={card.label}
+      className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-4 py-5 shadow-sm"
+    >
+      <p className="text-lg font-semibold leading-[0.85] text-amber-950">
+        {card.value}
+      </p>
+      <p className="text-xs leading-[0.7] text-amber-700/80">{card.label}</p>
+    </Card>
+  );
 
   return (
     <div className="min-h-full p-2">
@@ -69,22 +130,39 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-amber-950">DUPR Rating</h3>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {duprItems.map((item) => (
-              <Card
-                key={item.label}
-                className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-3 py-3 shadow-sm ring-1 ring-border"
-              >
-                <p className="text-xs text-amber-700/80">{item.label}</p>
-                <p
-                  className={`mt-1 font-semibold text-amber-950 ${item.valueClassName}`}
+          <h3 className="text-sm font-semibold text-amber-950">
+            PkpkDUPR Rating
+          </h3>
+          {matchStats ? (
+            <div className="mt-4 flex flex-col gap-4">
+              {duprItems.map((item) => (
+                <div key={item.key}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
+                    {item.label}
+                  </p>
+                  <div className="mt-2 grid grid-cols-3 gap-3">
+                    {item.cards.map(renderStatCard)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {duprItems.map((item) => (
+                <Card
+                  key={item.key}
+                  className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-4 py-5 shadow-sm"
                 >
-                  {item.value}
-                </p>
-              </Card>
-            ))}
-          </div>
+                  <p className="text-lg font-semibold leading-[0.85] text-amber-950">
+                    {item.rating}
+                  </p>
+                  <p className="text-xs leading-[0.7] text-amber-700/80">
+                    {item.label}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
