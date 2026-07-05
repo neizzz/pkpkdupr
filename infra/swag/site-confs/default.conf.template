@@ -27,9 +27,5 @@ server {
     location /grafana/ {
         proxy_pass http://grafana:3000;
         include /config/nginx/proxy.conf;
-
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_read_timeout 360s;
     }
 }
