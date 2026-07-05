@@ -1,0 +1,36 @@
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    server_name __DOMAIN__;
+
+    include /config/nginx/ssl.conf;
+
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass http://web:80;
+        include /config/nginx/proxy.conf;
+    }
+
+    location /api/ {
+        proxy_pass http://api:4000;
+        include /config/nginx/proxy.conf;
+    }
+
+    location /uploads/ {
+        proxy_pass http://api:4000;
+        include /config/nginx/proxy.conf;
+    }
+
+    location /grafana/ {
+        proxy_pass http://grafana:3000;
+        include /config/nginx/proxy.conf;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 360s;
+    }
+}

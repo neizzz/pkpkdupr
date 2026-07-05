@@ -15,7 +15,8 @@
         "build:api": "pnpm --filter @pkpkdupr/api build",
         "build:admin": "pnpm --filter @pkpkdupr/admin-web build",
         "lint": "pnpm -r lint",
-        "clean": "pnpm -r --parallel clean"
+        "clean": "pnpm -r --parallel clean",
+        "check:healthy": "node scripts/check-healthy.mjs"
     },
     "devDependencies": {
         "typescript": "^5.3.3"
