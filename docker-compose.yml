@@ -1,5 +1,5 @@
 services:
-   # 🔒 Reverse Proxy & SSL (Let's Encrypt) - 포트 80 없이 TLS-ALPN 방식 사용
+   # 🔒 Reverse Proxy & SSL (Let's Encrypt) - DuckDNS DNS 검증 사용
   proxy:
     image: linuxserver/swag:latest
     container_name: pkpkdupr-proxy
@@ -12,7 +12,9 @@ services:
         - PGID=1000
         - TZ=Asia/Seoul
         - URL=${DOMAIN:-pkpkdupr.duckdns.org}
-        - VALIDATION=TLS-ALPN # Port 80 없어도 되는 ACME v2 방식
+        - VALIDATION=dns
+        - DNSPLUGIN=duckdns
+        - DUCKDNSTOKEN=${DUCKDNSTOKEN}
         - SUBDOMAINS= # 현재는 기본 도메인만 사용하므로 비워둠
     ports:
         - "443:443"

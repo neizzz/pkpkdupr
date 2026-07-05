@@ -77,6 +77,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 
   cat > "${ENV_FILE}" <<EOF
 DOMAIN=${DOMAIN_DEFAULT}
+DUCKDNSTOKEN=replace-with-your-duckdns-token
 JWT_SECRET=${JWT_SECRET_VALUE}
 GF_SECURITY_ADMIN_USER=admin
 GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD_VALUE}
@@ -92,6 +93,13 @@ EOF
   echo "   - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD_VALUE}"
 else
   echo "ℹ️ 기존 .env 파일을 사용합니다: ${ENV_FILE}"
+fi
+
+DUCKDNS_TOKEN_VALUE="$(read_env_value DUCKDNSTOKEN)"
+if [[ -z "${DUCKDNS_TOKEN_VALUE}" || "${DUCKDNS_TOKEN_VALUE}" == "replace-with-your-duckdns-token" ]]; then
+  echo "❌ DUCKDNSTOKEN 값을 .env에 설정해야 DuckDNS DNS 검증으로 인증서를 발급할 수 있습니다." >&2
+  echo "   예: DUCKDNSTOKEN=your-real-duckdns-token" >&2
+  exit 1
 fi
 
 DOMAIN_VALUE="$(read_env_value DOMAIN)"
