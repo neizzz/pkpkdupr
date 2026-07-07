@@ -6,8 +6,12 @@ import type {
   MatchStatus,
 } from "@pkpkdupr/shared/match";
 import {
+  getMaxScoreCountForMatchMode,
   MATCH_RESULT_MAX_SCORE_COUNT,
+  matchModeLabels,
+  matchSourceLabels,
   matchTypeLabels,
+  validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import UserChip from "@/components/UserChip";
 
@@ -155,7 +159,8 @@ const Match: React.FC<MatchProps> = ({
   const resultActionLabel = hasResultScores ? "결과 수정" : "결과 입력";
   const shouldShowResultForm =
     canSubmitResult && (!hasResultScores || isResultFormOpen);
-  const canAddScoreRow = scoreRows.length < MATCH_RESULT_MAX_SCORE_COUNT;
+  const maxScoreCount = getMaxScoreCountForMatchMode(match.mode);
+  const canAddScoreRow = scoreRows.length < maxScoreCount;
 
   useEffect(() => {
     setScoreRows(
@@ -211,6 +216,8 @@ const Match: React.FC<MatchProps> = ({
         return { scoreA, scoreB };
       });
 
+      validateMatchScoresForMode(match.mode, scores);
+
       setResultError(null);
       await onSubmitResult(match.id, scores);
     } catch (err) {
@@ -258,11 +265,19 @@ const Match: React.FC<MatchProps> = ({
             <p className="text-lg font-semibold text-amber-950">
               {matchTypeLabels[match.type] ?? match.type}
             </p>
+            <span className={`${titleChipClassName} bg-amber-100 text-amber-800`}>
+              {matchModeLabels[match.mode]}
+            </span>
             <span
               className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}
             >
               {statusLabelMap[match.status]}
             </span>
+            {match.source === "admin_created_result" ? (
+              <span className={`${titleChipClassName} bg-indigo-100 text-indigo-700`}>
+                {matchSourceLabels[match.source]}
+              </span>
+            ) : null}
             {isRecentlyCreated ? (
               <span
                 className={`${titleChipClassName} bg-[#409eff]/10 text-[#409eff]`}
@@ -382,6 +397,11 @@ const Match: React.FC<MatchProps> = ({
           <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
             {hasResultScores ? "Edit Result" : "Result"}
           </p>
+          <p className="mt-1 text-xs text-[#888]">
+            {match.mode === "single-game"
+              ? "단판은 스코어 1개만 입력할 수 있어요."
+              : "2선승은 2개 또는 3개 스코어를 입력할 수 있어요."}
+          </p>
           <div className="mt-2 flex flex-col gap-2">
             {scoreRows.map((row, index) => (
               <div key={index} className="flex items-center gap-2">
@@ -433,7 +453,7 @@ const Match: React.FC<MatchProps> = ({
               }}
               isDisabled={isSubmittingResult || !canAddScoreRow}
             >
-              세트 추가
+              {match.mode === "single-game" ? "단판" : "세트 추가"}
             </Button>
             <Button
               size="sm"

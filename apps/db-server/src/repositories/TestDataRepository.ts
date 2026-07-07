@@ -157,6 +157,7 @@ const mockMatches = [
   {
     id: "dev-match-open-play-001",
     type: "mixed-doubles",
+    source: "player_created",
     creatorPlayerId: "dev-player-alice",
     status: "completed",
     location: "Dev Court A",
@@ -170,6 +171,7 @@ const mockMatches = [
   {
     id: "dev-match-ladder-002",
     type: "singles",
+    source: "player_created",
     creatorPlayerId: "dev-player-alice",
     status: "created",
     location: "Dev Court B",

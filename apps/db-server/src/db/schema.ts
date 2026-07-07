@@ -1,5 +1,10 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { matchTypeValues } from "@pkpkdupr/shared/match";
+import {
+  DEFAULT_MATCH_MODE,
+  matchModeValues,
+  matchSourceValues,
+  matchTypeValues,
+} from "@pkpkdupr/shared/match";
 
 export const players = sqliteTable("players", {
   id: text("id").primaryKey(),
@@ -47,6 +52,12 @@ export const playerRatingChangeLogs = sqliteTable("player_rating_change_logs", {
 export const matches = sqliteTable("matches", {
   id: text("id").primaryKey(),
   type: text("type", { enum: matchTypeValues }).notNull(),
+  mode: text("mode", { enum: matchModeValues })
+    .notNull()
+    .default(DEFAULT_MATCH_MODE),
+  source: text("source", { enum: matchSourceValues })
+    .notNull()
+    .default("player_created"),
   creatorPlayerId: text("creator_player_id").notNull(),
   status: text("status").notNull(),
   location: text("location").notNull(),

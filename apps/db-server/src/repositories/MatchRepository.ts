@@ -1,11 +1,17 @@
 import type {
+  MatchMode,
   Match,
   MatchResultApproval,
   MatchScore,
+  MatchSource,
   MatchType,
   Team,
 } from "@pkpkdupr/shared/match";
-import { MATCH_RESULT_MAX_SCORE_COUNT } from "@pkpkdupr/shared/match";
+import {
+  DEFAULT_MATCH_MODE,
+  MATCH_RESULT_MAX_SCORE_COUNT,
+  validateMatchScoresForMode,
+} from "@pkpkdupr/shared/match";
 import {
   normalizeNullablePlayerDupr,
   type Player,
@@ -47,6 +53,8 @@ export class CompletedMatchApprovalCancelError extends Error {
 export interface CreateMatchInput {
   id: string;
   type: MatchType;
+  mode: MatchMode;
+  source?: MatchSource;
   creatorPlayerId: string;
   status: Match["status"];
   teams: [Team, Team];
@@ -150,9 +158,15 @@ export class MatchRepository {
   async create(data: CreateMatchInput): Promise<Match> {
     const now = new Date();
 
+    if ((data.scores?.length ?? 0) > 0) {
+      validateMatchScoresForMode(data.mode, data.scores ?? []);
+    }
+
     await this.db.insert(matches).values({
       id: data.id,
       type: data.type,
+      mode: data.mode,
+      source: data.source ?? "player_created",
       creatorPlayerId: data.creatorPlayerId,
       status: data.status,
       location: data.location,
@@ -204,6 +218,8 @@ export class MatchRepository {
         `스코어는 최대 ${MATCH_RESULT_MAX_SCORE_COUNT}개까지 입력할 수 있습니다.`,
       );
     }
+
+    validateMatchScoresForMode(existing.mode, scores);
 
     const scoreColumns = await this.getMatchScoreColumns();
     const shouldResetApprovals =
@@ -476,6 +492,8 @@ export class MatchRepository {
     return {
       id: match.id,
       type: match.type as MatchType,
+      mode: (match.mode as MatchMode | null) ?? DEFAULT_MATCH_MODE,
+      source: (match.source as MatchSource | null) ?? "player_created",
       creatorPlayerId: match.creatorPlayerId,
       status: match.status as Match["status"],
       teams,

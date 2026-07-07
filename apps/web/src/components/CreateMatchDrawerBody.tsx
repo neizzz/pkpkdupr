@@ -8,8 +8,12 @@ import React, {
 import { Button, Drawer } from "@heroui/react";
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import { IoQrCodeSharp } from "react-icons/io5";
-import type { MatchType } from "@pkpkdupr/shared/match";
-import { matchTypeLabels } from "@pkpkdupr/shared/match";
+import type { MatchMode, MatchType } from "@pkpkdupr/shared/match";
+import {
+  DEFAULT_MATCH_MODE,
+  matchModeLabels,
+  matchTypeLabels,
+} from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import Avatar from "@/components/Avatar";
@@ -278,6 +282,8 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   );
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [createMatchError, setCreateMatchError] = useState<string | null>(null);
+  const [selectedMatchMode, setSelectedMatchMode] =
+    useState<MatchMode>(DEFAULT_MATCH_MODE);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const lastScannedPayloadRef = useRef<string | null>(null);
@@ -678,6 +684,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         },
         body: JSON.stringify({
           type: selectedMatchType,
+          mode: selectedMatchMode,
           teams: teams.map((team, teamIndex) => ({
             name: `Team ${teamIndex === 0 ? "A" : "B"}`,
             playerIds: team.map((member) => member.id),
@@ -917,6 +924,35 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   유효한 성별 구성이 필요해요.
                 </p>
               )}
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <p className="bs-text-title text-amber-950">경기 모드</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(["single-game", "best-of-3"] as const).map((mode) => {
+                  const isSelected = selectedMatchMode === mode;
+
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setSelectedMatchMode(mode)}
+                      className={`rounded-2xl border px-3 py-3 text-left transition ${
+                        isSelected
+                          ? "border-[#409eff] bg-[#409eff]/10 text-[#409eff]"
+                          : "border-border bg-white text-amber-950"
+                      }`}
+                    >
+                      <p className="bs-text-title">{matchModeLabels[mode]}</p>
+                      <p className="bs-text-caption mt-1 text-current/70">
+                        {mode === "single-game"
+                          ? "1게임으로 종료"
+                          : "2게임을 먼저 이기면 종료"}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </section>
 
             <section className="flex flex-col gap-2">

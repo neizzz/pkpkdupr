@@ -1,4 +1,5 @@
-import type { Match, MatchScore } from "@pkpkdupr/shared/match";
+import type { Match, MatchMode, MatchScore } from "@pkpkdupr/shared/match";
+import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
 
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
 
@@ -17,6 +18,8 @@ const toDateOrNull = (value: string | Date | null | undefined) =>
 
 const hydrateMatch = (record: any): Match => ({
   ...record,
+  mode: (record.mode as MatchMode | undefined) ?? DEFAULT_MATCH_MODE,
+  source: record.source ?? "player_created",
   teams: [
     {
       ...record.teams[0],

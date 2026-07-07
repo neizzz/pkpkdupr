@@ -4,11 +4,16 @@ import fs from "fs/promises";
 import { randomUUID } from "crypto";
 import path from "path";
 import {
+  DEFAULT_MATCH_MODE,
   MATCH_RESULT_MAX_SCORE_COUNT,
+  inferMatchModeFromScores,
+  matchModeValues,
   matchTypeLabels,
   matchTypeValues,
+  type MatchMode,
   type MatchScore,
   type MatchType,
+  validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import type { Player, PlayerStatus } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
@@ -37,6 +42,8 @@ const defaultAvatarUploadDir =
 const avatarUploadDir = process.env.AVATAR_UPLOAD_DIR
   ? path.resolve(process.env.AVATAR_UPLOAD_DIR)
   : defaultAvatarUploadDir;
+const PROTECTED_ADMIN_USERNAME = process.env.API_ADMIN_USERNAME || "admin";
+const INITIAL_ADMIN_CREATED_PASSWORD = "123qwe";
 const domain = process.env.DOMAIN || "pkpkdupr.duckdns.org";
 const webPublicPort = process.env.WEB_PUBLIC_PORT || "443";
 const adminStackPort =
@@ -96,6 +103,7 @@ const playerStatuses: PlayerStatus[] = ["active", "inactive"];
 
 type CreateMatchRequest = {
   type?: MatchType;
+  mode?: MatchMode;
   teams?: [
     { name?: string; playerIds?: string[] },
     { name?: string; playerIds?: string[] },
@@ -104,12 +112,28 @@ type CreateMatchRequest = {
   scheduledAt?: string;
 };
 
+type MatchTeamRequest = { name?: string; playerIds?: string[] };
+
+type AdminBatchMatchRequest = {
+  matches?: Array<{
+    type?: MatchType;
+    mode?: MatchMode;
+    teams?: [MatchTeamRequest, MatchTeamRequest];
+    location?: string;
+    scheduledAt?: string;
+    scores?: MatchScore[];
+  }>;
+};
+
 type SubmitMatchResultRequest = {
   scores?: MatchScore[];
 };
 
 const isMatchType = (value: unknown): value is MatchType =>
   typeof value === "string" && matchTypeValues.includes(value as MatchType);
+
+const isMatchMode = (value: unknown): value is MatchMode =>
+  typeof value === "string" && matchModeValues.includes(value as MatchMode);
 
 const isMixedDoublesTeamValid = (players: Player[]) =>
   players.length === 2 &&
@@ -140,6 +164,39 @@ const validateCreateMatchTeams = (
       team.length === 2 && team.every((player) => player.gender === "F"),
   );
 };
+
+const normalizeRequestedTeamPlayerIds = (teams: [MatchTeamRequest, MatchTeamRequest]) => {
+  const flatPlayerIds = teams.flatMap((team) => team.playerIds ?? []);
+  const uniquePlayerIds = new Set(flatPlayerIds);
+
+  if (uniquePlayerIds.size !== flatPlayerIds.length) {
+    throw new Error("중복된 멤버가 있습니다.");
+  }
+
+  return flatPlayerIds;
+};
+
+const buildMatchTeamsFromRequests = (
+  teams: [MatchTeamRequest, MatchTeamRequest],
+  playersById: Map<string, Player>,
+) =>
+  teams.map((team, teamIndex) => {
+    const playerIds = team.playerIds ?? [];
+    const players = playerIds.map((playerId) => playersById.get(playerId));
+
+    if (players.some((player) => !player)) {
+      throw new Error("유효하지 않은 멤버가 포함되어 있습니다.");
+    }
+
+    return {
+      id: `team-${Date.now()}-${teamIndex === 0 ? "a" : "b"}`,
+      name: team.name?.trim() || `Team ${teamIndex === 0 ? "A" : "B"}`,
+      players: players as Player[],
+    };
+  }) as [
+    { id: string; name: string; players: Player[] },
+    { id: string; name: string; players: Player[] },
+  ];
 
 const normalizeMatchScores = (scores: unknown): MatchScore[] => {
   if (!Array.isArray(scores) || scores.length === 0) {
@@ -394,10 +451,13 @@ app.post("/api/matches", async (req, res) => {
       return;
     }
 
-    const { type, teams, location, scheduledAt } =
+    const { type, mode, teams, location, scheduledAt } =
       req.body as CreateMatchRequest;
     if (!isMatchType(type)) {
       return res.status(400).json({ error: "유효한 매치 타입이 필요합니다." });
+    }
+    if (mode != null && !isMatchMode(mode)) {
+      return res.status(400).json({ error: "유효한 경기 모드가 필요합니다." });
     }
 
     if (!teams || teams.length !== 2) {
@@ -408,7 +468,7 @@ app.post("/api/matches", async (req, res) => {
     if (
       !creator ||
       creator.status !== "active" ||
-      creator.username === "admin"
+      creator.username === PROTECTED_ADMIN_USERNAME
     ) {
       return res.status(403).json({ error: "매치를 생성할 수 없는 계정입니다." });
     }
@@ -417,35 +477,14 @@ app.post("/api/matches", async (req, res) => {
     const playersById = new Map<string, Player>(
       [creator, ...publicPlayers].map((player) => [player.id, player]),
     );
-    const flatPlayerIds = teams.flatMap((team) => team.playerIds ?? []);
+    const flatPlayerIds = normalizeRequestedTeamPlayerIds(teams);
     if (!flatPlayerIds.includes(decoded.playerId)) {
       return res
         .status(400)
         .json({ error: "매치 멤버에 본인이 포함되어야 합니다." });
     }
 
-    const uniquePlayerIds = new Set(flatPlayerIds);
-    if (uniquePlayerIds.size !== flatPlayerIds.length) {
-      return res.status(400).json({ error: "중복된 멤버가 있습니다." });
-    }
-
-    const matchTeams = teams.map((team, teamIndex) => {
-      const playerIds = team.playerIds ?? [];
-      const players = playerIds.map((playerId) => playersById.get(playerId));
-
-      if (players.some((player) => !player)) {
-        throw new Error("유효하지 않은 멤버가 포함되어 있습니다.");
-      }
-
-      return {
-        id: `team-${Date.now()}-${teamIndex === 0 ? "a" : "b"}`,
-        name: team.name?.trim() || `Team ${teamIndex === 0 ? "A" : "B"}`,
-        players: players as Player[],
-      };
-    }) as [
-      { id: string; name: string; players: Player[] },
-      { id: string; name: string; players: Player[] },
-    ];
+    const matchTeams = buildMatchTeamsFromRequests(teams, playersById);
 
     if (
       !validateCreateMatchTeams(type, [
@@ -465,6 +504,8 @@ app.post("/api/matches", async (req, res) => {
 
     const match = await matchRepository.create({
       type,
+      mode: mode ?? DEFAULT_MATCH_MODE,
+      source: "player_created",
       creatorPlayerId: decoded.playerId,
       status: "created",
       teams: matchTeams,
@@ -478,6 +519,109 @@ app.post("/api/matches", async (req, res) => {
     });
 
     res.status(201).json(match);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const payloadMatches = (req.body as AdminBatchMatchRequest).matches;
+    if (!Array.isArray(payloadMatches) || payloadMatches.length === 0) {
+      return res.status(400).json({ error: "한 개 이상의 경기가 필요합니다." });
+    }
+
+    const createdBy = await authService.getPlayerById(decoded.playerId);
+    if (!createdBy || createdBy.status !== "active") {
+      return res.status(403).json({ error: "유효한 관리자 계정이 필요합니다." });
+    }
+
+    const allPlayers = await authService.getAllPlayers();
+    const availablePlayers = allPlayers.filter(
+      (candidate) =>
+        candidate.status === "active" &&
+        candidate.username !== PROTECTED_ADMIN_USERNAME,
+    );
+    const playersById = new Map<string, Player>(
+      availablePlayers.map((player) => [player.id, player]),
+    );
+    const matchesToCreate = payloadMatches.map((requestedMatch, index) => {
+      const label = `${index + 1}번째 경기`;
+      const { type, mode, teams, location, scheduledAt, scores } = requestedMatch;
+
+      if (!isMatchType(type)) {
+        throw new Error(`${label}: 유효한 매치 타입이 필요합니다.`);
+      }
+      if (mode != null && !isMatchMode(mode)) {
+        throw new Error(`${label}: 유효한 경기 모드가 필요합니다.`);
+      }
+
+      if (!teams || teams.length !== 2) {
+        throw new Error(`${label}: 두 팀 구성이 필요합니다.`);
+      }
+
+      const flatPlayerIds = normalizeRequestedTeamPlayerIds(teams);
+      if (flatPlayerIds.length === 0) {
+        throw new Error(`${label}: 참가자를 선택해주세요.`);
+      }
+
+      const matchTeams = buildMatchTeamsFromRequests(teams, playersById);
+      if (!validateCreateMatchTeams(type, [matchTeams[0].players, matchTeams[1].players])) {
+        throw new Error(
+          `${label}: ${matchTypeLabels[type]}에 맞는 유효한 팀 구성이 필요합니다.`,
+        );
+      }
+
+      const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
+      if (Number.isNaN(scheduledDate.getTime())) {
+        throw new Error(`${label}: 유효한 경기 시간이 필요합니다.`);
+      }
+
+      const normalizedScores = normalizeMatchScores(scores);
+      const resolvedMode = mode ?? inferMatchModeFromScores(normalizedScores);
+      validateMatchScoresForMode(resolvedMode, normalizedScores);
+
+      return {
+        id: `admin-match-${Date.now()}-${index}-${randomUUID()}`,
+        type,
+        mode: resolvedMode,
+        source: "admin_created_result" as const,
+        creatorPlayerId: createdBy.id,
+        status: "completed" as const,
+        teams: matchTeams,
+        scores: normalizedScores,
+        resultSubmittedByPlayerId: createdBy.id,
+        resultSubmittedAt: scheduledDate,
+        approvals: [],
+        location: location?.trim() || "Court TBD",
+        scheduledAt: scheduledDate,
+        completedAt: scheduledDate,
+      };
+    });
+
+    const createdMatches = [];
+    for (const matchInput of matchesToCreate) {
+      createdMatches.push(await matchRepository.create(matchInput));
+    }
+
+    const { matches } = await matchRepository.findAll(0, 10000);
+    const completedMatches = matches.filter((match) => match.status === "completed");
+    const recalculation = await authService.recalculateDuprRatings(completedMatches, {
+      source: "manual_recalculation",
+      sourceLogId: `admin-match-batch-${Date.now()}-${randomUUID()}`,
+    });
+
+    res.status(201).json({
+      matches: createdMatches,
+      createdCount: createdMatches.length,
+      completedMatchCount: completedMatches.length,
+      ...recalculation,
+    });
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
   }
@@ -819,14 +963,14 @@ app.post("/api/admin/register", requireAdmin, async (req, res) => {
       return;
     }
 
-    const { username, password, gender } = req.body;
-    if (!username || !password || !gender) {
+    const { username, gender } = req.body;
+    if (!username || !gender) {
       return res
         .status(400)
-        .json({ error: "username, password, gender는 필수입니다." });
+        .json({ error: "username, gender는 필수입니다." });
     }
     const player = await authService.registerAdmin(
-      { username, password, gender },
+      { username, password: INITIAL_ADMIN_CREATED_PASSWORD, gender },
       decoded.playerId,
     );
     res.json(player);

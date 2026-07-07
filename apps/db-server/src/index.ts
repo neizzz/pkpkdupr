@@ -1,4 +1,5 @@
 import express from "express";
+import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
 import {
   normalizeStoredPlayerDupr,
   shouldStorePlayerDuprAsNull,
@@ -213,6 +214,8 @@ const initSchema = async () => {
     CREATE TABLE IF NOT EXISTS matches (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL CHECK (type IN ('mixed-doubles', 'men-doubles', 'women-doubles', 'singles')),
+      mode TEXT NOT NULL DEFAULT '${DEFAULT_MATCH_MODE}' CHECK (mode IN ('single-game', 'best-of-3')),
+      source TEXT NOT NULL DEFAULT 'player_created',
       creator_player_id TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL,
       location TEXT NOT NULL,
@@ -225,6 +228,10 @@ const initSchema = async () => {
     )
   `);
 
+  await safeExec(
+    `ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '${DEFAULT_MATCH_MODE}'`,
+  );
+  await safeExec(`ALTER TABLE matches ADD COLUMN source TEXT NOT NULL DEFAULT 'player_created'`);
   await safeExec(`ALTER TABLE matches ADD COLUMN creator_player_id TEXT NOT NULL DEFAULT ''`);
   await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_at INTEGER`);
@@ -255,6 +262,12 @@ const initSchema = async () => {
   `);
 
   await client.execute(`
+    UPDATE matches
+    SET source = 'player_created'
+    WHERE source IS NULL OR trim(source) = ''
+  `);
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS match_scores (
       id TEXT PRIMARY KEY,
       match_id TEXT NOT NULL,
@@ -281,6 +294,28 @@ const initSchema = async () => {
       WHERE score_b IS NULL
     `);
   }
+
+  await client.execute(`
+    UPDATE matches
+    SET mode = CASE
+      WHEN (
+        SELECT COUNT(*)
+        FROM match_scores
+        WHERE match_scores.match_id = matches.id
+      ) = 1 THEN 'single-game'
+      WHEN mode IS NULL OR trim(mode) = '' OR mode NOT IN ('single-game', 'best-of-3')
+        THEN '${DEFAULT_MATCH_MODE}'
+      ELSE mode
+    END
+    WHERE mode IS NULL
+       OR trim(mode) = ''
+       OR mode NOT IN ('single-game', 'best-of-3')
+       OR (
+         SELECT COUNT(*)
+         FROM match_scores
+         WHERE match_scores.match_id = matches.id
+       ) = 1
+  `);
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS match_participants (

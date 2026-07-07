@@ -10,6 +10,9 @@ import type {
 } from "@pkpkdupr/shared/player";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import AdminMatchBatchForm, {
+  type AdminBatchMatchRequest,
+} from "../components/AdminMatchBatchForm";
 
 type PlayerInfo = Pick<
   Player,
@@ -41,6 +44,7 @@ const creationSourceLabelMap: Record<PlayerCreationSource, string> = {
 const PROTECTED_ADMIN_USERNAME =
   (import.meta.env.VITE_PROTECTED_ADMIN_USERNAME as string | undefined) ??
   "admin";
+const INITIAL_ADMIN_CREATED_PASSWORD = "123qwe";
 
 const formatDupr = (value?: number | null) =>
   typeof value === "number" ? value.toFixed(3) : "NR";
@@ -70,7 +74,6 @@ const AdminDashboard: React.FC = () => {
   const [resettingPasswordPlayerId, setResettingPasswordPlayerId] =
     useState<string | null>(null);
   const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [gender, setGender] = useState<"M" | "F">("M");
   const [officialPlayerId, setOfficialPlayerId] = useState("");
   const [officialReason, setOfficialReason] = useState("");
@@ -92,6 +95,8 @@ const AdminDashboard: React.FC = () => {
     useState(false);
   const [isApplyingOfficialDupr, setIsApplyingOfficialDupr] = useState(false);
   const [isRecalculatingRatings, setIsRecalculatingRatings] = useState(false);
+  const [isSavingAdminMatches, setIsSavingAdminMatches] = useState(false);
+  const [adminMatchFormResetKey, setAdminMatchFormResetKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -184,7 +189,7 @@ const AdminDashboard: React.FC = () => {
         },
         body: JSON.stringify({
           username: newUsername,
-          password: newPassword,
+          password: INITIAL_ADMIN_CREATED_PASSWORD,
           gender,
         }),
       });
@@ -192,9 +197,10 @@ const AdminDashboard: React.FC = () => {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "회원 추가 실패");
       }
-      setSuccess(`${newUsername} 회원이 추가되었습니다.`);
+      setSuccess(
+        `${newUsername} 회원이 추가되었습니다. 초기 비밀번호는 ${INITIAL_ADMIN_CREATED_PASSWORD} 입니다.`,
+      );
       setNewUsername("");
-      setNewPassword("");
       await loadDashboardData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
@@ -341,6 +347,48 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleAdminMatchBatchSubmit = async (
+    matches: AdminBatchMatchRequest[],
+  ) => {
+    try {
+      setIsSavingAdminMatches(true);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch("/api/admin/matches/batch", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ matches }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "관리자 경기 저장 실패");
+      }
+
+      const data = (await res.json()) as {
+        createdCount: number;
+        changedPlayerCount: number;
+        completedMatchCount: number;
+        ratingChangeLogs: PlayerRatingChangeLog[];
+      };
+
+      await loadDashboardData();
+      setAdminMatchFormResetKey((prev) => prev + 1);
+      setSuccess(
+        `관리자 입력 경기 ${data.createdCount}건을 저장했습니다. 완료 매치 ${data.completedMatchCount}개 기준, ${data.changedPlayerCount}명 변동 (${data.ratingChangeLogs.length}건 기록).`,
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+      throw err;
+    } finally {
+      setIsSavingAdminMatches(false);
+    }
+  };
+
   const buildOfficialDuprPayload = () => ({
     ratings: {
       singles: Number(officialRatings.singles),
@@ -457,6 +505,11 @@ const AdminDashboard: React.FC = () => {
 
   const genderLabel = player?.gender === "M" ? "남" : "여";
   const nowPlaying = () => new Date().toLocaleString("ko-KR");
+  const selectableMatchPlayers = players.filter(
+    (candidate) =>
+      candidate.status === "active" &&
+      candidate.username !== PROTECTED_ADMIN_USERNAME,
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -514,17 +567,11 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
+                초기 비밀번호
               </label>
-              <input
-                type="password"
-                required
-                placeholder="최소 6자"
-                minLength={6}
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="w-full rounded-lg border bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                {INITIAL_ADMIN_CREATED_PASSWORD}
+              </div>
             </div>
             <div className="col-span-2 flex gap-6 items-center">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -579,6 +626,13 @@ const AdminDashboard: React.FC = () => {
             </button>
           </div>
         </section>
+
+        <AdminMatchBatchForm
+          players={selectableMatchPlayers}
+          isSubmitting={isSavingAdminMatches}
+          resetKey={adminMatchFormResetKey}
+          onSubmit={handleAdminMatchBatchSubmit}
+        />
 
         <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
