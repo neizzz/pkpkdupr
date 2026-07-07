@@ -10,10 +10,12 @@
         "dev:web": "pnpm --filter @pkpkdupr/web dev",
         "dev:api": "pnpm --filter @pkpkdupr/api dev",
         "dev:admin": "pnpm --filter @pkpkdupr/admin-web dev",
+        "prepare": "node scripts/setup-git-hooks.mjs",
         "build": "pnpm -r build",
         "build:web": "pnpm --filter @pkpkdupr/web build",
         "build:api": "pnpm --filter @pkpkdupr/api build",
         "build:admin": "pnpm --filter @pkpkdupr/admin-web build",
+        "verify:pre-push": "pnpm build",
         "lint": "pnpm -r lint",
         "clean": "pnpm -r --parallel clean",
         "check:healthy": "node scripts/check-healthy.mjs"
