@@ -1,6 +1,7 @@
 import React from "react";
 import { Avatar as HeroAvatar, Badge } from "@heroui/react";
 import { IoPerson } from "react-icons/io5";
+import { resolveAssetUrl } from "@/lib/api";
 
 interface AvatarProps {
   avatarUrl?: string;
@@ -36,6 +37,8 @@ const Avatar: React.FC<AvatarProps> = ({
   className,
   isMe = false,
 }) => {
+  const resolvedAvatarUrl = resolveAssetUrl(avatarUrl);
+
   const avatar = (
     <HeroUiAvatar
       size={size}
@@ -45,9 +48,9 @@ const Avatar: React.FC<AvatarProps> = ({
         className,
       ].join(" ")}
     >
-      {avatarUrl ? (
+      {resolvedAvatarUrl ? (
         <HeroUiAvatar.Image
-          src={avatarUrl}
+          src={resolvedAvatarUrl}
           alt={name ?? "avatar"}
           className="rounded-full object-cover"
         />

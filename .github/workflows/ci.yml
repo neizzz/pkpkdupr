@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable corepack pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.7.0 --activate
+
+      - name: Docker Compose config
+        run: docker compose -f docker-compose.yml -f docker-compose.build.yml config
+
+      - name: Check scripts syntax
+        run: |
+          bash -n scripts/install-server.sh
+          bash -n scripts/update-server.sh
+          bash -n scripts/upsert-env.sh
+          node --check scripts/check-healthy.mjs
+
+      - name: Docker build
+        run: docker compose -f docker-compose.yml -f docker-compose.build.yml build web admin-web api db-server

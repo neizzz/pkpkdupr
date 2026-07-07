@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import Match, { type MatchInfo } from "@/components/Match";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { buildApiUrl } from "@/lib/api";
 
 interface MatchesProps {
   reloadKey?: number;
@@ -49,7 +50,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       setError(null);
       setNotice(null);
 
-      const res = await fetch("/api/matches", {
+      const res = await fetch(buildApiUrl("/api/matches"), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -128,7 +129,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
       try {
         setPendingMatchAction({ matchId, type: "submit-result" });
-        const res = await fetch(`/api/matches/${matchId}/result`, {
+        const res = await fetch(buildApiUrl(`/api/matches/${matchId}/result`), {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -161,7 +162,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
       try {
         setPendingMatchAction({ matchId, type: "approve-result" });
-        const res = await fetch(`/api/matches/${matchId}/approval`, {
+        const res = await fetch(buildApiUrl(`/api/matches/${matchId}/approval`), {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -190,7 +191,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
       try {
         setPendingMatchAction({ matchId, type: "cancel-approval" });
-        const res = await fetch(`/api/matches/${matchId}/approval`, {
+        const res = await fetch(buildApiUrl(`/api/matches/${matchId}/approval`), {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });

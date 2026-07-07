@@ -8,6 +8,7 @@ import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
+import { buildApiUrl } from "@/lib/api";
 import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
 
 const Me: React.FC = () => {
@@ -38,10 +39,13 @@ const Me: React.FC = () => {
           playerId: player.id,
           limit: "1000",
         });
-        const res = await fetch(`/api/matches?${searchParams.toString()}`, {
+        const res = await fetch(
+          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          {
           headers: { Authorization: `Bearer ${token}` },
           signal: abortController.signal,
-        });
+          },
+        );
 
         if (!res.ok) {
           throw new Error("매치 목록을 불러오지 못했습니다.");

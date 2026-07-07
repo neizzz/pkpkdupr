@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { PlayerDupr } from '@pkpkdupr/shared/player';
+import { buildApiUrl } from "@/lib/api";
 
 export interface PlayerInfo {
     id: string;
@@ -73,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
 
         try {
-            const res = await fetch('/api/me', {
+            const res = await fetch(buildApiUrl('/api/me'), {
                 headers: { Authorization: `Bearer ${accessToken}` },
              });
             if (res.ok) {
@@ -118,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error('오프라인에서는 로그인할 수 없습니다. 온라인 연결이 필요합니다.');
         }
 
-        const res = await fetch('/api/login', {
+        const res = await fetch(buildApiUrl('/api/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password, rememberMe }),
@@ -143,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(ONLINE_REQUIRED_MESSAGE);
         }
 
-        const res = await fetch('/api/me/profile', {
+        const res = await fetch(buildApiUrl('/api/me/profile'), {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -169,7 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(ONLINE_REQUIRED_MESSAGE);
         }
 
-        const res = await fetch('/api/me/avatar', {
+        const res = await fetch(buildApiUrl('/api/me/avatar'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -195,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw new Error(ONLINE_REQUIRED_MESSAGE);
         }
 
-        const res = await fetch('/api/me/avatar', {
+        const res = await fetch(buildApiUrl('/api/me/avatar'), {
             method: 'DELETE',
             headers: { Authorization: `Bearer ${token}` },
          });

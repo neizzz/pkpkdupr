@@ -7,6 +7,7 @@ import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { buildApiUrl } from "@/lib/api";
 import { formatRating, getCompositeDoublesRating } from "@/utils/dupr";
 import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
 
@@ -53,7 +54,7 @@ const Members: React.FC = () => {
         setError(null);
         setNotice(null);
 
-        const res = await fetch("/api/players", {
+        const res = await fetch(buildApiUrl("/api/players"), {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -107,10 +108,13 @@ const Members: React.FC = () => {
           playerId: selectedMemberId,
           limit: "1000",
         });
-        const res = await fetch(`/api/matches?${searchParams.toString()}`, {
+        const res = await fetch(
+          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          {
           headers: { Authorization: `Bearer ${token}` },
           signal: abortController.signal,
-        });
+          },
+        );
 
         if (!res.ok) {
           throw new Error("매치 목록을 불러오지 못했습니다.");

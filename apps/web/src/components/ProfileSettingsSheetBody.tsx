@@ -3,6 +3,7 @@ import { Button } from "@heroui/react";
 import Avatar from "@/components/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { buildApiUrl } from "@/lib/api";
 
 const MAX_AVATAR_SIZE = 512;
 const AVATAR_JPEG_QUALITY = 0.85;
@@ -230,7 +231,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
     setIsSavingPassword(true);
     try {
-      const res = await fetch("/api/change-password", {
+      const res = await fetch(buildApiUrl("/api/change-password"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

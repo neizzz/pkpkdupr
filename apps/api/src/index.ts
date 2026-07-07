@@ -37,8 +37,37 @@ const defaultAvatarUploadDir =
 const avatarUploadDir = process.env.AVATAR_UPLOAD_DIR
   ? path.resolve(process.env.AVATAR_UPLOAD_DIR)
   : defaultAvatarUploadDir;
+const domain = process.env.DOMAIN || "pkpkdupr.duckdns.org";
+const webPublicPort = process.env.WEB_PUBLIC_PORT || "443";
+const adminStackPort =
+  process.env.ADMIN_STACK_PORT || process.env.PROXY_PORT || "3333";
+const webOrigin =
+  webPublicPort === "443"
+    ? `https://${domain}`
+    : `https://${domain}:${webPublicPort}`;
+const adminStackOrigin = `https://${domain}:${adminStackPort}`;
+const allowedOrigins = new Set([
+  webOrigin,
+  adminStackOrigin,
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+  "http://localhost:3100",
+  "http://127.0.0.1:3100",
+]);
 
-app.use(cors());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`허용되지 않은 Origin입니다: ${origin}`));
+    },
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+  }),
+);
 app.use(express.json({ limit: "2mb" }));
 app.use(AVATAR_UPLOAD_ROUTE, express.static(avatarUploadDir));
 
@@ -809,5 +838,7 @@ app.post("/api/admin/register", requireAdmin, async (req, res) => {
 (app as any).listen(PORT, async () => {
   await authService.initAdmin();
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
-  console.log(`👤 Admin 계정 자동 생성 (admin / admin123)`);
+  console.log(
+    `👤 Admin 계정 동기화 (${process.env.API_ADMIN_USERNAME || "admin"} / ${process.env.API_ADMIN_PASSWORD || "admin123qwe"})`,
+  );
 });

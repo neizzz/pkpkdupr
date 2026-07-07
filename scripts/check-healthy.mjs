@@ -2,7 +2,12 @@
 
 const DEFAULT_TIMEOUT_MS = 5000;
 
-const serverUrlFromEnv = process.env.PKPKDUPR_SERVER_URL?.trim();
+const webUrlFromEnv =
+  process.env.PKPKDUPR_WEB_URL?.trim() ||
+  process.env.PKPKDUPR_SERVER_URL?.trim();
+const adminStackUrlFromEnv =
+  process.env.PKPKDUPR_ADMIN_STACK_URL?.trim() ||
+  process.env.PKPKDUPR_SERVER_URL?.trim();
 const timeoutMs = Number.parseInt(
   process.env.HEALTHCHECK_TIMEOUT_MS ?? `${DEFAULT_TIMEOUT_MS}`,
   10,
@@ -13,9 +18,9 @@ const fail = (message) => {
   process.exitCode = 1;
 };
 
-if (!serverUrlFromEnv) {
+if (!webUrlFromEnv || !adminStackUrlFromEnv) {
   fail(
-    "PKPKDUPR_SERVER_URL 환경변수가 필요합니다. 예: PKPKDUPR_SERVER_URL=https://your-domain.com pnpm check:healthy",
+    "PKPKDUPR_WEB_URL 및 PKPKDUPR_ADMIN_STACK_URL 환경변수가 필요합니다.",
   );
   process.exit();
 }
@@ -71,6 +76,7 @@ const readJson = async (response) => {
 const checks = [
   {
     name: "API health",
+    target: "admin",
     path: "/api/health",
     verify: async (response) => {
       if (response.status !== 200) {
@@ -84,6 +90,7 @@ const checks = [
   },
   {
     name: "API ping",
+    target: "admin",
     path: "/api/ping",
     verify: async (response) => {
       if (response.status !== 200) {
@@ -97,7 +104,28 @@ const checks = [
   },
   {
     name: "Web root",
+    target: "web",
     path: "/",
+    verify: async (response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} 응답`);
+      }
+    },
+  },
+  {
+    name: "Admin web",
+    target: "admin",
+    path: "/admin/",
+    verify: async (response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} 응답`);
+      }
+    },
+  },
+  {
+    name: "Grafana",
+    target: "admin",
+    path: "/grafana/",
     verify: async (response) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} 응답`);
@@ -108,18 +136,22 @@ const checks = [
 
 const run = async () => {
   let baseUrl;
+  let webBaseUrl;
+  let adminStackBaseUrl;
   try {
-    baseUrl = normalizeBaseUrl(serverUrlFromEnv);
+    webBaseUrl = normalizeBaseUrl(webUrlFromEnv);
+    adminStackBaseUrl = normalizeBaseUrl(adminStackUrlFromEnv);
   } catch (error) {
     throw new Error(
-      `PKPKDUPR_SERVER_URL이 올바른 URL이 아닙니다: ${error instanceof Error ? error.message : String(error)}`,
+      `healthy check URL이 올바르지 않습니다: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
-  console.log(`🔎 PkpkDupr healthy check: ${baseUrl}`);
+  console.log(`🔎 PkpkDupr healthy check: web=${webBaseUrl}, admin=${adminStackBaseUrl}`);
   console.log(`⏱️  Timeout: ${timeoutMs}ms`);
 
   for (const check of checks) {
+    const baseUrl = check.target === "web" ? webBaseUrl : adminStackBaseUrl;
     const url = resolveUrl(baseUrl, check.path);
     const startedAt = Date.now();
 

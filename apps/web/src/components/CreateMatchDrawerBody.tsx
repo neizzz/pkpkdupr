@@ -15,6 +15,7 @@ import type { VerifyPlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import Avatar from "@/components/Avatar";
 import UserChip from "@/components/UserChip";
 import { useAuth } from "@/context/AuthContext";
+import { buildApiUrl } from "@/lib/api";
 
 type MatchMember = Pick<Player, "id" | "username" | "gender" | "avatarUrl"> & {
   duprRating?: Player["duprRating"];
@@ -302,7 +303,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
       if (token) {
         try {
-          const res = await fetch("/api/players", {
+          const res = await fetch(buildApiUrl("/api/players"), {
             headers: { Authorization: `Bearer ${token}` },
           });
 
@@ -408,7 +409,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         setQrScannerError(null);
         setPendingQrMember(null);
 
-        const res = await fetch("/api/player-qr-token/verify", {
+        const res = await fetch(buildApiUrl("/api/player-qr-token/verify"), {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -669,7 +670,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       setIsCreatingMatch(true);
       setCreateMatchError(null);
 
-      const res = await fetch("/api/matches", {
+      const res = await fetch(buildApiUrl("/api/matches"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

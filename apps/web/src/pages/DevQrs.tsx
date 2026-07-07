@@ -4,6 +4,7 @@ import type {
   DevPlayerQrToken,
   DevPlayerQrTokenListResponse,
 } from "@pkpkdupr/shared/qr";
+import { buildApiUrl } from "@/lib/api";
 
 const getGenderLabel = (gender: DevPlayerQrToken["player"]["gender"]) =>
   gender === "M" ? "남자" : "여자";
@@ -76,7 +77,7 @@ const DevQrs: React.FC = () => {
         setIsLoading(true);
         setError(null);
 
-        const res = await fetch("/api/dev/player-qr-tokens");
+        const res = await fetch(buildApiUrl("/api/dev/player-qr-tokens"));
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(

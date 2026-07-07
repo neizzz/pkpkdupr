@@ -54,6 +54,8 @@ import type { Match } from "@pkpkdupr/shared/match";
 const SALT_ROUNDS = 10;
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
 const DEV_MOCK_DATA_ENABLED = process.env.ENABLE_DEV_MOCK_DATA === "true";
+const API_ADMIN_USERNAME = process.env.API_ADMIN_USERNAME || "admin";
+const API_ADMIN_PASSWORD = process.env.API_ADMIN_PASSWORD || "admin123qwe";
 
 interface StoredPlayerRecord extends Player {
   passwordHash: string;
@@ -469,7 +471,7 @@ export class AuthService {
     return createAccessToken(
       {
         playerId: stored.id,
-        isAdmin: stored.username === "admin",
+        isAdmin: stored.username === API_ADMIN_USERNAME,
         rememberMe,
         passwordFingerprint: createPasswordFingerprint(stored.passwordHash),
       },
@@ -599,7 +601,7 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-    const isAdmin = username === "admin";
+    const isAdmin = username === API_ADMIN_USERNAME;
     const player = createPlayer({ username, gender });
 
     const created = await this.dbRequest<any>("/internal/players", {
@@ -1291,15 +1293,31 @@ export class AuthService {
 
   async initAdmin(): Promise<Player> {
     const existing = await this.retryOperation(
-      () => this.getStoredPlayerByUsername("admin"),
+      () => this.getStoredPlayerByUsername(API_ADMIN_USERNAME),
       { retries: 20 },
     );
     if (existing) {
-      return toPublicPlayer(existing);
+      const passwordHash = await bcrypt.hash(API_ADMIN_PASSWORD, SALT_ROUNDS);
+      const updated = hydratePlayer(
+        await this.retryOperation(
+          () =>
+            this.dbRequest<any>(`/internal/players/${existing.id}/password`, {
+              method: "PATCH",
+              body: JSON.stringify({
+                passwordHash,
+                isFirstLogin: false,
+              }),
+              retries: 10,
+            }),
+          { retries: 20 },
+        ),
+      );
+
+      return toPublicPlayer(updated);
     }
 
-    const passwordHash = await bcrypt.hash("admin123", SALT_ROUNDS);
-    const player = createPlayer({ username: "admin", gender: "M" });
+    const passwordHash = await bcrypt.hash(API_ADMIN_PASSWORD, SALT_ROUNDS);
+    const player = createPlayer({ username: API_ADMIN_USERNAME, gender: "M" });
 
     const created = hydratePlayer(
       await this.retryOperation(

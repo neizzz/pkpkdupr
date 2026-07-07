@@ -38,7 +38,9 @@ const creationSourceLabelMap: Record<PlayerCreationSource, string> = {
   bootstrap: "초기 관리자 생성",
 };
 
-const PROTECTED_ADMIN_USERNAME = "admin";
+const PROTECTED_ADMIN_USERNAME =
+  (import.meta.env.VITE_PROTECTED_ADMIN_USERNAME as string | undefined) ??
+  "admin";
 
 const formatDupr = (value?: number | null) =>
   typeof value === "number" ? value.toFixed(3) : "NR";

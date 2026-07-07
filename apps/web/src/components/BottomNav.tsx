@@ -28,6 +28,7 @@ import {
   type TabKey,
 } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { buildApiUrl } from "@/lib/api";
 import Matches from "@/pages/Matches";
 import Members from "@/pages/Members";
 import Me from "@/pages/Me";
@@ -390,7 +391,7 @@ const BottomNav: React.FC = () => {
       setIsQrLoading(true);
       setQrError(null);
 
-      const res = await fetch("/api/player-qr-token", {
+      const res = await fetch(buildApiUrl("/api/player-qr-token"), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
