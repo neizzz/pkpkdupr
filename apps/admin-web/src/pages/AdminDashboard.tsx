@@ -505,12 +505,6 @@ const AdminDashboard: React.FC = () => {
 
   const genderLabel = player?.gender === "M" ? "남" : "여";
   const nowPlaying = () => new Date().toLocaleString("ko-KR");
-  const selectableMatchPlayers = players.filter(
-    (candidate) =>
-      candidate.status === "active" &&
-      candidate.username !== PROTECTED_ADMIN_USERNAME,
-  );
-
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
@@ -628,8 +622,9 @@ const AdminDashboard: React.FC = () => {
         </section>
 
         <AdminMatchBatchForm
-          players={selectableMatchPlayers}
+          players={players}
           isSubmitting={isSavingAdminMatches}
+          protectedAdminUsername={PROTECTED_ADMIN_USERNAME}
           resetKey={adminMatchFormResetKey}
           onSubmit={handleAdminMatchBatchSubmit}
         />
