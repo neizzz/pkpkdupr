@@ -56,6 +56,7 @@ const adminStackOrigin = `https://${domain}:${adminStackPort}`;
 const allowedOrigins = new Set([
   webOrigin,
   adminStackOrigin,
+  "https://neiz-office.fedev.kakao.com",
   "http://localhost:8080",
   "http://127.0.0.1:8080",
   "http://localhost:3100",
