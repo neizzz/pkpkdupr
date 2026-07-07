@@ -20,7 +20,6 @@ import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
 import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
-import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import { useAuth } from "@/context/AuthContext";
 import {
   TabNavigationProvider,
@@ -376,7 +375,9 @@ const BottomNav: React.FC = () => {
   const loadPlayerQrToken = useCallback(async () => {
     if (!isOnline) {
       setQrToken(null);
-      setQrError("오프라인에서는 QR 코드를 생성할 수 없습니다. 온라인 연결이 필요합니다.");
+      setQrError(
+        "오프라인에서는 QR 코드를 생성할 수 없습니다. 온라인 연결이 필요합니다.",
+      );
       setQrRemainingSeconds(0);
       return;
     }
@@ -559,10 +560,8 @@ const BottomNav: React.FC = () => {
       <Tabs
         selectedKey={selectedTab}
         onSelectionChange={handleSelectionChange}
-        className="relative flex h-screen min-h-screen flex-col overflow-hidden bg-white"
+        className="relative flex h-screen min-h-screen max-w-full flex-col overflow-hidden bg-white"
       >
-        <PwaInstallPrompt />
-
         <div className="fixed inset-x-0 bottom-0 z-20 flex items-end gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List

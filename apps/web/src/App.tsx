@@ -2,6 +2,7 @@ import { Spinner } from "@heroui/react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
+import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import DevQrs from "./pages/DevQrs";
 import Login from "./pages/Login";
@@ -30,7 +31,9 @@ function AppRoutes() {
       />
       <Route
         path="/"
-        element={isAuthenticated ? <BottomNav /> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated ? <BottomNav /> : <Navigate to="/login" replace />
+        }
       />
       <Route
         path="/login"
@@ -57,7 +60,7 @@ function App() {
           : "min-h-screen flex justify-center bg-gray-900"
       }
     >
-      <div
+      <main
         className={
           isFullWidthDevPage
             ? "w-full min-h-screen"
@@ -66,9 +69,10 @@ function App() {
       >
         <AuthProvider>
           <OfflineBanner />
+          <PwaInstallPrompt />
           <AppRoutes />
         </AuthProvider>
-      </div>
+      </main>
     </div>
   );
 }

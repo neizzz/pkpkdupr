@@ -2,7 +2,7 @@
 @import "@heroui/styles";
 
 @theme {
-  --color-error: #F8626c;
+  --color-error: #f8626c;
   --color-border: #e6e6e6;
   --color-divider: #e6e6e6;
 }
@@ -20,6 +20,10 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+  }
+
+  html {
+    overscroll-behavior: none;
   }
 
   body {

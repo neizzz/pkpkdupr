@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Button, CloseButton } from "@heroui/react";
+import { useLocation } from "react-router-dom";
 import { IoShareOutline } from "react-icons/io5";
+import { useAuth } from "@/context/AuthContext";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -12,7 +14,9 @@ const isStandaloneDisplay = () =>
   window.matchMedia("(display-mode: fullscreen)").matches ||
   window.matchMedia("(display-mode: minimal-ui)").matches ||
   ("standalone" in window.navigator &&
-    Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone));
+    Boolean(
+      (window.navigator as Navigator & { standalone?: boolean }).standalone,
+    ));
 
 const isLocalhost = () =>
   ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
@@ -33,21 +37,35 @@ const isSafari = () => {
 
 const isIosSafari = () => isIosLike() && isSafari();
 
+const isAndroidChrome = () => {
+  const userAgent = window.navigator.userAgent;
+
+  return (
+    /android/i.test(userAgent) &&
+    /chrome|chromium/i.test(userAgent) &&
+    !/edg|opr|opera|samsungbrowser|firefox|\bwv\b|; wv\)/i.test(userAgent)
+  );
+};
+
 type InstallPrompt =
   | {
       kind: "ios-safari";
       title: string;
     }
   | {
-      kind: "installable" | "unsupported";
+      kind: "installable" | "android-manual" | "unsupported";
       title: string;
       message: string;
     };
 
 const PwaInstallPrompt: React.FC = () => {
+  const location = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() =>
+    typeof window === "undefined" ? false : isStandaloneDisplay(),
+  );
   const [isDismissed, setIsDismissed] = useState(false);
 
   const installPrompt = useMemo<InstallPrompt | null>(() => {
@@ -59,17 +77,28 @@ const PwaInstallPrompt: React.FC = () => {
       if (isIosSafari()) {
         return {
           kind: "ios-safari",
-          title: "iPhone 홈 화면에 추가",
+          title: "PkpkDupr를 앱처럼 설치할 수 있어요.",
         };
       }
 
-      return deferredPrompt
-        ? {
-            kind: "installable",
-            title: "앱 설치 안내",
-            message: "PkpkDupr를 앱처럼 설치할 수 있어요.",
-          }
-        : null;
+      if (deferredPrompt) {
+        return {
+          kind: "installable",
+          title: "앱 설치 안내",
+          message: "PkpkDupr를 앱처럼 설치할 수 있어요.",
+        };
+      }
+
+      if (isAndroidChrome()) {
+        return {
+          kind: "android-manual",
+          title: "PkpkDupr를 앱처럼 설치할 수 있어요.",
+          message:
+            "Android Chrome에서는 메뉴(⋮)에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택해주세요.",
+        };
+      }
+
+      return null;
     }
 
     return {
@@ -105,7 +134,17 @@ const PwaInstallPrompt: React.FC = () => {
     };
   }, []);
 
-  if (isInstalled || isDismissed || !installPrompt) {
+  const isFullWidthDevPage =
+    import.meta.env.DEV && location.pathname === "/dev/qrs";
+
+  if (
+    isLoading ||
+    !isAuthenticated ||
+    isFullWidthDevPage ||
+    isInstalled ||
+    isDismissed ||
+    !installPrompt
+  ) {
     return null;
   }
 
@@ -137,15 +176,18 @@ const PwaInstallPrompt: React.FC = () => {
           <Alert.Description className="text-xs font-semibold text-[#888]">
             {installPrompt.kind === "ios-safari" ? (
               <>
-                Safari 하단 중앙의{" "}
+                iOS에서는 Safari 하단 중앙의{" "}
                 <span
-                  className="inline-flex size-5 translate-y-0.5 items-center justify-center rounded-md border border-border bg-white text-[#409eff]"
+                  className="inline-flex translate-y-0.5 items-center gap-0.5 rounded-md border border-border bg-white px-1 py-0.5 text-[#409eff]"
                   aria-label="공유하기 버튼"
                   role="img"
                 >
                   <IoShareOutline className="size-3.5" />
+                  <span className="text-[10px] font-bold">공유</span>
                 </span>{" "}
-                버튼을 누른 뒤 ‘홈 화면에 추가’를 선택해주세요.
+                버튼을 누른 뒤,
+                <br />
+                [홈 화면에 추가]를 선택해주세요.
               </>
             ) : (
               installPrompt.message
