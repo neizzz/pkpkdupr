@@ -18,6 +18,7 @@ import {
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
+import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
 import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import { useAuth } from "@/context/AuthContext";
@@ -479,9 +480,6 @@ const BottomNav: React.FC = () => {
           if (!isOnline) return;
           openCreateMatchSheet();
           break;
-        case "logout":
-          logout();
-          break;
         default:
           break;
       }
@@ -492,6 +490,17 @@ const BottomNav: React.FC = () => {
       action();
     }
   };
+
+  const handleLogout = useCallback(() => {
+    const action = () => {
+      logout();
+    };
+
+    if (!closeDepth(globalMenuTabKey, "global-menu", action)) {
+      setIsGlobalMenuOpen(false);
+      action();
+    }
+  }, [closeDepth, globalMenuTabKey, logout]);
 
   const handleCreateMatch = () => {
     isCreateMatchQrScannerOpenRef.current = false;
@@ -645,12 +654,22 @@ const BottomNav: React.FC = () => {
                   <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
                   <Label>매치 생성</Label>
                 </Dropdown.Item>
-                <Separator className="my-1" />
-                <Dropdown.Item id="logout" textValue="Logout">
-                  <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
-                  <Label className="text-[#f8626c]">로그아웃</Label>
-                </Dropdown.Item>
               </Dropdown.Menu>
+              <Separator className="my-1" />
+              <div className="relative z-10 px-1 pb-1">
+                <HoldToConfirmButton
+                  holdDurationMs={1000}
+                  ariaLabel="길게 눌러 로그아웃"
+                  onComplete={handleLogout}
+                  className="rounded-lg text-[#f8626c] hover:bg-[#f8626c]/6"
+                  progressClassName="bg-[#f8626c]/18"
+                >
+                  <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
+                  <span className="truncate text-sm font-medium text-[#f8626c]">
+                    길게 눌러 로그아웃
+                  </span>
+                </HoldToConfirmButton>
+              </div>
             </Dropdown.Popover>
           </Dropdown>
         </div>
