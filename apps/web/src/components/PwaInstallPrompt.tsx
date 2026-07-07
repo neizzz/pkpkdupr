@@ -37,16 +37,6 @@ const isSafari = () => {
 
 const isIosSafari = () => isIosLike() && isSafari();
 
-const isAndroidChrome = () => {
-  const userAgent = window.navigator.userAgent;
-
-  return (
-    /android/i.test(userAgent) &&
-    /chrome|chromium/i.test(userAgent) &&
-    !/edg|opr|opera|samsungbrowser|firefox|\bwv\b|; wv\)/i.test(userAgent)
-  );
-};
-
 type InstallPrompt =
   | {
       kind: "ios-safari";
@@ -77,24 +67,14 @@ const PwaInstallPrompt: React.FC = () => {
       if (isIosSafari()) {
         return {
           kind: "ios-safari",
-          title: "PkpkDupr를 앱처럼 설치할 수 있어요.",
+          title: "앱처럼 설치할 수 있어요.",
         };
       }
 
       if (deferredPrompt) {
         return {
           kind: "installable",
-          title: "앱 설치 안내",
-          message: "PkpkDupr를 앱처럼 설치할 수 있어요.",
-        };
-      }
-
-      if (isAndroidChrome()) {
-        return {
-          kind: "android-manual",
-          title: "PkpkDupr를 앱처럼 설치할 수 있어요.",
-          message:
-            "Android Chrome에서는 메뉴(⋮)에서 ‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택해주세요.",
+          title: "앱처럼 설치할 수 있어요.",
         };
       }
 
@@ -166,17 +146,17 @@ const PwaInstallPrompt: React.FC = () => {
     <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-[430px] px-3">
       <Alert
         status={installPrompt.kind === "installable" ? "accent" : "warning"}
-        className="items-start rounded-2xl border border-[#409eff]/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
+        className="items-center rounded-2xl border border-[#409eff]/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
       >
-        <Alert.Indicator className="mt-0.5 shrink-0 self-start" />
-        <Alert.Content className="min-w-0 gap-0">
+        <Alert.Indicator className="shrink-0 self-center" />
+        <Alert.Content className="min-w-0 gap-0 self-center">
           <Alert.Title className="text-sm font-bold text-amber-950">
             {installPrompt.title}
           </Alert.Title>
           <Alert.Description className="text-xs font-semibold text-[#888]">
             {installPrompt.kind === "ios-safari" ? (
               <>
-                iOS에서는 Safari 하단 중앙의{" "}
+                Safari 하단 중앙의{" "}
                 <span
                   className="inline-flex translate-y-0.5 items-center gap-0.5 rounded-md border border-border bg-white px-1 py-0.5 text-[#409eff]"
                   aria-label="공유하기 버튼"
@@ -204,7 +184,7 @@ const PwaInstallPrompt: React.FC = () => {
           </Button>
         ) : null}
         <CloseButton
-          className="shrink-0 self-start"
+          className="shrink-0 self-center"
           aria-label="설치 안내 닫기"
           onClick={() => setIsDismissed(true)}
         />
