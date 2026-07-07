@@ -6,6 +6,7 @@ dist/
 build/
 .out/
 data/
+apps/db-server/db.sqlite
 
 # Environment files
 .env
