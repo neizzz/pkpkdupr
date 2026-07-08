@@ -40,6 +40,18 @@ read_env_value() {
   printf '%s' "${value}"
 }
 
+sync_duckdns_credentials() {
+  local token="$1"
+  local credentials_file="${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini"
+
+  mkdir -p "$(dirname "${credentials_file}")"
+  umask 077
+  printf 'dns_duckdns_token=%s\n' "${token}" > "${credentials_file}"
+  chmod 600 "${credentials_file}"
+
+  echo "✅ DuckDNS credential 파일 동기화 완료: ${credentials_file}"
+}
+
 wait_for_file() {
   local path="$1"
   local attempts="${2:-60}"
@@ -136,6 +148,8 @@ mkdir -p \
   "${DEPLOY_ROOT}/data/db" \
   "${DEPLOY_ROOT}/data/uploads/avatars" \
   "${DEPLOY_ROOT}/data/certs"
+
+sync_duckdns_credentials "${DUCKDNS_TOKEN_VALUE}"
 
 echo "🚀 SWAG 초기화 중..."
 docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" up -d proxy

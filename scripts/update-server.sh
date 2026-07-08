@@ -27,6 +27,18 @@ read_env_value() {
   printf '%s' "${value}"
 }
 
+sync_duckdns_credentials() {
+  local token="$1"
+  local credentials_file="${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini"
+
+  mkdir -p "$(dirname "${credentials_file}")"
+  umask 077
+  printf 'dns_duckdns_token=%s\n' "${token}" > "${credentials_file}"
+  chmod 600 "${credentials_file}"
+
+  echo "✅ DuckDNS credential 파일 동기화 완료: ${credentials_file}"
+}
+
 wait_for_url() {
   local url="$1"
   local attempts="${2:-60}"
@@ -64,6 +76,15 @@ else
 fi
 
 export IMAGE_TAG="${IMAGE_TAG_INPUT}"
+DUCKDNS_TOKEN_VALUE="$(read_env_value DUCKDNSTOKEN)"
+if [[ -z "${DUCKDNS_TOKEN_VALUE}" || "${DUCKDNS_TOKEN_VALUE}" == "replace-with-your-duckdns-token" ]]; then
+  echo "❌ DUCKDNSTOKEN 값을 ${ENV_FILE}에 설정해야 DuckDNS DNS 검증으로 인증서를 발급/갱신할 수 있습니다." >&2
+  echo "   예: DUCKDNSTOKEN=your-real-duckdns-token" >&2
+  exit 1
+fi
+
+sync_duckdns_credentials "${DUCKDNS_TOKEN_VALUE}"
+
 DOMAIN_VALUE="$(read_env_value DOMAIN)"
 DOMAIN_VALUE="${DOMAIN_VALUE:-${DOMAIN_DEFAULT}}"
 WEB_PUBLIC_PORT_VALUE="$(read_env_value WEB_PUBLIC_PORT)"
