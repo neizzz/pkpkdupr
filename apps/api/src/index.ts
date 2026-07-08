@@ -102,6 +102,7 @@ app.get("/api/ping", (_req, res) => {
 const authService = new AuthService();
 const matchRepository = new MatchRepository();
 const playerStatuses: PlayerStatus[] = ["active", "inactive"];
+const playerGenders: Array<Player["gender"]> = ["M", "F"];
 
 type CreateMatchRequest = {
   type?: MatchType;
@@ -874,6 +875,30 @@ app.get("/api/admin/player-status-logs", requireAdmin, async (_req, res) => {
     res.json(logs);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.patch("/api/admin/players/:playerId/gender", requireAdmin, async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const { gender } = req.body as { gender?: Player["gender"] };
+    if (!gender || !playerGenders.includes(gender)) {
+      return res.status(400).json({ error: "gender는 M 또는 F 여야 합니다." });
+    }
+
+    const result = await authService.updatePlayerGender(
+      req.params.playerId,
+      gender,
+      decoded.playerId,
+    );
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

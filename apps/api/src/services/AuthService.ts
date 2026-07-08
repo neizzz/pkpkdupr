@@ -957,6 +957,39 @@ export class AuthService {
     );
   }
 
+  async updatePlayerGender(
+    playerId: string,
+    nextGender: Player["gender"],
+    changedByPlayerId: string,
+  ): Promise<{ player: Player; changed: boolean }> {
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+
+    const changedBy = await this.getStoredPlayerById(changedByPlayerId);
+    if (!changedBy) {
+      throw new Error("성별 변경 요청자를 찾을 수 없습니다.");
+    }
+
+    if (stored.username === API_ADMIN_USERNAME) {
+      throw new Error("기본 관리자 계정 성별은 이 기능으로 변경할 수 없습니다.");
+    }
+
+    if (stored.gender === nextGender) {
+      return { player: toPublicPlayer(stored), changed: false };
+    }
+
+    const updated = hydratePlayer(
+      await this.dbRequest<any>(`/internal/players/${playerId}/gender`, {
+        method: "PATCH",
+        body: JSON.stringify({ gender: nextGender }),
+      }),
+    );
+
+    return { player: toPublicPlayer(updated), changed: true };
+  }
+
   async updatePlayerStatus(
     playerId: string,
     nextStatus: PlayerStatus,

@@ -80,6 +80,17 @@ export class PlayerRepository {
     return await this.findById(id);
   }
 
+  async updateGender(
+    id: string,
+    gender: Player["gender"],
+  ): Promise<StoredPlayerRecord | undefined> {
+    await this.db
+      .update(players)
+      .set({ gender, updatedAt: new Date() })
+      .where(eq(players.id, id));
+    return await this.findById(id);
+  }
+
   async updatePassword(
     id: string,
     passwordHash: string,

@@ -26,8 +26,14 @@ type PlayerInfo = Pick<
   updatedAt: string;
 };
 
+type PlayerGender = Player["gender"];
 type PlayerStatusLogsByPlayerId = Record<string, PlayerStatusChangeLog[]>;
 type PlayerCreationLogsByPlayerId = Record<string, PlayerCreationLog[]>;
+
+const genderLabelMap: Record<PlayerGender, string> = {
+  M: "남",
+  F: "여",
+};
 
 const statusLabelMap: Record<PlayerStatus, string> = {
   active: "활성",
@@ -68,11 +74,17 @@ const AdminDashboard: React.FC = () => {
     useState<PlayerStatusLogsByPlayerId>({});
   const [creationLogsByPlayerId, setCreationLogsByPlayerId] =
     useState<PlayerCreationLogsByPlayerId>({});
+  const [genderDrafts, setGenderDrafts] = useState<Record<string, PlayerGender>>(
+    {},
+  );
   const [statusDrafts, setStatusDrafts] = useState<Record<string, PlayerStatus>>(
     {},
   );
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>(
     {},
+  );
+  const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<string | null>(
+    null,
   );
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
   const [resettingPasswordPlayerId, setResettingPasswordPlayerId] =
@@ -122,6 +134,16 @@ const AdminDashboard: React.FC = () => {
     }
   }, [token, player, isAdmin, logout, navigate]);
 
+  const syncGenderDrafts = (loadedPlayers: PlayerInfo[]) => {
+    setGenderDrafts((prev) => {
+      const next: Record<string, PlayerGender> = {};
+      loadedPlayers.forEach((loadedPlayer) => {
+        next[loadedPlayer.id] = prev[loadedPlayer.id] ?? loadedPlayer.gender;
+      });
+      return next;
+    });
+  };
+
   const syncStatusDrafts = (loadedPlayers: PlayerInfo[]) => {
     setStatusDrafts((prev) => {
       const next: Record<string, PlayerStatus> = {};
@@ -142,6 +164,7 @@ const AdminDashboard: React.FC = () => {
 
     const data = (await res.json()) as PlayerInfo[];
     setPlayers(data);
+    syncGenderDrafts(data);
     syncStatusDrafts(data);
   };
 
@@ -212,6 +235,59 @@ const AdminDashboard: React.FC = () => {
       await loadDashboardData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    }
+  };
+
+  const handleGenderChange = async (playerId: string) => {
+    const targetPlayer = players.find((item) => item.id === playerId);
+    if (targetPlayer?.username === PROTECTED_ADMIN_USERNAME) {
+      setError("admin 계정 성별은 변경할 수 없습니다.");
+      setSuccess(null);
+      return;
+    }
+
+    const nextGender = genderDrafts[playerId];
+    if (!nextGender) {
+      return;
+    }
+
+    try {
+      setSavingGenderPlayerId(playerId);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch(`/api/admin/players/${playerId}/gender`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ gender: nextGender }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "성별 변경 실패");
+      }
+
+      const data = (await res.json()) as {
+        player: PlayerInfo;
+        changed: boolean;
+      };
+
+      setPlayers((prev) =>
+        prev.map((item) => (item.id === data.player.id ? data.player : item)),
+      );
+      setGenderDrafts((prev) => ({ ...prev, [playerId]: data.player.gender }));
+      setSuccess(
+        data.changed
+          ? `${data.player.username} 회원 성별이 ${genderLabelMap[data.player.gender]}으로 변경되었습니다.`
+          : "변경된 성별이 없습니다.",
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setSavingGenderPlayerId(null);
     }
   };
 
@@ -898,10 +974,13 @@ const buildOfficialDuprPayload = () => ({
                     const creationLogs = creationLogsByPlayerId[p.id] ?? [];
                     const statusLogs = statusLogsByPlayerId[p.id] ?? [];
                     const latestCreationLog = creationLogs[0];
+                    const draftGender = genderDrafts[p.id] ?? p.gender;
                     const draftStatus = statusDrafts[p.id] ?? p.status;
+                    const isSavingGender = savingGenderPlayerId === p.id;
                     const isSaving = savingPlayerId === p.id;
                     const isResettingPassword = resettingPasswordPlayerId === p.id;
                     const passwordDraft = passwordDrafts[p.id] ?? "";
+                    const isGenderDirty = draftGender !== p.gender;
                     const isDirty = draftStatus !== p.status;
                     const isProtectedAdminAccount =
                       p.username === PROTECTED_ADMIN_USERNAME;
@@ -917,7 +996,44 @@ const buildOfficialDuprPayload = () => ({
                             <div>D {formatDupr(doublesRating)}</div>
                           </div>
                         </td>
-                        <td className="py-3">{p.gender === "M" ? "남" : "여"}</td>
+                        <td className="py-3 min-w-[200px]">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={draftGender}
+                              disabled={isProtectedAdminAccount}
+                              onChange={(e) =>
+                                setGenderDrafts((prev) => ({
+                                  ...prev,
+                                  [p.id]: e.target.value as PlayerGender,
+                                }))
+                              }
+                              className="border rounded-lg px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                              <option value="M">남</option>
+                              <option value="F">여</option>
+                            </select>
+                            <button
+                              type="button"
+                              disabled={
+                                isProtectedAdminAccount ||
+                                !isGenderDirty ||
+                                isSavingGender
+                              }
+                              onClick={() => void handleGenderChange(p.id)}
+                              className="px-3 py-2 rounded-lg bg-slate-800 text-white disabled:bg-slate-300"
+                            >
+                              {isSavingGender ? "저장 중..." : "저장"}
+                            </button>
+                            {isProtectedAdminAccount ? (
+                              <span className="text-xs text-slate-500">
+                                admin 계정은 변경 불가
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            현재: {genderLabelMap[p.gender]}
+                          </p>
+                        </td>
                         <td className="py-3">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClassMap[p.status]}`}

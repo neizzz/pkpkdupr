@@ -467,6 +467,18 @@ app.patch("/internal/players/:id/status", async (req, res) => {
   }
 });
 
+app.patch("/internal/players/:id/gender", async (req, res) => {
+  try {
+    const player = await playerRepository.updateGender(req.params.id, req.body.gender);
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.patch("/internal/players/:id/password", async (req, res) => {
   try {
     const player = await playerRepository.updatePassword(
