@@ -31,14 +31,19 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       }}
     >
       <div className="relative mx-auto w-full">
-        <button
-          type="button"
-          aria-label="Close"
-          onClick={() => onOpenChange(false)}
-          className="absolute -top-10 right-4 z-10 flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-50"
-        >
-          ×
-        </button>
+        <div className="pointer-events-none absolute inset-x-0 -top-10 z-20 flex justify-end px-4">
+          <button
+            type="button"
+            aria-label="Close"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={() => onOpenChange(false)}
+            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-50"
+          >
+            ×
+          </button>
+        </div>
         <section
           role="dialog"
           aria-label={ariaLabel}

@@ -322,6 +322,7 @@ interface CreateMatchDrawerBodyProps {
   onCancel: () => void;
   onQrScannerOpenChange?: (isOpen: boolean) => void;
   isOnline?: boolean;
+  closeQrScannerRequestKey?: number;
 }
 
 const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
@@ -329,6 +330,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   onCancel,
   onQrScannerOpenChange,
   isOnline = true,
+  closeQrScannerRequestKey = 0,
 }) => {
   const { player, token } = useAuth();
   const [, setMatchMemberCandidates] = useState<MatchMember[]>([]);
@@ -357,6 +359,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const lastScannedPayloadRef = useRef<string | null>(null);
   const selectedMatchMembersRef = useRef<MatchMember[]>(selectedMatchMembers);
+  const lastHandledCloseQrScannerRequestKeyRef = useRef(0);
   const currentPlayerMember = useMemo(
     () => normalizeMatchMember(player),
     [player],
@@ -472,8 +475,17 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     scannerControlsRef.current?.stop();
     scannerControlsRef.current = null;
 
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+    const video = videoRef.current;
+    if (video) {
+      const stream = video.srcObject;
+      if (stream instanceof MediaStream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+
+      video.pause();
+      video.srcObject = null;
+      video.removeAttribute("src");
+      video.load();
     }
   }, []);
 
@@ -644,6 +656,19 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     [onQrScannerOpenChange],
   );
 
+  useEffect(() => {
+    if (
+      !closeQrScannerRequestKey ||
+      !isQrScannerOpen ||
+      closeQrScannerRequestKey === lastHandledCloseQrScannerRequestKeyRef.current
+    ) {
+      return;
+    }
+
+    lastHandledCloseQrScannerRequestKeyRef.current = closeQrScannerRequestKey;
+    closeQrScanner();
+  }, [closeQrScanner, closeQrScannerRequestKey, isQrScannerOpen]);
+
   const handleAddMatchMemberByQr = () => {
     if (!token) {
       return;
@@ -653,6 +678,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return;
     }
 
+    stopQrScanner();
     onQrScannerOpenChange?.(true);
     setIsQrScannerOpen(true);
     setQrScannerStatus("scanning");
@@ -843,32 +869,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 return (
                   <div
                     key={member.id}
-                    role={interactive ? "button" : undefined}
-                    tabIndex={interactive && isClickable ? 0 : undefined}
-                    onClick={
-                      interactive && isClickable
-                        ? () => handleTeamMemberPress(member)
-                        : undefined
-                    }
-                    onKeyDown={
-                      interactive && isClickable
-                        ? (event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              handleTeamMemberPress(member);
-                            }
-                          }
-                        : undefined
-                    }
-                    className={`w-fit rounded-full transition ${
-                      isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""
-                    } ${
-                      interactive && selectedSwapMemberId && !isSelected && !isSwappable
-                        ? "cursor-not-allowed opacity-35"
-                        : interactive
-                          ? "cursor-pointer opacity-100"
-                          : "cursor-default opacity-100"
-                    }`}
+                    className="w-fit max-w-full rounded-full"
                   >
                     <UserChip
                       player={member}
@@ -876,6 +877,20 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                         isMe ? undefined : () => handleRemoveMatchMember(member.id)
                       }
                       isMe={isMe}
+                      reserveRemoveSlot={isMe}
+                      onPress={
+                        interactive && isClickable
+                          ? () => handleTeamMemberPress(member)
+                          : undefined
+                      }
+                      isPressable={interactive}
+                      isSelected={isSelected}
+                      isDisabled={
+                        interactive &&
+                        !!selectedSwapMemberId &&
+                        !isSelected &&
+                        !isSwappable
+                      }
                     />
                   </div>
                 );
@@ -902,9 +917,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         {renderTeamGrid(false)}
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-border bg-slate-950">
+      <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-slate-950">
         {qrScannerStatus === "scanning" ? (
-          <div className="relative">
+          <div className="absolute inset-0">
             <video
               ref={videoRef}
               autoPlay
@@ -923,7 +938,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         ) : null}
 
         {qrScannerStatus === "verifying" ? (
-          <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-white px-5 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white px-5 text-center">
             <div className="size-10 animate-spin rounded-full border-[3px] border-[#409eff]/20 border-t-[#409eff]" />
             <p className="bs-text-title text-amber-950">
               QR 코드를 확인 중입니다...
@@ -932,7 +947,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         ) : null}
 
         {qrScannerStatus === "confirm" && pendingQrMember ? (
-          <div className="flex aspect-square w-full flex-col items-center justify-center gap-4 bg-white px-5 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white px-5 text-center">
             <div className="flex w-full max-w-[180px] min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center shadow-sm ring-1 ring-border">
               <Avatar
                 size="sm"
@@ -968,7 +983,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         ) : null}
 
         {qrScannerStatus === "error" ? (
-          <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 bg-white px-5 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white px-5 text-center">
             <div className="bs-text-caption rounded-full bg-error/10 px-3 py-1 font-bold text-error">
               스캔 실패
             </div>
@@ -1063,10 +1078,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 </>
               ) : (
                 <>
-                  {renderTeamGrid(false)}
-                  <p className="bs-text-body text-error">
+                  <p className="bs-text-caption text-error">
                     멤버 2명 또는 4명이 필요해요.
                   </p>
+                  {renderTeamGrid(false)}
                 </>
               )}
             </section>

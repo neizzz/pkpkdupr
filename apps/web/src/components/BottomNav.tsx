@@ -93,6 +93,8 @@ const BottomNav: React.FC = () => {
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrRemainingSeconds, setQrRemainingSeconds] = useState(0);
+  const [createMatchQrScannerCloseRequestKey, setCreateMatchQrScannerCloseRequestKey] =
+    useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const selectedTabRef = useRef<TabKey>(selectedTab);
   const depthEntriesRef = useRef<Record<TabKey, TabDepthEntry[]>>({
@@ -368,6 +370,7 @@ const BottomNav: React.FC = () => {
       }
 
       if (isCreateMatchQrScannerOpenRef.current) {
+        setCreateMatchQrScannerCloseRequestKey((prev) => prev + 1);
         return;
       }
 
@@ -756,6 +759,7 @@ const BottomNav: React.FC = () => {
             onCancel={handleCancelCreateMatch}
             onQrScannerOpenChange={handleCreateMatchQrScannerOpenChange}
             isOnline={isOnline}
+            closeQrScannerRequestKey={createMatchQrScannerCloseRequestKey}
           />
         </BottomSheet>
       </Tabs>

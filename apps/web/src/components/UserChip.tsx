@@ -10,6 +10,11 @@ interface UserChipProps {
   removeLabel?: string;
   isMe?: boolean;
   endAdornment?: React.ReactNode;
+  reserveRemoveSlot?: boolean;
+  onPress?: () => void;
+  isPressable?: boolean;
+  isSelected?: boolean;
+  isDisabled?: boolean;
 }
 
 const UserChip: React.FC<UserChipProps> = ({
@@ -18,6 +23,11 @@ const UserChip: React.FC<UserChipProps> = ({
   removeLabel,
   isMe = false,
   endAdornment,
+  reserveRemoveSlot = false,
+  onPress,
+  isPressable = false,
+  isSelected = false,
+  isDisabled = false,
 }) => {
   const genderBgClass =
     player.gender === "M"
@@ -27,43 +37,77 @@ const UserChip: React.FC<UserChipProps> = ({
     player.gender === "M"
       ? "border-1 border-[#409eff]/15 shadow-[0_0_0_1px_rgba(64,158,255,0.16)]"
       : "border-1 border-[#f8626c]/15 shadow-[0_0_0_1px_rgba(248,98,108,0.16)]";
+  const shouldReserveRemoveSlot = !!onRemove || reserveRemoveSlot;
+  const canPress = isPressable && !isDisabled && !!onPress;
 
   return (
-    <Chip
-      variant="secondary"
-      className={`relative h-6 w-30 overflow-hidden rounded-full px-0 ${onRemove ? "pr-1" : "pr-3"} shadow-none ${genderBgClass}`}
+    <div
+      className={
+        shouldReserveRemoveSlot
+          ? "grid min-w-0 max-w-full grid-cols-[minmax(0,7.5rem)_auto] items-center gap-1"
+          : "flex min-w-0 max-w-full items-center gap-1"
+      }
     >
-      <div className="flex min-w-0 max-w-full items-center gap-1">
-        <Avatar
-          size="xs"
-          avatarUrl={player.avatarUrl}
-          name={player.username}
-          className={`bg-white/80 ${genderAvatarClass}`}
-          isMe={isMe}
-        />
-        <span className="min-w-0 truncate text-sm font-medium text-current">
-          {player.username}
-        </span>
-        {endAdornment ? (
-          <span className="absolute right-[6px] shrink-0 leading-none">
-            {endAdornment}
+      <Chip
+        variant="secondary"
+        role={isPressable ? "button" : undefined}
+        tabIndex={isPressable ? 0 : undefined}
+        onClick={canPress ? onPress : undefined}
+        onKeyDown={
+          canPress
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onPress();
+                }
+              }
+            : undefined
+        }
+        className={`relative h-6 min-w-0 max-w-full overflow-hidden rounded-full px-0 transition ${shouldReserveRemoveSlot ? "w-full pr-2" : "w-30 pr-3"} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+      >
+        <div className="flex min-w-0 max-w-full items-center gap-1">
+          <Avatar
+            size="xs"
+            avatarUrl={player.avatarUrl}
+            name={player.username}
+            className={`bg-white/80 ${genderAvatarClass}`}
+            isMe={isMe}
+          />
+          <span className="min-w-0 truncate text-sm font-medium text-current">
+            {player.username}
           </span>
-        ) : null}
-        {onRemove ? (
-          <button
-            type="button"
-            aria-label={removeLabel ?? `${player.username} 제거`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onRemove();
-            }}
-            className="ml-0.5 shrink-0 rounded-full p-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
-          >
-            <IoClose className="size-3.5" />
-          </button>
-        ) : null}
-      </div>
-    </Chip>
+          {endAdornment ? (
+            <span className="absolute right-[6px] shrink-0 leading-none">
+              {endAdornment}
+            </span>
+          ) : null}
+        </div>
+      </Chip>
+      {onRemove ? (
+        <button
+          type="button"
+          aria-label={removeLabel ?? `${player.username} 제거`}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+          className="shrink-0 rounded-full p-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
+        >
+          <IoClose className="size-3.5" />
+        </button>
+      ) : reserveRemoveSlot ? (
+        <span
+          aria-hidden="true"
+          className="invisible shrink-0 rounded-full p-0.5 text-current/70"
+        >
+          <IoClose className="size-3.5" />
+        </span>
+      ) : null}
+    </div>
   );
 };
 
