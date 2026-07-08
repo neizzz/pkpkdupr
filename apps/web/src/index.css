@@ -121,9 +121,7 @@
   }
 
   .app-safe-bottom-pad {
-    padding-bottom: calc(
-      1.5rem + max(env(safe-area-inset-bottom), var(--app-bottom-offset))
-    );
+    padding-bottom: max(env(safe-area-inset-bottom), var(--app-bottom-offset));
   }
 
   .app-fixed-bottom {

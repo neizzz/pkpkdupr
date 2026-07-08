@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button, Drawer } from "@heroui/react";
+import { Button, Drawer, Radio, RadioGroup, Separator } from "@heroui/react";
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type {
@@ -15,13 +15,9 @@ import type {
 } from "@pkpkdupr/shared/match";
 import {
   DEFAULT_MATCH_MODE,
-  doublesMatchTypeValues,
   getMatchTopLevelType,
   isSinglesMatchType,
   matchModeLabels,
-  matchTopLevelTypeLabels,
-  matchTypeLabels,
-  singlesMatchTypeValues,
 } from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
@@ -132,19 +128,44 @@ const resolveDefaultMatchType = (
   return "unrestricted-doubles";
 };
 
-const getSelectableMatchTypes = (topLevelType: MatchTopLevelType | null) => {
-  if (topLevelType === "singles") {
-    return singlesMatchTypeValues;
+const createEmptyTeams = (): MatchTeams => [[], []];
+
+const buildPreviewTeams = (
+  members: MatchMember[],
+  teams: MatchTeams,
+  matchType: MatchType | null,
+): MatchTeams => {
+  if (matchType) {
+    return teams;
   }
 
-  if (topLevelType === "doubles") {
-    return doublesMatchTypeValues;
+  if (members.length <= 1) {
+    return [[members[0]].filter((member): member is MatchMember => !!member), []];
   }
 
-  return [];
+  if (members.length === 2) {
+    return [
+      [members[0]].filter((member): member is MatchMember => !!member),
+      [members[1]].filter((member): member is MatchMember => !!member),
+    ];
+  }
+
+  return [
+    [members[0], members[1]].filter((member): member is MatchMember => !!member),
+    [members[2], members[3]].filter((member): member is MatchMember => !!member),
+  ];
 };
 
-const createEmptyTeams = (): MatchTeams => [[], []];
+const getPreviewTeamSlotCount = (
+  members: MatchMember[],
+  matchType: MatchType | null,
+) => {
+  if (matchType) {
+    return isSinglesMatchType(matchType) ? 1 : 2;
+  }
+
+  return members.length >= 3 ? 2 : 1;
+};
 
 const buildInitialTeams = (
   members: MatchMember[],
@@ -347,6 +368,14 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const canCreateMatch =
     isOnline && !!selectedMatchType && areTeamsValid(teams, selectedMatchType);
   const canAddMatchMember = isOnline && !!token && selectedMatchMembers.length < 4;
+  const previewTeams = useMemo(
+    () => buildPreviewTeams(selectedMatchMembers, teams, selectedMatchType),
+    [selectedMatchMembers, selectedMatchType, teams],
+  );
+  const previewTeamSlotCount = useMemo(
+    () => getPreviewTeamSlotCount(selectedMatchMembers, selectedMatchType),
+    [selectedMatchMembers, selectedMatchType],
+  );
 
   useEffect(() => {
     let isCancelled = false;
@@ -661,14 +690,19 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return;
     }
 
-    selectedMatchMembersRef.current = [
-      ...selectedMatchMembersRef.current,
-      nextMember,
-    ];
-    setSelectedMatchMembers((prev) => [...prev, nextMember]);
+    const nextMembers = [...selectedMatchMembersRef.current, nextMember];
+
+    selectedMatchMembersRef.current = nextMembers;
+    setSelectedMatchMembers(nextMembers);
     setMatchMemberCandidates((prev) =>
       mergeUniqueMembers([...prev, nextMember]),
     );
+
+    if (nextMembers.length >= 4) {
+      closeQrScanner();
+      return;
+    }
+
     handleRetryQrScan();
   };
 
@@ -754,7 +788,6 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          type: selectedMatchType,
           mode: selectedMatchMode,
           teams: teams.map((team, teamIndex) => ({
             name: `Team ${teamIndex === 0 ? "A" : "B"}`,
@@ -780,32 +813,93 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     }
   };
 
+  const renderTeamGrid = (interactive: boolean) => (
+    <div className="grid grid-cols-2 gap-3">
+      {previewTeams.map((team, teamIndex) => {
+        const typedTeamIndex = teamIndex as TeamIndex;
+        const emptySlotCount = Math.max(0, previewTeamSlotCount - team.length);
+
+        return (
+          <div
+            key={typedTeamIndex}
+            className="rounded-2xl border border-border bg-white px-3 py-3"
+          >
+            <p className="bs-text-caption font-semibold uppercase tracking-wide text-amber-700/70">
+              Team {typedTeamIndex === 0 ? "A" : "B"}
+            </p>
+            <div className="mt-2 flex flex-col gap-2">
+              {team.map((member) => {
+                const isSelected = selectedSwapMemberId === member.id;
+                const isSwappable = canSwapMembers(
+                  teams,
+                  selectedMatchType,
+                  selectedSwapMemberId,
+                  member,
+                );
+                const isClickable =
+                  !selectedSwapMemberId || isSelected || isSwappable;
+                const isMe = member.id === currentPlayerMember?.id;
+
+                return (
+                  <div
+                    key={member.id}
+                    role={interactive ? "button" : undefined}
+                    tabIndex={interactive && isClickable ? 0 : undefined}
+                    onClick={
+                      interactive && isClickable
+                        ? () => handleTeamMemberPress(member)
+                        : undefined
+                    }
+                    onKeyDown={
+                      interactive && isClickable
+                        ? (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              handleTeamMemberPress(member);
+                            }
+                          }
+                        : undefined
+                    }
+                    className={`w-fit rounded-full transition ${
+                      isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""
+                    } ${
+                      interactive && selectedSwapMemberId && !isSelected && !isSwappable
+                        ? "cursor-not-allowed opacity-35"
+                        : interactive
+                          ? "cursor-pointer opacity-100"
+                          : "cursor-default opacity-100"
+                    }`}
+                  >
+                    <UserChip
+                      player={member}
+                      onRemove={
+                        isMe ? undefined : () => handleRemoveMatchMember(member.id)
+                      }
+                      isMe={isMe}
+                    />
+                  </div>
+                );
+              })}
+              {Array.from({ length: emptySlotCount }).map((_, emptyIndex) => (
+                <div
+                  key={`empty-${typedTeamIndex}-${emptyIndex}`}
+                  className="flex h-6 w-30 items-center rounded-full border border-dashed border-border bg-slate-50 px-3 text-sm text-slate-400"
+                >
+                  빈 자리
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const qrScannerPanel = (
     <div className="mt-6 flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <p className="bs-text-title text-amber-950">현재 멤버</p>
-        <div className="flex flex-wrap items-center gap-2">
-          {selectedMatchMembers.length > 0 ? (
-            selectedMatchMembers.map((member) => {
-              const isMe = member.id === currentPlayerMember?.id;
-
-              return (
-                <UserChip
-                  key={member.id}
-                  player={member}
-                  onRemove={
-                    isMe ? undefined : () => handleRemoveMatchMember(member.id)
-                  }
-                  isMe={isMe}
-                />
-              );
-            })
-          ) : (
-            <p className="bs-text-body text-amber-700/70">
-              아직 추가된 멤버가 없어요.
-            </p>
-          )}
-        </div>
+        <p className="bs-text-title text-amber-950">팀 구성</p>
+        {renderTeamGrid(false)}
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-border bg-slate-950">
@@ -940,7 +1034,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             <section className="flex flex-col gap-2">
               <div className="relative flex items-start justify-between gap-3 mt-8">
                 <div>
-                  <p className="bs-text-title text-amber-950">멤버</p>
+                  <p className="bs-text-title text-amber-950">팀 구성</p>
                 </div>
                 <button
                   type="button"
@@ -958,208 +1052,101 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 </button>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {selectedMatchMembers.length > 0 ? (
-                  selectedMatchMembers.map((member) => {
-                    const isMe = member.id === currentPlayerMember?.id;
-
-                    return (
-                      <UserChip
-                        key={member.id}
-                        player={member}
-                        onRemove={
-                          isMe
-                            ? undefined
-                            : () => handleRemoveMatchMember(member.id)
-                        }
-                        isMe={isMe}
-                      />
-                    );
-                  })
-                ) : (
-                  <p className="bs-text-body text-amber-700/70">
-                    아직 추가된 멤버가 없어요.
-                  </p>
-                )}
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-2">
-              <p className="bs-text-title text-amber-950">매치 타입</p>
-              {selectedMatchTopLevelType ? (
-                <div className="flex flex-col gap-2">
-                  <div className="bs-text-title rounded-2xl border border-[#409eff] bg-[#409eff]/10 px-3 py-2 text-[#409eff]">
-                    {matchTopLevelTypeLabels[selectedMatchTopLevelType]}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {getSelectableMatchTypes(selectedMatchTopLevelType).map(
-                      (matchType) => {
-                        const isSelected = selectedMatchType === matchType;
-
-                        return (
-                          <button
-                            key={matchType}
-                            type="button"
-                            onClick={() => setSelectedMatchType(matchType)}
-                            className={`rounded-2xl border px-3 py-3 text-left transition ${
-                              isSelected
-                                ? "border-[#409eff] bg-[#409eff]/10 text-[#409eff]"
-                                : "border-border bg-white text-amber-950"
-                            }`}
-                          >
-                            <p className="bs-text-title">
-                              {matchTypeLabels[matchType]}
-                            </p>
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <p className="bs-text-body text-error">
-                  멤버 2명 또는 4명이 필요해요.
-                </p>
-              )}
-            </section>
-
-            <section className="flex flex-col gap-2">
-              <p className="bs-text-title text-amber-950">경기 모드</p>
-              <div className="grid grid-cols-2 gap-2">
-                {(["single-game", "best-of-3"] as const).map((mode) => {
-                  const isSelected = selectedMatchMode === mode;
-
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setSelectedMatchMode(mode)}
-                      className={`rounded-2xl border px-3 py-3 text-left transition ${
-                        isSelected
-                          ? "border-[#409eff] bg-[#409eff]/10 text-[#409eff]"
-                          : "border-border bg-white text-amber-950"
-                      }`}
-                    >
-                      <p className="bs-text-title">{matchModeLabels[mode]}</p>
-                      <p className="bs-text-caption mt-1 text-current/70">
-                        {mode === "single-game"
-                          ? "1게임으로 종료"
-                          : "2게임을 먼저 이기면 종료"}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-2">
               {selectedMatchType ? (
-                <div className="flex items-center justify-between gap-3">
-                  <p className="bs-text-title text-amber-950">팀 구성</p>
-                  {selectedSwapMemberId ? (
-                    <p className="bs-text-caption text-amber-700/70">
-                      교체할 상대 팀 멤버를 선택하세요.
-                    </p>
-                  ) : (
-                    <p className="bs-text-caption text-amber-700/70">
-                      멤버를 탭해서 팀을 교체할 수 있어요.
-                    </p>
-                  )}
-                </div>
+                <>
+                  <p className="bs-text-caption text-amber-700/70">
+                    {selectedSwapMemberId
+                      ? "교체할 상대 팀 멤버를 선택하세요."
+                      : "멤버를 탭해서 팀을 교체할 수 있어요."}
+                  </p>
+                  {renderTeamGrid(true)}
+                </>
               ) : (
                 <>
-                  <p className="bs-text-title text-amber-950">팀 구성</p>
+                  {renderTeamGrid(false)}
                   <p className="bs-text-body text-error">
                     멤버 2명 또는 4명이 필요해요.
                   </p>
                 </>
               )}
+            </section>
 
-              {selectedMatchType ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {teams.map((team, teamIndex) => {
-                    const typedTeamIndex = teamIndex as TeamIndex;
-
-                    return (
-                      <div
-                        key={typedTeamIndex}
-                        className="rounded-2xl border border-border bg-white px-3 py-3"
+            <section className="flex flex-col gap-2">
+              <p className="bs-text-title text-amber-950">경기 모드</p>
+              <RadioGroup
+                aria-label="경기 모드"
+                value={selectedMatchMode}
+                onChange={(value) => setSelectedMatchMode(value as MatchMode)}
+                orientation="horizontal"
+                className="flex gap-5"
+              >
+                {(["single-game", "best-of-3"] as const).map((mode) => (
+                  <Radio key={mode} value={mode}>
+                    <div
+                      onClick={() => setSelectedMatchMode(mode)}
+                      className="cursor-pointer"
+                    >
+                      <Radio.Content
+                        className="flex select-none items-center gap-2 py-1"
                       >
-                        <p className="bs-text-caption font-semibold uppercase tracking-wide text-amber-700/70">
-                          Team {typedTeamIndex === 0 ? "A" : "B"}
-                        </p>
-                        <div className="mt-2 flex flex-col gap-2">
-                          {team.map((member) => {
-                            const isSelected =
-                              selectedSwapMemberId === member.id;
-                            const isSwappable = canSwapMembers(
-                              teams,
-                              selectedMatchType,
-                              selectedSwapMemberId,
-                              member,
-                            );
-                            const isClickable =
-                              !selectedSwapMemberId ||
-                              isSelected ||
-                              isSwappable;
-
-                            return (
-                              <button
-                                key={member.id}
-                                type="button"
-                                disabled={!isClickable}
-                                onClick={() => handleTeamMemberPress(member)}
-                                className={`w-fit rounded-full transition ${
+                        <Radio.Control className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
+                          <Radio.Indicator className="flex size-full items-center justify-center">
+                            {({ isSelected }) => (
+                              <span
+                                className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
                                   isSelected
-                                    ? "ring-2 ring-[#409eff] ring-offset-2"
-                                    : ""
-                                } ${
-                                  selectedSwapMemberId &&
-                                  !isSelected &&
-                                  !isSwappable
-                                    ? "cursor-not-allowed opacity-35"
-                                    : "cursor-pointer opacity-100"
+                                    ? "scale-100 opacity-100"
+                                    : "scale-0 opacity-0"
                                 }`}
-                              >
-                                <UserChip
-                                  player={member}
-                                  isMe={member.id === player?.id}
-                                />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
+                              />
+                            )}
+                          </Radio.Indicator>
+                        </Radio.Control>
+                        <span
+                          className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
+                            selectedMatchMode === mode
+                              ? "opacity-100"
+                              : "opacity-45"
+                          }`}
+                        >
+                          {matchModeLabels[mode]}
+                        </span>
+                      </Radio.Content>
+                    </div>
+                  </Radio>
+                ))}
+              </RadioGroup>
             </section>
           </>
         )}
       </Drawer.Body>
       {!isQrScannerOpen ? (
-        <Drawer.Footer className="flex flex-col gap-2 px-5 pt-0">
-          {createMatchError ? (
-            <p className="bs-text-body text-error">{createMatchError}</p>
-          ) : null}
-          <div className="grid w-full grid-cols-3 gap-2">
-            <Button
-              className="w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
-              isDisabled={isCreatingMatch}
-              onPress={onCancel}
-            >
-              취소
-            </Button>
-            <Button
-              className="col-span-2 w-full rounded-2xl bg-[#409eff] py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
-              isDisabled={!canCreateMatch || isCreatingMatch}
-              onPress={handleCreateMatchPress}
-            >
-              {!isOnline ? "온라인 연결 필요" : isCreatingMatch ? "생성 중..." : "매치 생성"}
-            </Button>
+        <>
+          <div className="px-5">
+            <Separator />
           </div>
-        </Drawer.Footer>
+          <Drawer.Footer className="flex flex-col gap-2 px-5 pt-3">
+            {createMatchError ? (
+              <p className="bs-text-body text-error">{createMatchError}</p>
+            ) : null}
+            <div className="grid w-full grid-cols-3 gap-2">
+              <Button
+                className="w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
+                isDisabled={isCreatingMatch}
+                onPress={onCancel}
+              >
+                취소
+              </Button>
+              <Button
+                className="col-span-2 w-full rounded-2xl bg-[#409eff] py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+                isDisabled={!canCreateMatch || isCreatingMatch}
+                onPress={handleCreateMatchPress}
+              >
+                {!isOnline ? "온라인 연결 필요" : isCreatingMatch ? "생성 중..." : "매치 생성"}
+              </Button>
+            </div>
+          </Drawer.Footer>
+        </>
       ) : null}
     </>
   );
