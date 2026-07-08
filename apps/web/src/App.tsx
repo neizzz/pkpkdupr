@@ -198,7 +198,7 @@ function App() {
         className={
           isFullWidthDevPage
             ? "app-shell-height w-full min-w-0 overflow-y-auto overflow-x-hidden"
-            : "app-shell-height w-full min-w-0 max-w-[430px] overflow-hidden bg-white shadow-lg"
+            : "app-shell-height w-full min-w-0 max-w-[430px] overflow-hidden bg-white shadow-none min-[431px]:shadow-lg"
         }
       >
         <AppUpdateProvider>
