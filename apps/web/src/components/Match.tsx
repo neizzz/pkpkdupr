@@ -15,6 +15,7 @@ import {
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import UserChip from "@/components/UserChip";
+import { formatRating, getDisplayRatingForMatchType } from "@/utils/dupr";
 
 export type MatchInfo = Omit<
   SharedMatch,
@@ -128,6 +129,28 @@ const Match: React.FC<MatchProps> = ({
     getTeamSetScore(match.scores, 0),
     getTeamSetScore(match.scores, 1),
   ] as const;
+  const teamDuprSums = useMemo(
+    () =>
+      match.teams.map((team) => {
+        let total = 0;
+
+        for (const player of team.players) {
+          const rating = getDisplayRatingForMatchType(
+            match.type,
+            player.duprRating,
+          );
+
+          if (rating == null) {
+            return null;
+          }
+
+          total += rating;
+        }
+
+        return total;
+      }),
+    [match.teams, match.type],
+  );
   const canSubmitResult =
     (match.status === "created" || match.status === "pending-approval") &&
     isCreator &&
@@ -138,10 +161,12 @@ const Match: React.FC<MatchProps> = ({
     [match.approvals],
   );
   const participantIds = useMemo(
-    () => match.teams.flatMap((team) => team.players.map((player) => player.id)),
+    () =>
+      match.teams.flatMap((team) => team.players.map((player) => player.id)),
     [match.teams],
   );
-  const hasApproved = !!currentPlayerId && approvedPlayerIds.has(currentPlayerId);
+  const hasApproved =
+    !!currentPlayerId && approvedPlayerIds.has(currentPlayerId);
   const canApproveResult =
     isPendingApprovalMatch &&
     isMyMatch &&
@@ -266,7 +291,9 @@ const Match: React.FC<MatchProps> = ({
             <p className="text-lg font-semibold text-amber-950">
               {matchTopLevelTypeLabels[getMatchTopLevelType(match.type)]}
             </p>
-            <span className={`${titleChipClassName} bg-amber-100 text-amber-800`}>
+            <span
+              className={`${titleChipClassName} bg-amber-100 text-amber-800`}
+            >
               {matchModeLabels[match.mode]}
             </span>
             <span
@@ -275,7 +302,9 @@ const Match: React.FC<MatchProps> = ({
               {statusLabelMap[match.status]}
             </span>
             {match.source === "admin_created_result" ? (
-              <span className={`${titleChipClassName} bg-indigo-100 text-indigo-700`}>
+              <span
+                className={`${titleChipClassName} bg-indigo-100 text-indigo-700`}
+              >
                 {matchSourceLabels[match.source]}
               </span>
             ) : null}
@@ -297,9 +326,7 @@ const Match: React.FC<MatchProps> = ({
       </div>
 
       <div className="mt-3">
-        <div
-          className={`relative ${hasResultScores ? "h-10" : ""}`}
-        >
+        <div className={`relative ${hasResultScores ? "h-10" : ""}`}>
           <div className="grid h-full grid-cols-2 items-center gap-3">
             <p
               className={`text-center text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
@@ -325,6 +352,17 @@ const Match: React.FC<MatchProps> = ({
               </span>
             </div>
           ) : null}
+        </div>
+
+        <div className="-mt-1 grid grid-cols-2 items-center gap-3">
+          {teamDuprSums.map((teamDuprSum, index) => (
+            <p
+              key={match.teams[index]?.id ?? index}
+              className="text-center text-xs font-medium tabular-nums text-[#888] underline decoration-current underline-offset-2"
+            >
+              {formatRating(teamDuprSum)}
+            </p>
+          ))}
         </div>
 
         <div className="mt-2 grid grid-cols-2 justify-items-center gap-3">
@@ -356,7 +394,9 @@ const Match: React.FC<MatchProps> = ({
         <button
           type="button"
           className={`mt-1 w-full rounded-2xl bg-amber-50 px-3 py-3 text-left ${
-            canSubmitResult ? "cursor-pointer transition-colors hover:bg-amber-100/70" : ""
+            canSubmitResult
+              ? "cursor-pointer transition-colors hover:bg-amber-100/70"
+              : ""
           }`}
           onClick={() => {
             if (canSubmitResult) {
@@ -386,7 +426,9 @@ const Match: React.FC<MatchProps> = ({
                   {isResultFormOpen ? "닫기" : "수정"}
                 </span>
               ) : hasApproved ? (
-                <span className="font-semibold text-emerald-600">승인 완료</span>
+                <span className="font-semibold text-emerald-600">
+                  승인 완료
+                </span>
               ) : null}
             </div>
           ) : null}
