@@ -1,10 +1,10 @@
-name: build-and-push-images
+name: deploy
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "배포할 이미지 태그. 비워두면 현재 commit SHA를 사용합니다."
+        description: "배포할 이미지 태그. 비워두면 현재 commit의 8자리 SHA를 사용합니다."
         required: false
         type: string
       git_ref:
@@ -34,10 +34,11 @@ jobs:
       - name: Resolve image tag and manual deploy defaults
         run: |
           if [ -n "${{ inputs.image_tag }}" ]; then
-            echo "IMAGE_TAG=${{ inputs.image_tag }}" >> "$GITHUB_ENV"
+            IMAGE_TAG="${{ inputs.image_tag }}"
           else
-            echo "IMAGE_TAG=${GITHUB_SHA}" >> "$GITHUB_ENV"
+            IMAGE_TAG="$(git rev-parse --short=8 HEAD)"
           fi
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
           if [ -n "${{ secrets.DEPLOY_PORT }}" ]; then
             echo "DEPLOY_PORT=${{ secrets.DEPLOY_PORT }}" >> "$GITHUB_ENV"
           else
