@@ -5,35 +5,50 @@ export type PlayerCreationSource =
   | "admin_register"
   | "bootstrap";
 
+export interface PlayerDuprSingles {
+  standard: number;
+  unrestricted: number;
+}
+
 export interface PlayerDuprDoubles {
   mixed: number;
   men: number;
   women: number;
+  unrestricted: number;
 }
 
 export interface PlayerDupr {
   total: number;
   doubles: PlayerDuprDoubles;
-  singles: number;
+  singles: PlayerDuprSingles;
 }
 
+export type PlayerDuprSinglesKey = keyof PlayerDuprSingles;
 export type PlayerDuprDoublesKey = keyof PlayerDuprDoubles;
-export type PlayerDuprCategory = "singles" | `doubles.${PlayerDuprDoublesKey}`;
+export type PlayerDuprCategory =
+  | `singles.${PlayerDuprSinglesKey}`
+  | `doubles.${PlayerDuprDoublesKey}`;
 
 export interface PlayerDuprMetric {
   confidence: number;
   accuracy: number | null;
 }
 
+export interface PlayerDuprMetricsSingles {
+  standard: PlayerDuprMetric;
+  unrestricted: PlayerDuprMetric;
+}
+
 export interface PlayerDuprMetricsDoubles {
   mixed: PlayerDuprMetric;
   men: PlayerDuprMetric;
   women: PlayerDuprMetric;
+  unrestricted: PlayerDuprMetric;
 }
 
 export interface PlayerDuprMetrics {
   doubles: PlayerDuprMetricsDoubles;
-  singles: PlayerDuprMetric;
+  singles: PlayerDuprMetricsSingles;
 }
 
 export interface StoredPlayerDupr {
@@ -47,17 +62,17 @@ export interface OfficialDuprAdjustmentLog {
   changedByPlayerId: string;
   changedByUsername: string;
   ratings: Partial<{
-    singles: number;
+    singles: Partial<PlayerDuprSingles>;
     doubles: Partial<PlayerDuprDoubles>;
   }>;
   confidence: Partial<{
-    singles: number;
+    singles: Partial<Record<PlayerDuprSinglesKey, number>>;
     doubles: Partial<Record<PlayerDuprDoublesKey, number>>;
   }>;
   previousRating: PlayerDupr;
   nextRating: PlayerDupr;
   preUpdateAccuracy: Partial<{
-    singles: number | null;
+    singles: Partial<Record<PlayerDuprSinglesKey, number | null>>;
     doubles: Partial<Record<PlayerDuprDoublesKey, number | null>>;
   }>;
   reason: string | null;
@@ -99,6 +114,11 @@ export const DUPR_MAX_RATING = 8;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+const average = (values: number[]) =>
+  values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : 0;
 
 export const roundDuprRating = (value: number) =>
   Math.round(value * 1000) / 1000;
@@ -146,6 +166,38 @@ const normalizeMetricValue = (
   };
 };
 
+export const getCompositeSinglesRating = (
+  duprRating?: PlayerDupr | null,
+): number | null => {
+  if (!duprRating) {
+    return null;
+  }
+
+  return roundDuprRating(
+    average([
+      duprRating.singles.standard,
+      duprRating.singles.unrestricted,
+    ]),
+  );
+};
+
+export const getCompositeDoublesRating = (
+  duprRating?: PlayerDupr | null,
+): number | null => {
+  if (!duprRating) {
+    return null;
+  }
+
+  return roundDuprRating(
+    average([
+      duprRating.doubles.mixed,
+      duprRating.doubles.men,
+      duprRating.doubles.women,
+      duprRating.doubles.unrestricted,
+    ]),
+  );
+};
+
 export const createDefaultPlayerDuprMetrics = (
   confidence = 0,
   accuracy: number | null = null,
@@ -154,17 +206,22 @@ export const createDefaultPlayerDuprMetrics = (
     mixed: { confidence, accuracy },
     men: { confidence, accuracy },
     women: { confidence, accuracy },
+    unrestricted: { confidence, accuracy },
   },
-  singles: { confidence, accuracy },
+  singles: {
+    standard: { confidence, accuracy },
+    unrestricted: { confidence, accuracy },
+  },
 });
 
 export const computeTotalDuprRating = (rating: Omit<PlayerDupr, "total">) =>
   roundDuprRating(
-    (rating.singles +
-      rating.doubles.mixed +
-      rating.doubles.men +
-      rating.doubles.women) /
-      4,
+    average([
+      getCompositeSinglesRating({ ...rating, total: DUPR_DEFAULT_RATING }) ??
+        DUPR_DEFAULT_RATING,
+      getCompositeDoublesRating({ ...rating, total: DUPR_DEFAULT_RATING }) ??
+        DUPR_DEFAULT_RATING,
+    ]),
   );
 
 export const createDefaultPlayerDupr = (
@@ -176,8 +233,12 @@ export const createDefaultPlayerDupr = (
       mixed: normalizedSeed,
       men: normalizedSeed,
       women: normalizedSeed,
+      unrestricted: normalizedSeed,
     },
-    singles: normalizedSeed,
+    singles: {
+      standard: normalizedSeed,
+      unrestricted: normalizedSeed,
+    },
   };
 
   return {
@@ -188,10 +249,48 @@ export const createDefaultPlayerDupr = (
 
 export const isDefaultPlayerDupr = (rating: PlayerDupr) =>
   rating.total === DUPR_DEFAULT_RATING &&
-  rating.singles === DUPR_DEFAULT_RATING &&
+  rating.singles.standard === DUPR_DEFAULT_RATING &&
+  rating.singles.unrestricted === DUPR_DEFAULT_RATING &&
   rating.doubles.mixed === DUPR_DEFAULT_RATING &&
   rating.doubles.men === DUPR_DEFAULT_RATING &&
-  rating.doubles.women === DUPR_DEFAULT_RATING;
+  rating.doubles.women === DUPR_DEFAULT_RATING &&
+  rating.doubles.unrestricted === DUPR_DEFAULT_RATING;
+
+const normalizeSinglesRating = (
+  value: unknown,
+  fallback: number,
+): PlayerDuprSingles => {
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return {
+      standard: normalizeDuprRatingValue(record.standard ?? fallback),
+      unrestricted: normalizeDuprRatingValue(record.unrestricted ?? fallback),
+    };
+  }
+
+  const normalized = normalizeDuprRatingValue(value ?? fallback);
+  return {
+    standard: normalized,
+    unrestricted: normalized,
+  };
+};
+
+const normalizeDoublesRating = (
+  value: unknown,
+  fallback: number,
+): PlayerDuprDoubles => {
+  const record =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    mixed: normalizeDuprRatingValue(record.mixed ?? fallback),
+    men: normalizeDuprRatingValue(record.men ?? fallback),
+    women: normalizeDuprRatingValue(record.women ?? fallback),
+    unrestricted: normalizeDuprRatingValue(record.unrestricted ?? fallback),
+  };
+};
 
 export const normalizePlayerDupr = (value: unknown): PlayerDupr => {
   if (typeof value === "number" || typeof value === "string") {
@@ -208,17 +307,15 @@ export const normalizePlayerDupr = (value: unknown): PlayerDupr => {
       ? (record.rating as Record<string, unknown>)
       : record;
   const baseTotal = normalizeDuprRatingValue(ratingSource.total);
-  const doubles =
-    ratingSource.doubles && typeof ratingSource.doubles === "object"
-      ? (ratingSource.doubles as Record<string, unknown>)
-      : {};
+  const rawSingles = ratingSource.singles;
+  const rawDoubles = ratingSource.doubles;
+  const legacySinglesSeed =
+    rawSingles && typeof rawSingles === "object"
+      ? baseTotal
+      : normalizeDuprRatingValue(rawSingles ?? baseTotal);
   const rating = {
-    doubles: {
-      mixed: normalizeDuprRatingValue(doubles.mixed ?? baseTotal),
-      men: normalizeDuprRatingValue(doubles.men ?? baseTotal),
-      women: normalizeDuprRatingValue(doubles.women ?? baseTotal),
-    },
-    singles: normalizeDuprRatingValue(ratingSource.singles ?? baseTotal),
+    doubles: normalizeDoublesRating(rawDoubles, baseTotal),
+    singles: normalizeSinglesRating(rawSingles, legacySinglesSeed),
   };
 
   return {
@@ -228,14 +325,56 @@ export const normalizePlayerDupr = (value: unknown): PlayerDupr => {
 };
 
 const isDefaultPlayerDuprMetrics = (metrics: PlayerDuprMetrics) =>
-  metrics.singles.confidence === 0 &&
-  metrics.singles.accuracy == null &&
+  metrics.singles.standard.confidence === 0 &&
+  metrics.singles.standard.accuracy == null &&
+  metrics.singles.unrestricted.confidence === 0 &&
+  metrics.singles.unrestricted.accuracy == null &&
   metrics.doubles.mixed.confidence === 0 &&
   metrics.doubles.mixed.accuracy == null &&
   metrics.doubles.men.confidence === 0 &&
   metrics.doubles.men.accuracy == null &&
   metrics.doubles.women.confidence === 0 &&
-  metrics.doubles.women.accuracy == null;
+  metrics.doubles.women.accuracy == null &&
+  metrics.doubles.unrestricted.confidence === 0 &&
+  metrics.doubles.unrestricted.accuracy == null;
+
+const normalizeSinglesMetrics = (
+  value: unknown,
+  fallback: PlayerDuprMetric = { confidence: 0, accuracy: null },
+): PlayerDuprMetricsSingles => {
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if ("standard" in record || "unrestricted" in record) {
+      return {
+        standard: normalizeMetricValue(record.standard, fallback),
+        unrestricted: normalizeMetricValue(record.unrestricted, fallback),
+      };
+    }
+  }
+
+  const normalized = normalizeMetricValue(value, fallback);
+  return {
+    standard: normalized,
+    unrestricted: normalized,
+  };
+};
+
+const normalizeDoublesMetrics = (
+  value: unknown,
+  fallback: PlayerDuprMetric = { confidence: 0, accuracy: null },
+): PlayerDuprMetricsDoubles => {
+  const record =
+    value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    mixed: normalizeMetricValue(record.mixed, fallback),
+    men: normalizeMetricValue(record.men, fallback),
+    women: normalizeMetricValue(record.women, fallback),
+    unrestricted: normalizeMetricValue(record.unrestricted, fallback),
+  };
+};
 
 export const normalizeStoredPlayerDupr = (value: unknown): StoredPlayerDupr => {
   if (typeof value === "string") {
@@ -273,20 +412,12 @@ export const normalizeStoredPlayerDupr = (value: unknown): StoredPlayerDupr => {
     record.metrics && typeof record.metrics === "object"
       ? (record.metrics as Record<string, unknown>)
       : {};
-  const doubles =
-    metricsSource.doubles && typeof metricsSource.doubles === "object"
-      ? (metricsSource.doubles as Record<string, unknown>)
-      : {};
 
   return {
     rating,
     metrics: {
-      doubles: {
-        mixed: normalizeMetricValue(doubles.mixed),
-        men: normalizeMetricValue(doubles.men),
-        women: normalizeMetricValue(doubles.women),
-      },
-      singles: normalizeMetricValue(metricsSource.singles),
+      doubles: normalizeDoublesMetrics(metricsSource.doubles),
+      singles: normalizeSinglesMetrics(metricsSource.singles),
     },
   };
 };
@@ -321,10 +452,16 @@ export const getDuprRatingByCategory = (
   rating: PlayerDupr,
   category: PlayerDuprCategory,
 ) => {
-  if (category === "singles") {
-    return rating.singles;
+  const [group, key] = category.split(".") as [
+    "singles" | "doubles",
+    string,
+  ];
+
+  if (group === "singles") {
+    return rating.singles[key as PlayerDuprSinglesKey];
   }
-  return rating.doubles[category.split(".")[1] as PlayerDuprDoublesKey];
+
+  return rating.doubles[key as PlayerDuprDoublesKey];
 };
 
 export const setDuprRatingByCategory = (
@@ -332,15 +469,19 @@ export const setDuprRatingByCategory = (
   category: PlayerDuprCategory,
   value: number,
 ): PlayerDupr => {
+  const [group, key] = category.split(".") as [
+    "singles" | "doubles",
+    string,
+  ];
   const next: Omit<PlayerDupr, "total"> = {
     doubles: { ...rating.doubles },
-    singles: rating.singles,
+    singles: { ...rating.singles },
   };
 
-  if (category === "singles") {
-    next.singles = normalizeDuprRatingValue(value);
+  if (group === "singles") {
+    next.singles[key as PlayerDuprSinglesKey] = normalizeDuprRatingValue(value);
   } else {
-    next.doubles[category.split(".")[1] as PlayerDuprDoublesKey] =
+    next.doubles[key as PlayerDuprDoublesKey] =
       normalizeDuprRatingValue(value);
   }
 
@@ -354,10 +495,16 @@ export const getDuprMetricByCategory = (
   metrics: PlayerDuprMetrics,
   category: PlayerDuprCategory,
 ) => {
-  if (category === "singles") {
-    return metrics.singles;
+  const [group, key] = category.split(".") as [
+    "singles" | "doubles",
+    string,
+  ];
+
+  if (group === "singles") {
+    return metrics.singles[key as PlayerDuprSinglesKey];
   }
-  return metrics.doubles[category.split(".")[1] as PlayerDuprDoublesKey];
+
+  return metrics.doubles[key as PlayerDuprDoublesKey];
 };
 
 export const setDuprMetricByCategory = (
@@ -365,11 +512,21 @@ export const setDuprMetricByCategory = (
   category: PlayerDuprCategory,
   value: PlayerDuprMetric,
 ): PlayerDuprMetrics => {
-  if (category === "singles") {
-    return { ...metrics, singles: normalizeMetricValue(value) };
+  const [group, key] = category.split(".") as [
+    "singles" | "doubles",
+    string,
+  ];
+
+  if (group === "singles") {
+    return {
+      ...metrics,
+      singles: {
+        ...metrics.singles,
+        [key]: normalizeMetricValue(value),
+      },
+    };
   }
 
-  const key = category.split(".")[1] as PlayerDuprDoublesKey;
   return {
     ...metrics,
     doubles: {
@@ -385,16 +542,12 @@ export interface Player {
   duprRating: PlayerDupr | null;
   gender: "M" | "F";
   status: PlayerStatus;
-  //   birthYear?: number;
   avatarUrl?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface PlayerProfile extends Player {
-  //   bio?: string;
-  //   city?: string;
-  //   state?: string;
   totalMatches: number;
   winRate: number;
 }

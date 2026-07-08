@@ -1,10 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   MATCH_RESULT_MAX_SCORE_COUNT,
+  doublesMatchTypeValues,
+  getMatchTopLevelType,
+  isSinglesMatchType,
+  matchTopLevelTypeLabels,
+  matchTopLevelTypeValues,
   matchTypeLabels,
-  matchTypeValues,
   type MatchScore,
+  type MatchTopLevelType,
   type MatchType,
+  singlesMatchTypeValues,
 } from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
 
@@ -88,7 +94,7 @@ const toLocalDateTimeValue = (date = new Date()) => {
 const getSlotRequirements = (
   matchType: MatchType,
 ): [SlotRequirement[], SlotRequirement[]] => {
-  if (matchType === "singles") {
+  if (isSinglesMatchType(matchType)) {
     return [[{ label: "참가자" }], [{ label: "참가자" }]];
   }
 
@@ -102,6 +108,13 @@ const getSlotRequirements = (
         { label: "남자", gender: "M" },
         { label: "여자", gender: "F" },
       ],
+    ];
+  }
+
+  if (matchType === "unrestricted-doubles") {
+    return [
+      [{ label: "참가자 1" }, { label: "참가자 2" }],
+      [{ label: "참가자 1" }, { label: "참가자 2" }],
     ];
   }
 
@@ -124,6 +137,14 @@ const createEmptyTeams = (matchType: MatchType): [string[], string[]] => {
   const [teamA, teamB] = getSlotRequirements(matchType);
   return [teamA.map(() => ""), teamB.map(() => "")];
 };
+
+const getDefaultMatchTypeForTopLevel = (
+  topLevelType: MatchTopLevelType,
+): MatchType =>
+  topLevelType === "singles" ? "singles" : "unrestricted-doubles";
+
+const getSelectableMatchTypes = (topLevelType: MatchTopLevelType) =>
+  topLevelType === "singles" ? singlesMatchTypeValues : doublesMatchTypeValues;
 
 const createEmptyDraft = (): MatchDraft => ({
   id: `admin-batch-draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -291,7 +312,7 @@ const buildImportedPreview = (
       } else if (womenCount === 4) {
         inferredType = "women-doubles";
       } else {
-        issues.push("성별 조합으로 종목을 추론할 수 없습니다.");
+        inferredType = "unrestricted-doubles";
       }
     }
 
@@ -400,6 +421,14 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       type,
       teams: createEmptyTeams(type),
     }));
+  };
+
+  const handleDraftTopLevelTypeChange = (
+    draftId: string,
+    topLevelType: MatchTopLevelType,
+  ) => {
+    const nextType = getDefaultMatchTypeForTopLevel(topLevelType);
+    handleDraftTypeChange(draftId, nextType);
   };
 
   const handlePlayerChange = (
@@ -673,10 +702,31 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       종목
+                    </label>
+                    <select
+                      value={getMatchTopLevelType(draft.type)}
+                      onChange={(event) =>
+                        handleDraftTopLevelTypeChange(
+                          draft.id,
+                          event.target.value as MatchTopLevelType,
+                        )
+                      }
+                      className="w-full rounded-lg border bg-white px-4 py-2"
+                    >
+                      {matchTopLevelTypeValues.map((matchType) => (
+                        <option key={matchType} value={matchType}>
+                          {matchTopLevelTypeLabels[matchType]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      세부 타입
                     </label>
                     <select
                       value={draft.type}
@@ -688,11 +738,13 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                       }
                       className="w-full rounded-lg border bg-white px-4 py-2"
                     >
-                      {matchTypeValues.map((matchType) => (
-                        <option key={matchType} value={matchType}>
-                          {matchTypeLabels[matchType]}
-                        </option>
-                      ))}
+                      {getSelectableMatchTypes(getMatchTopLevelType(draft.type)).map(
+                        (matchType) => (
+                          <option key={matchType} value={matchType}>
+                            {matchTypeLabels[matchType]}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </div>
                   <div>

@@ -24,8 +24,12 @@ const createDupr = (total: number): PlayerDupr => ({
     mixed: total + 0.012,
     men: total - 0.008,
     women: total + 0.004,
+    unrestricted: total + 0.006,
   },
-  singles: total - 0.016,
+  singles: {
+    standard: total - 0.016,
+    unrestricted: total - 0.01,
+  },
 });
 
 const mockPlayers: CreateStoredPlayerInput[] = [

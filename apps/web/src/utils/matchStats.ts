@@ -1,13 +1,10 @@
-import type { MatchType } from "@pkpkdupr/shared/match";
-import { matchTypeValues } from "@pkpkdupr/shared/match";
+import { getMatchTopLevelType } from "@pkpkdupr/shared/match";
 import type { MatchInfo } from "@/components/Match";
 import type { MemberProfileMatchStats } from "@/components/MemberProfile";
 
 export const createEmptyMatchStats = (): MemberProfileMatchStats => ({
-  "mixed-doubles": { wins: 0, losses: 0 },
-  "men-doubles": { wins: 0, losses: 0 },
-  "women-doubles": { wins: 0, losses: 0 },
   singles: { wins: 0, losses: 0 },
+  doubles: { wins: 0, losses: 0 },
 });
 
 const getWinningTeamIndex = (scores: MatchInfo["scores"]): 0 | 1 | null => {
@@ -58,10 +55,6 @@ export const buildMatchStats = (
   const stats = createEmptyMatchStats();
 
   matches.forEach((match) => {
-    if (!matchTypeValues.includes(match.type as MatchType)) {
-      return;
-    }
-
     if (match.status !== "completed") {
       return;
     }
@@ -74,9 +67,9 @@ export const buildMatchStats = (
     }
 
     if (playerTeamIndex === winningTeamIndex) {
-      stats[match.type].wins += 1;
+      stats[getMatchTopLevelType(match.type)].wins += 1;
     } else {
-      stats[match.type].losses += 1;
+      stats[getMatchTopLevelType(match.type)].losses += 1;
     }
   });
 

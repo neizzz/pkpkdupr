@@ -1,12 +1,17 @@
 import React from "react";
 import { Card } from "@heroui/react";
-import type { MatchType } from "@pkpkdupr/shared/match";
-import { matchTypeLabels, matchTypeValues } from "@pkpkdupr/shared/match";
+import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
+import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
 import Avatar from "@/components/Avatar";
 import type { PlayerInfo } from "@/context/AuthContext";
+import {
+  formatRating,
+  getCompositeDoublesRating,
+  getCompositeSinglesRating,
+} from "@/utils/dupr";
 
 export type MemberProfileMatchStats = Record<
-  MatchType,
+  MatchTopLevelType,
   {
     wins: number;
     losses: number;
@@ -21,8 +26,6 @@ interface MemberProfileProps {
   matchStats?: MemberProfileMatchStats;
 }
 
-const formatRating = (rating?: number | null) => rating?.toFixed(3) ?? "NR";
-
 const MemberProfile: React.FC<MemberProfileProps> = ({
   player,
   memberName,
@@ -32,23 +35,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
 }) => {
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
-  const genderDoublesType: MatchType =
-    player?.gender === "F" ? "women-doubles" : "men-doubles";
-
-  const ratingByMatchType: Record<MatchType, string> = {
-    singles: formatRating(player?.duprRating?.singles),
-    "mixed-doubles": formatRating(player?.duprRating?.doubles.mixed),
-    "men-doubles": formatRating(player?.duprRating?.doubles.men),
-    "women-doubles": formatRating(player?.duprRating?.doubles.women),
-  };
-
-  const hiddenGenderDoublesType: MatchType =
-    genderDoublesType === "men-doubles" ? "women-doubles" : "men-doubles";
-  const displayedRatingTypes: MatchType[] = matchStats
-    ? matchTypeValues.filter((type) => type !== hiddenGenderDoublesType)
-    : ["singles", "mixed-doubles", genderDoublesType];
-
-  const duprItems = displayedRatingTypes.map((type) => {
+  const duprItems = (["singles", "doubles"] as const).map((type) => {
     const stats = matchStats?.[type];
     const playedCount = stats ? stats.wins + stats.losses : 0;
     const winRate =
@@ -57,15 +44,19 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
         : stats
           ? "0%"
           : "-";
+    const rating =
+      type === "singles"
+        ? formatRating(getCompositeSinglesRating(player?.duprRating))
+        : formatRating(getCompositeDoublesRating(player?.duprRating));
 
     return {
       type,
-      label: matchTypeLabels[type],
-      rating: ratingByMatchType[type],
+      label: matchTopLevelTypeLabels[type],
+      rating,
       cards: [
         {
           label: "Rating",
-          value: ratingByMatchType[type],
+          value: rating,
         },
         {
           label: "승률",

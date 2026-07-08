@@ -8,11 +8,20 @@ import React, {
 import { Button, Drawer } from "@heroui/react";
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import { IoQrCodeSharp } from "react-icons/io5";
-import type { MatchMode, MatchType } from "@pkpkdupr/shared/match";
+import type {
+  MatchMode,
+  MatchTopLevelType,
+  MatchType,
+} from "@pkpkdupr/shared/match";
 import {
   DEFAULT_MATCH_MODE,
+  doublesMatchTypeValues,
+  getMatchTopLevelType,
+  isSinglesMatchType,
   matchModeLabels,
+  matchTopLevelTypeLabels,
   matchTypeLabels,
+  singlesMatchTypeValues,
 } from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
@@ -83,13 +92,26 @@ const areSameMatchMembers = (a: MatchMember[], b: MatchMember[]) =>
     );
   });
 
-const resolveMatchType = (members: MatchMember[]): MatchType | null => {
+const resolveMatchTopLevelType = (
+  members: MatchMember[],
+): MatchTopLevelType | null => {
   if (members.length === 2) {
     return "singles";
   }
 
-  if (members.length !== 4) {
+  return members.length === 4 ? "doubles" : null;
+};
+
+const resolveDefaultMatchType = (
+  members: MatchMember[],
+  topLevelType: MatchTopLevelType | null,
+): MatchType | null => {
+  if (!topLevelType) {
     return null;
+  }
+
+  if (topLevelType === "singles") {
+    return "singles";
   }
 
   const menCount = members.filter((member) => member.gender === "M").length;
@@ -107,7 +129,19 @@ const resolveMatchType = (members: MatchMember[]): MatchType | null => {
     return "women-doubles";
   }
 
-  return null;
+  return "unrestricted-doubles";
+};
+
+const getSelectableMatchTypes = (topLevelType: MatchTopLevelType | null) => {
+  if (topLevelType === "singles") {
+    return singlesMatchTypeValues;
+  }
+
+  if (topLevelType === "doubles") {
+    return doublesMatchTypeValues;
+  }
+
+  return [];
 };
 
 const createEmptyTeams = (): MatchTeams => [[], []];
@@ -127,6 +161,13 @@ const buildInitialTeams = (
   if (matchType === "mixed-doubles") {
     const men = members.filter((member) => member.gender === "M");
     const women = members.filter((member) => member.gender === "F");
+
+    if (men.length !== 2 || women.length !== 2) {
+      return [
+        [members[0], members[1]].filter(Boolean),
+        [members[2], members[3]].filter(Boolean),
+      ] as MatchTeams;
+    }
 
     return [
       [men[0], women[0]],
@@ -150,7 +191,7 @@ const areTeamsValid = (teams: MatchTeams, matchType: MatchType | null) => {
     return false;
   }
 
-  if (matchType === "singles") {
+  if (isSinglesMatchType(matchType)) {
     return teams[0].length === 1 && teams[1].length === 1;
   }
 
@@ -165,10 +206,14 @@ const areTeamsValid = (teams: MatchTeams, matchType: MatchType | null) => {
     );
   }
 
-  return teams.every(
-    (team) =>
-      team.length === 2 && team.every((member) => member.gender === "F"),
-  );
+  if (matchType === "women-doubles") {
+    return teams.every(
+      (team) =>
+        team.length === 2 && team.every((member) => member.gender === "F"),
+    );
+  }
+
+  return teams.every((team) => team.length === 2);
 };
 
 const findMemberTeamIndex = (
@@ -284,6 +329,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const [createMatchError, setCreateMatchError] = useState<string | null>(null);
   const [selectedMatchMode, setSelectedMatchMode] =
     useState<MatchMode>(DEFAULT_MATCH_MODE);
+  const [selectedMatchType, setSelectedMatchType] = useState<MatchType | null>(
+    null,
+  );
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerControlsRef = useRef<IScannerControls | null>(null);
   const lastScannedPayloadRef = useRef<string | null>(null);
@@ -292,11 +340,12 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     () => normalizeMatchMember(player),
     [player],
   );
-  const selectedMatchType = useMemo(
-    () => resolveMatchType(selectedMatchMembers),
+  const selectedMatchTopLevelType = useMemo(
+    () => resolveMatchTopLevelType(selectedMatchMembers),
     [selectedMatchMembers],
   );
-  const canCreateMatch = isOnline && areTeamsValid(teams, selectedMatchType);
+  const canCreateMatch =
+    isOnline && !!selectedMatchType && areTeamsValid(teams, selectedMatchType);
   const canAddMatchMember = isOnline && !!token && selectedMatchMembers.length < 4;
 
   useEffect(() => {
@@ -357,6 +406,28 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return next;
     });
   }, [currentPlayerMember]);
+
+  useEffect(() => {
+    const nextDefaultType = resolveDefaultMatchType(
+      selectedMatchMembers,
+      selectedMatchTopLevelType,
+    );
+
+    setSelectedMatchType((previousType) => {
+      if (!nextDefaultType) {
+        return null;
+      }
+
+      if (
+        previousType &&
+        getMatchTopLevelType(previousType) === selectedMatchTopLevelType
+      ) {
+        return previousType;
+      }
+
+      return nextDefaultType;
+    });
+  }, [selectedMatchMembers, selectedMatchTopLevelType]);
 
   useEffect(() => {
     setSelectedSwapMemberId(null);
@@ -915,13 +986,39 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
             <section className="flex flex-col gap-2">
               <p className="bs-text-title text-amber-950">매치 타입</p>
-              {selectedMatchType ? (
-                <div className="bs-text-title rounded-2xl border border-[#409eff] bg-[#409eff]/10 px-3 py-2 text-[#409eff]">
-                  {matchTypeLabels[selectedMatchType]}
+              {selectedMatchTopLevelType ? (
+                <div className="flex flex-col gap-2">
+                  <div className="bs-text-title rounded-2xl border border-[#409eff] bg-[#409eff]/10 px-3 py-2 text-[#409eff]">
+                    {matchTopLevelTypeLabels[selectedMatchTopLevelType]}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {getSelectableMatchTypes(selectedMatchTopLevelType).map(
+                      (matchType) => {
+                        const isSelected = selectedMatchType === matchType;
+
+                        return (
+                          <button
+                            key={matchType}
+                            type="button"
+                            onClick={() => setSelectedMatchType(matchType)}
+                            className={`rounded-2xl border px-3 py-3 text-left transition ${
+                              isSelected
+                                ? "border-[#409eff] bg-[#409eff]/10 text-[#409eff]"
+                                : "border-border bg-white text-amber-950"
+                            }`}
+                          >
+                            <p className="bs-text-title">
+                              {matchTypeLabels[matchType]}
+                            </p>
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="bs-text-body text-error">
-                  유효한 성별 구성이 필요해요.
+                  멤버 2명 또는 4명이 필요해요.
                 </p>
               )}
             </section>
@@ -973,7 +1070,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 <>
                   <p className="bs-text-title text-amber-950">팀 구성</p>
                   <p className="bs-text-body text-error">
-                    유효한 성별 구성이 필요해요.
+                    멤버 2명 또는 4명이 필요해요.
                   </p>
                 </>
               )}

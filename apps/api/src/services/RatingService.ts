@@ -52,10 +52,12 @@ const average = (values: number[]) =>
 export const getDuprCategoryForMatchType = (
   matchType: MatchType,
 ): PlayerDuprCategory => {
-  if (matchType === "singles") return "singles";
+  if (matchType === "singles") return "singles.standard";
+  if (matchType === "unrestricted-singles") return "singles.unrestricted";
   if (matchType === "mixed-doubles") return "doubles.mixed";
   if (matchType === "men-doubles") return "doubles.men";
-  return "doubles.women";
+  if (matchType === "women-doubles") return "doubles.women";
+  return "doubles.unrestricted";
 };
 
 export class RatingService {

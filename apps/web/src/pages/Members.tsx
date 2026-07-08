@@ -8,7 +8,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
-import { formatRating, getCompositeDoublesRating } from "@/utils/dupr";
+import {
+  formatRating,
+  getCompositeDoublesRating,
+  getCompositeSinglesRating,
+} from "@/utils/dupr";
 import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
 
 const CACHED_MEMBERS_KEY = "pkpkdupr:members";
@@ -194,9 +198,9 @@ const Members: React.FC = () => {
             <div className="grid grid-cols-2 gap-3">
               {members.map((member) => {
                 const rating = member.duprRating;
+                const singlesRating = getCompositeSinglesRating(rating);
                 const doublesRating = getCompositeDoublesRating(
                   rating,
-                  member.gender,
                 );
 
                 return (
@@ -222,7 +226,7 @@ const Members: React.FC = () => {
                       <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-[#888]">
                         <span>S</span>
                         <span className="tabular-nums">
-                          {formatRating(rating?.singles)}
+                          {formatRating(singlesRating)}
                         </span>
                         <span>D</span>
                         <span className="tabular-nums">

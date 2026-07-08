@@ -8,6 +8,10 @@ import type {
   PlayerStatus,
   PlayerStatusChangeLog,
 } from "@pkpkdupr/shared/player";
+import {
+  getCompositeDoublesRating,
+  getCompositeSinglesRating,
+} from "@pkpkdupr/shared/player";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AdminMatchBatchForm, {
@@ -78,16 +82,20 @@ const AdminDashboard: React.FC = () => {
   const [officialPlayerId, setOfficialPlayerId] = useState("");
   const [officialReason, setOfficialReason] = useState("");
   const [officialRatings, setOfficialRatings] = useState({
-    singles: "",
+    standardSingles: "",
+    unrestrictedSingles: "",
     mixed: "",
     men: "",
     women: "",
+    unrestricted: "",
   });
   const [officialConfidence, setOfficialConfidence] = useState({
-    singles: "",
+    standardSingles: "",
+    unrestrictedSingles: "",
     mixed: "",
     men: "",
     women: "",
+    unrestricted: "",
   });
   const [officialPreview, setOfficialPreview] =
     useState<OfficialDuprAdjustmentPreview | null>(null);
@@ -389,21 +397,29 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const buildOfficialDuprPayload = () => ({
+const buildOfficialDuprPayload = () => ({
     ratings: {
-      singles: Number(officialRatings.singles),
+      singles: {
+        standard: Number(officialRatings.standardSingles),
+        unrestricted: Number(officialRatings.unrestrictedSingles),
+      },
       doubles: {
         mixed: Number(officialRatings.mixed),
         men: Number(officialRatings.men),
         women: Number(officialRatings.women),
+        unrestricted: Number(officialRatings.unrestricted),
       },
     },
     confidence: {
-      singles: Number(officialConfidence.singles),
+      singles: {
+        standard: Number(officialConfidence.standardSingles),
+        unrestricted: Number(officialConfidence.unrestrictedSingles),
+      },
       doubles: {
         mixed: Number(officialConfidence.mixed),
         men: Number(officialConfidence.men),
         women: Number(officialConfidence.women),
+        unrestricted: Number(officialConfidence.unrestricted),
       },
     },
     reason: officialReason,
@@ -674,10 +690,12 @@ const AdminDashboard: React.FC = () => {
               />
             </div>
             {[
-              ["singles", "Singles"],
+              ["standardSingles", "Singles"],
+              ["unrestrictedSingles", "Unrestricted Singles"],
               ["mixed", "Mixed"],
               ["men", "Men"],
               ["women", "Women"],
+              ["unrestricted", "Unrestricted"],
             ].map(([key, label]) => (
               <React.Fragment key={key}>
                 <div>
@@ -772,9 +790,11 @@ const AdminDashboard: React.FC = () => {
                         <th className="pb-2">회원</th>
                         <th className="pb-2">Total</th>
                         <th className="pb-2">Singles</th>
+                        <th className="pb-2">U Singles</th>
                         <th className="pb-2">Mixed</th>
                         <th className="pb-2">Men</th>
                         <th className="pb-2">Women</th>
+                        <th className="pb-2">Unrestricted</th>
                         <th className="pb-2">관련 매치</th>
                       </tr>
                     </thead>
@@ -788,8 +808,13 @@ const AdminDashboard: React.FC = () => {
                             ["total", impact.nextRating.total, impact.delta.total],
                             [
                               "singles",
-                              impact.nextRating.singles,
-                              impact.delta.singles,
+                              impact.nextRating.singles.standard,
+                              impact.delta.singles.standard,
+                            ],
+                            [
+                              "unrestricted-singles",
+                              impact.nextRating.singles.unrestricted,
+                              impact.delta.singles.unrestricted,
                             ],
                             [
                               "mixed",
@@ -805,6 +830,11 @@ const AdminDashboard: React.FC = () => {
                               "women",
                               impact.nextRating.doubles.women,
                               impact.delta.doubles.women,
+                            ],
+                            [
+                              "unrestricted",
+                              impact.nextRating.doubles.unrestricted,
+                              impact.delta.doubles.unrestricted,
                             ],
                           ].map(([key, nextValue, deltaValue]) => (
                             <td key={key} className="py-2">
@@ -873,18 +903,16 @@ const AdminDashboard: React.FC = () => {
                     const isDirty = draftStatus !== p.status;
                     const isProtectedAdminAccount =
                       p.username === PROTECTED_ADMIN_USERNAME;
+                    const singlesRating = getCompositeSinglesRating(p.duprRating);
+                    const doublesRating = getCompositeDoublesRating(p.duprRating);
 
                     return (
                       <tr key={p.id} className="border-b align-top hover:bg-gray-50">
                         <td className="py-3 pl-2 font-medium">{p.username}</td>
                         <td className="py-3 text-blue-600">
                           <div className="space-y-1 text-xs">
-                            <div>S {formatDupr(p.duprRating?.singles)}</div>
-                            <div>Mx {formatDupr(p.duprRating?.doubles.mixed)}</div>
-                            <div>
-                              Men {formatDupr(p.duprRating?.doubles.men)} / Women{" "}
-                              {formatDupr(p.duprRating?.doubles.women)}
-                            </div>
+                            <div>S {formatDupr(singlesRating)}</div>
+                            <div>D {formatDupr(doublesRating)}</div>
                           </div>
                         </td>
                         <td className="py-3">{p.gender === "M" ? "남" : "여"}</td>

@@ -6,6 +6,7 @@ import path from "path";
 import {
   DEFAULT_MATCH_MODE,
   MATCH_RESULT_MAX_SCORE_COUNT,
+  isSinglesMatchType,
   inferMatchModeFromScores,
   matchModeValues,
   matchTypeLabels,
@@ -145,7 +146,7 @@ const validateCreateMatchTeams = (
   matchType: MatchType,
   teams: [Player[], Player[]],
 ) => {
-  if (matchType === "singles") {
+  if (isSinglesMatchType(matchType)) {
     return teams.every((team) => team.length === 1);
   }
 
@@ -160,9 +161,15 @@ const validateCreateMatchTeams = (
     );
   }
 
+  if (matchType === "women-doubles") {
+    return teams.every(
+      (team) =>
+        team.length === 2 && team.every((player) => player.gender === "F"),
+    );
+  }
+
   return teams.every(
-    (team) =>
-      team.length === 2 && team.every((player) => player.gender === "F"),
+    (team) => team.length === 2,
   );
 };
 

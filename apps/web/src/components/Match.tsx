@@ -7,10 +7,11 @@ import type {
 } from "@pkpkdupr/shared/match";
 import {
   getMaxScoreCountForMatchMode,
+  getMatchTopLevelType,
   MATCH_RESULT_MAX_SCORE_COUNT,
   matchModeLabels,
   matchSourceLabels,
-  matchTypeLabels,
+  matchTopLevelTypeLabels,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import UserChip from "@/components/UserChip";
@@ -263,7 +264,7 @@ const Match: React.FC<MatchProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <p className="text-lg font-semibold text-amber-950">
-              {matchTypeLabels[match.type] ?? match.type}
+              {matchTopLevelTypeLabels[getMatchTopLevelType(match.type)]}
             </p>
             <span className={`${titleChipClassName} bg-amber-100 text-amber-800`}>
               {matchModeLabels[match.mode]}

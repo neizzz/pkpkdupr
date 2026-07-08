@@ -213,7 +213,7 @@ const initSchema = async () => {
   await client.execute(`
     CREATE TABLE IF NOT EXISTS matches (
       id TEXT PRIMARY KEY,
-      type TEXT NOT NULL CHECK (type IN ('mixed-doubles', 'men-doubles', 'women-doubles', 'singles')),
+      type TEXT NOT NULL CHECK (type IN ('singles', 'unrestricted-singles', 'mixed-doubles', 'men-doubles', 'women-doubles', 'unrestricted-doubles')),
       mode TEXT NOT NULL DEFAULT '${DEFAULT_MATCH_MODE}' CHECK (mode IN ('single-game', 'best-of-3')),
       source TEXT NOT NULL DEFAULT 'player_created',
       creator_player_id TEXT NOT NULL DEFAULT '',
@@ -247,6 +247,11 @@ const initSchema = async () => {
       WHEN type = 'WomenDoubles' THEN 'women-doubles'
       WHEN type = 'Women Doubles' THEN 'women-doubles'
       WHEN type = 'Singles' THEN 'singles'
+      WHEN type = 'Unrestricted Singles' THEN 'unrestricted-singles'
+      WHEN type = 'UnrestrictedSingles' THEN 'unrestricted-singles'
+      WHEN type = 'Unrestricted Doubles' THEN 'unrestricted-doubles'
+      WHEN type = 'UnrestrictedDoubles' THEN 'unrestricted-doubles'
+      WHEN type = 'Unrestricted' THEN 'unrestricted-doubles'
       ELSE type
     END
     WHERE type IN (
@@ -257,7 +262,12 @@ const initSchema = async () => {
       'Men Doubles',
       'WomenDoubles',
       'Women Doubles',
-      'Singles'
+      'Singles',
+      'Unrestricted Singles',
+      'UnrestrictedSingles',
+      'Unrestricted Doubles',
+      'UnrestrictedDoubles',
+      'Unrestricted'
     )
   `);
 

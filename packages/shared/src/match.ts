@@ -1,20 +1,59 @@
 import { Player } from "./player.js";
 
 export const matchTypeValues = [
+  "singles",
+  "unrestricted-singles",
   "mixed-doubles",
   "men-doubles",
   "women-doubles",
-  "singles",
+  "unrestricted-doubles",
 ] as const;
 
 export type MatchType = (typeof matchTypeValues)[number];
 
+export const singlesMatchTypeValues = [
+  "singles",
+  "unrestricted-singles",
+] as const satisfies MatchType[];
+
+export const doublesMatchTypeValues = [
+  "mixed-doubles",
+  "men-doubles",
+  "women-doubles",
+  "unrestricted-doubles",
+] as const satisfies MatchType[];
+
+export const matchTopLevelTypeValues = ["singles", "doubles"] as const;
+
+export type MatchTopLevelType = (typeof matchTopLevelTypeValues)[number];
+
 export const matchTypeLabels: Record<MatchType, string> = {
+  singles: "Singles",
+  "unrestricted-singles": "Unrestricted Singles",
   "mixed-doubles": "Mixed Doubles",
   "men-doubles": "Men Doubles",
   "women-doubles": "Women Doubles",
-  singles: "Singles",
+  "unrestricted-doubles": "Unrestricted",
 };
+
+export const matchTopLevelTypeLabels: Record<MatchTopLevelType, string> = {
+  singles: "Singles",
+  doubles: "Doubles",
+};
+
+export const isSinglesMatchType = (
+  matchType: MatchType,
+): matchType is (typeof singlesMatchTypeValues)[number] =>
+  singlesMatchTypeValues.includes(matchType as (typeof singlesMatchTypeValues)[number]);
+
+export const isDoublesMatchType = (
+  matchType: MatchType,
+): matchType is (typeof doublesMatchTypeValues)[number] =>
+  doublesMatchTypeValues.includes(matchType as (typeof doublesMatchTypeValues)[number]);
+
+export const getMatchTopLevelType = (
+  matchType: MatchType,
+): MatchTopLevelType => (isSinglesMatchType(matchType) ? "singles" : "doubles");
 
 export const matchSourceValues = [
   "player_created",

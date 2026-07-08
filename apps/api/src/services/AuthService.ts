@@ -134,12 +134,78 @@ const hydrateStatusChangeLog = (record: any): PlayerStatusChangeLog => ({
   changedAt: toDate(record.changedAt),
 });
 
+const normalizeOfficialSinglesPatch = <T>(
+  value: T | Record<string, T> | undefined,
+) => {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, T>;
+    if ("standard" in record || "unrestricted" in record) {
+      return {
+        standard: record.standard,
+        unrestricted: record.unrestricted,
+      };
+    }
+  }
+
+  return value == null
+    ? undefined
+    : {
+        standard: value as T,
+        unrestricted: value as T,
+      };
+};
+
+const normalizeOfficialDuprPatch = (
+  patch: OfficialDuprAdjustmentLog["ratings"] | undefined,
+) => ({
+  singles: normalizeOfficialSinglesPatch(patch?.singles),
+  doubles: patch?.doubles
+    ? {
+        mixed: patch.doubles.mixed,
+        men: patch.doubles.men,
+        women: patch.doubles.women,
+        unrestricted: patch.doubles.unrestricted,
+      }
+    : undefined,
+});
+
+const normalizeOfficialDuprConfidencePatch = (
+  patch: OfficialDuprAdjustmentLog["confidence"] | undefined,
+) => ({
+  singles: normalizeOfficialSinglesPatch(patch?.singles),
+  doubles: patch?.doubles
+    ? {
+        mixed: patch.doubles.mixed,
+        men: patch.doubles.men,
+        women: patch.doubles.women,
+        unrestricted: patch.doubles.unrestricted,
+      }
+    : undefined,
+});
+
+const normalizeOfficialDuprAccuracyPatch = (
+  patch: OfficialDuprAdjustmentLog["preUpdateAccuracy"] | undefined,
+) => ({
+  singles: normalizeOfficialSinglesPatch(patch?.singles),
+  doubles: patch?.doubles
+    ? {
+        mixed: patch.doubles.mixed,
+        men: patch.doubles.men,
+        women: patch.doubles.women,
+        unrestricted: patch.doubles.unrestricted,
+      }
+    : undefined,
+});
+
 const hydrateOfficialDuprAdjustmentLog = (
   record: any,
 ): OfficialDuprAdjustmentLog => ({
   ...record,
+  ratings: normalizeOfficialDuprPatch(record.ratings),
+  confidence: normalizeOfficialDuprConfidencePatch(record.confidence),
   previousRating: normalizePlayerDupr(record.previousRating),
   nextRating: normalizePlayerDupr(record.nextRating),
+  preUpdateAccuracy: normalizeOfficialDuprAccuracyPatch(record.preUpdateAccuracy),
   createdAt: toDate(record.createdAt),
 });
 
@@ -226,21 +292,40 @@ interface RecalculateDuprRatingsOptions {
 
 const duprPatchEntries = [
   {
-    category: "singles" as const,
-    getRating: (ratings?: OfficialDuprRatingPatch) => ratings?.singles,
+    category: "singles.standard" as const,
+    getRating: (ratings?: OfficialDuprRatingPatch) => ratings?.singles?.standard,
     getConfidence: (confidence?: OfficialDuprConfidencePatch) =>
-      confidence?.singles,
+      confidence?.singles?.standard,
     setRating: (patch: OfficialDuprRatingPatch, value: number) => {
-      patch.singles = value;
+      patch.singles = { ...(patch.singles ?? {}), standard: value };
     },
     setConfidence: (patch: OfficialDuprConfidencePatch, value: number) => {
-      patch.singles = value;
+      patch.singles = { ...(patch.singles ?? {}), standard: value };
     },
     setAccuracy: (
       patch: OfficialDuprAccuracyPatch,
       value: number | null,
     ) => {
-      patch.singles = value;
+      patch.singles = { ...(patch.singles ?? {}), standard: value };
+    },
+  },
+  {
+    category: "singles.unrestricted" as const,
+    getRating: (ratings?: OfficialDuprRatingPatch) =>
+      ratings?.singles?.unrestricted,
+    getConfidence: (confidence?: OfficialDuprConfidencePatch) =>
+      confidence?.singles?.unrestricted,
+    setRating: (patch: OfficialDuprRatingPatch, value: number) => {
+      patch.singles = { ...(patch.singles ?? {}), unrestricted: value };
+    },
+    setConfidence: (patch: OfficialDuprConfidencePatch, value: number) => {
+      patch.singles = { ...(patch.singles ?? {}), unrestricted: value };
+    },
+    setAccuracy: (
+      patch: OfficialDuprAccuracyPatch,
+      value: number | null,
+    ) => {
+      patch.singles = { ...(patch.singles ?? {}), unrestricted: value };
     },
   },
   {
@@ -297,6 +382,25 @@ const duprPatchEntries = [
       patch.doubles = { ...(patch.doubles ?? {}), women: value };
     },
   },
+  {
+    category: "doubles.unrestricted" as const,
+    getRating: (ratings?: OfficialDuprRatingPatch) =>
+      ratings?.doubles?.unrestricted,
+    getConfidence: (confidence?: OfficialDuprConfidencePatch) =>
+      confidence?.doubles?.unrestricted,
+    setRating: (patch: OfficialDuprRatingPatch, value: number) => {
+      patch.doubles = { ...(patch.doubles ?? {}), unrestricted: value };
+    },
+    setConfidence: (patch: OfficialDuprConfidencePatch, value: number) => {
+      patch.doubles = { ...(patch.doubles ?? {}), unrestricted: value };
+    },
+    setAccuracy: (
+      patch: OfficialDuprAccuracyPatch,
+      value: number | null,
+    ) => {
+      patch.doubles = { ...(patch.doubles ?? {}), unrestricted: value };
+    },
+  },
 ];
 
 const normalizeConfidenceValue = (value: unknown) => {
@@ -340,7 +444,14 @@ const buildDuprDelta = (
   previousRating: PlayerDupr,
 ): PlayerDupr => ({
   total: roundDuprRating(nextRating.total - previousRating.total),
-  singles: roundDuprRating(nextRating.singles - previousRating.singles),
+  singles: {
+    standard: roundDuprRating(
+      nextRating.singles.standard - previousRating.singles.standard,
+    ),
+    unrestricted: roundDuprRating(
+      nextRating.singles.unrestricted - previousRating.singles.unrestricted,
+    ),
+  },
   doubles: {
     mixed: roundDuprRating(
       nextRating.doubles.mixed - previousRating.doubles.mixed,
@@ -349,22 +460,33 @@ const buildDuprDelta = (
     women: roundDuprRating(
       nextRating.doubles.women - previousRating.doubles.women,
     ),
+    unrestricted: roundDuprRating(
+      nextRating.doubles.unrestricted - previousRating.doubles.unrestricted,
+    ),
   },
 });
 
 const hasDuprChange = (delta: PlayerDupr) =>
   delta.total !== 0 ||
-  delta.singles !== 0 ||
+  delta.singles.standard !== 0 ||
+  delta.singles.unrestricted !== 0 ||
   delta.doubles.mixed !== 0 ||
   delta.doubles.men !== 0 ||
-  delta.doubles.women !== 0;
+  delta.doubles.women !== 0 ||
+  delta.doubles.unrestricted !== 0;
 
 const hasDuprMetricChange = (
   nextMetrics: PlayerDuprMetrics,
   previousMetrics: PlayerDuprMetrics,
 ) =>
-  nextMetrics.singles.confidence !== previousMetrics.singles.confidence ||
-  nextMetrics.singles.accuracy !== previousMetrics.singles.accuracy ||
+  nextMetrics.singles.standard.confidence !==
+    previousMetrics.singles.standard.confidence ||
+  nextMetrics.singles.standard.accuracy !==
+    previousMetrics.singles.standard.accuracy ||
+  nextMetrics.singles.unrestricted.confidence !==
+    previousMetrics.singles.unrestricted.confidence ||
+  nextMetrics.singles.unrestricted.accuracy !==
+    previousMetrics.singles.unrestricted.accuracy ||
   nextMetrics.doubles.mixed.confidence !==
     previousMetrics.doubles.mixed.confidence ||
   nextMetrics.doubles.mixed.accuracy !==
@@ -374,7 +496,11 @@ const hasDuprMetricChange = (
   nextMetrics.doubles.men.accuracy !== previousMetrics.doubles.men.accuracy ||
   nextMetrics.doubles.women.confidence !==
     previousMetrics.doubles.women.confidence ||
-  nextMetrics.doubles.women.accuracy !== previousMetrics.doubles.women.accuracy;
+  nextMetrics.doubles.women.accuracy !== previousMetrics.doubles.women.accuracy ||
+  nextMetrics.doubles.unrestricted.confidence !==
+    previousMetrics.doubles.unrestricted.confidence ||
+  nextMetrics.doubles.unrestricted.accuracy !==
+    previousMetrics.doubles.unrestricted.accuracy;
 
 const hasStoredDuprStateChange = (
   nextState: StoredPlayerDupr,
