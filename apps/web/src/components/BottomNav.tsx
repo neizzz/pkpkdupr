@@ -34,6 +34,12 @@ import Members from "@/pages/Members";
 import Me from "@/pages/Me";
 
 const TAB_KEYS: TabKey[] = ["match", "members", "me"];
+const DEFAULT_THEME_COLOR = "#ffffff";
+const TAB_THEME_COLOR_MAP: Record<TabKey, string> = {
+  match: "#f9fafb",
+  members: "#f9fafb",
+  me: DEFAULT_THEME_COLOR,
+};
 
 const emptyDepthStacks = (): TabDepthStacks => ({
   match: [],
@@ -424,6 +430,26 @@ const BottomNav: React.FC = () => {
 
   useEffect(() => {
     selectedTabRef.current = selectedTab;
+  }, [selectedTab]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const themeColorMeta = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+
+    if (!themeColorMeta) {
+      return;
+    }
+
+    themeColorMeta.setAttribute("content", TAB_THEME_COLOR_MAP[selectedTab]);
+
+    return () => {
+      themeColorMeta.setAttribute("content", DEFAULT_THEME_COLOR);
+    };
   }, [selectedTab]);
 
   useEffect(() => {
