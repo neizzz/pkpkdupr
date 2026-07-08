@@ -206,7 +206,7 @@ const AdminDashboard: React.FC = () => {
         throw new Error(errData.error || "회원 추가 실패");
       }
       setSuccess(
-        `${newUsername} 회원이 추가되었습니다. 초기 비밀번호는 ${INITIAL_ADMIN_CREATED_PASSWORD} 입니다.`,
+        `${newUsername} 회원이 추가되었습니다. 초기 비밀번호는 ${INITIAL_ADMIN_CREATED_PASSWORD} 이며, 첫 로그인 시 비밀번호 변경이 필요합니다.`,
       );
       setNewUsername("");
       await loadDashboardData();
@@ -315,7 +315,9 @@ const AdminDashboard: React.FC = () => {
         prev.map((item) => (item.id === data.player.id ? data.player : item)),
       );
       setPasswordDrafts((prev) => ({ ...prev, [playerId]: "" }));
-      setSuccess(`${data.player.username} 회원의 비밀번호가 초기화되었습니다.`);
+      setSuccess(
+        `${data.player.username} 회원의 비밀번호가 초기화되었습니다. 임시 비밀번호로 첫 로그인 시 비밀번호 변경이 필요합니다.`,
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {

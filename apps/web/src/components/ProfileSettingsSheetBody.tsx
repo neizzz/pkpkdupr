@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
+import { useNavigate } from "react-router-dom";
 import Avatar from "@/components/Avatar";
+import PasswordChangeForm from "@/components/PasswordChangeForm";
 import { useAuth } from "@/context/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { buildApiUrl } from "@/lib/api";
+import { PASSWORD_CHANGED_LOGIN_NOTICE } from "@/lib/authMessages";
 
 const MAX_AVATAR_SIZE = 512;
 const AVATAR_JPEG_QUALITY = 0.85;
@@ -61,7 +63,8 @@ const resizeAvatarImage = async (file: File) => {
 };
 
 const ProfileSettingsSheetBody: React.FC = () => {
-  const { player, token, uploadAvatar, deleteAvatar } = useAuth();
+  const { player, uploadAvatar, deleteAvatar, logout } = useAuth();
+  const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState(
     player?.avatarUrl ?? "",
@@ -69,16 +72,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
   const [selectedAvatarDataUrl, setSelectedAvatarDataUrl] = useState<
     string | null
   >(null);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [currentPasswordValidationError, setCurrentPasswordValidationError] =
-    useState<string | null>(null);
-  const [passwordSubmitError, setPasswordSubmitError] = useState<string | null>(
-    null,
-  );
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
@@ -93,29 +87,6 @@ const ProfileSettingsSheetBody: React.FC = () => {
     setMessage(null);
     setError(null);
   };
-
-  const newPasswordValidationError =
-    newPassword.length > 0 && newPassword.length < 6
-      ? "새 패스워드는 6자 이상이어야 합니다."
-      : null;
-  const confirmPasswordValidationError =
-    confirmPassword.length > 0 && newPassword !== confirmPassword
-      ? "새 패스워드 확인이 일치하지 않습니다."
-      : null;
-  const passwordValidationMessage =
-    currentPasswordValidationError ||
-    newPasswordValidationError ||
-    confirmPasswordValidationError ||
-    passwordSubmitError;
-  const isPasswordChangeDisabled =
-    isSavingPassword ||
-    !isOnline ||
-    !currentPassword ||
-    !newPassword ||
-    !confirmPassword ||
-    !!currentPasswordValidationError ||
-    !!newPasswordValidationError ||
-    !!confirmPasswordValidationError;
 
   const handleSelectAvatar = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -199,68 +170,12 @@ const ProfileSettingsSheetBody: React.FC = () => {
     }
   };
 
-  const handleChangePassword = async (event: React.FormEvent) => {
-    event.preventDefault();
-    clearFeedback();
-
-    if (!token) {
-      setError("로그인이 필요합니다.");
-      return;
-    }
-    if (!isOnline) {
-      setError("오프라인에서는 패스워드를 변경할 수 없습니다. 온라인 연결이 필요합니다.");
-      return;
-    }
-
-    setPasswordSubmitError(null);
-
-    if (!currentPassword) {
-      setCurrentPasswordValidationError("현재 패스워드를 입력해주세요.");
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setError("새 패스워드는 6자 이상이어야 합니다.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError("새 패스워드 확인이 일치하지 않습니다.");
-      return;
-    }
-
-    setIsSavingPassword(true);
-    try {
-      const res = await fetch(buildApiUrl("/api/change-password"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "비밀번호 변경 실패");
-      }
-
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setCurrentPasswordValidationError(null);
-      setMessage("비밀번호가 변경되었습니다.");
-    } catch (err) {
-      const nextError =
-        err instanceof Error ? err.message : "비밀번호를 변경하지 못했습니다.";
-      if (nextError.includes("현재 패스워드")) {
-        setCurrentPasswordValidationError(nextError);
-      } else {
-        setPasswordSubmitError(nextError);
-      }
-    } finally {
-      setIsSavingPassword(false);
-    }
+  const handlePasswordChangeSuccess = async () => {
+    logout();
+    navigate("/login", {
+      replace: true,
+      state: { notice: PASSWORD_CHANGED_LOGIN_NOTICE },
+    });
   };
 
   return (
@@ -279,7 +194,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
       {!isOnline ? (
         <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-amber-700">
-          프로필 이미지와 패스워드 변경은 온라인 연결이 필요합니다.
+          프로필 이미지 변경은 온라인 연결이 필요합니다.
         </div>
       ) : null}
 
@@ -340,60 +255,10 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
       <div className="h-px bg-divider" />
 
-      <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
-        <h3 className="bs-text-title text-amber-950">패스워드 변경</h3>
-
-        <input
-          type="password"
-          placeholder="현재 패스워드"
-          value={currentPassword}
-          disabled={!isOnline}
-          onChange={(event) => {
-            setCurrentPassword(event.target.value);
-            setCurrentPasswordValidationError(null);
-            setPasswordSubmitError(null);
-          }}
-          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
-        />
-
-        <input
-          type="password"
-          placeholder="새 패스워드"
-          minLength={6}
-          value={newPassword}
-          disabled={!isOnline}
-          onChange={(event) => {
-            setNewPassword(event.target.value);
-            setPasswordSubmitError(null);
-          }}
-          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
-        />
-        <input
-          type="password"
-          placeholder="새 패스워드 확인"
-          minLength={6}
-          value={confirmPassword}
-          disabled={!isOnline}
-          onChange={(event) => {
-            setConfirmPassword(event.target.value);
-            setPasswordSubmitError(null);
-          }}
-          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
-        />
-
-        <div className="flex items-end justify-between gap-3">
-          <p className="bs-text-caption min-h-4 text-error">
-            {passwordValidationMessage}
-          </p>
-          <Button
-            type="submit"
-            className="rounded-2xl bg-[#409eff] px-6 text-white"
-            isDisabled={isPasswordChangeDisabled}
-          >
-            {isSavingPassword ? "변경 중..." : "변경"}
-          </Button>
-        </div>
-      </form>
+      <PasswordChangeForm
+        title="패스워드 변경"
+        onSuccess={handlePasswordChangeSuccess}
+      />
     </div>
   );
 };

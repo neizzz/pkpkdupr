@@ -1,18 +1,21 @@
 import { Spinner } from "@heroui/react";
+import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import DevQrs from "./pages/DevQrs";
+import ForceChangePassword from "./pages/ForceChangePassword";
 import Login from "./pages/Login";
 
 function AppRoutes() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, requiresPasswordChange } = useAuth();
+  const authenticatedHome = requiresPasswordChange ? "/force-change-password" : "/";
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex app-page-fill items-center justify-center overflow-hidden">
         <Spinner
           aria-label="앱 로딩 중"
           className="text-[#409eff]"

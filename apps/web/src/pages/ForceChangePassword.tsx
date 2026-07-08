@@ -1,0 +1,36 @@
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import PasswordChangeForm from "@/components/PasswordChangeForm";
+import { useAuth } from "@/context/AuthContext";
+import { PASSWORD_CHANGED_LOGIN_NOTICE } from "@/lib/authMessages";
+
+const ForceChangePassword: React.FC = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSuccess = async () => {
+    logout();
+    navigate("/login", {
+      replace: true,
+      state: { notice: PASSWORD_CHANGED_LOGIN_NOTICE },
+    });
+  };
+
+  return (
+    <div className="flex app-page-fill app-safe-bottom-pad flex-col justify-center overflow-hidden px-3 pt-6">
+      <div className="app-narrow-page app-scroll-area max-h-full self-center rounded-[28px] border border-border bg-white px-5 py-6 shadow-sm">
+        <p className="mb-6 text-sm leading-6 text-[#666]">
+          초기 비밀번호여서 비밀번호 변경이 필요합니다.
+        </p>
+
+        <PasswordChangeForm
+          submitLabel="변경 후 로그인"
+          requireCurrentPassword={false}
+          onSuccess={handleSuccess}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default ForceChangePassword;

@@ -76,6 +76,7 @@ interface RetryOperationOptions {
 export interface AuthenticatedSession {
   payload: JwtPayload;
   player: Player;
+  isFirstLogin: boolean;
   refreshedAccessToken?: string;
 }
 
@@ -512,6 +513,12 @@ const hasStoredDuprStateChange = (
 export class AuthService {
   private ratingService = new RatingService();
 
+  private shouldRequirePasswordChange(
+    stored: Pick<StoredPlayerRecord, "username" | "isFirstLogin">,
+  ): boolean {
+    return stored.username !== API_ADMIN_USERNAME && stored.isFirstLogin;
+  }
+
   private async retryOperation<T>(
     operation: () => Promise<T>,
     options: RetryOperationOptions,
@@ -634,10 +641,11 @@ export class AuthService {
     return {
       payload: {
         ...decoded,
-        isAdmin: stored.username === "admin",
+        isAdmin: stored.username === API_ADMIN_USERNAME,
         rememberMe,
       },
       player: toPublicPlayer(stored),
+      isFirstLogin: this.shouldRequirePasswordChange(stored),
       refreshedAccessToken: rememberMe
         ? this.createAccessTokenForPlayer(stored, true)
         : undefined,
@@ -752,7 +760,7 @@ export class AuthService {
     return {
       ...toPublicPlayer(hydratedPlayer),
       accessToken,
-      isFirstLogin: true,
+      isFirstLogin: this.shouldRequirePasswordChange(hydratedPlayer),
       isAdmin,
     } as any;
   }
@@ -773,9 +781,13 @@ export class AuthService {
     if (!isValidPassword) {
       throw new Error("아이디 또는 비밀번호가 틀렸습니다.");
     }
-    const isAdmin = username === "admin";
+    const isAdmin = stored.username === API_ADMIN_USERNAME;
     const accessToken = this.createAccessTokenForPlayer(stored, rememberMe);
-    return { accessToken, isFirstLogin: stored.isFirstLogin, isAdmin };
+    return {
+      accessToken,
+      isFirstLogin: this.shouldRequirePasswordChange(stored),
+      isAdmin,
+    };
   }
 
   async getPlayerById(playerId: string): Promise<Player | undefined> {
@@ -846,20 +858,28 @@ export class AuthService {
 
   async changePassword(
     playerId: string,
-    currentPassword: string,
+    currentPassword: string | undefined,
     newPassword: string,
   ): Promise<void> {
     const stored = await this.getStoredPlayerById(playerId);
     if (!stored) {
       throw new Error("사용자를 찾을 수 없습니다.");
     }
-    const isValidCurrentPassword = await bcrypt.compare(
-      currentPassword,
-      stored.passwordHash,
-    );
-    if (!isValidCurrentPassword) {
-      throw new Error("현재 패스워드가 올바르지 않습니다.");
+
+    if (!this.shouldRequirePasswordChange(stored)) {
+      if (!currentPassword) {
+        throw new Error("현재 패스워드를 입력해주세요.");
+      }
+
+      const isValidCurrentPassword = await bcrypt.compare(
+        currentPassword,
+        stored.passwordHash,
+      );
+      if (!isValidCurrentPassword) {
+        throw new Error("현재 패스워드가 올바르지 않습니다.");
+      }
     }
+
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await this.dbRequest(`/internal/players/${playerId}/password`, {
       method: "PATCH",
