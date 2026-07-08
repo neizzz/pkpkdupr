@@ -1,4 +1,4 @@
-name: deploy
+name: build-and-push-images
 
 on:
   workflow_dispatch:
@@ -18,19 +18,20 @@ env:
   DEPLOY_PATH: /opt/pkpkdupr
 
 jobs:
-  deploy:
+  build_and_push_images:
+    name: Build and push deployable images
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout source for image build
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_ref != '' && inputs.git_ref || github.sha }}
 
-      - name: Resolve image tag
+      - name: Resolve image tag and target domain
         run: |
           if [ -n "${{ inputs.image_tag }}" ]; then
             echo "IMAGE_TAG=${{ inputs.image_tag }}" >> "$GITHUB_ENV"
@@ -42,8 +43,13 @@ jobs:
           else
             echo "DEPLOY_PORT=22" >> "$GITHUB_ENV"
           fi
+          if [ -n "${{ secrets.PUBLIC_DOMAIN }}" ]; then
+            echo "TARGET_DOMAIN=${{ secrets.PUBLIC_DOMAIN }}" >> "$GITHUB_ENV"
+          else
+            echo "TARGET_DOMAIN=${{ secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
+          fi
 
-      - name: Login to GHCR
+      - name: Authenticate to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -88,42 +94,68 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pkpkdupr-db-server:${{ env.IMAGE_TAG }}
 
-      - name: Setup SSH key
+      - name: Summarize pushed images and manual remote deploy steps
         run: |
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -p "${DEPLOY_PORT}" "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## Images pushed successfully
 
-      - name: Sync deploy files to server
-        run: |
-          ssh -p "${DEPLOY_PORT}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "mkdir -p '${{ env.DEPLOY_PATH }}/scripts' '${{ env.DEPLOY_PATH }}/infra/monitoring' '${{ env.DEPLOY_PATH }}/infra/swag'"
-          scp -P "${DEPLOY_PORT}" docker-compose.yml "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/docker-compose.yml"
-          scp -P "${DEPLOY_PORT}" .env.example "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/.env.example"
-          scp -P "${DEPLOY_PORT}" scripts/update-server.sh scripts/check-healthy.mjs scripts/upsert-env.sh "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/"
-          scp -P "${DEPLOY_PORT}" -r infra/monitoring "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/infra/"
-          scp -P "${DEPLOY_PORT}" -r infra/swag "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/infra/"
+          - Image tag: \`${IMAGE_TAG}\`
+          - Web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-web:${IMAGE_TAG}\`
+          - Admin web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-admin-web:${IMAGE_TAG}\`
+          - API: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-api:${IMAGE_TAG}\`
+          - DB server: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-db-server:${IMAGE_TAG}\`
 
-      - name: Deploy on server
-        run: |
-          ssh -p "${DEPLOY_PORT}" "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" "
-            set -euo pipefail
-            cd '${{ env.DEPLOY_PATH }}'
-            chmod +x scripts/update-server.sh scripts/upsert-env.sh
-            if [ ! -f .env ]; then
-              cp .env.example .env
-            fi
-            scripts/upsert-env.sh .env DOMAIN '${{ secrets.PUBLIC_DOMAIN != '' && secrets.PUBLIC_DOMAIN || secrets.DEPLOY_HOST }}'
-            scripts/upsert-env.sh .env WEB_PUBLIC_PORT '443'
-            scripts/upsert-env.sh .env ADMIN_STACK_PORT '3333'
-            scripts/upsert-env.sh .env VITE_API_BASE_URL 'https://${{ secrets.PUBLIC_DOMAIN != '' && secrets.PUBLIC_DOMAIN || secrets.DEPLOY_HOST }}:3333'
-            scripts/upsert-env.sh .env API_ADMIN_USERNAME '${{ secrets.API_ADMIN_USERNAME != '' && secrets.API_ADMIN_USERNAME || 'admin' }}'
-            scripts/upsert-env.sh .env API_ADMIN_PASSWORD '${{ secrets.API_ADMIN_PASSWORD != '' && secrets.API_ADMIN_PASSWORD || 'admin123qwe' }}'
-            scripts/upsert-env.sh .env GF_SECURITY_ADMIN_USER '${{ secrets.GF_SECURITY_ADMIN_USER != '' && secrets.GF_SECURITY_ADMIN_USER || 'admin' }}'
-            scripts/upsert-env.sh .env GF_SECURITY_ADMIN_PASSWORD '${{ secrets.GF_SECURITY_ADMIN_PASSWORD != '' && secrets.GF_SECURITY_ADMIN_PASSWORD || 'admin123qwe' }}'
-            scripts/upsert-env.sh .env GF_SERVER_ROOT_URL 'https://${{ secrets.PUBLIC_DOMAIN != '' && secrets.PUBLIC_DOMAIN || secrets.DEPLOY_HOST }}:3333/grafana/'
-            export GHCR_USERNAME='${{ github.actor }}'
-            export GHCR_TOKEN='${{ github.token }}'
-            export IMAGE_TAG='${{ env.IMAGE_TAG }}'
-            bash scripts/update-server.sh '${{ env.IMAGE_TAG }}'
-          "
+          ## Next steps
+
+          1. Prepare SSH access manually on your machine.
+             - private key / agent / known_hosts
+             - target: \`<DEPLOY_USER>@<DEPLOY_HOST>\`
+             - port: \`${DEPLOY_PORT}\`
+             - if you want a reusable checklist later, run the \`manual-remote-deploy\` workflow with this image tag
+
+          2. Sync deploy files to the server.
+
+          \`\`\`bash
+          ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST> "mkdir -p '${DEPLOY_PATH}/scripts' '${DEPLOY_PATH}/infra/monitoring' '${DEPLOY_PATH}/infra/swag'"
+          scp -P "${DEPLOY_PORT}" docker-compose.yml <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/docker-compose.yml
+          scp -P "${DEPLOY_PORT}" .env.example <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/.env.example
+          scp -P "${DEPLOY_PORT}" scripts/update-server.sh scripts/check-healthy.mjs scripts/upsert-env.sh <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/scripts/
+          scp -P "${DEPLOY_PORT}" -r infra/monitoring <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/infra/
+          scp -P "${DEPLOY_PORT}" -r infra/swag <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/infra/
+          \`\`\`
+
+          3. SSH into the server, update \`${DEPLOY_PATH}/.env\`, and run the deployment.
+
+          \`\`\`bash
+          ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST>
+          cd "${DEPLOY_PATH}"
+          chmod +x scripts/update-server.sh scripts/upsert-env.sh
+          [ -f .env ] || cp .env.example .env
+
+          scripts/upsert-env.sh .env DOMAIN '${TARGET_DOMAIN}'
+          scripts/upsert-env.sh .env WEB_PUBLIC_PORT '443'
+          scripts/upsert-env.sh .env ADMIN_STACK_PORT '3333'
+          scripts/upsert-env.sh .env VITE_API_BASE_URL 'https://${TARGET_DOMAIN}:3333'
+          scripts/upsert-env.sh .env API_ADMIN_USERNAME '<API_ADMIN_USERNAME>'
+          scripts/upsert-env.sh .env API_ADMIN_PASSWORD '<API_ADMIN_PASSWORD>'
+          scripts/upsert-env.sh .env GF_SECURITY_ADMIN_USER '<GF_SECURITY_ADMIN_USER>'
+          scripts/upsert-env.sh .env GF_SECURITY_ADMIN_PASSWORD '<GF_SECURITY_ADMIN_PASSWORD>'
+          scripts/upsert-env.sh .env GF_SERVER_ROOT_URL 'https://${TARGET_DOMAIN}:3333/grafana/'
+
+          # Option A: server already logged in to GHCR
+          bash scripts/update-server.sh '${IMAGE_TAG}'
+
+          # Option B: login just for this deploy
+          export GHCR_USERNAME='<GHCR_USERNAME>'
+          export GHCR_TOKEN='<GHCR_TOKEN>'
+          bash scripts/update-server.sh '${IMAGE_TAG}'
+          \`\`\`
+
+          4. Verify after deploy.
+
+          - Web: \`https://${TARGET_DOMAIN}/\`
+          - API health: \`https://${TARGET_DOMAIN}:3333/api/health\`
+          - API ping: \`https://${TARGET_DOMAIN}:3333/api/ping\`
+          - Admin: \`https://${TARGET_DOMAIN}:3333/admin/\`
+          - Grafana: \`https://${TARGET_DOMAIN}:3333/grafana/\`
+          EOF
