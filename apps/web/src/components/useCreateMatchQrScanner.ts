@@ -229,7 +229,8 @@ const useCreateMatchQrScanner = ({
     if (
       !closeQrScannerRequestKey ||
       !isQrScannerOpen ||
-      closeQrScannerRequestKey === lastHandledCloseQrScannerRequestKeyRef.current
+      closeQrScannerRequestKey <=
+        lastHandledCloseQrScannerRequestKeyRef.current
     ) {
       return;
     }
@@ -244,13 +245,20 @@ const useCreateMatchQrScanner = ({
     }
 
     stopQrScanner();
+    lastHandledCloseQrScannerRequestKeyRef.current = closeQrScannerRequestKey;
     onQrScannerOpenChange?.(true);
     setIsQrScannerOpen(true);
     setQrScannerStatus("scanning");
     setQrScannerError(null);
     setPendingQrMember(null);
     lastScannedPayloadRef.current = null;
-  }, [onQrScannerOpenChange, selectedMatchMembersRef, stopQrScanner, token]);
+  }, [
+    closeQrScannerRequestKey,
+    onQrScannerOpenChange,
+    selectedMatchMembersRef,
+    stopQrScanner,
+    token,
+  ]);
 
   const retryQrScan = useCallback(() => {
     stopQrScanner();

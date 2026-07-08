@@ -1,6 +1,8 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
+const TRANSITION_DURATION_MS = 200;
+
 interface BottomSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -18,7 +20,79 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   className,
   isDismissable = true,
 }) => {
-  if (!isOpen) {
+  const [shouldRender, setShouldRender] = React.useState(isOpen);
+  const [isVisible, setIsVisible] = React.useState(isOpen);
+  const [isSheetTransitionEnabled, setIsSheetTransitionEnabled] =
+    React.useState(false);
+  const openAnimationFrameRef = React.useRef<number | null>(null);
+  const transitionTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    if (openAnimationFrameRef.current !== null) {
+      window.cancelAnimationFrame(openAnimationFrameRef.current);
+      openAnimationFrameRef.current = null;
+    }
+
+    if (transitionTimeoutRef.current !== null) {
+      window.clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
+
+    if (isOpen) {
+      setShouldRender(true);
+      setIsSheetTransitionEnabled(true);
+      setIsVisible(false);
+
+      openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        setIsVisible(true);
+        openAnimationFrameRef.current = null;
+
+        transitionTimeoutRef.current = window.setTimeout(() => {
+          setIsSheetTransitionEnabled(false);
+          transitionTimeoutRef.current = null;
+        }, TRANSITION_DURATION_MS);
+      });
+
+      return undefined;
+    }
+
+    setIsSheetTransitionEnabled(true);
+    setIsVisible(true);
+    openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      setIsVisible(false);
+      openAnimationFrameRef.current = null;
+
+      transitionTimeoutRef.current = window.setTimeout(() => {
+        setShouldRender(false);
+        setIsSheetTransitionEnabled(false);
+        transitionTimeoutRef.current = null;
+      }, TRANSITION_DURATION_MS);
+    });
+
+    return undefined;
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    return () => {
+      if (openAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(openAnimationFrameRef.current);
+      }
+
+      if (transitionTimeoutRef.current !== null) {
+        window.clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  if (!shouldRender) {
     return null;
   }
 
@@ -28,14 +102,33 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-end justify-center"
       onMouseDown={(event) => {
         if (isDismissable && event.target === event.currentTarget) {
           onOpenChange(false);
         }
       }}
     >
-      <div className="app-shell-fixed-width relative mx-auto w-full">
+      <div
+        aria-hidden="true"
+        className={[
+          "pointer-events-none absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-200 ease-out",
+          isVisible ? "opacity-100" : "opacity-0",
+        ].join(" ")}
+      />
+      <div
+        className={[
+          "app-shell-fixed-width relative z-10 mx-auto w-full",
+          isSheetTransitionEnabled
+            ? [
+                "transform-gpu transition-transform will-change-transform",
+                isVisible
+                  ? "translate-y-0 duration-200 ease-out"
+                  : "translate-y-[calc(100%+2rem)] duration-200 ease-in",
+              ].join(" ")
+            : "",
+        ].join(" ")}
+      >
         <div className="pointer-events-none absolute inset-x-0 -top-10 z-20 flex justify-end px-4">
           <button
             type="button"
