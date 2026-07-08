@@ -53,7 +53,7 @@ const Home: React.FC = () => {
 
             <Button
               onPress={handleLogout}
-              className="mt-4 w-full bg-default-200 text-default-700"
+              className="app-action-button mt-4 w-full bg-default-200 text-default-700"
               fullWidth
             >
               로그아웃
@@ -63,7 +63,7 @@ const Home: React.FC = () => {
           <div className="space-y-3">
             <Link
               to="/login"
-              className="mx-auto block w-full max-w-[320px] rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-[#409eff]/90"
+              className="app-action-button mx-auto flex w-full max-w-[320px] items-center justify-center rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-[#409eff]/90"
             >
               로그인
             </Link>

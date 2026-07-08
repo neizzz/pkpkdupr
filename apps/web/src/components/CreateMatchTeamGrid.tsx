@@ -11,7 +11,6 @@ import {
 interface CreateMatchTeamGridProps {
   previewTeams: MatchTeams;
   teams: MatchTeams;
-  previewTeamSlotCount: number;
   selectedMatchType: MatchType | null;
   selectedSwapMemberId: string | null;
   currentPlayerMemberId?: string;
@@ -23,7 +22,6 @@ interface CreateMatchTeamGridProps {
 const CreateMatchTeamGrid: React.FC<CreateMatchTeamGridProps> = ({
   previewTeams,
   teams,
-  previewTeamSlotCount,
   selectedMatchType,
   selectedSwapMemberId,
   currentPlayerMemberId,
@@ -34,7 +32,6 @@ const CreateMatchTeamGrid: React.FC<CreateMatchTeamGridProps> = ({
   <div className="grid grid-cols-2 gap-3">
     {previewTeams.map((team, teamIndex) => {
       const typedTeamIndex = teamIndex as TeamIndex;
-      const emptySlotCount = Math.max(0, previewTeamSlotCount - team.length);
 
       return (
         <div
@@ -58,7 +55,7 @@ const CreateMatchTeamGrid: React.FC<CreateMatchTeamGridProps> = ({
               const isMe = member.id === currentPlayerMemberId;
 
               return (
-                <div key={member.id} className="w-fit max-w-full rounded-full">
+                <div key={member.id} className="w-full max-w-full rounded-full">
                   <UserChip
                     player={member}
                     onRemove={isMe ? undefined : () => onRemoveMember(member.id)}
@@ -81,14 +78,6 @@ const CreateMatchTeamGrid: React.FC<CreateMatchTeamGridProps> = ({
                 </div>
               );
             })}
-            {Array.from({ length: emptySlotCount }).map((_, emptyIndex) => (
-              <div
-                key={`empty-${typedTeamIndex}-${emptyIndex}`}
-                className="flex h-6 w-30 items-center rounded-full border border-dashed border-border bg-slate-50 px-3 text-sm text-slate-400"
-              >
-                빈 자리
-              </div>
-            ))}
           </div>
         </div>
       );

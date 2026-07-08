@@ -12,7 +12,7 @@ interface HoldToConfirmButtonProps {
 
 const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
   onComplete,
-  holdDurationMs = 2000,
+  holdDurationMs = 800,
   children,
   className,
   progressClassName,

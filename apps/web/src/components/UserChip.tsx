@@ -63,7 +63,7 @@ const UserChip: React.FC<UserChipProps> = ({
               }
             : undefined
         }
-        className={`relative h-6 min-w-0 max-w-full overflow-hidden rounded-full px-0 transition ${shouldReserveRemoveSlot ? "w-full pr-2" : "w-30 pr-3"} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+        className={`relative h-6 min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? "w-full pr-2" : "w-30 pr-3"} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
       >
         <div className="flex min-w-0 max-w-full items-center gap-1">
           <Avatar

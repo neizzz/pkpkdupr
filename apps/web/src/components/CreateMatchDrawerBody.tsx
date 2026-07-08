@@ -8,6 +8,7 @@ import { buildApiUrl } from "@/lib/api";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
 import CreateMatchTeamGrid from "./CreateMatchTeamGrid";
+import HoldToConfirmButton from "./HoldToConfirmButton";
 import {
   areSameMatchMembers,
   areSameMatchTeams,
@@ -16,7 +17,6 @@ import {
   buildPreviewTeams,
   canSwapMembers,
   createEmptyTeams,
-  getPreviewTeamSlotCount,
   mergeUniqueMembers,
   normalizeMatchMember,
   resolveSelectedMatchType,
@@ -61,10 +61,6 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const previewTeams = useMemo(
     () => buildPreviewTeams(selectedMatchMembers, teams, selectedMatchType),
     [selectedMatchMembers, selectedMatchType, teams],
-  );
-  const previewTeamSlotCount = useMemo(
-    () => getPreviewTeamSlotCount(selectedMatchMembers, selectedMatchType),
-    [selectedMatchMembers, selectedMatchType],
   );
 
   const applyMembersState = useCallback((nextMembers: MatchMember[]) => {
@@ -258,7 +254,6 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     <CreateMatchTeamGrid
       previewTeams={previewTeams}
       teams={teams}
-      previewTeamSlotCount={previewTeamSlotCount}
       selectedMatchType={selectedMatchType}
       selectedSwapMemberId={selectedSwapMemberId}
       currentPlayerMemberId={currentPlayerMember?.id}
@@ -277,7 +272,6 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               <CreateMatchTeamGrid
                 previewTeams={previewTeams}
                 teams={teams}
-                previewTeamSlotCount={previewTeamSlotCount}
                 selectedMatchType={selectedMatchType}
                 selectedSwapMemberId={selectedSwapMemberId}
                 currentPlayerMemberId={currentPlayerMember?.id}
@@ -355,23 +349,25 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             ) : null}
             <div className="grid w-full grid-cols-3 gap-2">
               <Button
-                className="w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
+                className="app-action-button w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
                 isDisabled={isCreatingMatch}
                 onPress={onCancel}
               >
                 취소
               </Button>
-              <Button
-                className="col-span-2 w-full rounded-2xl bg-[#409eff] py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+              <HoldToConfirmButton
+                ariaLabel="길게 눌러 매치생성"
+                onComplete={handleCreateMatchPress}
                 isDisabled={!canCreateMatch || isCreatingMatch}
-                onPress={handleCreateMatchPress}
+                className="app-action-button col-span-2 w-full justify-center rounded-2xl bg-[#409eff] px-3 py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+                progressClassName="bg-white/20"
               >
                 {!isOnline
                   ? "온라인 연결 필요"
                   : isCreatingMatch
                     ? "생성 중..."
-                    : "매치 생성"}
-              </Button>
+                    : "길게 눌러 매치생성"}
+              </HoldToConfirmButton>
             </div>
           </Drawer.Footer>
         </>

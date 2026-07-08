@@ -217,7 +217,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           <Button
             type="button"
             variant="secondary"
-            className="rounded-2xl text-amber-800"
+            className="app-action-button rounded-2xl text-amber-800"
             onPress={() => avatarInputRef.current?.click()}
             isDisabled={isSavingProfile || !isOnline}
           >
@@ -226,7 +226,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           <Button
             type="button"
             variant="secondary"
-            className="rounded-2xl text-red-600"
+            className="app-action-button rounded-2xl text-red-600"
             onPress={handleDeleteAvatar}
             isDisabled={
               isSavingProfile ||
@@ -241,7 +241,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
         <div className="flex justify-end">
           <Button
             type="submit"
-            className="rounded-2xl bg-[#409eff] px-6 text-white"
+            className="app-action-button rounded-2xl bg-[#409eff] px-6 text-white"
             isDisabled={isSavingProfile || !isOnline || !hasPendingAvatarChange}
           >
             {isSavingProfile ? "저장 중..." : "저장"}

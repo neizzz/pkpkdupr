@@ -79,7 +79,7 @@ const Login: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-[#409eff]/90"
+            className="app-action-button w-full rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-[#409eff]/90"
           >
             로그인
           </button>

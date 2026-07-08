@@ -119,13 +119,13 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
       {qrScannerStatus === "confirm" ? (
         <>
           <Button
-            className="flex-1 rounded-2xl bg-red-50 font-semibold text-red-500"
+            className="app-action-button flex-1 rounded-2xl bg-red-50 font-semibold text-red-500"
             onPress={onRetry}
           >
             취소
           </Button>
           <Button
-            className="flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
+            className="app-action-button flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
             onPress={onConfirm}
           >
             추가
@@ -136,13 +136,13 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
       {qrScannerStatus === "error" ? (
         <>
           <Button
-            className="flex-1 rounded-2xl bg-slate-100 text-slate-700"
+            className="app-action-button flex-1 rounded-2xl bg-slate-100 text-slate-700"
             onPress={onClose}
           >
             닫기
           </Button>
           <Button
-            className="flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
+            className="app-action-button flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
             onPress={onRetry}
           >
             다시 스캔
@@ -152,7 +152,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
 
       {qrScannerStatus === "scanning" || qrScannerStatus === "verifying" ? (
         <Button
-          className="w-full rounded-2xl bg-[#409eff] font-semibold text-white"
+          className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white"
           onPress={onClose}
         >
           완료

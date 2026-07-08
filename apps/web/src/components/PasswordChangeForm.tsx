@@ -168,7 +168,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
         <p className="bs-text-caption min-h-4 text-error">{validationMessage}</p>
         <Button
           type="submit"
-          className="rounded-2xl bg-[#409eff] px-6 text-white"
+          className="app-action-button rounded-2xl bg-[#409eff] px-6 text-white"
           isDisabled={isSubmitDisabled}
         >
           {isSubmitting ? "변경 중..." : submitLabel}
