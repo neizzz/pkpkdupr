@@ -2,7 +2,25 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+DEFAULT_DEPLOY_ROOT="/opt/pkpkdupr"
+
+resolve_root_dir() {
+  if [[ -n "${PKPKDUPR_DEPLOY_PATH:-}" ]]; then
+    printf '%s' "${PKPKDUPR_DEPLOY_PATH}"
+    return
+  fi
+
+  if [[ -f "${DEFAULT_DEPLOY_ROOT}/docker-compose.yml" && -d "${DEFAULT_DEPLOY_ROOT}/scripts" ]]; then
+    printf '%s' "${DEFAULT_DEPLOY_ROOT}"
+    return
+  fi
+
+  printf '%s' "${SCRIPT_REPO_ROOT}"
+}
+
+ROOT_DIR="$(resolve_root_dir)"
 ENV_FILE="${ROOT_DIR}/.env"
 IMAGE_TAG_INPUT="${1:-${IMAGE_TAG:-latest}}"
 DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
@@ -49,6 +67,8 @@ fi
 docker compose version >/dev/null
 
 cd "${ROOT_DIR}"
+
+echo "ℹ️ 배포 루트: ${ROOT_DIR}"
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin

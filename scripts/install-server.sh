@@ -2,7 +2,25 @@
 
 set -euo pipefail
 
-ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+DEFAULT_DEPLOY_ROOT="/opt/pkpkdupr"
+
+resolve_root_dir() {
+  if [[ -n "${PKPKDUPR_DEPLOY_PATH:-}" ]]; then
+    printf '%s' "${PKPKDUPR_DEPLOY_PATH}"
+    return
+  fi
+
+  if [[ -f "${DEFAULT_DEPLOY_ROOT}/docker-compose.yml" && -d "${DEFAULT_DEPLOY_ROOT}/scripts" ]]; then
+    printf '%s' "${DEFAULT_DEPLOY_ROOT}"
+    return
+  fi
+
+  printf '%s' "${SCRIPT_REPO_ROOT}"
+}
+
+ROOT_DIR="$(resolve_root_dir)"
 ENV_FILE="${ROOT_DIR}/.env"
 DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
 WEB_PUBLIC_PORT_DEFAULT="443"
@@ -72,6 +90,8 @@ require_command curl
 docker compose version >/dev/null
 
 cd "${ROOT_DIR}"
+
+echo "ℹ️ 배포 루트: ${ROOT_DIR}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   umask 077

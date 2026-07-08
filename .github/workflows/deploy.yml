@@ -109,7 +109,7 @@ jobs:
           ## 배포용 이미지 push 완료
 
           이 워크플로는 배포 가능한 이미지를 **빌드하고 GHCR에 push만** 합니다.
-          서버 SSH 접속, 파일 동기화, 실제 원격 배포 명령 실행은 **직접 수동으로** 진행해야 합니다.
+          서버 SSH 접속, 서버 repo 최신화, 실제 원격 배포 명령 실행은 **직접 수동으로** 진행해야 합니다.
 
           - 이미지 태그: \`${IMAGE_TAG}\`
           - Web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-web:${IMAGE_TAG}\`
@@ -125,18 +125,23 @@ jobs:
              - 접속 대상: \`<DEPLOY_USER>@<DEPLOY_HOST>\`
              - 포트: \`${DEPLOY_PORT}\`
 
-          2. 서버에 배포 파일을 동기화합니다.
+          2. 서버에 SSH 접속한 뒤 배포 repo를 준비합니다.
+             - 최초 1회라면 \`${DEPLOY_PATH}\`에 repo를 clone 합니다.
+             - 이미 repo가 있다면 \`git pull\`로 최신 상태를 받습니다.
 
           \`\`\`bash
-          ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST> "mkdir -p '${DEPLOY_PATH}/scripts' '${DEPLOY_PATH}/infra/monitoring' '${DEPLOY_PATH}/infra/swag'"
-          scp -P "${DEPLOY_PORT}" docker-compose.yml <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/docker-compose.yml
-          scp -P "${DEPLOY_PORT}" .env.example <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/.env.example
-          scp -P "${DEPLOY_PORT}" scripts/manual-deploy.sh scripts/update-server.sh scripts/check-healthy.mjs scripts/upsert-env.sh <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/scripts/
-          scp -P "${DEPLOY_PORT}" -r infra/monitoring <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/infra/
-          scp -P "${DEPLOY_PORT}" -r infra/swag <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/infra/
+          ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST>
+
+          # 최초 1회
+          mkdir -p "$(dirname "${DEPLOY_PATH}")"
+          git clone <REPO_URL> "${DEPLOY_PATH}"
+
+          # 이미 clone 되어 있다면
+          cd "${DEPLOY_PATH}"
+          git pull
           \`\`\`
 
-          3. 서버에 SSH 접속한 뒤 \`${DEPLOY_PATH}\`에서 배포를 실행합니다.
+          3. \`${DEPLOY_PATH}\`에서 배포를 실행합니다.
              - \`.env\`가 없으면 \`.env.example\`을 복사합니다.
              - \`scripts/manual-deploy.sh\`는 실행 전에 아래 값을 자동 동기화합니다.
                - \`DOMAIN\`
@@ -146,10 +151,12 @@ jobs:
                - \`GF_SERVER_ROOT_URL\`
 
           \`\`\`bash
-          ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST>
           cd "${DEPLOY_PATH}"
           chmod +x scripts/manual-deploy.sh scripts/update-server.sh scripts/upsert-env.sh
           [ -f .env ] || cp .env.example .env
+
+          # 최초 설치 또는 런타임 설정 drift 복구가 필요하면
+          bash scripts/install-server.sh
 
           # 일반 배포: 서버에 GHCR 로그인 상태가 이미 있는 경우
           bash scripts/manual-deploy.sh --image-tag '${IMAGE_TAG}' --public-domain '${TARGET_DOMAIN}'
