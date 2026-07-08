@@ -95,14 +95,15 @@
   }
 
   .app-narrow-page {
-    width: min(430px, var(--app-shell-width));
+    /* width: min(430px, var(--app-shell-width)); */
     min-width: min(320px, var(--app-shell-width));
     max-width: min(430px, var(--app-shell-width));
     margin-inline: auto;
   }
 
   .app-shell-fixed-width {
-    width: min(430px, var(--app-shell-width));
+    /* width: min(430px, var(--app-shell-width)); */
+    min-width: min(320px, var(--app-shell-width));
     max-width: min(430px, var(--app-shell-width));
   }
 
