@@ -37,6 +37,20 @@
 }
 
 @layer utilities {
+  .app-scroll-area {
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-tab-panel-scroll-area {
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
+  }
+
   .bs-text-head {
     @apply text-xl font-bold leading-6;
   }

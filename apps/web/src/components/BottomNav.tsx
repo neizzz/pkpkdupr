@@ -675,7 +675,7 @@ const BottomNav: React.FC = () => {
 
         <div
           ref={scrollContainerRef}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="app-scroll-area app-tab-panel-scroll-area flex-1"
         >
           <Tabs.Panel
             id="match"
