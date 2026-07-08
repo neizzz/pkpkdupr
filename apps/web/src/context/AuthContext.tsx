@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import type { PlayerDupr } from "@pkpkdupr/shared/player";
+import type { PublicPlayerDupr } from "@pkpkdupr/shared/player";
 import { buildApiUrl } from "@/lib/api";
 
 export interface PlayerInfo {
   id: string;
   username?: string;
-  duprRating?: PlayerDupr | null;
+  duprRating?: PublicPlayerDupr | null;
   gender?: "M" | "F";
   avatarUrl?: string;
 }

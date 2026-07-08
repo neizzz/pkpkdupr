@@ -23,6 +23,24 @@ export interface PlayerDupr {
   singles: PlayerDuprSingles;
 }
 
+export interface PublicPlayerDuprSingles {
+  standard: number | null;
+  unrestricted: number | null;
+}
+
+export interface PublicPlayerDuprDoubles {
+  mixed: number | null;
+  men: number | null;
+  women: number | null;
+  unrestricted: number | null;
+}
+
+export interface PublicPlayerDupr {
+  total: number | null;
+  doubles: PublicPlayerDuprDoubles;
+  singles: PublicPlayerDuprSingles;
+}
+
 export type PlayerDuprSinglesKey = keyof PlayerDuprSingles;
 export type PlayerDuprDoublesKey = keyof PlayerDuprDoubles;
 export type PlayerDuprCategory =
@@ -108,9 +126,10 @@ export interface OfficialDuprAdjustmentPreview {
   impacts: OfficialDuprAdjustmentImpact[];
 }
 
-export const DUPR_DEFAULT_RATING = 3.5;
+export const DUPR_DEFAULT_RATING = 3.0;
 export const DUPR_MIN_RATING = 2;
 export const DUPR_MAX_RATING = 8;
+const LEGACY_DUPR_DEFAULT_RATING = 3.5;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -119,6 +138,13 @@ const average = (values: number[]) =>
   values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : 0;
+
+const averagePresent = (values: Array<number | null | undefined>) => {
+  const presentValues = values.filter(
+    (value): value is number => typeof value === "number",
+  );
+  return presentValues.length ? average(presentValues) : null;
+};
 
 export const roundDuprRating = (value: number) =>
   Math.round(value * 1000) / 1000;
@@ -167,35 +193,33 @@ const normalizeMetricValue = (
 };
 
 export const getCompositeSinglesRating = (
-  duprRating?: PlayerDupr | null,
+  duprRating?: PlayerDupr | PublicPlayerDupr | null,
 ): number | null => {
   if (!duprRating) {
     return null;
   }
 
-  return roundDuprRating(
-    average([
-      duprRating.singles.standard,
-      duprRating.singles.unrestricted,
-    ]),
-  );
+  const composite = averagePresent([
+    duprRating.singles.standard,
+    duprRating.singles.unrestricted,
+  ]);
+  return composite == null ? null : roundDuprRating(composite);
 };
 
 export const getCompositeDoublesRating = (
-  duprRating?: PlayerDupr | null,
+  duprRating?: PlayerDupr | PublicPlayerDupr | null,
 ): number | null => {
   if (!duprRating) {
     return null;
   }
 
-  return roundDuprRating(
-    average([
-      duprRating.doubles.mixed,
-      duprRating.doubles.men,
-      duprRating.doubles.women,
-      duprRating.doubles.unrestricted,
-    ]),
-  );
+  const composite = averagePresent([
+    duprRating.doubles.mixed,
+    duprRating.doubles.men,
+    duprRating.doubles.women,
+    duprRating.doubles.unrestricted,
+  ]);
+  return composite == null ? null : roundDuprRating(composite);
 };
 
 export const createDefaultPlayerDuprMetrics = (
@@ -255,6 +279,15 @@ export const isDefaultPlayerDupr = (rating: PlayerDupr) =>
   rating.doubles.men === DUPR_DEFAULT_RATING &&
   rating.doubles.women === DUPR_DEFAULT_RATING &&
   rating.doubles.unrestricted === DUPR_DEFAULT_RATING;
+
+const isLegacyDefaultPlayerDupr = (rating: PlayerDupr) =>
+  rating.total === LEGACY_DUPR_DEFAULT_RATING &&
+  rating.singles.standard === LEGACY_DUPR_DEFAULT_RATING &&
+  rating.singles.unrestricted === LEGACY_DUPR_DEFAULT_RATING &&
+  rating.doubles.mixed === LEGACY_DUPR_DEFAULT_RATING &&
+  rating.doubles.men === LEGACY_DUPR_DEFAULT_RATING &&
+  rating.doubles.women === LEGACY_DUPR_DEFAULT_RATING &&
+  rating.doubles.unrestricted === LEGACY_DUPR_DEFAULT_RATING;
 
 const normalizeSinglesRating = (
   value: unknown,
@@ -337,6 +370,9 @@ const isDefaultPlayerDuprMetrics = (metrics: PlayerDuprMetrics) =>
   metrics.doubles.women.accuracy == null &&
   metrics.doubles.unrestricted.confidence === 0 &&
   metrics.doubles.unrestricted.accuracy == null;
+
+const hasMeaningfulMetric = (metric: PlayerDuprMetric) =>
+  metric.confidence > 0 || metric.accuracy != null;
 
 const normalizeSinglesMetrics = (
   value: unknown,
@@ -433,14 +469,74 @@ export const shouldStorePlayerDuprAsNull = (value: unknown): boolean => {
 
   const state = normalizeStoredPlayerDupr(value);
   return (
-    isDefaultPlayerDupr(state.rating) && isDefaultPlayerDuprMetrics(state.metrics)
+    (isDefaultPlayerDupr(state.rating) ||
+      isLegacyDefaultPlayerDupr(state.rating)) &&
+    isDefaultPlayerDuprMetrics(state.metrics)
   );
 };
 
-export const normalizeNullablePlayerDupr = (value: unknown): PlayerDupr | null =>
-  shouldStorePlayerDuprAsNull(value)
-    ? null
-    : normalizeStoredPlayerDupr(value).rating;
+export const toPublicPlayerDupr = (
+  state: StoredPlayerDupr,
+): PublicPlayerDupr | null => {
+  if (shouldStorePlayerDuprAsNull(state)) {
+    return null;
+  }
+
+  if (isDefaultPlayerDuprMetrics(state.metrics)) {
+    return {
+      total: state.rating.total,
+      singles: {
+        standard: state.rating.singles.standard,
+        unrestricted: state.rating.singles.unrestricted,
+      },
+      doubles: {
+        mixed: state.rating.doubles.mixed,
+        men: state.rating.doubles.men,
+        women: state.rating.doubles.women,
+        unrestricted: state.rating.doubles.unrestricted,
+      },
+    };
+  }
+
+  const publicRating: PublicPlayerDupr = {
+    total: null,
+    singles: {
+      standard: hasMeaningfulMetric(state.metrics.singles.standard)
+        ? state.rating.singles.standard
+        : null,
+      unrestricted: hasMeaningfulMetric(state.metrics.singles.unrestricted)
+        ? state.rating.singles.unrestricted
+        : null,
+    },
+    doubles: {
+      mixed: hasMeaningfulMetric(state.metrics.doubles.mixed)
+        ? state.rating.doubles.mixed
+        : null,
+      men: hasMeaningfulMetric(state.metrics.doubles.men)
+        ? state.rating.doubles.men
+        : null,
+      women: hasMeaningfulMetric(state.metrics.doubles.women)
+        ? state.rating.doubles.women
+        : null,
+      unrestricted: hasMeaningfulMetric(state.metrics.doubles.unrestricted)
+        ? state.rating.doubles.unrestricted
+        : null,
+    },
+  };
+
+  const singlesComposite = getCompositeSinglesRating(publicRating);
+  const doublesComposite = getCompositeDoublesRating(publicRating);
+  const totalComposite = averagePresent([singlesComposite, doublesComposite]);
+
+  return {
+    ...publicRating,
+    total: totalComposite == null ? null : roundDuprRating(totalComposite),
+  };
+};
+
+export const normalizeNullablePlayerDupr = (
+  value: unknown,
+): PublicPlayerDupr | null => toPublicPlayerDupr(normalizeStoredPlayerDupr(value));
 
 export const serializeStoredPlayerDupr = (value: StoredPlayerDupr) =>
   JSON.stringify({
@@ -539,7 +635,7 @@ export const setDuprMetricByCategory = (
 export interface Player {
   id: string;
   username: string;
-  duprRating: PlayerDupr | null;
+  duprRating: PublicPlayerDupr | null;
   gender: "M" | "F";
   status: PlayerStatus;
   avatarUrl?: string;

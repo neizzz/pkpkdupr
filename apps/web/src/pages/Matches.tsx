@@ -11,9 +11,16 @@ interface MatchesProps {
   reloadKey?: number;
 }
 
-const CACHED_MATCHES_KEY = "pkpkdupr:matches";
+const CACHED_MATCHES_KEY = "pkpkdupr:matches:v2-public-dupr";
+const LEGACY_CACHED_MATCHES_KEYS = ["pkpkdupr:matches"];
 const OFFLINE_FALLBACK_MESSAGE =
   "최신 정보를 불러오지 못해 저장된 매치 목록을 표시합니다.";
+
+const clearLegacyCachedMatches = () => {
+  for (const key of LEGACY_CACHED_MATCHES_KEYS) {
+    localStorage.removeItem(key);
+  }
+};
 
 const readCachedMatches = (): MatchInfo[] | null => {
   try {
@@ -37,6 +44,10 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     matchId: string;
     type: "submit-result" | "approve-result" | "cancel-approval";
   } | null>(null);
+
+  useEffect(() => {
+    clearLegacyCachedMatches();
+  }, []);
 
   const loadMatches = useCallback(async () => {
     if (!token) {

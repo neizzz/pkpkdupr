@@ -5,23 +5,23 @@ import {
 import {
   getCompositeDoublesRating as getSharedCompositeDoublesRating,
   getCompositeSinglesRating as getSharedCompositeSinglesRating,
-  type PlayerDupr,
+  type PublicPlayerDupr,
 } from "@pkpkdupr/shared/player";
 
 export const formatRating = (rating?: number | null) =>
   rating?.toFixed(3) ?? "NR";
 
 export const getCompositeSinglesRating = (
-  duprRating?: PlayerDupr | null,
+  duprRating?: PublicPlayerDupr | null,
 ) => getSharedCompositeSinglesRating(duprRating);
 
 export const getCompositeDoublesRating = (
-  duprRating?: PlayerDupr | null,
+  duprRating?: PublicPlayerDupr | null,
 ) => getSharedCompositeDoublesRating(duprRating);
 
 export const getDisplayRatingForMatchType = (
   matchType: MatchType,
-  duprRating?: PlayerDupr | null,
+  duprRating?: PublicPlayerDupr | null,
 ) =>
   getMatchTopLevelType(matchType) === "singles"
     ? getCompositeSinglesRating(duprRating)
