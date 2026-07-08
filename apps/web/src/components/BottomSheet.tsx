@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -21,7 +22,11 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     return null;
   }
 
-  return (
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm"
       onMouseDown={(event) => {
@@ -30,7 +35,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
         }
       }}
     >
-      <div className="relative mx-auto w-full">
+      <div className="app-shell-fixed-width relative mx-auto w-full">
         <div className="pointer-events-none absolute inset-x-0 -top-10 z-20 flex justify-end px-4">
           <button
             type="button"
@@ -58,7 +63,8 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           {children}
         </section>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

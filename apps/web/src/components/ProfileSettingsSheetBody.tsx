@@ -72,16 +72,19 @@ const ProfileSettingsSheetBody: React.FC = () => {
   const [selectedAvatarDataUrl, setSelectedAvatarDataUrl] = useState<
     string | null
   >(null);
+  const [isAvatarRemovalPending, setIsAvatarRemovalPending] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const hasPendingAvatarChange =
+    !!selectedAvatarDataUrl || isAvatarRemovalPending;
 
   useEffect(() => {
-    if (!selectedAvatarDataUrl) {
+    if (!hasPendingAvatarChange) {
       setAvatarPreviewUrl(player?.avatarUrl ?? "");
     }
-  }, [player?.avatarUrl, selectedAvatarDataUrl]);
+  }, [hasPendingAvatarChange, player?.avatarUrl]);
 
   const clearFeedback = () => {
     setMessage(null);
@@ -101,6 +104,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
     try {
       const nextAvatarDataUrl = await resizeAvatarImage(file);
+      setIsAvatarRemovalPending(false);
       setSelectedAvatarDataUrl(nextAvatarDataUrl);
       setAvatarPreviewUrl(nextAvatarDataUrl);
       setMessage("이미지를 선택했습니다.");
@@ -122,17 +126,27 @@ const ProfileSettingsSheetBody: React.FC = () => {
       return;
     }
 
-    if (!selectedAvatarDataUrl) {
-      setError("먼저 갤러리에서 이미지를 선택해주세요.");
+    if (!hasPendingAvatarChange) {
+      setError("변경된 프로필 이미지가 없습니다.");
       return;
     }
 
     setIsSavingProfile(true);
 
     try {
-      await uploadAvatar(selectedAvatarDataUrl);
+      if (selectedAvatarDataUrl) {
+        await uploadAvatar(selectedAvatarDataUrl);
+      } else if (isAvatarRemovalPending) {
+        await deleteAvatar();
+      }
+
       setSelectedAvatarDataUrl(null);
-      setMessage("프로필 이미지가 변경되었습니다.");
+      setIsAvatarRemovalPending(false);
+      setMessage(
+        isAvatarRemovalPending
+          ? "프로필 이미지가 삭제되었습니다."
+          : "프로필 이미지가 변경되었습니다.",
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -144,30 +158,12 @@ const ProfileSettingsSheetBody: React.FC = () => {
     }
   };
 
-  const handleDeleteAvatar = async () => {
+  const handleDeleteAvatar = () => {
     clearFeedback();
-
-    if (!isOnline) {
-      setError("오프라인에서는 프로필 이미지를 삭제할 수 없습니다. 온라인 연결이 필요합니다.");
-      return;
-    }
-
-    setIsSavingProfile(true);
-
-    try {
-      await deleteAvatar();
-      setSelectedAvatarDataUrl(null);
-      setAvatarPreviewUrl("");
-      setMessage("프로필 이미지가 삭제되었습니다.");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "프로필 이미지를 삭제하지 못했습니다.",
-      );
-    } finally {
-      setIsSavingProfile(false);
-    }
+    setSelectedAvatarDataUrl(null);
+    setIsAvatarRemovalPending(true);
+    setAvatarPreviewUrl("");
+    setMessage("이미지 제거가 저장 대기 중입니다.");
   };
 
   const handlePasswordChangeSuccess = async () => {
@@ -180,7 +176,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="bs-text-head text-amber-950">프로필 설정</h2>
+      <h2 className="bs-text-head text-center text-amber-950">프로필 설정</h2>
 
       {(message || error) && (
         <div
@@ -246,14 +242,12 @@ const ProfileSettingsSheetBody: React.FC = () => {
           <Button
             type="submit"
             className="rounded-2xl bg-[#409eff] px-6 text-white"
-            isDisabled={isSavingProfile || !isOnline || !selectedAvatarDataUrl}
+            isDisabled={isSavingProfile || !isOnline || !hasPendingAvatarChange}
           >
             {isSavingProfile ? "저장 중..." : "저장"}
           </Button>
         </div>
       </form>
-
-      <div className="h-px bg-divider" />
 
       <PasswordChangeForm
         title="패스워드 변경"
