@@ -233,7 +233,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                 } as React.CSSProperties
               }
             >
-              <Switch.Content className="gap-2 text-[#409eff]">
+              <Switch.Content className="-mx-2 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-[#409eff] touch-manipulation">
                 <Switch.Control>
                   <Switch.Thumb />
                 </Switch.Control>
