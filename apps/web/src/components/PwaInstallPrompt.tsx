@@ -37,20 +37,28 @@ const isSafari = () => {
 
 const isIosSafari = () => isIosLike() && isSafari();
 
+const isAndroidLike = () => /android/i.test(window.navigator.userAgent);
+
+const isMobileInstallTarget = () => isIosLike() || isAndroidLike();
+
 type InstallPrompt =
   | {
       kind: "ios-safari";
       title: string;
     }
   | {
-      kind: "installable" | "android-manual" | "unsupported";
+      kind: "installable";
+      title: string;
+    }
+  | {
+      kind: "android-manual" | "unsupported";
       title: string;
       message: string;
     };
 
 const PwaInstallPrompt: React.FC = () => {
   const location = useLocation();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, requiresPasswordChange } = useAuth();
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(() =>
@@ -60,6 +68,10 @@ const PwaInstallPrompt: React.FC = () => {
 
   const installPrompt = useMemo<InstallPrompt | null>(() => {
     if (typeof window === "undefined") {
+      return null;
+    }
+
+    if (!isMobileInstallTarget()) {
       return null;
     }
 
@@ -116,11 +128,15 @@ const PwaInstallPrompt: React.FC = () => {
 
   const isFullWidthDevPage =
     import.meta.env.DEV && location.pathname === "/dev/qrs";
+  const isForcedPasswordChangePage =
+    location.pathname === "/force-change-password";
 
   if (
     isLoading ||
     !isAuthenticated ||
+    requiresPasswordChange ||
     isFullWidthDevPage ||
+    isForcedPasswordChangePage ||
     isInstalled ||
     isDismissed ||
     !installPrompt
@@ -143,7 +159,7 @@ const PwaInstallPrompt: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-[430px] px-3">
+    <div className="app-install-prompt-bottom fixed left-1/2 z-30 app-shell-fixed-width -translate-x-1/2 px-3">
       <Alert
         status={installPrompt.kind === "installable" ? "accent" : "warning"}
         className="items-center rounded-2xl border border-[#409eff]/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
@@ -153,8 +169,8 @@ const PwaInstallPrompt: React.FC = () => {
           <Alert.Title className="text-sm font-bold text-amber-950">
             {installPrompt.title}
           </Alert.Title>
-          <Alert.Description className="text-xs font-semibold text-[#888]">
-            {installPrompt.kind === "ios-safari" ? (
+          {installPrompt.kind === "ios-safari" ? (
+            <Alert.Description className="text-xs font-semibold text-[#888]">
               <>
                 Safari 하단 중앙의{" "}
                 <span
@@ -169,10 +185,12 @@ const PwaInstallPrompt: React.FC = () => {
                 <br />
                 [홈 화면에 추가]를 선택해주세요.
               </>
-            ) : (
-              installPrompt.message
-            )}
-          </Alert.Description>
+            </Alert.Description>
+          ) : "message" in installPrompt ? (
+            <Alert.Description className="text-xs font-semibold text-[#888]">
+              {installPrompt.message}
+            </Alert.Description>
+          ) : null}
         </Alert.Content>
         {installPrompt.kind === "installable" && deferredPrompt ? (
           <Button

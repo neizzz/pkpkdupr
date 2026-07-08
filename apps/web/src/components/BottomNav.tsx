@@ -560,9 +560,9 @@ const BottomNav: React.FC = () => {
       <Tabs
         selectedKey={selectedTab}
         onSelectionChange={handleSelectionChange}
-        className="relative flex h-screen min-h-screen max-w-full flex-col overflow-hidden bg-white"
+        className="relative flex h-full max-w-full flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="fixed inset-x-0 bottom-0 z-20 flex items-end gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+        <div className="app-fixed-bottom fixed left-1/2 z-20 flex app-shell-fixed-width -translate-x-1/2 items-end gap-3 px-3 pb-3 pt-2">
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
@@ -679,19 +679,19 @@ const BottomNav: React.FC = () => {
         >
           <Tabs.Panel
             id="match"
-            className="min-h-full bg-gray-50 pb-[calc(4rem+env(safe-area-inset-bottom))]"
+            className="app-panel-bottom-pad min-h-full bg-gray-50"
           >
             <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
-            className="min-h-full bg-gray-50 pb-[calc(4rem+env(safe-area-inset-bottom))]"
+            className="app-panel-bottom-pad min-h-full bg-gray-50"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"
-            className="min-h-full bg-white pb-[calc(4rem+env(safe-area-inset-bottom))]"
+            className="app-panel-bottom-pad min-h-full bg-white"
           >
             <Me />
           </Tabs.Panel>
@@ -703,7 +703,7 @@ const BottomNav: React.FC = () => {
 
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-white via-white/100 to-transparent"
+          className="app-bottom-overlay-height pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white/100 to-transparent"
         />
 
         <BottomSheet

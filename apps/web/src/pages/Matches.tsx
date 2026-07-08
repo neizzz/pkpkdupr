@@ -77,9 +77,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       }
 
       setError(
-        err instanceof Error
-          ? err.message
-          : "매치 목록을 불러오지 못했습니다.",
+        err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.",
       );
     } finally {
       setIsLoading(false);
@@ -124,7 +122,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         throw new Error("로그인이 필요해요.");
       }
       if (!isOnline) {
-        throw new Error("오프라인에서는 결과를 입력할 수 없습니다. 온라인 연결이 필요합니다.");
+        throw new Error(
+          "오프라인에서는 결과를 입력할 수 없습니다. 온라인 연결이 필요합니다.",
+        );
       }
 
       try {
@@ -157,15 +157,20 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         throw new Error("로그인이 필요해요.");
       }
       if (!isOnline) {
-        throw new Error("오프라인에서는 결과를 승인할 수 없습니다. 온라인 연결이 필요합니다.");
+        throw new Error(
+          "오프라인에서는 결과를 승인할 수 없습니다. 온라인 연결이 필요합니다.",
+        );
       }
 
       try {
         setPendingMatchAction({ matchId, type: "approve-result" });
-        const res = await fetch(buildApiUrl(`/api/matches/${matchId}/approval`), {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          buildApiUrl(`/api/matches/${matchId}/approval`),
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -186,15 +191,20 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         throw new Error("로그인이 필요해요.");
       }
       if (!isOnline) {
-        throw new Error("오프라인에서는 합의를 취소할 수 없습니다. 온라인 연결이 필요합니다.");
+        throw new Error(
+          "오프라인에서는 합의를 취소할 수 없습니다. 온라인 연결이 필요합니다.",
+        );
       }
 
       try {
         setPendingMatchAction({ matchId, type: "cancel-approval" });
-        const res = await fetch(buildApiUrl(`/api/matches/${matchId}/approval`), {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          buildApiUrl(`/api/matches/${matchId}/approval`),
+          {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -215,7 +225,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         <div>
           <h2 className="text-2xl font-bold text-amber-950">Matches</h2>
           {!isLoading && matches.length > 0 ? (
-            <div className="mt-2 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-[#888]">
                 전체 {matches.length}경기 · 내 경기 {myMatchCount}경기
               </p>

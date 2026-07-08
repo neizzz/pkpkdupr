@@ -30,21 +30,55 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/dev/qrs"
-        element={import.meta.env.DEV ? <DevQrs /> : <Navigate to="/" replace />}
+        element={
+          import.meta.env.DEV ? (
+            !isAuthenticated ? (
+              <Navigate to="/login" replace />
+            ) : requiresPasswordChange ? (
+              <Navigate to="/force-change-password" replace />
+            ) : (
+              <DevQrs />
+            )
+          ) : (
+            <Navigate to={authenticatedHome} replace />
+          )
+        }
       />
       <Route
         path="/"
         element={
-          isAuthenticated ? <BottomNav /> : <Navigate to="/login" replace />
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : requiresPasswordChange ? (
+            <Navigate to="/force-change-password" replace />
+          ) : (
+            <BottomNav />
+          )
         }
       />
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+        element={
+          isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <Login />
+        }
+      />
+      <Route
+        path="/force-change-password"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : requiresPasswordChange ? (
+            <ForceChangePassword />
+          ) : (
+            <Navigate to="/" replace />
+          )
+        }
       />
       <Route
         path="*"
-        element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />}
+        element={
+          <Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />
+        }
       />
     </Routes>
   );
@@ -55,19 +89,58 @@ function App() {
   const isFullWidthDevPage =
     import.meta.env.DEV && location.pathname === "/dev/qrs";
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const updateViewportMetrics = () => {
+      const visualViewport = window.visualViewport;
+      const visualViewportWidth = visualViewport?.width ?? window.innerWidth;
+      const shellWidth = Math.min(window.innerWidth, visualViewportWidth);
+      const bottomOffset = Math.max(
+        0,
+        window.innerHeight -
+          (visualViewport?.height ?? window.innerHeight) -
+          (visualViewport?.offsetTop ?? 0),
+      );
+
+      document.documentElement.style.setProperty(
+        "--app-shell-width",
+        `${Math.round(shellWidth)}px`,
+      );
+      document.documentElement.style.setProperty(
+        "--app-bottom-offset",
+        `${Math.round(bottomOffset)}px`,
+      );
+    };
+
+    updateViewportMetrics();
+
+    window.addEventListener("resize", updateViewportMetrics);
+    window.visualViewport?.addEventListener("resize", updateViewportMetrics);
+    window.visualViewport?.addEventListener("scroll", updateViewportMetrics);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportMetrics);
+      window.visualViewport?.removeEventListener("resize", updateViewportMetrics);
+      window.visualViewport?.removeEventListener("scroll", updateViewportMetrics);
+    };
+  }, []);
+
   return (
     <div
       className={
         isFullWidthDevPage
-          ? "min-h-screen bg-amber-50"
-          : "min-h-screen flex justify-center bg-gray-900"
+          ? "app-shell-height w-full overflow-hidden bg-amber-50"
+          : "app-shell-height flex w-full min-w-0 justify-center overflow-hidden bg-gray-900"
       }
     >
       <main
         className={
           isFullWidthDevPage
-            ? "w-full min-h-screen"
-            : "w-full max-w-[430px] bg-white min-h-screen shadow-lg"
+            ? "app-shell-height w-full min-w-0 overflow-y-auto overflow-x-hidden"
+            : "app-shell-height w-full min-w-0 max-w-[430px] overflow-hidden bg-white shadow-lg"
         }
       >
         <AuthProvider>
