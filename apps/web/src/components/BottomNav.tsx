@@ -97,8 +97,10 @@ const BottomNav: React.FC = () => {
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [qrRemainingSeconds, setQrRemainingSeconds] = useState(0);
-  const [createMatchQrScannerCloseRequestKey, setCreateMatchQrScannerCloseRequestKey] =
-    useState(0);
+  const [
+    createMatchQrScannerCloseRequestKey,
+    setCreateMatchQrScannerCloseRequestKey,
+  ] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const selectedTabRef = useRef<TabKey>(selectedTab);
   const depthEntriesRef = useRef<Record<TabKey, TabDepthEntry[]>>({
@@ -623,7 +625,7 @@ const BottomNav: React.FC = () => {
         onSelectionChange={handleSelectionChange}
         className="relative flex h-full max-w-full flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="app-fixed-bottom fixed left-1/2 z-20 flex app-shell-fixed-width -translate-x-1/2 items-end gap-3 px-3 pb-3 pt-2">
+        <div className="app-fixed-bottom fixed left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end gap-3 px-3 pb-3 pt-2">
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"

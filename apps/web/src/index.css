@@ -101,8 +101,8 @@
     margin-inline: auto;
   }
 
-  .app-shell-fixed-width {
-    /* width: min(430px, var(--app-shell-width)); */
+  .app-shell-width {
+    width: 100%;
     min-width: min(320px, var(--app-shell-width));
     max-width: min(430px, var(--app-shell-width));
   }

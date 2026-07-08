@@ -118,7 +118,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
       />
       <div
         className={[
-          "app-shell-fixed-width relative z-10 mx-auto w-full",
+          "app-shell-width relative z-10 mx-auto w-full",
           isSheetTransitionEnabled
             ? [
                 "transform-gpu transition-transform will-change-transform",
