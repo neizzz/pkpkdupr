@@ -34,11 +34,9 @@ PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/
 
 파일: `/Users/neiz/pkpkdupr/scripts/manual-deploy.sh`
 
-- 목적: SSH로 서버에 접속한 뒤, `.env` 반영과 `update-server.sh` 실행을 한 번에 처리합니다.
+- 목적: SSH로 서버에 접속한 뒤, 기존 `.env`를 그대로 사용해 `update-server.sh`를 실행합니다.
 - 기본 동작:
-  - `.env`가 없으면 `.env.example`을 복사
-  - `DOMAIN`, `WEB_PUBLIC_PORT`, `ADMIN_STACK_PORT`, `VITE_API_BASE_URL` 갱신
-  - 필요 시 admin/sqlite-web 비밀번호 값 override
+  - `/opt/pkpkdupr/.env` 파일이 이미 존재하는지 확인
   - 필요 시 GHCR 로그인 정보 export 후 `scripts/update-server.sh <image_tag>` 실행
 
 서버 반영 순서:
@@ -46,14 +44,13 @@ PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/
 ```bash
 ssh -p <DEPLOY_PORT> <DEPLOY_USER>@<DEPLOY_HOST>
 cd /opt/pkpkdupr
-chmod +x scripts/manual-deploy.sh scripts/update-server.sh scripts/upsert-env.sh
-bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --public-domain <PUBLIC_DOMAIN>
+chmod +x scripts/manual-deploy.sh scripts/update-server.sh
+bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG>
 ```
 
 예시:
 
 ```bash
 bash scripts/manual-deploy.sh \
-  --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe \
-  --public-domain pkpkdupr.example.com
+  --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe
 ```
