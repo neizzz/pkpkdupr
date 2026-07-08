@@ -13,8 +13,10 @@ import {
   IoPeopleOutline,
   IoPersonCircleOutline,
   IoQrCodeSharp,
+  IoSettingsOutline,
   IoTennisballOutline,
 } from "react-icons/io5";
+import AppSettingsSheetBody from "@/components/AppSettingsSheetBody";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
@@ -87,6 +89,8 @@ const BottomNav: React.FC = () => {
   const [qrTabKey, setQrTabKey] = useState<TabKey>("me");
   const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
   const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("me");
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
+  const [appSettingsTabKey, setAppSettingsTabKey] = useState<TabKey>("me");
   const [matchesReloadKey, setMatchesReloadKey] = useState(0);
   const isCreateMatchQrScannerOpenRef = useRef(false);
   const [qrToken, setQrToken] = useState<PlayerQrTokenResponse | null>(null);
@@ -334,6 +338,17 @@ const BottomNav: React.FC = () => {
     setIsCreateMatchOpen(true);
   }, [pushDepth]);
 
+  const openAppSettingsSheet = useCallback(() => {
+    const tabKey = selectedTabRef.current;
+    setAppSettingsTabKey(tabKey);
+    pushDepth(tabKey, {
+      id: "app-settings-sheet",
+      kind: "bottom-sheet",
+      onClose: () => setIsAppSettingsOpen(false),
+    });
+    setIsAppSettingsOpen(true);
+  }, [pushDepth]);
+
   const handleGlobalMenuOpenChange = useCallback(
     (isOpen: boolean) => {
       if (isOpen) {
@@ -379,6 +394,20 @@ const BottomNav: React.FC = () => {
       }
     },
     [closeDepth, createMatchTabKey, openCreateMatchSheet],
+  );
+
+  const handleAppSettingsOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (isOpen) {
+        openAppSettingsSheet();
+        return;
+      }
+
+      if (!closeDepth(appSettingsTabKey, "app-settings-sheet")) {
+        setIsAppSettingsOpen(false);
+      }
+    },
+    [appSettingsTabKey, closeDepth, openAppSettingsSheet],
   );
 
   const loadPlayerQrToken = useCallback(async () => {
@@ -509,6 +538,9 @@ const BottomNav: React.FC = () => {
         case "create-match":
           if (!isOnline) return;
           openCreateMatchSheet();
+          break;
+        case "settings":
+          openAppSettingsSheet();
           break;
         default:
           break;
@@ -682,6 +714,10 @@ const BottomNav: React.FC = () => {
                   <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
                   <Label>매치 생성</Label>
                 </Dropdown.Item>
+                <Dropdown.Item id="settings" textValue="Settings">
+                  <IoSettingsOutline className="size-4 shrink-0 text-amber-700" />
+                  <Label>설정</Label>
+                </Dropdown.Item>
               </Dropdown.Menu>
               <Separator className="my-1" />
               <div className="relative z-10 px-1 pb-1">
@@ -761,6 +797,15 @@ const BottomNav: React.FC = () => {
             isOnline={isOnline}
             closeQrScannerRequestKey={createMatchQrScannerCloseRequestKey}
           />
+        </BottomSheet>
+
+        <BottomSheet
+          isOpen={isAppSettingsOpen}
+          onOpenChange={handleAppSettingsOpenChange}
+          ariaLabel="앱 설정"
+          className="px-5 pt-6"
+        >
+          <AppSettingsSheetBody />
         </BottomSheet>
       </Tabs>
     </TabNavigationProvider>

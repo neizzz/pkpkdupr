@@ -4,6 +4,8 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
+import PwaUpdatePrompt from "./components/PwaUpdatePrompt";
+import { AppUpdateProvider } from "./context/AppUpdateContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
@@ -199,11 +201,14 @@ function App() {
             : "app-shell-height w-full min-w-0 max-w-[430px] overflow-hidden bg-white shadow-lg"
         }
       >
-        <AuthProvider>
-          <OfflineBanner />
-          <PwaInstallPrompt />
-          <AppRoutes />
-        </AuthProvider>
+        <AppUpdateProvider>
+          <AuthProvider>
+            <OfflineBanner />
+            <PwaInstallPrompt />
+            <PwaUpdatePrompt />
+            <AppRoutes />
+          </AuthProvider>
+        </AppUpdateProvider>
       </main>
     </div>
   );
