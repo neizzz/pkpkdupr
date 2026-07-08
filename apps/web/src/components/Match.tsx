@@ -328,7 +328,7 @@ const Match: React.FC<MatchProps> = ({
         </div>
       </div>
 
-      <div className="mt-3">
+      <div>
         <div className={`relative ${shouldShowTeamSetScores ? "h-10" : ""}`}>
           <div className="grid h-full grid-cols-2 items-center gap-3">
             <p
