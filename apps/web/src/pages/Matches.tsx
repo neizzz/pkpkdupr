@@ -214,33 +214,37 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
         <div>
           <h2 className="text-2xl font-bold text-amber-950">Matches</h2>
-          <div className="mt-2 flex items-center justify-between gap-3">
-            <p className="text-sm text-[#888]">
-              전체 {matches.length}경기 · 내 경기 {myMatchCount}경기
-            </p>
-            <Switch
-              aria-label="내경기만 보기"
-              className="shrink-0"
-              isSelected={isMyMatchOnly}
-              onChange={setIsMyMatchOnly}
-              size="sm"
-              style={
-                {
-                  "--switch-control-bg": "#d1d5db",
-                  "--switch-control-bg-hover": "#cbd5e1",
-                  "--switch-control-bg-checked": "#409eff",
-                  "--switch-control-bg-checked-hover": "#2f8be6",
-                } as React.CSSProperties
-              }
-            >
-              <Switch.Content className="-mx-2 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-[#409eff] touch-manipulation">
-                <Switch.Control>
-                  <Switch.Thumb />
-                </Switch.Control>
-                <span className="text-sm font-semibold leading-none">내경기</span>
-              </Switch.Content>
-            </Switch>
-          </div>
+          {!isLoading && matches.length > 0 ? (
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <p className="text-sm text-[#888]">
+                전체 {matches.length}경기 · 내 경기 {myMatchCount}경기
+              </p>
+              <Switch
+                aria-label="내경기만 보기"
+                className="shrink-0"
+                isSelected={isMyMatchOnly}
+                onChange={setIsMyMatchOnly}
+                size="sm"
+                style={
+                  {
+                    "--switch-control-bg": "#d1d5db",
+                    "--switch-control-bg-hover": "#cbd5e1",
+                    "--switch-control-bg-checked": "#409eff",
+                    "--switch-control-bg-checked-hover": "#2f8be6",
+                  } as React.CSSProperties
+                }
+              >
+                <Switch.Content className="-mx-2 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-[#409eff] touch-manipulation">
+                  <Switch.Control>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                  <span className="text-sm font-semibold leading-none">
+                    내경기
+                  </span>
+                </Switch.Content>
+              </Switch>
+            </div>
+          ) : null}
           {notice ? (
             <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
               {notice}
