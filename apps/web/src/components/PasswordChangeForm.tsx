@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { useAuth } from "@/context/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -23,6 +23,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const newPasswordInputRef = useRef<HTMLInputElement>(null);
   const [currentPasswordValidationError, setCurrentPasswordValidationError] =
     useState<string | null>(null);
   const [passwordSubmitError, setPasswordSubmitError] = useState<string | null>(
@@ -52,6 +53,12 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
     !!currentPasswordValidationError ||
     !!newPasswordValidationError ||
     !!confirmPasswordValidationError;
+
+  useEffect(() => {
+    if (!requireCurrentPassword && isOnline) {
+      newPasswordInputRef.current?.focus();
+    }
+  }, [isOnline, requireCurrentPassword]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -138,31 +145,39 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
         />
       ) : null}
 
-      <input
-        type="password"
-        placeholder="새 패스워드"
-        minLength={6}
-        value={newPassword}
-        disabled={!isOnline}
-        onChange={(event) => {
-          setNewPassword(event.target.value);
-          setPasswordSubmitError(null);
-        }}
-        className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
-      />
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-[#444]">
+        <span>새 비밀번호</span>
+        <input
+          ref={newPasswordInputRef}
+          type="password"
+          autoFocus={!requireCurrentPassword}
+          placeholder="새 비밀번호"
+          minLength={6}
+          value={newPassword}
+          disabled={!isOnline}
+          onChange={(event) => {
+            setNewPassword(event.target.value);
+            setPasswordSubmitError(null);
+          }}
+          className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
+        />
+      </label>
 
-      <input
-        type="password"
-        placeholder="새 패스워드 확인"
-        minLength={6}
-        value={confirmPassword}
-        disabled={!isOnline}
-        onChange={(event) => {
-          setConfirmPassword(event.target.value);
-          setPasswordSubmitError(null);
-        }}
-        className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
-      />
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-[#444]">
+        <span>새 비밀번호 확인</span>
+        <input
+          type="password"
+          placeholder="새 비밀번호 확인"
+          minLength={6}
+          value={confirmPassword}
+          disabled={!isOnline}
+          onChange={(event) => {
+            setConfirmPassword(event.target.value);
+            setPasswordSubmitError(null);
+          }}
+          className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
+        />
+      </label>
 
       <div className="flex items-end justify-between gap-3">
         <p className="bs-text-caption min-h-4 text-error">{validationMessage}</p>

@@ -17,8 +17,8 @@ const ForceChangePassword: React.FC = () => {
   };
 
   return (
-    <div className="flex app-page-fill app-safe-bottom-pad flex-col justify-center overflow-hidden px-3 pt-6">
-      <div className="app-narrow-page app-scroll-area max-h-full self-center rounded-[28px] border border-border bg-white px-5 py-6 shadow-sm">
+    <div className="flex app-page-fill app-safe-bottom-pad items-center justify-center overflow-hidden">
+      <div className="app-narrow-page app-scroll-area flex max-h-full w-full flex-col justify-center px-4 py-6">
         <p className="mb-6 text-sm leading-6 text-[#666]">
           초기 비밀번호여서 비밀번호 변경이 필요합니다.
         </p>
