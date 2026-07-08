@@ -26,7 +26,7 @@ import {
 import { DbRequestError, MatchRepository } from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 
-const app = express();
+const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
 const AVATAR_UPLOAD_ROUTE = "/uploads/avatars";
 const AVATAR_MAX_BYTES = 1024 * 1024;
@@ -171,6 +171,45 @@ const validateCreateMatchTeams = (
   return teams.every(
     (team) => team.length === 2,
   );
+};
+
+const inferMatchTypeFromTeams = (
+  teams: [Player[], Player[]],
+): MatchType => {
+  if (teams.every((team) => team.length === 1)) {
+    const [firstPlayer, secondPlayer] = teams.flat();
+
+    if (!firstPlayer || !secondPlayer) {
+      throw new Error("유효한 팀 구성이 필요합니다.");
+    }
+
+    return firstPlayer.gender === secondPlayer.gender
+      ? "unrestricted-singles"
+      : "singles";
+  }
+
+  if (!teams.every((team) => team.length === 2)) {
+    throw new Error("유효한 팀 구성이 필요합니다.");
+  }
+
+  const [teamA, teamB] = teams;
+  const allPlayers = [...teamA, ...teamB];
+  const menCount = allPlayers.filter((player) => player.gender === "M").length;
+  const womenCount = allPlayers.filter((player) => player.gender === "F").length;
+
+  if (isMixedDoublesTeamValid(teamA) && isMixedDoublesTeamValid(teamB)) {
+    return "mixed-doubles";
+  }
+
+  if (menCount === 4) {
+    return "men-doubles";
+  }
+
+  if (womenCount === 4) {
+    return "women-doubles";
+  }
+
+  return "unrestricted-doubles";
 };
 
 const normalizeRequestedTeamPlayerIds = (teams: [MatchTeamRequest, MatchTeamRequest]) => {
@@ -462,7 +501,7 @@ app.post("/api/matches", async (req, res) => {
 
     const { type, mode, teams, location, scheduledAt } =
       req.body as CreateMatchRequest;
-    if (!isMatchType(type)) {
+    if (type != null && !isMatchType(type)) {
       return res.status(400).json({ error: "유효한 매치 타입이 필요합니다." });
     }
     if (mode != null && !isMatchMode(mode)) {
@@ -494,15 +533,21 @@ app.post("/api/matches", async (req, res) => {
     }
 
     const matchTeams = buildMatchTeamsFromRequests(teams, playersById);
+    const resolvedMatchType = type
+      ? type
+      : inferMatchTypeFromTeams([
+          matchTeams[0].players,
+          matchTeams[1].players,
+        ]);
 
     if (
-      !validateCreateMatchTeams(type, [
+      !validateCreateMatchTeams(resolvedMatchType, [
         matchTeams[0].players,
         matchTeams[1].players,
       ])
     ) {
       return res.status(400).json({
-        error: `${matchTypeLabels[type]}에 맞는 유효한 팀 구성이 필요합니다.`,
+        error: `${matchTypeLabels[resolvedMatchType]}에 맞는 유효한 팀 구성이 필요합니다.`,
       });
     }
 
@@ -512,7 +557,7 @@ app.post("/api/matches", async (req, res) => {
     }
 
     const match = await matchRepository.create({
-      type,
+      type: resolvedMatchType,
       mode: mode ?? DEFAULT_MATCH_MODE,
       source: "player_created",
       creatorPlayerId: decoded.playerId,
@@ -985,10 +1030,18 @@ app.post("/api/admin/register", requireAdmin, async (req, res) => {
   }
 });
 
-(app as any).listen(PORT, async () => {
+export { app };
+
+export const startServer = async () => {
   await authService.initAdmin();
-  console.log(`🚀 API Server running on http://localhost:${PORT}`);
-  console.log(
-    `👤 Admin 계정 동기화 (${process.env.API_ADMIN_USERNAME || "admin"} / ${process.env.API_ADMIN_PASSWORD || "admin123qwe"})`,
-  );
-});
+  return (app as any).listen(PORT, () => {
+    console.log(`🚀 API Server running on http://localhost:${PORT}`);
+    console.log(
+      `👤 Admin 계정 동기화 (${process.env.API_ADMIN_USERNAME || "admin"} / ${process.env.API_ADMIN_PASSWORD || "admin123qwe"})`,
+    );
+  });
+};
+
+if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") {
+  void startServer();
+}

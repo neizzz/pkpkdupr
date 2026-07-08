@@ -7,7 +7,9 @@
         "dev": "tsx watch src/index.ts",
         "build": "tsc",
         "start": "node dist/apps/api/src/index.js",
-        "lint": "eslint ."
+        "lint": "eslint .",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@pkpkdupr/shared": "workspace:*",
@@ -22,7 +24,10 @@
         "@types/cors": "^2.8.17",
         "@types/express": "^4.17.21",
         "@types/jsonwebtoken": "^9.0.10",
+        "@types/supertest": "^6.0.3",
+        "supertest": "^7.1.4",
         "tsx": "^4.7.0",
-        "typescript": "^5.3.3"
+        "typescript": "^5.3.3",
+        "vitest": "^3.2.4"
     }
 }
