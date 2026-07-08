@@ -462,7 +462,7 @@ const Match: React.FC<MatchProps> = ({
                   onChange={(event) =>
                     updateScoreRow(index, "scoreA", event.target.value)
                   }
-                  className="min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-amber-950 outline-none focus:ring-2 focus:ring-[#409eff]/40"
+                  className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-amber-950 outline-none"
                   placeholder="Team A"
                 />
                 <span className="text-sm font-semibold text-[#888]">:</span>
@@ -474,7 +474,7 @@ const Match: React.FC<MatchProps> = ({
                   onChange={(event) =>
                     updateScoreRow(index, "scoreB", event.target.value)
                   }
-                  className="min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-amber-950 outline-none focus:ring-2 focus:ring-[#409eff]/40"
+                  className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-amber-950 outline-none"
                   placeholder="Team B"
                 />
               </div>

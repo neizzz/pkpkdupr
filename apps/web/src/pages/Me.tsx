@@ -125,7 +125,7 @@ const Me: React.FC = () => {
         isOpen={isSettingsOpen}
         onOpenChange={handleSettingsOpenChange}
         ariaLabel="프로필 설정"
-        className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-6"
+        className="px-5 pt-6"
       >
         <ProfileSettingsSheetBody />
       </BottomSheet>

@@ -9,6 +9,46 @@ import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
 import Login from "./pages/Login";
 
+const KEYBOARD_INPUT_TYPES = new Set([
+  "text",
+  "search",
+  "url",
+  "tel",
+  "email",
+  "password",
+  "number",
+  "date",
+  "datetime-local",
+  "month",
+  "time",
+  "week",
+]);
+
+const isKeyboardInputElement = (
+  element: Element | null | undefined,
+): boolean => {
+  if (!element) {
+    return false;
+  }
+
+  if (element instanceof HTMLTextAreaElement) {
+    return !element.readOnly && !element.disabled;
+  }
+
+  if (element instanceof HTMLInputElement) {
+    const inputType = element.type.toLowerCase();
+    return (
+      KEYBOARD_INPUT_TYPES.has(inputType) && !element.readOnly && !element.disabled
+    );
+  }
+
+  return (
+    element instanceof HTMLElement &&
+    element.isContentEditable &&
+    element.getAttribute("contenteditable") !== "false"
+  );
+};
+
 function AppRoutes() {
   const { isAuthenticated, isLoading, requiresPasswordChange } = useAuth();
   const authenticatedHome = requiresPasswordChange ? "/force-change-password" : "/";
@@ -94,35 +134,51 @@ function App() {
       return;
     }
 
+    let isKeyboardInputFocused = isKeyboardInputElement(document.activeElement);
+
     const updateViewportMetrics = () => {
       const visualViewport = window.visualViewport;
-      const visualViewportWidth = visualViewport?.width ?? window.innerWidth;
-      const shellWidth = Math.min(window.innerWidth, visualViewportWidth);
-      const bottomOffset = Math.max(
-        0,
-        window.innerHeight -
-          (visualViewport?.height ?? window.innerHeight) -
-          (visualViewport?.offsetTop ?? 0),
-      );
+      const shellWidth = window.innerWidth;
+      const keyboardOffset = isKeyboardInputFocused
+        ? Math.max(
+            0,
+            window.innerHeight -
+              (visualViewport?.height ?? window.innerHeight) -
+              (visualViewport?.offsetTop ?? 0),
+          )
+        : 0;
 
       document.documentElement.style.setProperty(
         "--app-shell-width",
         `${Math.round(shellWidth)}px`,
       );
       document.documentElement.style.setProperty(
-        "--app-bottom-offset",
-        `${Math.round(bottomOffset)}px`,
+        "--app-keyboard-offset",
+        `${Math.round(keyboardOffset)}px`,
       );
+    };
+
+    const syncKeyboardFocusState = () => {
+      isKeyboardInputFocused = isKeyboardInputElement(document.activeElement);
+      updateViewportMetrics();
+    };
+
+    const handleFocusOut = () => {
+      window.requestAnimationFrame(syncKeyboardFocusState);
     };
 
     updateViewportMetrics();
 
     window.addEventListener("resize", updateViewportMetrics);
+    window.addEventListener("focusin", syncKeyboardFocusState);
+    window.addEventListener("focusout", handleFocusOut);
     window.visualViewport?.addEventListener("resize", updateViewportMetrics);
     window.visualViewport?.addEventListener("scroll", updateViewportMetrics);
 
     return () => {
       window.removeEventListener("resize", updateViewportMetrics);
+      window.removeEventListener("focusin", syncKeyboardFocusState);
+      window.removeEventListener("focusout", handleFocusOut);
       window.visualViewport?.removeEventListener("resize", updateViewportMetrics);
       window.visualViewport?.removeEventListener("scroll", updateViewportMetrics);
     };

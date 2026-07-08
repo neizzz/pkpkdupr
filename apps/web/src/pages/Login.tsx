@@ -55,7 +55,7 @@ const Login: React.FC = () => {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#409eff]"
+            className="app-mobile-input w-full rounded-lg border px-4 py-3"
           />
 
           <input
@@ -64,7 +64,7 @@ const Login: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full rounded-lg border px-4 py-3 focus:outline-none focus:ring-2 focus:ring-[#409eff]"
+            className="app-mobile-input w-full rounded-lg border px-4 py-3"
           />
 
           <label className="flex items-center gap-2 text-sm text-gray-600">

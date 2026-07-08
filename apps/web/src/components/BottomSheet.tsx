@@ -43,7 +43,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           role="dialog"
           aria-label={ariaLabel}
           className={[
-            "relative w-full rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl",
+            "app-bottom-sheet-surface app-bottom-sheet-padding relative w-full rounded-t-3xl bg-white shadow-2xl",
             className,
           ]
             .filter(Boolean)

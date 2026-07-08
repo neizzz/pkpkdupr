@@ -10,7 +10,7 @@
 :root {
   --app-shell-height: 100vh;
   --app-shell-width: 100vw;
-  --app-bottom-offset: 0px;
+  --app-keyboard-offset: 0px;
 }
 
 @supports (height: 100svh) {
@@ -112,38 +112,71 @@
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
+    scroll-padding-bottom: calc(1rem + var(--app-keyboard-offset));
     -webkit-overflow-scrolling: touch;
   }
 
   .app-tab-panel-scroll-area {
     overscroll-behavior: none;
     overscroll-behavior-y: none;
+    scroll-padding-bottom: calc(6rem + var(--app-keyboard-offset));
   }
 
   .app-safe-bottom-pad {
-    padding-bottom: max(env(safe-area-inset-bottom), var(--app-bottom-offset));
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .app-fixed-bottom {
-    bottom: max(env(safe-area-inset-bottom), var(--app-bottom-offset));
+    bottom: calc(env(safe-area-inset-bottom) + var(--app-keyboard-offset));
   }
 
   .app-panel-bottom-pad {
-    padding-bottom: calc(
-      4rem + max(env(safe-area-inset-bottom), var(--app-bottom-offset))
-    );
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
   }
 
   .app-bottom-overlay-height {
     height: calc(
-      5.5rem + max(env(safe-area-inset-bottom), var(--app-bottom-offset))
+      5.5rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
     );
   }
 
   .app-install-prompt-bottom {
     bottom: calc(
-      4.75rem + max(env(safe-area-inset-bottom), var(--app-bottom-offset))
+      4.75rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
     );
+  }
+
+  .app-bottom-sheet-surface {
+    max-height: calc(var(--app-shell-height) - var(--app-keyboard-offset));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-padding-bottom: calc(1rem + var(--app-keyboard-offset));
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-bottom-sheet-padding {
+    padding-bottom: calc(
+      1rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
+    );
+  }
+
+  .app-mobile-input {
+    min-height: 2.75rem;
+    font-size: 16px;
+    line-height: 1.5;
+    appearance: none;
+    -webkit-appearance: none;
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease;
+  }
+
+  .app-mobile-input:focus,
+  .app-mobile-input:focus-visible {
+    outline: none;
+    border-color: #409eff;
+    box-shadow: inset 0 0 0 1px rgba(64, 158, 255, 0.88);
   }
 
   .bs-text-head {

@@ -134,7 +134,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
             setCurrentPasswordValidationError(null);
             setPasswordSubmitError(null);
           }}
-          className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
+          className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
         />
       ) : null}
 
@@ -148,7 +148,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
           setNewPassword(event.target.value);
           setPasswordSubmitError(null);
         }}
-        className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
+        className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
       />
 
       <input
@@ -161,7 +161,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
           setConfirmPassword(event.target.value);
           setPasswordSubmitError(null);
         }}
-        className="w-full rounded-2xl border border-border px-4 py-3 text-sm outline-none transition focus:border-[#409eff] focus:ring-2 focus:ring-[#409eff]/20"
+        className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base outline-none"
       />
 
       <div className="flex items-end justify-between gap-3">
