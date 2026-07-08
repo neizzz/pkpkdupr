@@ -34,7 +34,7 @@ const Login: React.FC = () => {
   return (
     <div className="flex app-page-fill app-safe-bottom-pad w-full min-w-0 flex-col items-center justify-center overflow-hidden px-3 pt-6">
       <div className="app-scroll-area max-h-full w-full self-center">
-        <h1 className="mb-8 text-2xl font-bold">PkpkDupr</h1>
+        <h1 className="mb-8 text-2xl font-bold">PkpkDUPR</h1>
 
         {notice && !error && (
           <div className="mb-4 w-full rounded border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
