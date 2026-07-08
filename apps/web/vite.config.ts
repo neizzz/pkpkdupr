@@ -1,10 +1,23 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
+const appVersion =
+  (
+    JSON.parse(
+      readFileSync(new URL("./package.json", import.meta.url), "utf8"),
+    ) as {
+      version?: string;
+    }
+  ).version ?? "0.0.0";
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -23,8 +36,8 @@ export default defineConfig({
         "pwa-maskable-512x512.png",
       ],
       manifest: {
-        name: "PkpkDupr",
-        short_name: "PkpkDupr",
+        name: "PkpkDUPR",
+        short_name: "PkpkDUPR",
         description: "Pickleball DUPR match and member app",
         id: "/",
         lang: "ko",
@@ -64,7 +77,8 @@ export default defineConfig({
         ],
         runtimeCaching: [
           {
-            urlPattern: /^https?:\/\/[^/]+\/api\/(?:me|players|matches)(?:\?.*)?$/,
+            urlPattern:
+              /^https?:\/\/[^/]+\/api\/(?:me|players|matches)(?:\?.*)?$/,
             handler: "NetworkFirst",
             options: {
               cacheName: "pkpkdupr-api-read-v1",
