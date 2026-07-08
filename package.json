@@ -10,7 +10,7 @@
         "dev:web": "pnpm --filter @pkpkdupr/web dev",
         "dev:api": "pnpm --filter @pkpkdupr/api dev",
         "dev:admin": "pnpm --filter @pkpkdupr/admin-web dev",
-        "prepare": "node scripts/setup-git-hooks.mjs",
+        "prepare": "node --input-type=module -e \"import { existsSync } from 'node:fs'; if (existsSync('./scripts/setup-git-hooks.mjs')) await import('./scripts/setup-git-hooks.mjs')\"",
         "build": "pnpm -r build",
         "build:web": "pnpm --filter @pkpkdupr/web build",
         "build:api": "pnpm --filter @pkpkdupr/api build",

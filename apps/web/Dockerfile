@@ -5,6 +5,9 @@ ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 COPY pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
+COPY apps/admin-web/package.json apps/admin-web/package.json
+COPY apps/api/package.json apps/api/package.json
+COPY apps/db-server/package.json apps/db-server/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN corepack enable \
