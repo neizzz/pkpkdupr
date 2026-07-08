@@ -129,6 +129,9 @@ const Match: React.FC<MatchProps> = ({
     getTeamSetScore(match.scores, 0),
     getTeamSetScore(match.scores, 1),
   ] as const;
+  const shouldShowTeamSetScores = hasResultScores || match.status === "created";
+  const displayedTeamSetScores =
+    match.status === "created" ? ([0, 0] as const) : teamSetScores;
   const teamDuprSums = useMemo(
     () =>
       match.teams.map((team) => {
@@ -326,7 +329,7 @@ const Match: React.FC<MatchProps> = ({
       </div>
 
       <div className="mt-3">
-        <div className={`relative ${hasResultScores ? "h-10" : ""}`}>
+        <div className={`relative ${shouldShowTeamSetScores ? "h-10" : ""}`}>
           <div className="grid h-full grid-cols-2 items-center gap-3">
             <p
               className={`text-center text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
@@ -339,16 +342,16 @@ const Match: React.FC<MatchProps> = ({
               Team B
             </p>
           </div>
-          {hasResultScores ? (
+          {shouldShowTeamSetScores ? (
             <div className="pointer-events-none absolute inset-x-0 top-1/2 h-10 -translate-y-1/2 text-amber-950">
               <span className="absolute right-1/2 top-1/2 -translate-y-1/2 pr-3 text-4xl font-black leading-none tracking-tight">
-                {teamSetScores[0]}
+                {displayedTeamSetScores[0]}
               </span>
               <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl font-bold leading-none text-[#888]">
                 :
               </span>
               <span className="absolute left-1/2 top-1/2 -translate-y-1/2 pl-3 text-4xl font-black leading-none tracking-tight">
-                {teamSetScores[1]}
+                {displayedTeamSetScores[1]}
               </span>
             </div>
           ) : null}
