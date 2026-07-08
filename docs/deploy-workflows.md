@@ -37,8 +37,8 @@ PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/
 - 목적: SSH로 서버에 접속한 뒤, `.env` 반영과 `update-server.sh` 실행을 한 번에 처리합니다.
 - 기본 동작:
   - `.env`가 없으면 `.env.example`을 복사
-  - `DOMAIN`, `WEB_PUBLIC_PORT`, `ADMIN_STACK_PORT`, `VITE_API_BASE_URL`, `GF_SERVER_ROOT_URL` 갱신
-  - 필요 시 admin/Grafana 계정 값 override
+  - `DOMAIN`, `WEB_PUBLIC_PORT`, `ADMIN_STACK_PORT`, `VITE_API_BASE_URL` 갱신
+  - 필요 시 admin/sqlite-web 비밀번호 값 override
   - 필요 시 GHCR 로그인 정보 export 후 `scripts/update-server.sh <image_tag>` 실행
 
 서버 반영 순서:

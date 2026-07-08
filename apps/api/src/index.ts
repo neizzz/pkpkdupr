@@ -18,11 +18,6 @@ import {
 } from "@pkpkdupr/shared/match";
 import type { Player, PlayerStatus } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
-import {
-  getMetricsContentType,
-  getMetricsSnapshot,
-  metricsMiddleware,
-} from "./monitoring/metrics";
 import { DbRequestError, MatchRepository } from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 
@@ -79,13 +74,6 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 app.use(AVATAR_UPLOAD_ROUTE, express.static(avatarUploadDir));
-
-app.get("/metrics", async (_req, res) => {
-  res.set("Content-Type", getMetricsContentType());
-  res.end(await getMetricsSnapshot());
-});
-
-app.use(metricsMiddleware);
 
 app.get("/api/health", (_req, res) => {
   res.json({

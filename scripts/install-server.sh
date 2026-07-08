@@ -109,10 +109,7 @@ JWT_SECRET=${JWT_SECRET_VALUE}
 VITE_API_BASE_URL=https://${DOMAIN_DEFAULT}:${ADMIN_STACK_PORT_DEFAULT}
 API_ADMIN_USERNAME=admin
 API_ADMIN_PASSWORD=admin123qwe
-GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=admin123qwe
-GF_SERVER_ROOT_URL=https://${DOMAIN_DEFAULT}:${ADMIN_STACK_PORT_DEFAULT}/grafana/
-GF_SERVER_SERVE_FROM_SUB_PATH=true
+SQLITE_WEB_PASSWORD=$(random_hex)
 UID=${USER_ID}
 GID=${GROUP_ID}
 EOF
@@ -124,8 +121,7 @@ EOF
   echo "   - VITE_API_BASE_URL=https://${DOMAIN_DEFAULT}:${ADMIN_STACK_PORT_DEFAULT}"
   echo "   - API_ADMIN_USERNAME=admin"
   echo "   - API_ADMIN_PASSWORD=admin123qwe"
-  echo "   - GF_SECURITY_ADMIN_USER=admin"
-  echo "   - GF_SECURITY_ADMIN_PASSWORD=admin123qwe"
+  echo "   - SQLITE_WEB_PASSWORD=<generated>"
 else
   echo "ℹ️ 기존 .env 파일을 사용합니다: ${ENV_FILE}"
 fi
@@ -168,7 +164,7 @@ echo "📦 현재 컨테이너 상태"
 docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" ps
 
 echo "🪵 최근 로그"
-docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" logs --tail=40 proxy web admin-web api db-server grafana prometheus db-exporter || true
+docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" logs --tail=40 proxy web admin-web api db-server uptime-kuma sqlite-web || true
 
 WEB_BASE_URL="https://${DOMAIN_VALUE}"
 ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"
@@ -177,7 +173,8 @@ wait_for_url "${WEB_BASE_URL}/"
 wait_for_url "${ADMIN_STACK_BASE_URL}/api/health"
 wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping"
 wait_for_url "${ADMIN_STACK_BASE_URL}/admin/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/grafana/"
+wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/"
+wait_for_url "${ADMIN_STACK_BASE_URL}/db/"
 
 if command -v node >/dev/null 2>&1; then
   echo "🩺 Node healthy check 실행"

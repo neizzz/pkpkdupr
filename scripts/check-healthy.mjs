@@ -123,9 +123,19 @@ const checks = [
     },
   },
   {
-    name: "Grafana",
+    name: "Uptime Kuma",
     target: "admin",
-    path: "/grafana/",
+    path: "/uptime/",
+    verify: async (response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} 응답`);
+      }
+    },
+  },
+  {
+    name: "SQLite Web",
+    target: "admin",
+    path: "/db/",
     verify: async (response) => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status} 응답`);

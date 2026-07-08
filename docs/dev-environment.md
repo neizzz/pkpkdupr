@@ -1,6 +1,6 @@
 # PkpkDupr dev 환경 구조와 흐름
 
-이 문서는 로컬 개발 환경에서 앱, DB, 모니터링, Grafana row browser가 어떻게 연결되는지 설명합니다.
+이 문서는 로컬 개발 환경에서 앱, DB, 모니터링, SQLite row browser가 어떻게 연결되는지 설명합니다.
 
 ## 실행 명령
 
@@ -12,7 +12,7 @@ pnpm dev
 
 `pnpm dev`는 테스트/개발용 실행 흐름입니다.
 
-- `apps/web`: `http://localhost:3000`
+- `apps/web`: `http://localhost:8080`
 - `apps/admin-web`: `http://localhost:3100`
 - `apps/api`: `http://localhost:4000`
 - `apps/db-server`: `http://localhost:5001`
@@ -32,10 +32,10 @@ pnpm dev:monitoring
 
 dev 모니터링은 운영 compose를 그대로 바꾸지 않고 `docker-compose.dev.yml` override를 더해 실행합니다.
 
-- Prometheus: 컨테이너 내부 `:9090`
-- Grafana 직접 접근: `http://localhost:3300/grafana/`
-- 공식 dev 접근: `http://localhost:3000/grafana/`
-- SQLite exporter: 컨테이너 내부 `db-exporter:9697`
+- Uptime Kuma 직접 접근: `http://localhost:3300/`
+- Uptime Kuma 공식 dev 접근: `http://localhost:8080/uptime/`
+- sqlite-web 직접 접근: `http://localhost:3301/db/`
+- sqlite-web 공식 dev 접근: `http://localhost:8080/db/`
 
 종료:
 
@@ -48,9 +48,10 @@ pnpm dev:monitoring:down
 ```text
 ┌────────────────────────────┐
 │ apps/web                   │
-│ Vite dev server :3000      │
+│ Vite dev server :8080      │
 │ - /api     -> :4000        │
-│ - /grafana -> :3300        │
+│ - /uptime  -> :3300        │
+│ - /db      -> :3301        │
 └─────────────┬──────────────┘
               │
               │ /api
@@ -77,15 +78,9 @@ pnpm dev:monitoring:down
               ├───────────────┐
               ▼               ▼
 ┌───────────────────┐   ┌────────────────────────────┐
-│ db-exporter       │   │ Grafana dev SQLite plugin   │
-│ Prometheus metrics│   │ row browser datasource      │
-└─────────┬─────────┘   └─────────────┬──────────────┘
-          │                           │
-          ▼                           ▼
-┌───────────────────┐        ┌────────────────────────┐
-│ Prometheus        │        │ Grafana :3300/grafana  │
-│ API/SQLite metrics│        │ dashboards             │
-└───────────────────┘        └────────────────────────┘
+│ sqlite-web        │   │ Uptime Kuma               │
+│ DB row browser    │   │ API / admin URL checks    │
+└───────────────────┘   └────────────────────────────┘
 ```
 
 ## dev DB와 mock 데이터
@@ -126,40 +121,29 @@ data/db/db.sqlite
 - match와 match score도 deterministic id를 사용해 중복 삽입하지 않습니다.
 - 운영 compose 기본 실행에는 mock seed가 켜지지 않습니다.
 
-## Grafana 대시보드
+## dev 모니터링 / DB 확인
 
-dev Grafana는 `docker-compose.dev.yml`에서 별도 이미지 `pkpkdupr-grafana-dev`를 빌드합니다.
+### Uptime Kuma
 
-추가 구성:
+- 직접 접근: `http://localhost:3300/`
+- 공식 dev 접근: `http://localhost:8080/uptime/`
+- 첫 실행 시 계정은 UI에서 1회 생성합니다.
+- 기본 용도:
+  - web root 상태 확인
+  - admin 페이지 상태 확인
+  - `/api/health`, `/api/ping` 응답 확인
 
-- SQLite datasource plugin: `frser-sqlite-datasource`
-- plugin path: `/opt/grafana-plugins`
-- SQLite datasource: `SQLite Dev DB`
-- datasource DB path: `/var/lib/pkpkdupr/db/db.sqlite`
+### sqlite-web
 
-### SQLite Row Browser
+- 직접 접근: `http://localhost:3301/db/`
+- 공식 dev 접근: `http://localhost:8080/db/`
+- DB 파일: `data/db/db.sqlite`
+- 기본 설정:
+  - 단일 DB 파일만 노출
+  - read-only 모드
+  - 비밀번호 보호 (`SQLITE_WEB_PASSWORD`)
 
-접속:
-
-```text
-http://localhost:3000/grafana/d/sqlite-row-browser
-```
-
-패널:
-
-- `Database File Size`
-- `Players Count`
-- `Creation Logs Count`
-- `Status Change Logs Count`
-- `Matches Count`
-- `Match Scores Count`
-- `Players`
-- `Player Creation Logs`
-- `Player Status Change Logs`
-- `Matches`
-- `Match Scores`
-
-이 대시보드는 Prometheus 메트릭이 아니라 Grafana SQLite datasource가 `data/db/db.sqlite`를 읽어 실제 row를 보여줍니다.
+sqlite-web은 실제 SQLite 파일 row를 직접 보여주며, 테이블 browse/query를 가볍게 확인하는 용도입니다.
 
 ## 데이터 흐름
 
@@ -176,49 +160,20 @@ admin-web
   -> Grafana SQLite Row Browser refresh
 ```
 
-### SQLite 메트릭 수집
-
-```text
-data/db/db.sqlite
-  -> db-exporter /metrics
-  -> Prometheus scrape
-  -> Grafana Prometheus datasource
-```
-
-현재 SQLite row browser는 직접 SQLite datasource를 사용하므로, row 조회 자체는 Prometheus scrape 상태와 독립적입니다.
-
 ## 문제 해결
 
-### Row Browser가 No data로 보일 때
+### sqlite-web 접속이 안 될 때
 
-1. Grafana dev 이미지에 SQLite plugin이 로드됐는지 확인합니다.
-
-   ```bash
-   docker logs pkpkdupr-grafana --tail 200
-   ```
-
-   정상 로그:
-
-   ```text
-   Plugin registered pluginId=frser-sqlite-datasource
-   ```
-
-2. DB 파일이 존재하는지 확인합니다.
+1. DB 파일이 존재하는지 확인합니다.
 
    ```bash
    ls -l data/db/db.sqlite
    ```
 
-3. Grafana를 다시 빌드/실행합니다.
+2. 모니터링 컨테이너를 다시 실행합니다.
 
    ```bash
-   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build grafana
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d uptime-kuma sqlite-web
    ```
 
-### SQLite metrics가 No data로 보일 때
-
-DB 파일 생성 전에 `db-exporter`가 먼저 떠 있으면 exporter를 재시작합니다.
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml restart db-exporter
-```
+3. 브라우저 접근 경로가 `http://localhost:8080/db/`인지 확인합니다.

@@ -21,8 +21,7 @@ WEB_PUBLIC_PORT="${DEFAULT_WEB_PUBLIC_PORT}"
 ADMIN_STACK_PORT="${DEFAULT_ADMIN_STACK_PORT}"
 API_ADMIN_USERNAME=""
 API_ADMIN_PASSWORD=""
-GF_SECURITY_ADMIN_USER=""
-GF_SECURITY_ADMIN_PASSWORD=""
+SQLITE_WEB_PASSWORD=""
 GHCR_USERNAME_ARG=""
 GHCR_TOKEN_ARG=""
 
@@ -44,8 +43,7 @@ update-server.sh 실행 전에 배포 관련 env 값을 현재 인자 기준으�
   --admin-stack-port <port>       ADMIN_STACK_PORT 값 (기본값: 3333)
   --api-admin-username <value>    API_ADMIN_USERNAME 덮어쓰기
   --api-admin-password <value>    API_ADMIN_PASSWORD 덮어쓰기
-  --gf-admin-user <value>         GF_SECURITY_ADMIN_USER 덮어쓰기
-  --gf-admin-password <value>     GF_SECURITY_ADMIN_PASSWORD 덮어쓰기
+  --sqlite-web-password <value>   SQLITE_WEB_PASSWORD 덮어쓰기
   --ghcr-username <value>         update-server.sh용 GHCR_USERNAME export
   --ghcr-token <value>            update-server.sh용 GHCR_TOKEN export
   -h, --help                      도움말 출력
@@ -67,7 +65,7 @@ update-server.sh 실행 전에 배포 관련 env 값을 현재 인자 기준으�
     --web-public-port 443 \
     --admin-stack-port 3333 \
     --api-admin-username admin \
-    --gf-admin-user admin
+    --sqlite-web-password strong-password
 EOF
 }
 
@@ -122,12 +120,8 @@ while [[ $# -gt 0 ]]; do
       API_ADMIN_PASSWORD="${2:-}"
       shift 2
       ;;
-    --gf-admin-user)
-      GF_SECURITY_ADMIN_USER="${2:-}"
-      shift 2
-      ;;
-    --gf-admin-password)
-      GF_SECURITY_ADMIN_PASSWORD="${2:-}"
+    --sqlite-web-password)
+      SQLITE_WEB_PASSWORD="${2:-}"
       shift 2
       ;;
     --ghcr-username)
@@ -195,7 +189,6 @@ upsert_env_value DOMAIN "${TARGET_DOMAIN}"
 upsert_env_value WEB_PUBLIC_PORT "${WEB_PUBLIC_PORT}"
 upsert_env_value ADMIN_STACK_PORT "${ADMIN_STACK_PORT}"
 upsert_env_value VITE_API_BASE_URL "https://${TARGET_DOMAIN}:${ADMIN_STACK_PORT}"
-upsert_env_value GF_SERVER_ROOT_URL "https://${TARGET_DOMAIN}:${ADMIN_STACK_PORT}/grafana/"
 
 if [[ -n "${API_ADMIN_USERNAME}" ]]; then
   upsert_env_value API_ADMIN_USERNAME "${API_ADMIN_USERNAME}"
@@ -205,12 +198,8 @@ if [[ -n "${API_ADMIN_PASSWORD}" ]]; then
   upsert_env_value API_ADMIN_PASSWORD "${API_ADMIN_PASSWORD}"
 fi
 
-if [[ -n "${GF_SECURITY_ADMIN_USER}" ]]; then
-  upsert_env_value GF_SECURITY_ADMIN_USER "${GF_SECURITY_ADMIN_USER}"
-fi
-
-if [[ -n "${GF_SECURITY_ADMIN_PASSWORD}" ]]; then
-  upsert_env_value GF_SECURITY_ADMIN_PASSWORD "${GF_SECURITY_ADMIN_PASSWORD}"
+if [[ -n "${SQLITE_WEB_PASSWORD}" ]]; then
+  upsert_env_value SQLITE_WEB_PASSWORD "${SQLITE_WEB_PASSWORD}"
 fi
 
 if [[ -n "${GHCR_USERNAME_ARG}" ]]; then

@@ -1,39 +1,14 @@
 services:
-  prometheus:
-    command:
-      - "--config.file=/etc/prometheus/prometheus.dev.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=30d"
-      - "--web.enable-lifecycle"
-    user: "0:0"
-    volumes:
-      - ./infra/monitoring/prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.dev.yml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
   db-server:
     environment:
       - ENABLE_DEV_MOCK_DATA=true
 
-  grafana:
-    build:
-      context: .
-      dockerfile: infra/monitoring/grafana/Dockerfile.dev
-    image: pkpkdupr-grafana-dev
+  uptime-kuma:
     ports:
-      - "3300:3000"
-    volumes:
-      # Keep the DB connection itself read-only via the SQLite datasource
-      # pathOptions, but mount the directory writable so SQLite can create
-      # transient WAL/SHM lock files when the app is writing concurrently.
-      # A read-only bind mount can surface as malformed/no-data responses in
-      # Grafana's SQLite plugin during dev refreshes.
-      - ./data/db:/var/lib/pkpkdupr/db
-      - ./infra/monitoring/grafana/dev-provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./infra/monitoring/grafana/dev-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./infra/monitoring/grafana/dev-dashboards:/etc/grafana/dev-dashboards:ro
+      - "3300:3001"
+
+  sqlite-web:
+    ports:
+      - "3301:8080"
     environment:
-      - GF_PATHS_PLUGINS=/opt/grafana-plugins
-      - GF_SERVER_ROOT_URL=http://localhost:8080/grafana/
-      - GF_SERVER_SERVE_FROM_SUB_PATH=true
-      - GF_LIVE_ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://neiz-office.fedev.kakao.com:8080,http://neiz-office.fedev.kakao.com,https://neiz-office.fedev.kakao.com
+      - SQLITE_WEB_PASSWORD=${SQLITE_WEB_PASSWORD:-dev-password}

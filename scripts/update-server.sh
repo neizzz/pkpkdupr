@@ -95,23 +95,24 @@ WEB_BASE_URL="https://${DOMAIN_VALUE}"
 ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"
 
 echo "📥 이미지 pull 중 (tag=${IMAGE_TAG})..."
-docker compose --env-file "${ENV_FILE}" pull web admin-web api db-server
+docker compose --env-file "${ENV_FILE}" pull web admin-web api db-server uptime-kuma sqlite-web
 
 echo "🚀 서비스 업데이트 중..."
-docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api db-server db-exporter prometheus grafana
+docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api db-server uptime-kuma sqlite-web
 
 echo "📦 현재 컨테이너 상태"
 docker compose --env-file "${ENV_FILE}" ps
 
 echo "🪵 최근 로그"
-docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api db-server grafana prometheus db-exporter || true
+docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api db-server uptime-kuma sqlite-web || true
 
 echo "🔎 HTTPS 응답 확인 중..."
 wait_for_url "${WEB_BASE_URL}/"
 wait_for_url "${ADMIN_STACK_BASE_URL}/api/health"
 wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping"
 wait_for_url "${ADMIN_STACK_BASE_URL}/admin/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/grafana/"
+wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/"
+wait_for_url "${ADMIN_STACK_BASE_URL}/db/"
 
 if command -v node >/dev/null 2>&1; then
   echo "🩺 Node healthy check 실행"

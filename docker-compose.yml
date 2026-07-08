@@ -77,69 +77,39 @@ services:
     networks:
         - pkpkdupr-network
 
-  # 📊 SQLite Exporter (Sidecar for Prometheus metrics)
-  db-exporter:
-    build:
-      context: .
-      dockerfile: infra/monitoring/sqlite-exporter/Dockerfile
-    container_name: pkpkdupr-db-exporter
+  uptime-kuma:
+    image: louislam/uptime-kuma:2
+    container_name: pkpkdupr-uptime-kuma
     volumes:
-         - ${PKPKDUPR_DEPLOY_PATH:-.}/data/db:/data:ro
-         - ./infra/monitoring/sqlite-exporter/config.yml:/etc/sqlite_exporter/config.yml:ro
-    command:
-        - --config.file=/etc/sqlite_exporter/config.yml
-        - --web.listen-address=:9697
+      - uptime-kuma-data:/app/data
     expose:
-        - "9697"
-    depends_on:
-        - db-server
+      - "3001"
     networks:
-        - pkpkdupr-network
+      - pkpkdupr-network
 
-   # 📊 Prometheus
-  prometheus:
-    image: prom/prometheus:v2.47.0
-    container_name: pkpkdupr-prometheus
-    user: "${UID:-1000}:${GID:-1000}"
+  sqlite-web:
+    image: ghcr.io/coleifer/sqlite-web:latest
+    container_name: pkpkdupr-sqlite-web
     volumes:
-        - ./infra/monitoring/prometheus:/etc/prometheus:ro
-        - prometheus-data:/prometheus
-    command:
-        - '--config.file=/etc/prometheus/prometheus.yml'
-        - '--storage.tsdb.path=/prometheus'
-        - '--storage.tsdb.retention.time=30d'
-        - '--web.enable-lifecycle'
-    expose:
-        - "9090"
-    networks:
-        - pkpkdupr-network
-
-   # 📊 Grafana
-  grafana:
-    image: grafana/grafana:10.2.3
-    container_name: pkpkdupr-grafana
-    user: "${UID:-1000}:${GID:-1000}"
-    volumes:
-        - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-        - ./infra/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
-        - grafana-data:/var/lib/grafana
+      - ${PKPKDUPR_DEPLOY_PATH:-.}/data/db:/data:ro
     environment:
-        - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
-        - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin123qwe}
-        - GF_USERS_ALLOW_SIGN_UP=false
-        - GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL:-https://pkpkdupr.duckdns.org:3333/grafana/}
-        - GF_SERVER_SERVE_FROM_SUB_PATH=${GF_SERVER_SERVE_FROM_SUB_PATH:-true}
+      - SQLITE_WEB_PASSWORD=${SQLITE_WEB_PASSWORD:-change-me}
+    command:
+      - /data/db.sqlite
+      - --host=0.0.0.0
+      - --port=8080
+      - --read-only
+      - --url-prefix=/db/
     expose:
-        - "3000"
+      - "8080"
     depends_on:
-        - prometheus
+      - db-server
     networks:
-        - pkpkdupr-network
+      - pkpkdupr-network
 
 networks:
   pkpkdupr-network:
     driver: bridge
 
 volumes:
-  prometheus-data:
-  grafana-data:
+  uptime-kuma-data:

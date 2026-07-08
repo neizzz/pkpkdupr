@@ -59,7 +59,8 @@ export default defineConfig({
         navigateFallbackDenylist: [
           /^\/api\//,
           /^\/uploads\//,
-          /^\/grafana\//,
+          /^\/uptime\//,
+          /^\/db\//,
         ],
         runtimeCaching: [
           {
@@ -117,10 +118,14 @@ export default defineConfig({
         target: "http://localhost:4000",
         changeOrigin: true,
       },
-      "/grafana": {
+      "/uptime": {
         target: "http://localhost:3300",
         changeOrigin: true,
         ws: true,
+      },
+      "/db": {
+        target: "http://localhost:3301",
+        changeOrigin: true,
       },
     },
   },
