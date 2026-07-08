@@ -31,7 +31,7 @@ env:
 
 jobs:
   summarize_manual_remote_deploy:
-    name: Summarize manual remote deploy steps
+    name: Generate manual remote deploy checklist
     runs-on: ubuntu-latest
 
     steps:
@@ -66,13 +66,17 @@ jobs:
       - name: Summarize manual remote deploy commands
         run: |
           cat <<EOF >> "$GITHUB_STEP_SUMMARY"
-          ## Manual remote deploy
+          ## Manual remote deploy checklist
+
+          This workflow prints a reusable checklist only.
+          It does **not** open an SSH session, copy files, or run remote commands automatically.
 
           - Image tag: \`${{ inputs.image_tag }}\`
           - Web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-web:${{ inputs.image_tag }}\`
           - Admin web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-admin-web:${{ inputs.image_tag }}\`
           - API: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-api:${{ inputs.image_tag }}\`
           - DB server: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-db-server:${{ inputs.image_tag }}\`
+          - Manual deploy target domain: \`${TARGET_DOMAIN}\`
 
           ## 1) Prepare SSH access manually
 
