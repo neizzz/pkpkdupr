@@ -6,7 +6,7 @@ services:
     cap_add:
         - NET_ADMIN
     volumes:
-        - ./data/certs:/config
+        - ${PKPKDUPR_DEPLOY_PATH:-.}/data/certs:/config
     environment:
         - PUID=1000
         - PGID=1000
@@ -56,7 +56,7 @@ services:
     volumes:
         # API가 /uploads/avatars/*로 서빙하는 프로필 이미지 영구 저장소입니다.
         # 운영 reverse proxy는 /uploads/avatars/* 요청을 api:4000으로 전달해야 합니다.
-        - ./data/uploads/avatars:/app/data/uploads/avatars
+        - ${PKPKDUPR_DEPLOY_PATH:-.}/data/uploads/avatars:/app/data/uploads/avatars
     depends_on:
         - db-server
     expose:
@@ -71,7 +71,7 @@ services:
     environment:
         - DB_FILE_PATH=file:/app/data/db.sqlite
     volumes:
-        - ./data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
+        - ${PKPKDUPR_DEPLOY_PATH:-.}/data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
     expose:
         - "5001"
     networks:
@@ -84,7 +84,7 @@ services:
       dockerfile: infra/monitoring/sqlite-exporter/Dockerfile
     container_name: pkpkdupr-db-exporter
     volumes:
-         - ./data/db:/data:ro
+         - ${PKPKDUPR_DEPLOY_PATH:-.}/data/db:/data:ro
          - ./infra/monitoring/sqlite-exporter/config.yml:/etc/sqlite_exporter/config.yml:ro
     command:
         - --config.file=/etc/sqlite_exporter/config.yml

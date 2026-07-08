@@ -6,14 +6,14 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 DEPLOY_ROOT="/opt/pkpkdupr"
 
-ROOT_DIR="${DEPLOY_ROOT}"
+ROOT_DIR="${SOURCE_REPO_ROOT}"
 ENV_FILE="${DEPLOY_ROOT}/.env"
 DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
 WEB_PUBLIC_PORT_DEFAULT="443"
 ADMIN_STACK_PORT_DEFAULT="3333"
 GHCR_NAMESPACE_DEFAULT="neizzz"
 IMAGE_TAG_DEFAULT="latest"
-SWAG_TEMPLATE="${DEPLOY_ROOT}/infra/swag/site-confs/default.conf.template"
+SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
 SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.build.yml)
 
@@ -31,21 +31,6 @@ random_hex() {
   fi
 
   od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
-}
-
-sync_source_to_deploy() {
-  mkdir -p "${DEPLOY_ROOT}"
-
-  tar \
-    --exclude='.git' \
-    --exclude='.env' \
-    --exclude='data' \
-    --exclude='node_modules' \
-    --exclude='apps/web/dev-dist' \
-    --exclude='apps/web/dist' \
-    --exclude='apps/admin-web/dist' \
-    -C "${SOURCE_REPO_ROOT}" \
-    -cf - . | tar -C "${DEPLOY_ROOT}" -xf -
 }
 
 read_env_value() {
@@ -92,10 +77,8 @@ docker compose version >/dev/null
 
 echo "ℹ️ 소스 repo 루트: ${SOURCE_REPO_ROOT}"
 echo "ℹ️ 배포 루트: ${DEPLOY_ROOT}"
-echo "🔄 소스 repo를 배포 루트로 동기화합니다."
-sync_source_to_deploy
-
-cd "${DEPLOY_ROOT}"
+export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
+cd "${SOURCE_REPO_ROOT}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   umask 077
@@ -149,26 +132,29 @@ WEB_PUBLIC_PORT_VALUE="${WEB_PUBLIC_PORT_VALUE:-${WEB_PUBLIC_PORT_DEFAULT}}"
 ADMIN_STACK_PORT_VALUE="$(read_env_value ADMIN_STACK_PORT)"
 ADMIN_STACK_PORT_VALUE="${ADMIN_STACK_PORT_VALUE:-${ADMIN_STACK_PORT_DEFAULT}}"
 
-mkdir -p data/db data/uploads/avatars data/certs
+mkdir -p \
+  "${DEPLOY_ROOT}/data/db" \
+  "${DEPLOY_ROOT}/data/uploads/avatars" \
+  "${DEPLOY_ROOT}/data/certs"
 
 echo "🚀 SWAG 초기화 중..."
-docker compose "${COMPOSE_FILES[@]}" up -d proxy
+docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" up -d proxy
 
-wait_for_file "${ROOT_DIR}/data/certs/nginx/proxy.conf"
+wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
 
 mkdir -p "$(dirname "${SWAG_TARGET}")"
 sed "s/__DOMAIN__/${DOMAIN_VALUE}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
 echo "✅ SWAG site config 동기화 완료: ${SWAG_TARGET}"
 
 echo "🚀 전체 서비스 배포 중..."
-docker compose "${COMPOSE_FILES[@]}" up -d --build
-docker compose "${COMPOSE_FILES[@]}" restart proxy
+docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" up -d --build
+docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" restart proxy
 
 echo "📦 현재 컨테이너 상태"
-docker compose "${COMPOSE_FILES[@]}" ps
+docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" ps
 
 echo "🪵 최근 로그"
-docker compose "${COMPOSE_FILES[@]}" logs --tail=40 proxy web admin-web api db-server grafana prometheus db-exporter || true
+docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" logs --tail=40 proxy web admin-web api db-server grafana prometheus db-exporter || true
 
 WEB_BASE_URL="https://${DOMAIN_VALUE}"
 ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"

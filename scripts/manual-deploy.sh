@@ -3,12 +3,14 @@
 set -euo pipefail
 
 DEPLOY_ROOT="/opt/pkpkdupr"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-ROOT_DIR="${DEPLOY_ROOT}"
+ROOT_DIR="${SOURCE_REPO_ROOT}"
 ENV_FILE="${DEPLOY_ROOT}/.env"
-ENV_EXAMPLE_FILE="${DEPLOY_ROOT}/.env.example"
-UPSERT_ENV_SCRIPT="${DEPLOY_ROOT}/scripts/upsert-env.sh"
-UPDATE_SERVER_SCRIPT="${DEPLOY_ROOT}/scripts/update-server.sh"
+ENV_EXAMPLE_FILE="${SOURCE_REPO_ROOT}/.env.example"
+UPSERT_ENV_SCRIPT="${SOURCE_REPO_ROOT}/scripts/upsert-env.sh"
+UPDATE_SERVER_SCRIPT="${SOURCE_REPO_ROOT}/scripts/update-server.sh"
 DEFAULT_DOMAIN="pkpkdupr.duckdns.org"
 DEFAULT_WEB_PUBLIC_PORT="443"
 DEFAULT_ADMIN_STACK_PORT="3333"
@@ -157,9 +159,10 @@ fi
 require_script "${UPSERT_ENV_SCRIPT}"
 require_script "${UPDATE_SERVER_SCRIPT}"
 
-cd "${ROOT_DIR}"
+cd "${SOURCE_REPO_ROOT}"
 
-echo "ℹ️ 배포 루트: ${ROOT_DIR}"
+echo "ℹ️ 소스 repo 루트: ${SOURCE_REPO_ROOT}"
+echo "ℹ️ 배포 루트: ${DEPLOY_ROOT}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   if [[ ! -f "${ENV_EXAMPLE_FILE}" ]]; then
@@ -217,6 +220,8 @@ fi
 if [[ -n "${GHCR_TOKEN_ARG}" ]]; then
   export GHCR_TOKEN="${GHCR_TOKEN_ARG}"
 fi
+
+export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
 
 echo "🚀 서버 배포 스크립트를 실행합니다."
 echo "   - IMAGE_TAG=${IMAGE_TAG}"

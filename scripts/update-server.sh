@@ -3,8 +3,10 @@
 set -euo pipefail
 
 DEPLOY_ROOT="/opt/pkpkdupr"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
-ROOT_DIR="${DEPLOY_ROOT}"
+ROOT_DIR="${SOURCE_REPO_ROOT}"
 ENV_FILE="${DEPLOY_ROOT}/.env"
 IMAGE_TAG_INPUT="${1:-${IMAGE_TAG:-latest}}"
 DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
@@ -50,9 +52,10 @@ fi
 
 docker compose version >/dev/null
 
-cd "${ROOT_DIR}"
-
-echo "ℹ️ 배포 루트: ${ROOT_DIR}"
+cd "${SOURCE_REPO_ROOT}"
+export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
+echo "ℹ️ 소스 repo 루트: ${SOURCE_REPO_ROOT}"
+echo "ℹ️ 배포 루트: ${DEPLOY_ROOT}"
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
@@ -71,16 +74,16 @@ WEB_BASE_URL="https://${DOMAIN_VALUE}"
 ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"
 
 echo "📥 이미지 pull 중 (tag=${IMAGE_TAG})..."
-docker compose pull web admin-web api db-server
+docker compose --env-file "${ENV_FILE}" pull web admin-web api db-server
 
 echo "🚀 서비스 업데이트 중..."
-docker compose up -d proxy web admin-web api db-server db-exporter prometheus grafana
+docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api db-server db-exporter prometheus grafana
 
 echo "📦 현재 컨테이너 상태"
-docker compose ps
+docker compose --env-file "${ENV_FILE}" ps
 
 echo "🪵 최근 로그"
-docker compose logs --tail=40 proxy web admin-web api db-server grafana prometheus db-exporter || true
+docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api db-server grafana prometheus db-exporter || true
 
 echo "🔎 HTTPS 응답 확인 중..."
 wait_for_url "${WEB_BASE_URL}/"
