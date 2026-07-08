@@ -224,11 +224,11 @@ const Members: React.FC = () => {
                       </div>
 
                       <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-[#888]">
-                        <span>S</span>
+                        <span className="font-bold">S</span>
                         <span className="tabular-nums">
                           {formatRating(singlesRating)}
                         </span>
-                        <span>D</span>
+                        <span className="font-bold">D</span>
                         <span className="tabular-nums">
                           {formatRating(doublesRating)}
                         </span>

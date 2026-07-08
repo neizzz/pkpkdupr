@@ -595,12 +595,12 @@ const BottomNav: React.FC = () => {
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-3 gap-1 *:min-w-0"
+              className="grid grid-cols-3 gap-1 rounded-full *:min-w-0"
             >
               <Tabs.Tab
                 id="match"
                 onClick={() => handleActiveTabClick("match")}
-                className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-[#409eff]"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
                   <IoTennisballOutline className="text-base" />
@@ -611,7 +611,7 @@ const BottomNav: React.FC = () => {
               <Tabs.Tab
                 id="members"
                 onClick={() => handleActiveTabClick("members")}
-                className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+                className="min-h-[2.8rem] w-full text-default-500 data-[selected=true]:text-[#409eff]"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
                   <IoPeopleOutline className="text-base" />
@@ -622,7 +622,7 @@ const BottomNav: React.FC = () => {
               <Tabs.Tab
                 id="me"
                 onClick={() => handleActiveTabClick("me")}
-                className="w-full text-default-500 data-[selected=true]:text-[#409eff]"
+                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-[#409eff]"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
                   <IoPersonCircleOutline className="text-base" />
@@ -640,17 +640,17 @@ const BottomNav: React.FC = () => {
             <Button
               isIconOnly
               aria-label="Global plus menu"
-              className={`shrink-0 rounded-full text-white shadow-lg transition-colors ${
+              className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-lg transition-colors ${
                 isGlobalMenuOpen
                   ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
                   : "bg-[#409eff] hover:bg-[#409eff]/90"
               }`}
             >
               <IoAdd
-                size={20}
-                className={`transition-transform duration-200 ${
+                className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
                   isGlobalMenuOpen ? "rotate-45" : "rotate-0"
                 }`}
+                style={{ width: "28px", height: "28px" }}
               />
             </Button>
             <Dropdown.Popover
