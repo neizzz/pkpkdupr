@@ -2,29 +2,13 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-DEFAULT_DEPLOY_ROOT="/opt/pkpkdupr"
+DEPLOY_ROOT="/opt/pkpkdupr"
 
-resolve_root_dir() {
-  if [[ -n "${PKPKDUPR_DEPLOY_PATH:-}" ]]; then
-    printf '%s' "${PKPKDUPR_DEPLOY_PATH}"
-    return
-  fi
-
-  if [[ -f "${DEFAULT_DEPLOY_ROOT}/docker-compose.yml" && -d "${DEFAULT_DEPLOY_ROOT}/scripts" ]]; then
-    printf '%s' "${DEFAULT_DEPLOY_ROOT}"
-    return
-  fi
-
-  printf '%s' "${SCRIPT_REPO_ROOT}"
-}
-
-ROOT_DIR="$(resolve_root_dir)"
-ENV_FILE="${ROOT_DIR}/.env"
-ENV_EXAMPLE_FILE="${ROOT_DIR}/.env.example"
-UPSERT_ENV_SCRIPT="${ROOT_DIR}/scripts/upsert-env.sh"
-UPDATE_SERVER_SCRIPT="${ROOT_DIR}/scripts/update-server.sh"
+ROOT_DIR="${DEPLOY_ROOT}"
+ENV_FILE="${DEPLOY_ROOT}/.env"
+ENV_EXAMPLE_FILE="${DEPLOY_ROOT}/.env.example"
+UPSERT_ENV_SCRIPT="${DEPLOY_ROOT}/scripts/upsert-env.sh"
+UPDATE_SERVER_SCRIPT="${DEPLOY_ROOT}/scripts/update-server.sh"
 DEFAULT_DOMAIN="pkpkdupr.duckdns.org"
 DEFAULT_WEB_PUBLIC_PORT="443"
 DEFAULT_ADMIN_STACK_PORT="3333"

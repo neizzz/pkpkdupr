@@ -2,25 +2,9 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-DEFAULT_DEPLOY_ROOT="/opt/pkpkdupr"
+DEPLOY_ROOT="/opt/pkpkdupr"
 
-resolve_root_dir() {
-  if [[ -n "${PKPKDUPR_DEPLOY_PATH:-}" ]]; then
-    printf '%s' "${PKPKDUPR_DEPLOY_PATH}"
-    return
-  fi
-
-  if [[ -f "${DEFAULT_DEPLOY_ROOT}/docker-compose.yml" && -d "${DEFAULT_DEPLOY_ROOT}/scripts" ]]; then
-    printf '%s' "${DEFAULT_DEPLOY_ROOT}"
-    return
-  fi
-
-  printf '%s' "${SCRIPT_REPO_ROOT}"
-}
-
-ROOT_DIR="$(resolve_root_dir)"
+ROOT_DIR="${DEPLOY_ROOT}"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then

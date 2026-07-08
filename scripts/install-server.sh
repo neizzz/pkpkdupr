@@ -3,32 +3,18 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-DEFAULT_DEPLOY_ROOT="/opt/pkpkdupr"
+SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+DEPLOY_ROOT="/opt/pkpkdupr"
 
-resolve_root_dir() {
-  if [[ -n "${PKPKDUPR_DEPLOY_PATH:-}" ]]; then
-    printf '%s' "${PKPKDUPR_DEPLOY_PATH}"
-    return
-  fi
-
-  if [[ -f "${DEFAULT_DEPLOY_ROOT}/docker-compose.yml" && -d "${DEFAULT_DEPLOY_ROOT}/scripts" ]]; then
-    printf '%s' "${DEFAULT_DEPLOY_ROOT}"
-    return
-  fi
-
-  printf '%s' "${SCRIPT_REPO_ROOT}"
-}
-
-ROOT_DIR="$(resolve_root_dir)"
-ENV_FILE="${ROOT_DIR}/.env"
+ROOT_DIR="${DEPLOY_ROOT}"
+ENV_FILE="${DEPLOY_ROOT}/.env"
 DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
 WEB_PUBLIC_PORT_DEFAULT="443"
 ADMIN_STACK_PORT_DEFAULT="3333"
 GHCR_NAMESPACE_DEFAULT="neizzz"
 IMAGE_TAG_DEFAULT="latest"
-SWAG_TEMPLATE="${ROOT_DIR}/infra/swag/site-confs/default.conf.template"
-SWAG_TARGET="${ROOT_DIR}/data/certs/nginx/site-confs/default.conf"
+SWAG_TEMPLATE="${DEPLOY_ROOT}/infra/swag/site-confs/default.conf.template"
+SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.build.yml)
 
 require_command() {
@@ -45,6 +31,21 @@ random_hex() {
   fi
 
   od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+}
+
+sync_source_to_deploy() {
+  mkdir -p "${DEPLOY_ROOT}"
+
+  tar \
+    --exclude='.git' \
+    --exclude='.env' \
+    --exclude='data' \
+    --exclude='node_modules' \
+    --exclude='apps/web/dev-dist' \
+    --exclude='apps/web/dist' \
+    --exclude='apps/admin-web/dist' \
+    -C "${SOURCE_REPO_ROOT}" \
+    -cf - . | tar -C "${DEPLOY_ROOT}" -xf -
 }
 
 read_env_value() {
@@ -89,9 +90,12 @@ require_command curl
 
 docker compose version >/dev/null
 
-cd "${ROOT_DIR}"
+echo "ℹ️ 소스 repo 루트: ${SOURCE_REPO_ROOT}"
+echo "ℹ️ 배포 루트: ${DEPLOY_ROOT}"
+echo "🔄 소스 repo를 배포 루트로 동기화합니다."
+sync_source_to_deploy
 
-echo "ℹ️ 배포 루트: ${ROOT_DIR}"
+cd "${DEPLOY_ROOT}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   umask 077
