@@ -26,33 +26,44 @@ usage() {
   cat <<'EOF'
 usage: bash scripts/manual-deploy.sh --image-tag <tag> [options]
 
-Run this script on the deploy server after SSH login.
+서버에 SSH 로그인한 뒤, 배포 서버에서 실행하세요.
+이 스크립트는 .env가 없으면 .env.example을 복사하고,
+update-server.sh 실행 전에 배포 관련 env 값을 현재 인자 기준으로 동기화합니다.
 
-required:
-  --image-tag <tag>               GHCR image tag to deploy
+필수:
+  --image-tag <tag>               배포할 GHCR 이미지 태그
 
-optional:
-  --public-domain <domain>        Domain to write into .env DOMAIN
-  --domain <domain>               Alias of --public-domain
-  --web-public-port <port>        WEB_PUBLIC_PORT value (default: 443)
-  --admin-stack-port <port>       ADMIN_STACK_PORT value (default: 3333)
-  --api-admin-username <value>    Override API_ADMIN_USERNAME
-  --api-admin-password <value>    Override API_ADMIN_PASSWORD
-  --gf-admin-user <value>         Override GF_SECURITY_ADMIN_USER
-  --gf-admin-password <value>     Override GF_SECURITY_ADMIN_PASSWORD
-  --ghcr-username <value>         Export GHCR_USERNAME for update-server.sh
-  --ghcr-token <value>            Export GHCR_TOKEN for update-server.sh
-  -h, --help                      Show this help
+선택:
+  --public-domain <domain>        .env의 DOMAIN 값으로 사용할 공개 도메인
+  --domain <domain>               --public-domain 별칭
+  --web-public-port <port>        WEB_PUBLIC_PORT 값 (기본값: 443)
+  --admin-stack-port <port>       ADMIN_STACK_PORT 값 (기본값: 3333)
+  --api-admin-username <value>    API_ADMIN_USERNAME 덮어쓰기
+  --api-admin-password <value>    API_ADMIN_PASSWORD 덮어쓰기
+  --gf-admin-user <value>         GF_SECURITY_ADMIN_USER 덮어쓰기
+  --gf-admin-password <value>     GF_SECURITY_ADMIN_PASSWORD 덮어쓰기
+  --ghcr-username <value>         update-server.sh용 GHCR_USERNAME export
+  --ghcr-token <value>            update-server.sh용 GHCR_TOKEN export
+  -h, --help                      도움말 출력
 
-examples:
+예시:
   bash scripts/manual-deploy.sh \
     --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe \
     --public-domain pkpkdupr.example.com
 
-  GHCR_USERNAME=your-user GHCR_TOKEN=your-token \
-    bash scripts/manual-deploy.sh \
-      --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe \
-      --public-domain pkpkdupr.example.com
+  bash scripts/manual-deploy.sh \
+    --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe \
+    --public-domain pkpkdupr.example.com \
+    --ghcr-username your-user \
+    --ghcr-token your-token
+
+  bash scripts/manual-deploy.sh \
+    --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe \
+    --public-domain pkpkdupr.example.com \
+    --web-public-port 443 \
+    --admin-stack-port 3333 \
+    --api-admin-username admin \
+    --gf-admin-user admin
 EOF
 }
 

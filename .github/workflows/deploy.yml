@@ -105,26 +105,26 @@ jobs:
       - name: Summarize pushed images and manual remote deploy steps
         run: |
           cat <<EOF >> "$GITHUB_STEP_SUMMARY"
-          ## Images pushed successfully
+          ## 배포용 이미지 push 완료
 
-          This workflow only builds and pushes deployable images.
-          It does **not** SSH into the server or run remote deployment commands for you.
+          이 워크플로는 배포 가능한 이미지를 **빌드하고 GHCR에 push만** 합니다.
+          서버 SSH 접속, 파일 동기화, 실제 원격 배포 명령 실행은 **직접 수동으로** 진행해야 합니다.
 
-          - Image tag: \`${IMAGE_TAG}\`
+          - 이미지 태그: \`${IMAGE_TAG}\`
           - Web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-web:${IMAGE_TAG}\`
-          - Admin web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-admin-web:${IMAGE_TAG}\`
+          - Admin Web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-admin-web:${IMAGE_TAG}\`
           - API: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-api:${IMAGE_TAG}\`
-          - DB server: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-db-server:${IMAGE_TAG}\`
-          - Manual deploy target domain: \`${TARGET_DOMAIN}\`
+          - DB Server: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-db-server:${IMAGE_TAG}\`
+          - 수동 배포 대상 도메인: \`${TARGET_DOMAIN}\`
 
-          ## Next steps for manual remote deploy
+          ## 수동 배포 가이드
 
-          1. Prepare SSH access manually on your machine.
-             - private key / agent / known_hosts
-             - target: \`<DEPLOY_USER>@<DEPLOY_HOST>\`
-             - port: \`${DEPLOY_PORT}\`
+          1. 로컬 환경에서 SSH 접속 준비를 합니다.
+             - private key / ssh-agent / known_hosts 상태 확인
+             - 접속 대상: \`<DEPLOY_USER>@<DEPLOY_HOST>\`
+             - 포트: \`${DEPLOY_PORT}\`
 
-          2. Sync deploy files to the server.
+          2. 서버에 배포 파일을 동기화합니다.
 
           \`\`\`bash
           ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST> "mkdir -p '${DEPLOY_PATH}/scripts' '${DEPLOY_PATH}/infra/monitoring' '${DEPLOY_PATH}/infra/swag'"
@@ -135,7 +135,14 @@ jobs:
           scp -P "${DEPLOY_PORT}" -r infra/swag <DEPLOY_USER>@<DEPLOY_HOST>:${DEPLOY_PATH}/infra/
           \`\`\`
 
-          3. SSH into the server, update \`${DEPLOY_PATH}/.env\`, and run the deployment.
+          3. 서버에 SSH 접속한 뒤 \`${DEPLOY_PATH}\`에서 배포를 실행합니다.
+             - \`.env\`가 없으면 \`.env.example\`을 복사합니다.
+             - \`scripts/manual-deploy.sh\`는 실행 전에 아래 값을 자동 동기화합니다.
+               - \`DOMAIN\`
+               - \`WEB_PUBLIC_PORT\`
+               - \`ADMIN_STACK_PORT\`
+               - \`VITE_API_BASE_URL\`
+               - \`GF_SERVER_ROOT_URL\`
 
           \`\`\`bash
           ssh -p "${DEPLOY_PORT}" <DEPLOY_USER>@<DEPLOY_HOST>
@@ -143,15 +150,29 @@ jobs:
           chmod +x scripts/manual-deploy.sh scripts/update-server.sh scripts/upsert-env.sh
           [ -f .env ] || cp .env.example .env
 
-          # Option A: server already logged in to GHCR
+          # 일반 배포: 서버에 GHCR 로그인 상태가 이미 있는 경우
           bash scripts/manual-deploy.sh --image-tag '${IMAGE_TAG}' --public-domain '${TARGET_DOMAIN}'
 
-          # Option B: login just for this deploy
-          GHCR_USERNAME='<GHCR_USERNAME>' GHCR_TOKEN='<GHCR_TOKEN>' \\
-            bash scripts/manual-deploy.sh --image-tag '${IMAGE_TAG}' --public-domain '${TARGET_DOMAIN}'
+          # 이번 배포에만 GHCR 자격증명을 함께 넘기고 싶다면
+          bash scripts/manual-deploy.sh \\
+            --image-tag '${IMAGE_TAG}' \\
+            --public-domain '${TARGET_DOMAIN}' \\
+            --ghcr-username '<GHCR_USERNAME>' \\
+            --ghcr-token '<GHCR_TOKEN>'
+
+          # 포트/관리자 계정을 함께 덮어쓰고 싶다면
+          bash scripts/manual-deploy.sh \\
+            --image-tag '${IMAGE_TAG}' \\
+            --public-domain '${TARGET_DOMAIN}' \\
+            --web-public-port 443 \\
+            --admin-stack-port 3333 \\
+            --api-admin-username '<API_ADMIN_USERNAME>' \\
+            --api-admin-password '<API_ADMIN_PASSWORD>' \\
+            --gf-admin-user '<GF_ADMIN_USER>' \\
+            --gf-admin-password '<GF_ADMIN_PASSWORD>'
           \`\`\`
 
-          4. Verify after deploy.
+          4. 배포 후 아래 URL로 정상 동작을 확인합니다.
 
           - Web: \`https://${TARGET_DOMAIN}/\`
           - API health: \`https://${TARGET_DOMAIN}:3333/api/health\`
