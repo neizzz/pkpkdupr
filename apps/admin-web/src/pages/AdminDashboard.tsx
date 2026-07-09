@@ -735,6 +735,18 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
+    if ((nextSessionName || nextSessionDate) && !nextSessionName) {
+      setError("세션이 있으면 세션명을 입력해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    if ((nextSessionName || nextSessionDate) && !nextSessionDate) {
+      setError("세션이 있으면 세션 날짜를 입력해주세요.");
+      setSuccess(null);
+      return;
+    }
+
     try {
       setSavingMatchMetadataId(matchId);
       setError(null);

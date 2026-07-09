@@ -444,6 +444,10 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       return undefined;
     }
 
+    if (!normalizedSessionName) {
+      throw new Error("세션명이 필요합니다.");
+    }
+
     if (!normalizedSessionDate) {
       throw new Error("세션 날짜를 입력해주세요.");
     }

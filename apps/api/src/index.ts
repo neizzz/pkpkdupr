@@ -152,6 +152,10 @@ const normalizeMatchSession = (
     return undefined;
   }
 
+  if (!name) {
+    throw new Error("세션명이 필요합니다.");
+  }
+
   if (!dateValue) {
     throw new Error("세션 날짜를 입력해주세요.");
   }
@@ -184,6 +188,37 @@ const normalizeOptionalDateString = (value: unknown) => {
   }
 
   return date.toISOString();
+};
+
+const validateSessionMetadataUpdate = ({
+  hasSessionName,
+  hasSessionDate,
+  sessionName,
+  sessionDate,
+}: {
+  hasSessionName: boolean;
+  hasSessionDate: boolean;
+  sessionName: string | undefined;
+  sessionDate: string | null;
+}) => {
+  const hasEffectiveSessionName = Boolean(sessionName);
+  const hasEffectiveSessionDate = Boolean(sessionDate);
+
+  if (!hasSessionName && !hasSessionDate) {
+    return;
+  }
+
+  if (!hasEffectiveSessionName && !hasEffectiveSessionDate) {
+    return;
+  }
+
+  if (!hasEffectiveSessionName) {
+    throw new Error("세션명이 필요합니다.");
+  }
+
+  if (!hasEffectiveSessionDate) {
+    throw new Error("세션 날짜를 입력해주세요.");
+  }
 };
 
 const isMatchType = (value: unknown): value is MatchType =>
@@ -762,14 +797,24 @@ app.patch("/api/admin/matches/:matchId/metadata", requireAdmin, async (req, res)
       return res.status(400).json({ error: "수정할 필드가 없습니다." });
     }
 
+    const normalizedSessionName = hasSessionName
+      ? normalizeOptionalName(body.sessionName)
+      : undefined;
+    const normalizedSessionDate = hasSessionDate
+      ? normalizeOptionalDateString(body.sessionDate)
+      : undefined;
+
+    validateSessionMetadataUpdate({
+      hasSessionName,
+      hasSessionDate,
+      sessionName: normalizedSessionName,
+      sessionDate: normalizedSessionDate ?? null,
+    });
+
     const match = await matchRepository.updateMetadata(req.params.matchId, {
       ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
-      ...(hasSessionName
-        ? { sessionName: normalizeOptionalName(body.sessionName) ?? null }
-        : {}),
-      ...(hasSessionDate
-        ? { sessionDate: normalizeOptionalDateString(body.sessionDate) }
-        : {}),
+      ...(hasSessionName ? { sessionName: normalizedSessionName ?? null } : {}),
+      ...(hasSessionDate ? { sessionDate: normalizedSessionDate ?? null } : {}),
     });
 
     res.json(match);
