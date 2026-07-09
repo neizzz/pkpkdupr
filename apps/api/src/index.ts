@@ -132,6 +132,7 @@ type SubmitMatchResultRequest = {
 type AdminMatchMetadataUpdateRequest = {
   name?: unknown;
   sessionName?: unknown;
+  sessionDate?: unknown;
 };
 
 const normalizeOptionalName = (value: unknown) =>
@@ -161,6 +162,28 @@ const normalizeMatchSession = (
   }
 
   return { name, date };
+};
+
+const normalizeOptionalDateString = (value: unknown) => {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    throw new Error("유효한 세션 날짜가 필요합니다.");
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("유효한 세션 날짜가 필요합니다.");
+  }
+
+  return date.toISOString();
 };
 
 const isMatchType = (value: unknown): value is MatchType =>
@@ -733,8 +756,9 @@ app.patch("/api/admin/matches/:matchId/metadata", requireAdmin, async (req, res)
     const body = req.body as AdminMatchMetadataUpdateRequest;
     const hasName = Object.prototype.hasOwnProperty.call(body, "name");
     const hasSessionName = Object.prototype.hasOwnProperty.call(body, "sessionName");
+    const hasSessionDate = Object.prototype.hasOwnProperty.call(body, "sessionDate");
 
-    if (!hasName && !hasSessionName) {
+    if (!hasName && !hasSessionName && !hasSessionDate) {
       return res.status(400).json({ error: "수정할 필드가 없습니다." });
     }
 
@@ -742,6 +766,9 @@ app.patch("/api/admin/matches/:matchId/metadata", requireAdmin, async (req, res)
       ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
       ...(hasSessionName
         ? { sessionName: normalizeOptionalName(body.sessionName) ?? null }
+        : {}),
+      ...(hasSessionDate
+        ? { sessionDate: normalizeOptionalDateString(body.sessionDate) }
         : {}),
     });
 

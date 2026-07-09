@@ -73,6 +73,7 @@ export interface CreateMatchInput {
 export interface UpdateMatchMetadataInput {
   name?: string | null;
   sessionName?: string | null;
+  sessionDate?: Date | null;
 }
 
 const toDateOrNull = (value: Date | string | number | null | undefined) =>
@@ -466,6 +467,10 @@ export class MatchRepository {
 
     if ("sessionName" in data) {
       updatePayload.sessionName = data.sessionName?.trim() || null;
+    }
+
+    if ("sessionDate" in data) {
+      updatePayload.sessionDate = toDateOrNull(data.sessionDate);
     }
 
     await this.db.update(matches).set(updatePayload).where(eq(matches.id, id));

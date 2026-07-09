@@ -81,6 +81,25 @@ type MatchInfo = {
   updatedAt: string;
 };
 
+const toLocalDateTimeInputValue = (value?: string | null) => {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 const genderLabelMap: Record<PlayerGender, string> = {
   M: "남",
   F: "여",
@@ -247,6 +266,9 @@ const AdminDashboard: React.FC = () => {
   const [matchSessionNameDrafts, setMatchSessionNameDrafts] = useState<
     Record<string, string>
   >({});
+  const [matchSessionDateDrafts, setMatchSessionDateDrafts] = useState<
+    Record<string, string>
+  >({});
   const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<string | null>(
     null,
   );
@@ -335,6 +357,15 @@ const AdminDashboard: React.FC = () => {
         next[loadedMatch.id] =
           prev[loadedMatch.id] ??
           (loadedMatch.sessionName ?? loadedMatch.session?.name ?? "");
+      });
+      return next;
+    });
+    setMatchSessionDateDrafts((prev) => {
+      const next: Record<string, string> = {};
+      loadedMatches.forEach((loadedMatch) => {
+        next[loadedMatch.id] =
+          prev[loadedMatch.id] ??
+          toLocalDateTimeInputValue(loadedMatch.session?.date ?? null);
       });
       return next;
     });
@@ -689,13 +720,18 @@ const AdminDashboard: React.FC = () => {
     const nextSessionName = normalizeDraftValue(
       matchSessionNameDrafts[matchId] ?? "",
     );
+    const nextSessionDate = (matchSessionDateDrafts[matchId] ?? "").trim();
 
     const isNameChanged = nextName !== (targetMatch.name ?? "");
     const currentSessionName =
       targetMatch.sessionName ?? targetMatch.session?.name ?? "";
     const isSessionNameChanged = nextSessionName !== currentSessionName;
+    const currentSessionDate = toLocalDateTimeInputValue(
+      targetMatch.session?.date ?? null,
+    );
+    const isSessionDateChanged = nextSessionDate !== currentSessionDate;
 
-    if (!isNameChanged && !isSessionNameChanged) {
+    if (!isNameChanged && !isSessionNameChanged && !isSessionDateChanged) {
       return;
     }
 
@@ -713,6 +749,7 @@ const AdminDashboard: React.FC = () => {
         body: JSON.stringify({
           name: nextName,
           sessionName: nextSessionName,
+          sessionDate: nextSessionDate,
         }),
       });
 
@@ -734,7 +771,11 @@ const AdminDashboard: React.FC = () => {
         [matchId]:
           updatedMatch.sessionName ?? updatedMatch.session?.name ?? "",
       }));
-      setSuccess("매치 세션명/매치명을 수정했습니다.");
+      setMatchSessionDateDrafts((prev) => ({
+        ...prev,
+        [matchId]: toLocalDateTimeInputValue(updatedMatch.session?.date ?? null),
+      }));
+      setSuccess("매치 세션명/세션 날짜/매치명을 수정했습니다.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {
@@ -1053,6 +1094,7 @@ const AdminDashboard: React.FC = () => {
                     min={2}
                     max={8}
                     step={0.001}
+                    placeholder="2.000~8.000"
                     value={officialRatings[key as keyof typeof officialRatings]}
                     onChange={(e) =>
                       setOfficialRatings((prev) => ({
@@ -1066,7 +1108,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {label} Confidence
+                    {label} Confidence (%)
                   </label>
                   <input
                     type="number"
@@ -1238,6 +1280,7 @@ const AdminDashboard: React.FC = () => {
                   <tr className="border-b text-left text-gray-500">
                     <th className="px-4 pb-3 whitespace-nowrap">일시</th>
                     <th className="px-4 pb-3 whitespace-nowrap">세션명</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">세션 날짜</th>
                     <th className="px-4 pb-3 whitespace-nowrap">매치명</th>
                     <th className="px-4 pb-3 whitespace-nowrap">타입</th>
                     <th className="px-4 pb-3 whitespace-nowrap">모드</th>
@@ -1256,6 +1299,9 @@ const AdminDashboard: React.FC = () => {
                       match.sessionName ??
                       match.session?.name ??
                       "";
+                    const draftSessionDate =
+                      matchSessionDateDrafts[match.id] ??
+                      toLocalDateTimeInputValue(match.session?.date ?? null);
                     const normalizedDraftMatchName =
                       normalizeDraftValue(draftMatchName);
                     const normalizedDraftSessionName =
@@ -1265,6 +1311,9 @@ const AdminDashboard: React.FC = () => {
                     const isSessionNameDirty =
                       normalizedDraftSessionName !==
                       (match.sessionName ?? match.session?.name ?? "");
+                    const isSessionDateDirty =
+                      draftSessionDate !==
+                      toLocalDateTimeInputValue(match.session?.date ?? null);
                     const isSavingMatchMetadata =
                       savingMatchMetadataId === match.id;
 
@@ -1294,6 +1343,20 @@ const AdminDashboard: React.FC = () => {
                               }))
                             }
                             placeholder="세션명"
+                            className="w-full rounded-lg border px-3 py-2"
+                          />
+                        </td>
+                        <td className="px-4 py-4 min-w-[220px]">
+                          <input
+                            type="datetime-local"
+                            value={draftSessionDate}
+                            onChange={(e) =>
+                              setMatchSessionDateDrafts((prev) => ({
+                                ...prev,
+                                [match.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="2026-07-09T18:30"
                             className="w-full rounded-lg border px-3 py-2"
                           />
                         </td>
@@ -1349,7 +1412,9 @@ const AdminDashboard: React.FC = () => {
                             type="button"
                             disabled={
                               isSavingMatchMetadata ||
-                              (!isMatchNameDirty && !isSessionNameDirty)
+                              (!isMatchNameDirty &&
+                                !isSessionNameDirty &&
+                                !isSessionDateDirty)
                             }
                             onClick={() => void handleMatchMetadataSave(match.id)}
                             className="rounded-lg bg-slate-800 px-3 py-2 text-white disabled:bg-slate-300"

@@ -213,7 +213,11 @@ export class MatchRepository {
 
   async updateMetadata(
     matchId: string,
-    input: { name?: string | null; sessionName?: string | null },
+    input: {
+      name?: string | null;
+      sessionName?: string | null;
+      sessionDate?: string | null;
+    },
   ): Promise<Match> {
     const updated = await this.dbRequest<any>(
       `/internal/matches/${matchId}/metadata`,
