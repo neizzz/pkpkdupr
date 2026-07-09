@@ -5,6 +5,7 @@ node_modules/
 dist/
 build/
 .out/
+apps/web/dev-dist/
 data/
 apps/db-server/db.sqlite
 

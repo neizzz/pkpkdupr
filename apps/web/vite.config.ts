@@ -1,11 +1,15 @@
+import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 
-const appVersion =
+const configDir = path.dirname(fileURLToPath(import.meta.url));
+
+const fallbackAppVersion =
   (
     JSON.parse(
       readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -13,6 +17,17 @@ const appVersion =
       version?: string;
     }
   ).version ?? "0.0.0";
+
+const appVersion = (() => {
+  try {
+    return execSync("git describe --tags --abbrev=0", {
+      cwd: configDir,
+      encoding: "utf8",
+    }).trim();
+  } catch {
+    return fallbackAppVersion;
+  }
+})();
 
 export default defineConfig({
   define: {
