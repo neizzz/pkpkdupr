@@ -197,9 +197,9 @@ const Match: React.FC<MatchProps> = ({
   const canAddScoreRow = scoreRows.length < maxScoreCount;
   const displayTitle = match.name ?? matchTopLevelTypeLabels[getMatchTopLevelType(match.type)];
   const sessionLabel = match.session
-    ? [match.session.name, formatDateTime(match.session.date)]
-        .filter(Boolean)
-        .join(" · ")
+    ? match.session.name
+      ? `${match.session.name} at ${formatDateTime(match.session.date)}`
+      : formatDateTime(match.session.date)
     : null;
 
   useEffect(() => {
