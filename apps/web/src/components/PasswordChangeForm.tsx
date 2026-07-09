@@ -146,7 +146,6 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
       ) : null}
 
       <label className="flex flex-col gap-1.5 text-sm font-medium text-[#444]">
-        <span>새 비밀번호</span>
         <input
           ref={newPasswordInputRef}
           type="password"
@@ -164,7 +163,6 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
       </label>
 
       <label className="flex flex-col gap-1.5 text-sm font-medium text-[#444]">
-        <span>새 비밀번호 확인</span>
         <input
           type="password"
           placeholder="새 비밀번호 확인"
