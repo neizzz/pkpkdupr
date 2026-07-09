@@ -70,15 +70,15 @@ describe("RatingService", () => {
       ],
     });
 
-    expect(closeResult.winner.rating.singles.standard).toBe(3.034);
-    expect(closeResult.loser.rating.singles.standard).toBe(2.966);
-    expect(blowoutResult.winner.rating.singles.standard).toBe(3.045);
-    expect(blowoutResult.loser.rating.singles.standard).toBe(2.955);
-    expect(blowoutResult.winner.rating.singles.standard).toBeGreaterThan(
-      closeResult.winner.rating.singles.standard,
+    expect(closeResult.winner.rating.singles).toBe(3.034);
+    expect(closeResult.loser.rating.singles).toBe(2.966);
+    expect(blowoutResult.winner.rating.singles).toBe(3.045);
+    expect(blowoutResult.loser.rating.singles).toBe(2.955);
+    expect(blowoutResult.winner.rating.singles).toBeGreaterThan(
+      closeResult.winner.rating.singles,
     );
-    expect(blowoutResult.loser.rating.singles.standard).toBeLessThan(
-      closeResult.loser.rating.singles.standard,
+    expect(blowoutResult.loser.rating.singles).toBeLessThan(
+      closeResult.loser.rating.singles,
     );
   });
 
@@ -110,15 +110,15 @@ describe("RatingService", () => {
       ],
     });
 
-    expect(twoToOneResult.winner.rating.singles.standard).toBe(3.034);
-    expect(twoToOneResult.loser.rating.singles.standard).toBe(2.966);
-    expect(twoToZeroResult.winner.rating.singles.standard).toBe(3.036);
-    expect(twoToZeroResult.loser.rating.singles.standard).toBe(2.964);
-    expect(twoToZeroResult.winner.rating.singles.standard).toBeGreaterThan(
-      twoToOneResult.winner.rating.singles.standard,
+    expect(twoToOneResult.winner.rating.singles).toBe(3.034);
+    expect(twoToOneResult.loser.rating.singles).toBe(2.966);
+    expect(twoToZeroResult.winner.rating.singles).toBe(3.036);
+    expect(twoToZeroResult.loser.rating.singles).toBe(2.964);
+    expect(twoToZeroResult.winner.rating.singles).toBeGreaterThan(
+      twoToOneResult.winner.rating.singles,
     );
-    expect(twoToZeroResult.loser.rating.singles.standard).toBeLessThan(
-      twoToOneResult.loser.rating.singles.standard,
+    expect(twoToZeroResult.loser.rating.singles).toBeLessThan(
+      twoToOneResult.loser.rating.singles,
     );
   });
 
@@ -151,15 +151,15 @@ describe("RatingService", () => {
       ],
     });
 
-    expect(freshResult.winner.rating.singles.standard).toBe(3.017);
-    expect(freshResult.loser.rating.singles.standard).toBe(2.983);
-    expect(staleResult.winner.rating.singles.standard).toBe(3.025);
-    expect(staleResult.loser.rating.singles.standard).toBe(2.975);
-    expect(staleResult.winner.rating.singles.standard).toBeGreaterThan(
-      freshResult.winner.rating.singles.standard,
+    expect(freshResult.winner.rating.singles).toBe(3.017);
+    expect(freshResult.loser.rating.singles).toBe(2.983);
+    expect(staleResult.winner.rating.singles).toBe(3.025);
+    expect(staleResult.loser.rating.singles).toBe(2.975);
+    expect(staleResult.winner.rating.singles).toBeGreaterThan(
+      freshResult.winner.rating.singles,
     );
-    expect(staleResult.loser.rating.singles.standard).toBeLessThan(
-      freshResult.loser.rating.singles.standard,
+    expect(staleResult.loser.rating.singles).toBeLessThan(
+      freshResult.loser.rating.singles,
     );
   });
 
@@ -200,10 +200,52 @@ describe("RatingService", () => {
       ],
     });
 
-    expect(freshPeersResult.a.metrics.doubles.mixed.confidence).toBe(53);
-    expect(stalePeersResult.a.metrics.doubles.mixed.confidence).toBe(52);
-    expect(stalePeersResult.a.metrics.doubles.mixed.confidence).toBeLessThan(
-      freshPeersResult.a.metrics.doubles.mixed.confidence,
+    expect(freshPeersResult.a.metrics.doubles.confidence).toBe(53);
+    expect(stalePeersResult.a.metrics.doubles.confidence).toBe(52);
+    expect(stalePeersResult.a.metrics.doubles.confidence).toBeLessThan(
+      freshPeersResult.a.metrics.doubles.confidence,
     );
+  });
+
+  it("unrestricted-singles도 singles track를 갱신한다", () => {
+    const service = new RatingService();
+    const result = service.replayMatch({
+      type: "unrestricted-singles",
+      winnerTeamIndex: 0,
+      scores: [{ scoreA: 11, scoreB: 9 }],
+      participants: [
+        { playerId: "winner", teamIndex: 0, state: createState() },
+        { playerId: "loser", teamIndex: 1, state: createState() },
+      ],
+    });
+
+    expect(result.winner.rating.singles).toBe(3.034);
+    expect(result.winner.rating.doubles).toBe(3);
+  });
+
+  it("모든 doubles subtype이 doubles track를 갱신한다", () => {
+    const service = new RatingService();
+
+    for (const type of [
+      "mixed-doubles",
+      "men-doubles",
+      "women-doubles",
+      "unrestricted-doubles",
+    ] as const) {
+      const result = service.replayMatch({
+        type,
+        winnerTeamIndex: 0,
+        scores: [{ scoreA: 11, scoreB: 9 }],
+        participants: [
+          { playerId: "a", teamIndex: 0, state: createState() },
+          { playerId: "b", teamIndex: 0, state: createState() },
+          { playerId: "c", teamIndex: 1, state: createState() },
+          { playerId: "d", teamIndex: 1, state: createState() },
+        ],
+      });
+
+      expect(result.a.rating.doubles).toBe(3.034);
+      expect(result.a.rating.singles).toBe(3);
+    }
   });
 });

@@ -1,6 +1,5 @@
 import type { MatchScore, MatchType } from "@pkpkdupr/shared/match";
 import {
-  computeTotalDuprRating,
   getDuprMetricByCategory,
   getDuprRatingByCategory,
   normalizeDuprRatingValue,
@@ -147,12 +146,11 @@ export const getDecayedConfidenceByInactivity = (
 export const getDuprCategoryForMatchType = (
   matchType: MatchType,
 ): PlayerDuprCategory => {
-  if (matchType === "singles") return "singles.standard";
-  if (matchType === "unrestricted-singles") return "singles.unrestricted";
-  if (matchType === "mixed-doubles") return "doubles.mixed";
-  if (matchType === "men-doubles") return "doubles.men";
-  if (matchType === "women-doubles") return "doubles.women";
-  return "doubles.unrestricted";
+  if (matchType === "singles" || matchType === "unrestricted-singles") {
+    return "singles";
+  }
+
+  return "doubles";
 };
 
 export class RatingService {
@@ -329,10 +327,7 @@ export class RatingService {
       );
 
       nextStates[participant.playerId] = {
-        rating: {
-          ...nextRating,
-          total: computeTotalDuprRating(nextRating),
-        },
+        rating: nextRating,
         metrics: nextMetrics,
       };
     }

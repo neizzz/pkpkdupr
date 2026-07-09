@@ -15,6 +15,7 @@ import {
   getCompositeSinglesRating,
 } from "@pkpkdupr/shared/player";
 import {
+  getMatchTopLevelType,
   matchModeLabels,
   matchSourceLabels,
   matchTypeLabels,
@@ -153,28 +154,11 @@ const formatDuprDelta = (value?: number) => {
   return `${value > 0 ? "+" : ""}${value.toFixed(3)}`;
 };
 
-const averageConfidence = (values: number[]) =>
-  values.length
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : null;
-
 const getCompositeSinglesConfidence = (metrics?: PlayerDuprMetrics | null) =>
-  metrics
-    ? averageConfidence([
-        metrics.singles.standard.confidence,
-        metrics.singles.unrestricted.confidence,
-      ])
-    : null;
+  metrics?.singles.confidence ?? null;
 
 const getCompositeDoublesConfidence = (metrics?: PlayerDuprMetrics | null) =>
-  metrics
-    ? averageConfidence([
-        metrics.doubles.mixed.confidence,
-        metrics.doubles.men.confidence,
-        metrics.doubles.women.confidence,
-        metrics.doubles.unrestricted.confidence,
-      ])
-    : null;
+  metrics?.doubles.confidence ?? null;
 
 const formatDateTime = (value?: string | null) => {
   if (!value) {
@@ -205,28 +189,10 @@ const getScoreLabel = (scores?: MatchScore[]) => {
 const getDisplayRatingForMatchType = (
   matchType: MatchType,
   duprRating?: PublicPlayerDupr | null,
-) => {
-  if (!duprRating) {
-    return null;
-  }
-
-  switch (matchType) {
-    case "singles":
-      return duprRating.singles.standard;
-    case "unrestricted-singles":
-      return duprRating.singles.unrestricted;
-    case "mixed-doubles":
-      return duprRating.doubles.mixed;
-    case "men-doubles":
-      return duprRating.doubles.men;
-    case "women-doubles":
-      return duprRating.doubles.women;
-    case "unrestricted-doubles":
-      return duprRating.doubles.unrestricted;
-    default:
-      return null;
-  }
-};
+) =>
+  getMatchTopLevelType(matchType) === "singles"
+    ? duprRating?.singles ?? null
+    : duprRating?.doubles ?? null;
 
 const getTeamLabel = (team: MatchTeamInfo, matchType: MatchType) =>
   team.players
@@ -288,20 +254,12 @@ const AdminDashboard: React.FC = () => {
   const [officialPlayerId, setOfficialPlayerId] = useState("");
   const [officialReason, setOfficialReason] = useState("");
   const [officialRatings, setOfficialRatings] = useState({
-    standardSingles: "",
-    unrestrictedSingles: "",
-    mixed: "",
-    men: "",
-    women: "",
-    unrestricted: "",
+    singles: "",
+    doubles: "",
   });
   const [officialConfidence, setOfficialConfidence] = useState({
-    standardSingles: "",
-    unrestrictedSingles: "",
-    mixed: "",
-    men: "",
-    women: "",
-    unrestricted: "",
+    singles: "",
+    doubles: "",
   });
   const [officialPreview, setOfficialPreview] =
     useState<OfficialDuprAdjustmentPreview | null>(null);
@@ -973,28 +931,12 @@ const AdminDashboard: React.FC = () => {
 
   const buildOfficialDuprPayload = () => ({
     ratings: {
-      singles: {
-        standard: Number(officialRatings.standardSingles),
-        unrestricted: Number(officialRatings.unrestrictedSingles),
-      },
-      doubles: {
-        mixed: Number(officialRatings.mixed),
-        men: Number(officialRatings.men),
-        women: Number(officialRatings.women),
-        unrestricted: Number(officialRatings.unrestricted),
-      },
+      singles: Number(officialRatings.singles),
+      doubles: Number(officialRatings.doubles),
     },
     confidence: {
-      singles: {
-        standard: Number(officialConfidence.standardSingles),
-        unrestricted: Number(officialConfidence.unrestrictedSingles),
-      },
-      doubles: {
-        mixed: Number(officialConfidence.mixed),
-        men: Number(officialConfidence.men),
-        women: Number(officialConfidence.women),
-        unrestricted: Number(officialConfidence.unrestricted),
-      },
+      singles: Number(officialConfidence.singles),
+      doubles: Number(officialConfidence.doubles),
     },
     reason: officialReason,
   });
@@ -1264,12 +1206,8 @@ const AdminDashboard: React.FC = () => {
               />
             </div>
             {[
-              ["standardSingles", "Singles"],
-              ["unrestrictedSingles", "Unrestricted Singles"],
-              ["mixed", "Mixed"],
-              ["men", "Men"],
-              ["women", "Women"],
-              ["unrestricted", "Unrestricted"],
+              ["singles", "Singles"],
+              ["doubles", "Doubles"],
             ].map(([key, label]) => (
               <React.Fragment key={key}>
                 <div>
@@ -1364,13 +1302,8 @@ const AdminDashboard: React.FC = () => {
                     <thead>
                       <tr className="border-b text-left text-indigo-800">
                         <th className="pb-2">회원</th>
-                        <th className="pb-2">Total</th>
                         <th className="pb-2">Singles</th>
-                        <th className="pb-2">U Singles</th>
-                        <th className="pb-2">Mixed</th>
-                        <th className="pb-2">Men</th>
-                        <th className="pb-2">Women</th>
-                        <th className="pb-2">Unrestricted</th>
+                        <th className="pb-2">Doubles</th>
                         <th className="pb-2">관련 매치</th>
                       </tr>
                     </thead>
@@ -1381,37 +1314,8 @@ const AdminDashboard: React.FC = () => {
                             {impact.username}
                           </td>
                           {[
-                            ["total", impact.nextRating.total, impact.delta.total],
-                            [
-                              "singles",
-                              impact.nextRating.singles.standard,
-                              impact.delta.singles.standard,
-                            ],
-                            [
-                              "unrestricted-singles",
-                              impact.nextRating.singles.unrestricted,
-                              impact.delta.singles.unrestricted,
-                            ],
-                            [
-                              "mixed",
-                              impact.nextRating.doubles.mixed,
-                              impact.delta.doubles.mixed,
-                            ],
-                            [
-                              "men",
-                              impact.nextRating.doubles.men,
-                              impact.delta.doubles.men,
-                            ],
-                            [
-                              "women",
-                              impact.nextRating.doubles.women,
-                              impact.delta.doubles.women,
-                            ],
-                            [
-                              "unrestricted",
-                              impact.nextRating.doubles.unrestricted,
-                              impact.delta.doubles.unrestricted,
-                            ],
+                            ["singles", impact.nextRating.singles, impact.delta.singles],
+                            ["doubles", impact.nextRating.doubles, impact.delta.doubles],
                           ].map(([key, nextValue, deltaValue]) => (
                             <td key={key} className="py-2">
                               <span className="font-medium text-gray-800">

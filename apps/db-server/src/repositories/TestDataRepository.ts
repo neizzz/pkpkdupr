@@ -18,18 +18,9 @@ import { PlayerRepository } from "./PlayerRepository";
 const DEV_PASSWORD_HASH =
   "$2b$10$sb/ySae/JFHbDN/fcXLG5eZLskOjzt6Od1X5LiaYBt8KJ2wtQn2QS"; // dev1234
 
-const createDupr = (total: number): PlayerDupr => ({
-  total,
-  doubles: {
-    mixed: total + 0.012,
-    men: total - 0.008,
-    women: total + 0.004,
-    unrestricted: total + 0.006,
-  },
-  singles: {
-    standard: total - 0.016,
-    unrestricted: total - 0.01,
-  },
+const createDupr = (seed: number): PlayerDupr => ({
+  singles: seed - 0.013,
+  doubles: seed + 0.004,
 });
 
 const mockPlayers: CreateStoredPlayerInput[] = [

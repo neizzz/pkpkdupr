@@ -89,9 +89,10 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
               >
                 {getGenderLabel(pendingQrMember.gender)}
               </p>
-              <p className="mt-2 text-sm font-semibold text-amber-950">
-                {formatRating(pendingQrMember.duprRating?.total)}
-              </p>
+              <div className="mt-2 space-y-1 text-sm font-semibold text-amber-950">
+                <p>S {formatRating(pendingQrMember.duprRating?.singles)}</p>
+                <p>D {formatRating(pendingQrMember.duprRating?.doubles)}</p>
+              </div>
             </div>
           </div>
           <div>
