@@ -99,6 +99,7 @@ docker compose --env-file "${ENV_FILE}" pull web admin-web api db-server uptime-
 
 echo "🚀 서비스 업데이트 중..."
 docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api db-server uptime-kuma sqlite-web
+docker compose --env-file "${ENV_FILE}" restart proxy
 
 echo "📦 현재 컨테이너 상태"
 docker compose --env-file "${ENV_FILE}" ps

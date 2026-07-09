@@ -63,42 +63,38 @@ const AppSettingsSheetBody: React.FC = () => {
         </div>
       ) : null}
 
-      <section className="flex flex-col gap-3 rounded-[28px] border border-border bg-white px-4 py-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
+      <section className="flex flex-col gap-4">
+        <div>
+          <h3 className="bs-text-title text-amber-950">앱 버전</h3>
+          <p className="mt-1 text-sm font-semibold text-[#666]">{appVersion}</p>
+        </div>
+
+        <div className="flex flex-col gap-3">
           <div>
-            <h3 className="bs-text-title text-amber-950">앱 버전</h3>
-            <p className="mt-1 text-sm font-semibold text-[#666]">
-              v{appVersion}
+            <h3 className="bs-text-title text-amber-950">업데이트</h3>
+            <p className="mt-1 text-sm text-[#666]">
+              {isUpdateAvailable
+                ? "새 버전이 준비되어 있어요. 업데이트 후 다시 불러옵니다."
+                : "새 버전이 있는지 확인할 수 있어요."}
             </p>
           </div>
-        </div>
-      </section>
 
-      <section className="flex flex-col gap-3 rounded-[28px] border border-border bg-white px-4 py-4 shadow-sm">
-        <div>
-          <h3 className="bs-text-title text-amber-950">업데이트</h3>
-          <p className="mt-1 text-sm text-[#666]">
-            {isUpdateAvailable
-              ? "새 버전이 준비되어 있어요. 업데이트 후 다시 불러옵니다."
-              : "새 버전이 있는지 확인할 수 있어요."}
-          </p>
-        </div>
-
-        <div className="flex justify-end">
-          <Button
-            type="button"
-            className="app-action-button rounded-2xl bg-[#409eff] px-6 text-white"
-            isDisabled={isCheckingForUpdate || isApplyingUpdate}
-            onPress={() => void handleUpdateAction()}
-          >
-            {isApplyingUpdate
-              ? "업데이트 중..."
-              : isCheckingForUpdate
-                ? "확인 중..."
-                : isUpdateAvailable
-                  ? "지금 업데이트"
-                  : "업데이트 확인"}
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              className="app-action-button rounded-2xl bg-[#409eff] px-6 text-white"
+              isDisabled={isCheckingForUpdate || isApplyingUpdate}
+              onPress={() => void handleUpdateAction()}
+            >
+              {isApplyingUpdate
+                ? "업데이트 중..."
+                : isCheckingForUpdate
+                  ? "확인 중..."
+                  : isUpdateAvailable
+                    ? "지금 업데이트"
+                    : "업데이트 확인"}
+            </Button>
+          </div>
         </div>
       </section>
     </div>
