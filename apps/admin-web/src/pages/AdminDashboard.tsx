@@ -269,13 +269,18 @@ const AdminDashboard: React.FC = () => {
   const [matchSessionDateDrafts, setMatchSessionDateDrafts] = useState<
     Record<string, string>
   >({});
+  const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
+  const [bulkSessionName, setBulkSessionName] = useState("");
+  const [bulkSessionDate, setBulkSessionDate] = useState("");
   const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<string | null>(
     null,
   );
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
-  const [savingMatchMetadataId, setSavingMatchMetadataId] = useState<string | null>(
-    null,
+  const [savingMatchMetadataIds, setSavingMatchMetadataIds] = useState<string[]>(
+    [],
   );
+  const [isSavingBulkMatchMetadata, setIsSavingBulkMatchMetadata] =
+    useState(false);
   const [resettingPasswordPlayerId, setResettingPasswordPlayerId] =
     useState<string | null>(null);
   const [newUsername, setNewUsername] = useState("");
@@ -369,6 +374,11 @@ const AdminDashboard: React.FC = () => {
       });
       return next;
     });
+    setSelectedMatchIds((prev) =>
+      prev.filter((selectedMatchId) =>
+        loadedMatches.some((loadedMatch) => loadedMatch.id === selectedMatchId),
+      ),
+    );
   };
 
   const loadPlayers = async () => {
@@ -748,7 +758,9 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
-      setSavingMatchMetadataId(matchId);
+      setSavingMatchMetadataIds((prev) =>
+        prev.includes(matchId) ? prev : [...prev, matchId],
+      );
       setError(null);
       setSuccess(null);
 
@@ -791,7 +803,171 @@ const AdminDashboard: React.FC = () => {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {
-      setSavingMatchMetadataId(null);
+      setSavingMatchMetadataIds((prev) =>
+        prev.filter((savingMatchId) => savingMatchId !== matchId),
+      );
+    }
+  };
+
+  const toggleMatchSelection = (matchId: string) => {
+    setSelectedMatchIds((prev) =>
+      prev.includes(matchId)
+        ? prev.filter((selectedMatchId) => selectedMatchId !== matchId)
+        : [...prev, matchId],
+    );
+  };
+
+  const handleToggleAllMatches = () => {
+    setSelectedMatchIds((prev) =>
+      prev.length === matches.length ? [] : matches.map((match) => match.id),
+    );
+  };
+
+  const handleBulkSessionApply = async () => {
+    if (selectedMatchIds.length === 0) {
+      setError("세션을 일괄 반영할 매치를 먼저 선택해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    const nextSessionName = normalizeDraftValue(bulkSessionName);
+    const nextSessionDate = bulkSessionDate.trim();
+
+    if ((nextSessionName || nextSessionDate) && !nextSessionName) {
+      setError("세션을 일괄 반영하려면 세션명을 입력해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    if ((nextSessionName || nextSessionDate) && !nextSessionDate) {
+      setError("세션을 일괄 반영하려면 세션 날짜를 입력해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    const selectedMatches = matches.filter((match) =>
+      selectedMatchIds.includes(match.id),
+    );
+    const matchesToUpdate = selectedMatches.filter((match) => {
+      const currentSessionName =
+        match.sessionName ?? match.session?.name ?? "";
+      const currentSessionDate = toLocalDateTimeInputValue(
+        match.session?.date ?? null,
+      );
+
+      return (
+        currentSessionName !== nextSessionName ||
+        currentSessionDate !== nextSessionDate
+      );
+    });
+
+    if (matchesToUpdate.length === 0) {
+      setSuccess("선택한 매치에 반영할 세션 변경이 없습니다.");
+      setError(null);
+      return;
+    }
+
+    try {
+      setIsSavingBulkMatchMetadata(true);
+      setSavingMatchMetadataIds((prev) => [
+        ...new Set([...prev, ...matchesToUpdate.map((match) => match.id)]),
+      ]);
+      setError(null);
+      setSuccess(null);
+
+      const results = await Promise.allSettled(
+        matchesToUpdate.map(async (match) => {
+          const res = await fetch(`/api/admin/matches/${match.id}/metadata`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              sessionName: nextSessionName,
+              sessionDate: nextSessionDate,
+            }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "세션 일괄 반영 실패");
+          }
+
+          return (await res.json()) as MatchInfo;
+        }),
+      );
+
+      const updatedMatches = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      const failedResults = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+
+      if (updatedMatches.length > 0) {
+        const updatedMatchesById = new Map(
+          updatedMatches.map((updatedMatch) => [updatedMatch.id, updatedMatch]),
+        );
+        setMatches((prev) =>
+          prev.map((match) => updatedMatchesById.get(match.id) ?? match),
+        );
+        setMatchNameDrafts((prev) => {
+          const next = { ...prev };
+          updatedMatches.forEach((updatedMatch) => {
+            next[updatedMatch.id] = updatedMatch.name ?? "";
+          });
+          return next;
+        });
+        setMatchSessionNameDrafts((prev) => {
+          const next = { ...prev };
+          updatedMatches.forEach((updatedMatch) => {
+            next[updatedMatch.id] =
+              updatedMatch.sessionName ?? updatedMatch.session?.name ?? "";
+          });
+          return next;
+        });
+        setMatchSessionDateDrafts((prev) => {
+          const next = { ...prev };
+          updatedMatches.forEach((updatedMatch) => {
+            next[updatedMatch.id] = toLocalDateTimeInputValue(
+              updatedMatch.session?.date ?? null,
+            );
+          });
+          return next;
+        });
+      }
+
+      if (failedResults.length > 0) {
+        const firstError = failedResults[0].reason;
+        setError(
+          firstError instanceof Error
+            ? firstError.message
+            : "일부 매치 세션 반영에 실패했습니다.",
+        );
+        setSuccess(
+          updatedMatches.length > 0
+            ? `선택한 ${selectedMatchIds.length}개 중 ${updatedMatches.length}개 매치에 세션을 반영했습니다.`
+            : null,
+        );
+        return;
+      }
+
+      setSelectedMatchIds([]);
+      setSuccess(
+        `${updatedMatches.length}개 매치에 세션명/세션 날짜를 일괄 반영했습니다.`,
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+      setSuccess(null);
+    } finally {
+      setIsSavingBulkMatchMetadata(false);
+      setSavingMatchMetadataIds((prev) =>
+        prev.filter(
+          (savingMatchId) =>
+            !matchesToUpdate.some((match) => match.id === savingMatchId),
+        ),
+      );
     }
   };
 
@@ -1286,10 +1462,77 @@ const AdminDashboard: React.FC = () => {
               등록된 매치가 없습니다.
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      일괄 세션명
+                    </label>
+                    <input
+                      type="text"
+                      value={bulkSessionName}
+                      onChange={(e) => setBulkSessionName(e.target.value)}
+                      placeholder="예: 수요일 저녁 세션"
+                      className="w-full rounded-lg border px-3 py-2"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      일괄 세션 날짜
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={bulkSessionDate}
+                      onChange={(e) => setBulkSessionDate(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleAllMatches}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white"
+                    >
+                      {selectedMatchIds.length === matches.length
+                        ? "전체 선택 해제"
+                        : "전체 선택"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        isSavingBulkMatchMetadata || selectedMatchIds.length === 0
+                      }
+                      onClick={() => void handleBulkSessionApply()}
+                      className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+                    >
+                      {isSavingBulkMatchMetadata
+                        ? "일괄 반영 중..."
+                        : `선택 ${selectedMatchIds.length}개 일괄 반영`}
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  수정할 매치를 선택한 뒤 같은 세션명/세션 날짜를 한 번에 반영할 수 있습니다.
+                  두 값을 모두 비우고 반영하면 선택한 매치의 세션 정보가 제거됩니다.
+                </p>
+              </div>
+
+              <div className="overflow-x-auto">
               <table className="w-full min-w-[1600px] table-auto text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
+                    <th className="px-4 pb-3 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={
+                          matches.length > 0 &&
+                          selectedMatchIds.length === matches.length
+                        }
+                        onChange={handleToggleAllMatches}
+                        aria-label="전체 매치 선택"
+                      />
+                    </th>
                     <th className="px-4 pb-3 whitespace-nowrap">일시</th>
                     <th className="px-4 pb-3 whitespace-nowrap">세션명</th>
                     <th className="px-4 pb-3 whitespace-nowrap">세션 날짜</th>
@@ -1327,13 +1570,21 @@ const AdminDashboard: React.FC = () => {
                       draftSessionDate !==
                       toLocalDateTimeInputValue(match.session?.date ?? null);
                     const isSavingMatchMetadata =
-                      savingMatchMetadataId === match.id;
+                      savingMatchMetadataIds.includes(match.id);
 
                     return (
                       <tr
                         key={match.id}
                         className="border-b align-top hover:bg-gray-50"
                       >
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedMatchIds.includes(match.id)}
+                            onChange={() => toggleMatchSelection(match.id)}
+                            aria-label={`${match.name ?? match.id} 선택`}
+                          />
+                        </td>
                         <td className="px-4 py-4 min-w-[130px] text-xs text-gray-600">
                           <div className="space-y-1">
                             <div>{formatDateTime(match.scheduledAt)}</div>
@@ -1439,7 +1690,8 @@ const AdminDashboard: React.FC = () => {
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </section>
 
