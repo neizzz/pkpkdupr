@@ -1271,6 +1271,7 @@ export class AuthService {
           type: match.type,
           winnerTeamIndex,
           participants,
+          scores: match.scores,
         },
         correctionWeightByPlayerId,
       );

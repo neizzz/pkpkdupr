@@ -1,4 +1,4 @@
-import type { MatchType } from "@pkpkdupr/shared/match";
+import type { MatchScore, MatchType } from "@pkpkdupr/shared/match";
 import {
   computeTotalDuprRating,
   getDuprMetricByCategory,
@@ -32,6 +32,7 @@ export interface MatchReplayInput {
   type: MatchType;
   winnerTeamIndex: 0 | 1;
   participants: MatchParticipantRatingInput[];
+  scores?: MatchScore[];
 }
 
 const CONFIDENCE_K_FACTORS = [
@@ -48,6 +49,68 @@ const average = (values: number[]) =>
   values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : 0;
+
+const getTeamSetWins = (scores: MatchScore[]) =>
+  scores.reduce<[number, number]>(
+    (wins, score) => {
+      if (score.scoreA > score.scoreB) {
+        wins[0] += 1;
+      } else if (score.scoreB > score.scoreA) {
+        wins[1] += 1;
+      }
+
+      return wins;
+    },
+    [0, 0],
+  );
+
+export const getScoreMarginMultiplier = (scores?: MatchScore[]): number => {
+  if (!scores?.length) {
+    return 1;
+  }
+
+  const [teamAPoints, teamBPoints] = scores.reduce<[number, number]>(
+    (acc, score) => [acc[0] + score.scoreA, acc[1] + score.scoreB],
+    [0, 0],
+  );
+  const totalPoints = teamAPoints + teamBPoints;
+
+  if (totalPoints <= 0) {
+    return 1;
+  }
+
+  const marginRatio = clamp(
+    Math.abs(teamAPoints - teamBPoints) / totalPoints,
+    0,
+    1,
+  );
+
+  return roundDuprRating(1 + marginRatio * 0.5);
+};
+
+export const getSetMarginMultiplier = (scores?: MatchScore[]): number => {
+  if (!scores?.length || scores.length === 1) {
+    return 1;
+  }
+
+  const [teamAWins, teamBWins] = getTeamSetWins(scores);
+  const setDiff = Math.abs(teamAWins - teamBWins);
+  const decisiveWinnerWins = Math.max(teamAWins, teamBWins);
+
+  if (decisiveWinnerWins < 2) {
+    return 1;
+  }
+
+  if (setDiff >= 2) {
+    return 1.08;
+  }
+
+  if (setDiff === 1) {
+    return 1.03;
+  }
+
+  return 1;
+};
 
 export const getDuprCategoryForMatchType = (
   matchType: MatchType,
@@ -163,6 +226,8 @@ export class RatingService {
     correctionWeightByPlayerId: Record<string, number> = {},
   ): Record<string, StoredPlayerDupr> {
     const category = getDuprCategoryForMatchType(match.type);
+    const scoreMarginMultiplier = getScoreMarginMultiplier(match.scores);
+    const setMarginMultiplier = getSetMarginMultiplier(match.scores);
     const teamRatings = ([0, 1] as const).map((teamIndex) => {
       const ratings = match.participants
         .filter((participant) => participant.teamIndex === teamIndex)
@@ -197,7 +262,10 @@ export class RatingService {
         isWinner: participant.teamIndex === match.winnerTeamIndex,
         confidence: currentMetric.confidence,
         peerConfidence,
-        correctionWeight: correctionWeightByPlayerId[participant.playerId] ?? 1,
+        correctionWeight:
+          (correctionWeightByPlayerId[participant.playerId] ?? 1) *
+          scoreMarginMultiplier *
+          setMarginMultiplier,
       });
       const nextRating = setDuprRatingByCategory(
         participant.state.rating,
