@@ -129,6 +129,11 @@ type SubmitMatchResultRequest = {
   scores?: MatchScore[];
 };
 
+type AdminMatchMetadataUpdateRequest = {
+  name?: unknown;
+  sessionName?: unknown;
+};
+
 const normalizeOptionalName = (value: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
@@ -714,6 +719,41 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
   }
 });
 
+app.get("/api/admin/matches", requireAdmin, async (_req, res) => {
+  try {
+    const result = await matchRepository.findAll(0, 10000);
+    res.json(result.matches);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.patch("/api/admin/matches/:matchId/metadata", requireAdmin, async (req, res) => {
+  try {
+    const body = req.body as AdminMatchMetadataUpdateRequest;
+    const hasName = Object.prototype.hasOwnProperty.call(body, "name");
+    const hasSessionName = Object.prototype.hasOwnProperty.call(body, "sessionName");
+
+    if (!hasName && !hasSessionName) {
+      return res.status(400).json({ error: "수정할 필드가 없습니다." });
+    }
+
+    const match = await matchRepository.updateMetadata(req.params.matchId, {
+      ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
+      ...(hasSessionName
+        ? { sessionName: normalizeOptionalName(body.sessionName) ?? null }
+        : {}),
+    });
+
+    res.json(match);
+  } catch (err) {
+    if (err instanceof DbRequestError && err.status === 404) {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/matches/:matchId/result", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -885,7 +925,7 @@ app.delete("/api/me/avatar", async (req, res) => {
 
 app.get("/api/admin/players", requireAdmin, async (_req, res) => {
   try {
-    const players = await authService.getAllPlayers();
+    const players = await authService.getAdminPlayers();
     res.json(players);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });

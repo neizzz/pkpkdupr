@@ -27,6 +27,7 @@ import {
   CompletedMatchResultEditError,
   MatchRepository,
   type CreateMatchInput,
+  type UpdateMatchMetadataInput,
 } from "./repositories/MatchRepository";
 import {
   getDevMockUsernames,
@@ -561,6 +562,21 @@ app.post("/internal/matches", async (req, res) => {
     res.json(match);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/matches/:id/metadata", async (req, res) => {
+  try {
+    const match = await matchRepository.updateMetadata(
+      req.params.id,
+      req.body as UpdateMatchMetadataInput,
+    );
+    if (!match) {
+      return res.status(404).json({ error: "매치를 찾을 수 없습니다." });
+    }
+    res.json(match);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
   }
 });
 

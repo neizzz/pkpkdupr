@@ -70,6 +70,11 @@ export interface CreateMatchInput {
   approvals?: MatchResultApproval[];
 }
 
+export interface UpdateMatchMetadataInput {
+  name?: string | null;
+  sessionName?: string | null;
+}
+
 const toDateOrNull = (value: Date | string | number | null | undefined) =>
   value == null ? null : new Date(value);
 
@@ -447,6 +452,26 @@ export class MatchRepository {
     return updated;
   }
 
+  async updateMetadata(
+    id: string,
+    data: UpdateMatchMetadataInput,
+  ): Promise<Match | undefined> {
+    const updatePayload: Partial<typeof matches.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if ("name" in data) {
+      updatePayload.name = data.name?.trim() || null;
+    }
+
+    if ("sessionName" in data) {
+      updatePayload.sessionName = data.sessionName?.trim() || null;
+    }
+
+    await this.db.update(matches).set(updatePayload).where(eq(matches.id, id));
+    return await this.findById(id);
+  }
+
   private async hydrateMatch(match: StoredMatch): Promise<Match> {
     const [participants, scores, approvals] = await Promise.all([
       this.db
@@ -495,13 +520,14 @@ export class MatchRepository {
         ),
     })) as [Team, Team];
 
-    return {
+    const hydratedMatch = {
       id: match.id,
       type: match.type as MatchType,
       mode: (match.mode as MatchMode | null) ?? DEFAULT_MATCH_MODE,
       source: (match.source as MatchSource | null) ?? "player_created",
       creatorPlayerId: match.creatorPlayerId,
       name: match.name?.trim() || undefined,
+      sessionName: match.sessionName?.trim() || undefined,
       session: match.sessionDate
         ? {
             name: match.sessionName?.trim() || undefined,
@@ -519,7 +545,9 @@ export class MatchRepository {
       createdAt: toDate(match.createdAt),
       completedAt: toDateOrNull(match.completedAt),
       updatedAt: toDate(match.updatedAt),
-    };
+    } as Match & { sessionName?: string };
+
+    return hydratedMatch;
   }
 
   private async createParticipants(matchId: string, teams: [Team, Team]) {

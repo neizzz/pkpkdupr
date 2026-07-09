@@ -210,4 +210,19 @@ export class MatchRepository {
       total: result.total,
     };
   }
+
+  async updateMetadata(
+    matchId: string,
+    input: { name?: string | null; sessionName?: string | null },
+  ): Promise<Match> {
+    const updated = await this.dbRequest<any>(
+      `/internal/matches/${matchId}/metadata`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      },
+    );
+
+    return hydrateMatch(updated);
+  }
 }

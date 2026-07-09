@@ -4,6 +4,8 @@ import type {
   Player,
   PlayerCreationLog,
   PlayerCreationSource,
+  PlayerDuprMetrics,
+  PublicPlayerDupr,
   PlayerRatingChangeLog,
   PlayerStatus,
   PlayerStatusChangeLog,
@@ -12,6 +14,16 @@ import {
   getCompositeDoublesRating,
   getCompositeSinglesRating,
 } from "@pkpkdupr/shared/player";
+import {
+  matchModeLabels,
+  matchSourceLabels,
+  matchTypeLabels,
+  type MatchMode,
+  type MatchScore,
+  type MatchSource,
+  type MatchStatus,
+  type MatchType,
+} from "@pkpkdupr/shared/match";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AdminMatchBatchForm, {
@@ -22,6 +34,7 @@ type PlayerInfo = Pick<
   Player,
   "id" | "username" | "duprRating" | "gender" | "status"
 > & {
+  duprMetrics: PlayerDuprMetrics;
   createdAt: string;
   updatedAt: string;
 };
@@ -29,6 +42,44 @@ type PlayerInfo = Pick<
 type PlayerGender = Player["gender"];
 type PlayerStatusLogsByPlayerId = Record<string, PlayerStatusChangeLog[]>;
 type PlayerCreationLogsByPlayerId = Record<string, PlayerCreationLog[]>;
+type MatchPlayerInfo = Pick<
+  Player,
+  "id" | "username" | "gender" | "status" | "duprRating"
+>;
+type MatchTeamInfo = {
+  id: string;
+  name: string;
+  players: MatchPlayerInfo[];
+};
+type MatchApprovalInfo = {
+  playerId: string;
+  approvedAt: string;
+};
+type MatchSessionInfo = {
+  name?: string;
+  date: string;
+};
+type MatchInfo = {
+  id: string;
+  type: MatchType;
+  mode: MatchMode;
+  source: MatchSource;
+  creatorPlayerId: string;
+  name?: string;
+  sessionName?: string;
+  session?: MatchSessionInfo;
+  status: MatchStatus;
+  teams: [MatchTeamInfo, MatchTeamInfo];
+  scores?: MatchScore[];
+  resultSubmittedByPlayerId: string | null;
+  resultSubmittedAt: string | null;
+  approvals: MatchApprovalInfo[];
+  location?: string;
+  scheduledAt: string;
+  createdAt: string;
+  completedAt: string | null;
+  updatedAt: string;
+};
 
 const genderLabelMap: Record<PlayerGender, string> = {
   M: "남",
@@ -45,6 +96,20 @@ const statusBadgeClassMap: Record<PlayerStatus, string> = {
   inactive: "bg-slate-200 text-slate-700",
 };
 
+const matchStatusLabelMap: Record<MatchStatus, string> = {
+  created: "예정",
+  "pending-approval": "합의중",
+  completed: "완료",
+  cancelled: "취소",
+};
+
+const matchStatusBadgeClassMap: Record<MatchStatus, string> = {
+  created: "bg-sky-100 text-sky-700",
+  "pending-approval": "bg-violet-100 text-violet-700",
+  completed: "bg-emerald-100 text-emerald-700",
+  cancelled: "bg-slate-200 text-slate-700",
+};
+
 const creationSourceLabelMap: Record<PlayerCreationSource, string> = {
   self_register: "일반 가입",
   admin_register: "관리자 생성",
@@ -59,6 +124,9 @@ const INITIAL_ADMIN_CREATED_PASSWORD = "123qwe";
 const formatDupr = (value?: number | null) =>
   typeof value === "number" ? value.toFixed(3) : "NR";
 
+const formatConfidence = (value?: number | null) =>
+  typeof value === "number" ? `${Math.round(value)}%` : "-";
+
 const formatDuprDelta = (value?: number) => {
   if (typeof value !== "number") {
     return "-";
@@ -66,10 +134,100 @@ const formatDuprDelta = (value?: number) => {
   return `${value > 0 ? "+" : ""}${value.toFixed(3)}`;
 };
 
+const averageConfidence = (values: number[]) =>
+  values.length
+    ? values.reduce((sum, value) => sum + value, 0) / values.length
+    : null;
+
+const getCompositeSinglesConfidence = (metrics?: PlayerDuprMetrics | null) =>
+  metrics
+    ? averageConfidence([
+        metrics.singles.standard.confidence,
+        metrics.singles.unrestricted.confidence,
+      ])
+    : null;
+
+const getCompositeDoublesConfidence = (metrics?: PlayerDuprMetrics | null) =>
+  metrics
+    ? averageConfidence([
+        metrics.doubles.mixed.confidence,
+        metrics.doubles.men.confidence,
+        metrics.doubles.women.confidence,
+        metrics.doubles.unrestricted.confidence,
+      ])
+    : null;
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+};
+
+const getScoreLabel = (scores?: MatchScore[]) => {
+  if (!scores?.length) {
+    return "-";
+  }
+
+  return scores.map((score) => `${score.scoreA}:${score.scoreB}`).join(" · ");
+};
+
+const getDisplayRatingForMatchType = (
+  matchType: MatchType,
+  duprRating?: PublicPlayerDupr | null,
+) => {
+  if (!duprRating) {
+    return null;
+  }
+
+  switch (matchType) {
+    case "singles":
+      return duprRating.singles.standard;
+    case "unrestricted-singles":
+      return duprRating.singles.unrestricted;
+    case "mixed-doubles":
+      return duprRating.doubles.mixed;
+    case "men-doubles":
+      return duprRating.doubles.men;
+    case "women-doubles":
+      return duprRating.doubles.women;
+    case "unrestricted-doubles":
+      return duprRating.doubles.unrestricted;
+    default:
+      return null;
+  }
+};
+
+const getTeamLabel = (team: MatchTeamInfo, matchType: MatchType) =>
+  team.players
+    .map((member) => {
+      const displayRating = getDisplayRatingForMatchType(
+        matchType,
+        member.duprRating,
+      );
+      return `${member.username} (${formatDupr(displayRating)})`;
+    })
+    .join(", ") || team.name;
+
+const normalizeDraftValue = (value: string) => value.trim();
+
 const AdminDashboard: React.FC = () => {
   const { player, isAdmin, logout, token } = useAuth();
   const navigate = useNavigate();
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
+  const [matches, setMatches] = useState<MatchInfo[]>([]);
+  const [isMatchListExpanded, setIsMatchListExpanded] = useState(true);
   const [statusLogsByPlayerId, setStatusLogsByPlayerId] =
     useState<PlayerStatusLogsByPlayerId>({});
   const [creationLogsByPlayerId, setCreationLogsByPlayerId] =
@@ -83,10 +241,19 @@ const AdminDashboard: React.FC = () => {
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>(
     {},
   );
+  const [matchNameDrafts, setMatchNameDrafts] = useState<Record<string, string>>(
+    {},
+  );
+  const [matchSessionNameDrafts, setMatchSessionNameDrafts] = useState<
+    Record<string, string>
+  >({});
   const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<string | null>(
     null,
   );
   const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
+  const [savingMatchMetadataId, setSavingMatchMetadataId] = useState<string | null>(
+    null,
+  );
   const [resettingPasswordPlayerId, setResettingPasswordPlayerId] =
     useState<string | null>(null);
   const [newUsername, setNewUsername] = useState("");
@@ -154,6 +321,25 @@ const AdminDashboard: React.FC = () => {
     });
   };
 
+  const syncMatchDrafts = (loadedMatches: MatchInfo[]) => {
+    setMatchNameDrafts((prev) => {
+      const next: Record<string, string> = {};
+      loadedMatches.forEach((loadedMatch) => {
+        next[loadedMatch.id] = prev[loadedMatch.id] ?? (loadedMatch.name ?? "");
+      });
+      return next;
+    });
+    setMatchSessionNameDrafts((prev) => {
+      const next: Record<string, string> = {};
+      loadedMatches.forEach((loadedMatch) => {
+        next[loadedMatch.id] =
+          prev[loadedMatch.id] ??
+          (loadedMatch.sessionName ?? loadedMatch.session?.name ?? "");
+      });
+      return next;
+    });
+  };
+
   const loadPlayers = async () => {
     const res = await fetch("/api/admin/players", {
       headers: { Authorization: `Bearer ${token}` },
@@ -192,10 +378,28 @@ const AdminDashboard: React.FC = () => {
     setStatusLogsByPlayerId(data);
   };
 
+  const loadMatches = async () => {
+    const res = await fetch("/api/admin/matches", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      throw new Error("매치 목록을 불러오지 못했습니다.");
+    }
+
+    const data = (await res.json()) as MatchInfo[];
+    setMatches(data);
+    syncMatchDrafts(data);
+  };
+
   const loadDashboardData = async () => {
     try {
       setError(null);
-      await Promise.all([loadPlayers(), loadCreationLogs(), loadStatusLogs()]);
+      await Promise.all([
+        loadPlayers(),
+        loadCreationLogs(),
+        loadStatusLogs(),
+        loadMatches(),
+      ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
     }
@@ -475,7 +679,70 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-const buildOfficialDuprPayload = () => ({
+  const handleMatchMetadataSave = async (matchId: string) => {
+    const targetMatch = matches.find((match) => match.id === matchId);
+    if (!targetMatch) {
+      return;
+    }
+
+    const nextName = normalizeDraftValue(matchNameDrafts[matchId] ?? "");
+    const nextSessionName = normalizeDraftValue(
+      matchSessionNameDrafts[matchId] ?? "",
+    );
+
+    const isNameChanged = nextName !== (targetMatch.name ?? "");
+    const currentSessionName =
+      targetMatch.sessionName ?? targetMatch.session?.name ?? "";
+    const isSessionNameChanged = nextSessionName !== currentSessionName;
+
+    if (!isNameChanged && !isSessionNameChanged) {
+      return;
+    }
+
+    try {
+      setSavingMatchMetadataId(matchId);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch(`/api/admin/matches/${matchId}/metadata`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: nextName,
+          sessionName: nextSessionName,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "매치 메타데이터 수정 실패");
+      }
+
+      const updatedMatch = (await res.json()) as MatchInfo;
+      setMatches((prev) =>
+        prev.map((match) => (match.id === updatedMatch.id ? updatedMatch : match)),
+      );
+      setMatchNameDrafts((prev) => ({
+        ...prev,
+        [matchId]: updatedMatch.name ?? "",
+      }));
+      setMatchSessionNameDrafts((prev) => ({
+        ...prev,
+        [matchId]:
+          updatedMatch.sessionName ?? updatedMatch.session?.name ?? "",
+      }));
+      setSuccess("매치 세션명/매치명을 수정했습니다.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setSavingMatchMetadataId(null);
+    }
+  };
+
+  const buildOfficialDuprPayload = () => ({
     ratings: {
       singles: {
         standard: Number(officialRatings.standardSingles),
@@ -619,7 +886,7 @@ const buildOfficialDuprPayload = () => ({
         </div>
       </header>
 
-      <main className="p-6 max-w-6xl mx-auto space-y-8">
+      <main className="mx-auto max-w-[144rem] space-y-8 p-6">
         <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
             신규 회원 추가
@@ -807,6 +1074,7 @@ const buildOfficialDuprPayload = () => ({
                     min={0}
                     max={100}
                     step={1}
+                    placeholder="0~100"
                     value={
                       officialConfidence[key as keyof typeof officialConfidence]
                     }
@@ -946,6 +1214,159 @@ const buildOfficialDuprPayload = () => ({
         </section>
 
         <section className="bg-white rounded-xl shadow-sm mt-2 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h2 className="text-lg font-semibold text-gray-700">
+              매치 목록 ({matches.length})
+            </h2>
+            <button
+              type="button"
+              onClick={() => setIsMatchListExpanded((prev) => !prev)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              {isMatchListExpanded ? "접기" : "펼치기"}
+            </button>
+          </div>
+
+          {!isMatchListExpanded ? null : matches.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">
+              등록된 매치가 없습니다.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1600px] table-auto text-sm">
+                <thead>
+                  <tr className="border-b text-left text-gray-500">
+                    <th className="px-4 pb-3 whitespace-nowrap">일시</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">세션명</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">매치명</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">타입</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">모드</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">상태</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">생성 방식</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">참가자</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">스코어</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">수정</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matches.map((match) => {
+                    const draftMatchName = matchNameDrafts[match.id] ?? match.name ?? "";
+                    const draftSessionName =
+                      matchSessionNameDrafts[match.id] ??
+                      match.sessionName ??
+                      match.session?.name ??
+                      "";
+                    const normalizedDraftMatchName =
+                      normalizeDraftValue(draftMatchName);
+                    const normalizedDraftSessionName =
+                      normalizeDraftValue(draftSessionName);
+                    const isMatchNameDirty =
+                      normalizedDraftMatchName !== (match.name ?? "");
+                    const isSessionNameDirty =
+                      normalizedDraftSessionName !==
+                      (match.sessionName ?? match.session?.name ?? "");
+                    const isSavingMatchMetadata =
+                      savingMatchMetadataId === match.id;
+
+                    return (
+                      <tr
+                        key={match.id}
+                        className="border-b align-top hover:bg-gray-50"
+                      >
+                        <td className="px-4 py-4 min-w-[130px] text-xs text-gray-600">
+                          <div className="space-y-1">
+                            <div>{formatDateTime(match.scheduledAt)}</div>
+                            {match.session?.date ? (
+                              <div className="text-slate-400">
+                                세션 날짜: {formatDateTime(match.session.date)}
+                              </div>
+                            ) : null}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 min-w-[180px]">
+                          <input
+                            type="text"
+                            value={draftSessionName}
+                            onChange={(e) =>
+                              setMatchSessionNameDrafts((prev) => ({
+                                ...prev,
+                                [match.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="세션명"
+                            className="w-full rounded-lg border px-3 py-2"
+                          />
+                        </td>
+                        <td className="px-4 py-4 min-w-[180px]">
+                          <input
+                            type="text"
+                            value={draftMatchName}
+                            onChange={(e) =>
+                              setMatchNameDrafts((prev) => ({
+                                ...prev,
+                                [match.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="매치명"
+                            className="w-full rounded-lg border px-3 py-2"
+                          />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-700">
+                          {matchTypeLabels[match.type]}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-700">
+                          {matchModeLabels[match.mode]}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${matchStatusBadgeClassMap[match.status]}`}
+                          >
+                            {matchStatusLabelMap[match.status]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-700">
+                          {matchSourceLabels[match.source]}
+                        </td>
+                        <td className="px-4 py-4 min-w-[280px] text-xs text-gray-600">
+                          <div className="space-y-1 leading-5">
+                            <div>
+                              <span className="font-medium text-gray-700">A</span>
+                              <span className="mx-1">·</span>
+                              <span>{getTeamLabel(match.teams[0], match.type)}</span>
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">B</span>
+                              <span className="mx-1">·</span>
+                              <span>{getTeamLabel(match.teams[1], match.type)}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-700">
+                          {getScoreLabel(match.scores)}
+                        </td>
+                        <td className="px-4 py-4 min-w-[120px]">
+                          <button
+                            type="button"
+                            disabled={
+                              isSavingMatchMetadata ||
+                              (!isMatchNameDirty && !isSessionNameDirty)
+                            }
+                            onClick={() => void handleMatchMetadataSave(match.id)}
+                            className="rounded-lg bg-slate-800 px-3 py-2 text-white disabled:bg-slate-300"
+                          >
+                            {isSavingMatchMetadata ? "저장 중..." : "저장"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="bg-white rounded-xl shadow-sm mt-2 p-6 space-y-4">
           <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
             회원 목록 ({players.length})
           </h2>
@@ -956,17 +1377,20 @@ const buildOfficialDuprPayload = () => ({
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[1360px] table-auto text-sm">
                 <thead>
                   <tr className="border-b text-left text-gray-500">
-                    <th className="pb-2 pl-2">Username</th>
-                    <th className="pb-2">DUPR</th>
-                    <th className="pb-2">성별</th>
-                    <th className="pb-2">현재 상태</th>
-                    <th className="pb-2">상태 변경</th>
-                    <th className="pb-2">비밀번호 초기화</th>
-                    <th className="pb-2">생성 로그</th>
-                    <th className="pb-2 pr-2">상태 로그</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">Username</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">DUPR</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">Confidence</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">성별</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">현재 상태</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">상태 변경</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">
+                      비밀번호 초기화
+                    </th>
+                    <th className="px-4 pb-3 whitespace-nowrap">생성 로그</th>
+                    <th className="px-4 pb-3 whitespace-nowrap">상태 로그</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -986,17 +1410,31 @@ const buildOfficialDuprPayload = () => ({
                       p.username === PROTECTED_ADMIN_USERNAME;
                     const singlesRating = getCompositeSinglesRating(p.duprRating);
                     const doublesRating = getCompositeDoublesRating(p.duprRating);
+                    const singlesConfidence = p.duprRating
+                      ? getCompositeSinglesConfidence(p.duprMetrics)
+                      : null;
+                    const doublesConfidence = p.duprRating
+                      ? getCompositeDoublesConfidence(p.duprMetrics)
+                      : null;
 
                     return (
                       <tr key={p.id} className="border-b align-top hover:bg-gray-50">
-                        <td className="py-3 pl-2 font-medium">{p.username}</td>
-                        <td className="py-3 text-blue-600">
+                        <td className="px-4 py-4 font-medium whitespace-nowrap">
+                          {p.username}
+                        </td>
+                        <td className="px-4 py-4 min-w-[120px] text-blue-600">
                           <div className="space-y-1 text-xs">
                             <div>S {formatDupr(singlesRating)}</div>
                             <div>D {formatDupr(doublesRating)}</div>
                           </div>
                         </td>
-                        <td className="py-3 min-w-[200px]">
+                        <td className="px-4 py-4 min-w-[120px] text-slate-600">
+                          <div className="space-y-1 text-xs">
+                            <div>S {formatConfidence(singlesConfidence)}</div>
+                            <div>D {formatConfidence(doublesConfidence)}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 min-w-[220px]">
                           <div className="flex items-center gap-2">
                             <select
                               value={draftGender}
@@ -1034,14 +1472,14 @@ const buildOfficialDuprPayload = () => ({
                             현재: {genderLabelMap[p.gender]}
                           </p>
                         </td>
-                        <td className="py-3">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClassMap[p.status]}`}
                           >
                             {statusLabelMap[p.status]}
                           </span>
                         </td>
-                        <td className="py-3 min-w-[180px]">
+                        <td className="px-4 py-4 min-w-[200px]">
                           <div className="flex items-center gap-2">
                             <select
                               value={draftStatus}
@@ -1074,7 +1512,7 @@ const buildOfficialDuprPayload = () => ({
                             ) : null}
                           </div>
                         </td>
-                        <td className="py-3 min-w-[260px]">
+                        <td className="px-4 py-4 min-w-[280px]">
                           <div className="flex items-center gap-2">
                             <input
                               type="password"
@@ -1113,7 +1551,7 @@ const buildOfficialDuprPayload = () => ({
                             </p>
                           )}
                         </td>
-                        <td className="py-3 min-w-[240px] text-xs text-gray-600">
+                        <td className="px-4 py-4 min-w-[240px] text-xs text-gray-600">
                           {!latestCreationLog ? (
                             <span className="text-gray-400">로그 없음</span>
                           ) : (
@@ -1130,7 +1568,7 @@ const buildOfficialDuprPayload = () => ({
                             </div>
                           )}
                         </td>
-                        <td className="py-3 pr-2 min-w-[280px] text-xs text-gray-600">
+                        <td className="px-4 py-4 min-w-[300px] text-xs text-gray-600">
                           {statusLogs.length === 0 ? (
                             <span className="text-gray-400">로그 없음</span>
                           ) : (

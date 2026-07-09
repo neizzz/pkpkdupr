@@ -48,7 +48,7 @@ import {
   verifyDevPlayerQrPayload,
   verifyPlayerQrPayload,
 } from "./playerQrToken";
-import { RatingService } from "./RatingService";
+import { getDuprCategoryForMatchType, RatingService } from "./RatingService";
 import type { Match } from "@pkpkdupr/shared/match";
 
 const SALT_ROUNDS = 10;
@@ -78,6 +78,10 @@ export interface AuthenticatedSession {
   player: Player;
   isFirstLogin: boolean;
   refreshedAccessToken?: string;
+}
+
+export interface AdminPlayer extends Player {
+  duprMetrics: PlayerDuprMetrics;
 }
 
 export interface UserCredentials {
@@ -234,6 +238,11 @@ const toPublicPlayer = (stored: StoredPlayerRecord): Player => {
   } = stored;
   return player;
 };
+
+const toAdminPlayer = (stored: StoredPlayerRecord): AdminPlayer => ({
+  ...toPublicPlayer(stored),
+  duprMetrics: stored.duprMetrics,
+});
 
 const toPlayerQrPublicPlayer = (player: Player): PlayerQrPublicPlayer => ({
   id: player.id,
@@ -950,6 +959,11 @@ export class AuthService {
     return players.map((record) => toPublicPlayer(hydratePlayer(record)));
   }
 
+  async getAdminPlayers(): Promise<AdminPlayer[]> {
+    const players = await this.dbRequest<any[]>("/internal/players");
+    return players.map((record) => toAdminPlayer(hydratePlayer(record)));
+  }
+
   async getPublicPlayers(): Promise<Player[]> {
     const players = await this.getAllPlayers();
     return players.filter(
@@ -1224,6 +1238,7 @@ export class AuthService {
     }
 
     const relatedMatchCountByPlayerId = new Map<string, number>();
+    const lastPlayedAtMsByCategoryKey = new Map<string, number>();
     const replayMatches = completedMatches
       .filter((match) => match.status === "completed" && match.completedAt)
       .sort(
@@ -1236,6 +1251,8 @@ export class AuthService {
       if (winnerTeamIndex == null) {
         continue;
       }
+      const category = getDuprCategoryForMatchType(match.type);
+      const completedAtMs = new Date(match.completedAt!).getTime();
 
       const participants = match.teams.flatMap((team, teamIndex) =>
         team.players
@@ -1259,6 +1276,17 @@ export class AuthService {
         continue;
       }
 
+      const inactiveElapsedMsByPlayerId = Object.fromEntries(
+        participants.map((participant) => {
+          const categoryKey = `${participant.playerId}:${category}`;
+          const lastPlayedAtMs = lastPlayedAtMsByCategoryKey.get(categoryKey);
+          return [
+            participant.playerId,
+            lastPlayedAtMs == null ? 0 : Math.max(0, completedAtMs - lastPlayedAtMs),
+          ];
+        }),
+      );
+
       participants.forEach((participant) => {
         relatedMatchCountByPlayerId.set(
           participant.playerId,
@@ -1272,12 +1300,20 @@ export class AuthService {
           winnerTeamIndex,
           participants,
           scores: match.scores,
+          inactiveElapsedMsByPlayerId,
         },
         correctionWeightByPlayerId,
       );
 
       Object.entries(replayResult).forEach(([playerId, state]) => {
         stateByPlayerId.set(playerId, state);
+      });
+
+      participants.forEach((participant) => {
+        lastPlayedAtMsByCategoryKey.set(
+          `${participant.playerId}:${category}`,
+          completedAtMs,
+        );
       });
     }
 
