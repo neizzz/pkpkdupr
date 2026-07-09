@@ -390,20 +390,30 @@ const Match: React.FC<MatchProps> = ({
               key={team.id}
               className="flex min-w-0 flex-col items-center gap-2 text-center"
             >
-              {team.players.map((teamPlayer) => (
-                <UserChip
-                  key={teamPlayer.id}
-                  player={teamPlayer}
-                  isMe={teamPlayer.id === currentPlayerId}
-                  endAdornment={
-                    teamPlayer.id === match.creatorPlayerId ? (
-                      <span aria-label="매치 생성자" role="img">
+              {team.players.map((teamPlayer) => {
+                const isCreatorPlayer = teamPlayer.id === match.creatorPlayerId;
+
+                return (
+                  <div
+                    key={teamPlayer.id}
+                    className="relative inline-flex min-w-0 max-w-full"
+                  >
+                    {isCreatorPlayer ? (
+                      <span
+                        aria-label="매치 생성자"
+                        role="img"
+                        className="absolute right-full top-1/2 mr-1 -translate-y-1/2 leading-none"
+                      >
                         👑
                       </span>
-                    ) : undefined
-                  }
-                />
-              ))}
+                    ) : null}
+                    <UserChip
+                      player={teamPlayer}
+                      isMe={teamPlayer.id === currentPlayerId}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
