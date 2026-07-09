@@ -83,6 +83,16 @@ const formatDateTime = (value: string) =>
     minute: "2-digit",
   }).format(new Date(value));
 
+const formatDateOnly = (value: string) =>
+  new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date(value))
+    .replace(/\.\s/g, ".")
+    .replace(/\.$/, "");
+
 const getScoreLabel = (scores?: MatchInfo["scores"]) => {
   if (!scores?.length) {
     return "스코어 없음";
@@ -198,8 +208,8 @@ const Match: React.FC<MatchProps> = ({
   const displayTitle = match.name ?? matchTopLevelTypeLabels[getMatchTopLevelType(match.type)];
   const sessionLabel = match.session
     ? match.session.name
-      ? `${match.session.name} at ${formatDateTime(match.session.date)}`
-      : formatDateTime(match.session.date)
+      ? `${match.session.name} · ${formatDateOnly(match.session.date)}`
+      : formatDateOnly(match.session.date)
     : null;
 
   useEffect(() => {
