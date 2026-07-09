@@ -33,6 +33,7 @@ export interface MatchReplayInput {
   winnerTeamIndex: 0 | 1;
   participants: MatchParticipantRatingInput[];
   scores?: MatchScore[];
+  inactiveElapsedMsByPlayerId?: Record<string, number>;
 }
 
 const CONFIDENCE_K_FACTORS = [
@@ -49,6 +50,11 @@ const average = (values: number[]) =>
   values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : 0;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const CONFIDENCE_DECAY_GRACE_PERIOD_MS = 14 * DAY_MS;
+const CONFIDENCE_DECAY_PER_DAY = 1.5;
+const CONFIDENCE_DECAY_FLOOR = 0;
 
 const getTeamSetWins = (scores: MatchScore[]) =>
   scores.reduce<[number, number]>(
@@ -110,6 +116,32 @@ export const getSetMarginMultiplier = (scores?: MatchScore[]): number => {
   }
 
   return 1;
+};
+
+export const getDecayedConfidenceByInactivity = (
+  confidence: number,
+  elapsedMs?: number,
+): number => {
+  if (
+    elapsedMs == null ||
+    !Number.isFinite(elapsedMs) ||
+    elapsedMs <= CONFIDENCE_DECAY_GRACE_PERIOD_MS
+  ) {
+    return Math.max(CONFIDENCE_DECAY_FLOOR, confidence);
+  }
+
+  const decayDays = Math.floor(
+    (elapsedMs - CONFIDENCE_DECAY_GRACE_PERIOD_MS) / DAY_MS,
+  );
+
+  if (decayDays <= 0) {
+    return Math.max(CONFIDENCE_DECAY_FLOOR, confidence);
+  }
+
+  return Math.max(
+    CONFIDENCE_DECAY_FLOOR,
+    confidence - decayDays * CONFIDENCE_DECAY_PER_DAY,
+  );
 };
 
 export const getDuprCategoryForMatchType = (
@@ -238,21 +270,36 @@ export class RatingService {
     });
 
     const nextStates: Record<string, StoredPlayerDupr> = {};
+    const decayedConfidenceByPlayerId = Object.fromEntries(
+      match.participants.map((participant) => {
+        const currentMetric = getDuprMetricByCategory(
+          participant.state.metrics,
+          category,
+        );
+        return [
+          participant.playerId,
+          getDecayedConfidenceByInactivity(
+            currentMetric.confidence,
+            match.inactiveElapsedMsByPlayerId?.[participant.playerId],
+          ),
+        ];
+      }),
+    );
 
     for (const participant of match.participants) {
       const peers = match.participants.filter(
         (candidate) => candidate.playerId !== participant.playerId,
       );
       const peerConfidence = average(
-        peers.map(
-          (peer) =>
-            getDuprMetricByCategory(peer.state.metrics, category).confidence,
-        ),
+        peers.map((peer) => decayedConfidenceByPlayerId[peer.playerId] ?? 0),
       );
       const currentMetric = getDuprMetricByCategory(
         participant.state.metrics,
         category,
       );
+      const decayedConfidence =
+        decayedConfidenceByPlayerId[participant.playerId] ??
+        currentMetric.confidence;
       const result = this.calculate({
         currentRating: getDuprRatingByCategory(
           participant.state.rating,
@@ -260,7 +307,7 @@ export class RatingService {
         ),
         opponentRating: teamRatings[participant.teamIndex === 0 ? 1 : 0],
         isWinner: participant.teamIndex === match.winnerTeamIndex,
-        confidence: currentMetric.confidence,
+        confidence: decayedConfidence,
         peerConfidence,
         correctionWeight:
           (correctionWeightByPlayerId[participant.playerId] ?? 1) *
