@@ -154,6 +154,11 @@ const formatDuprDelta = (value?: number) => {
   return `${value > 0 ? "+" : ""}${value.toFixed(3)}`;
 };
 
+const parseOptionalNumberInput = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed ? Number(trimmed) : undefined;
+};
+
 const getCompositeSinglesConfidence = (metrics?: PlayerDuprMetrics | null) =>
   metrics?.singles.confidence ?? null;
 
@@ -929,17 +934,24 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const buildOfficialDuprPayload = () => ({
-    ratings: {
-      singles: Number(officialRatings.singles),
-      doubles: Number(officialRatings.doubles),
-    },
-    confidence: {
-      singles: Number(officialConfidence.singles),
-      doubles: Number(officialConfidence.doubles),
-    },
-    reason: officialReason,
-  });
+  const buildOfficialDuprPayload = () => {
+    const singlesRating = parseOptionalNumberInput(officialRatings.singles);
+    const doublesRating = parseOptionalNumberInput(officialRatings.doubles);
+    const singlesConfidence = parseOptionalNumberInput(officialConfidence.singles);
+    const doublesConfidence = parseOptionalNumberInput(officialConfidence.doubles);
+
+    return {
+      ratings: {
+        ...(singlesRating != null ? { singles: singlesRating } : {}),
+        ...(doublesRating != null ? { doubles: doublesRating } : {}),
+      },
+      confidence: {
+        ...(singlesConfidence != null ? { singles: singlesConfidence } : {}),
+        ...(doublesConfidence != null ? { doubles: doublesConfidence } : {}),
+      },
+      reason: officialReason,
+    };
+  };
 
   const handleOfficialDuprSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1042,6 +1054,7 @@ const AdminDashboard: React.FC = () => {
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-blue-600">🏓 PkpkDupr Admin</h1>
         <div className="flex gap-4 items-center">
+          <span className="text-sm text-gray-400">v{__APP_VERSION__}</span>
           <span className="text-sm text-gray-600">
             {player?.username} ({genderLabel}) / 관리자
           </span>
@@ -1216,7 +1229,6 @@ const AdminDashboard: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    required
                     min={2}
                     max={8}
                     step={0.001}
@@ -1238,7 +1250,6 @@ const AdminDashboard: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    required
                     min={0}
                     max={100}
                     step={1}
