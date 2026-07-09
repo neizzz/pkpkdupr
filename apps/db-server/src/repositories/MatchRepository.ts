@@ -3,6 +3,7 @@ import type {
   Match,
   MatchResultApproval,
   MatchScore,
+  Session,
   MatchSource,
   MatchType,
   Team,
@@ -56,6 +57,8 @@ export interface CreateMatchInput {
   mode: MatchMode;
   source?: MatchSource;
   creatorPlayerId: string;
+  name?: string;
+  session?: Session;
   status: Match["status"];
   teams: [Team, Team];
   scores?: MatchScore[];
@@ -168,6 +171,9 @@ export class MatchRepository {
       mode: data.mode,
       source: data.source ?? "player_created",
       creatorPlayerId: data.creatorPlayerId,
+      name: data.name?.trim() || null,
+      sessionName: data.session?.name?.trim() || null,
+      sessionDate: toDateOrNull(data.session?.date),
       status: data.status,
       location: data.location,
       scheduledAt: new Date(data.scheduledAt),
@@ -495,6 +501,13 @@ export class MatchRepository {
       mode: (match.mode as MatchMode | null) ?? DEFAULT_MATCH_MODE,
       source: (match.source as MatchSource | null) ?? "player_created",
       creatorPlayerId: match.creatorPlayerId,
+      name: match.name?.trim() || undefined,
+      session: match.sessionDate
+        ? {
+            name: match.sessionName?.trim() || undefined,
+            date: toDate(match.sessionDate),
+          }
+        : undefined,
       status: match.status as Match["status"],
       teams,
       scores: scores.map(toMatchScore),

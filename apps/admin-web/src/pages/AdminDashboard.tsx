@@ -15,7 +15,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import AdminMatchBatchForm, {
-  type AdminBatchMatchRequest,
+  type AdminBatchMatchSubmitPayload,
 } from "../components/AdminMatchBatchForm";
 
 type PlayerInfo = Pick<
@@ -434,7 +434,7 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleAdminMatchBatchSubmit = async (
-    matches: AdminBatchMatchRequest[],
+    payload: AdminBatchMatchSubmitPayload,
   ) => {
     try {
       setIsSavingAdminMatches(true);
@@ -447,7 +447,7 @@ const AdminDashboard: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ matches }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {

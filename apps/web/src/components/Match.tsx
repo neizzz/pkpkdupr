@@ -24,6 +24,7 @@ export type MatchInfo = Omit<
   | "updatedAt"
   | "completedAt"
   | "resultSubmittedAt"
+  | "session"
   | "approvals"
 > & {
   scheduledAt: string;
@@ -31,6 +32,10 @@ export type MatchInfo = Omit<
   updatedAt: string;
   completedAt: string | null;
   resultSubmittedAt: string | null;
+  session?: {
+    name?: string;
+    date: string;
+  };
   approvals: Array<{
     playerId: string;
     approvedAt: string;
@@ -190,6 +195,12 @@ const Match: React.FC<MatchProps> = ({
     canSubmitResult && (!hasResultScores || isResultFormOpen);
   const maxScoreCount = getMaxScoreCountForMatchMode(match.mode);
   const canAddScoreRow = scoreRows.length < maxScoreCount;
+  const displayTitle = match.name ?? matchTopLevelTypeLabels[getMatchTopLevelType(match.type)];
+  const sessionLabel = match.session
+    ? [match.session.name, formatDateTime(match.session.date)]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
 
   useEffect(() => {
     setScoreRows(
@@ -292,7 +303,7 @@ const Match: React.FC<MatchProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <p className="text-lg font-semibold text-amber-950">
-              {matchTopLevelTypeLabels[getMatchTopLevelType(match.type)]}
+              {displayTitle}
             </p>
             <span
               className={`${titleChipClassName} bg-amber-100 text-amber-800`}
@@ -319,6 +330,11 @@ const Match: React.FC<MatchProps> = ({
               </span>
             ) : null}
           </div>
+          {sessionLabel ? (
+            <p className={`mt-1 text-xs font-medium ${subTextClassName}`}>
+              {sessionLabel}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-2 text-right">

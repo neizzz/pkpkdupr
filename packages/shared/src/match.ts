@@ -103,6 +103,11 @@ export interface MatchResultApproval {
   approvedAt: Date;
 }
 
+export interface Session {
+  name?: string;
+  date: Date;
+}
+
 const getMatchWinCounts = (scores: MatchScore[]) =>
   scores.reduce<[number, number]>(
     (wins, score) => {
@@ -179,6 +184,8 @@ export interface Match {
   mode: MatchMode;
   source: MatchSource;
   creatorPlayerId: string;
+  name?: string;
+  session?: Session;
   status: MatchStatus;
   teams: [Team, Team];
   scores?: MatchScore[];

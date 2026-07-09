@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Drawer, Separator } from "@heroui/react";
+import { Button, Drawer, Radio, RadioGroup, Separator } from "@heroui/react";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type { MatchMode } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
@@ -46,6 +46,8 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const [selectedSwapMemberId, setSelectedSwapMemberId] = useState<string | null>(null);
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [createMatchError, setCreateMatchError] = useState<string | null>(null);
+  const [matchNameMode, setMatchNameMode] = useState<"auto" | "manual">("auto");
+  const [matchName, setMatchName] = useState("");
   const [selectedMatchMode, setSelectedMatchMode] =
     useState<MatchMode>(DEFAULT_MATCH_MODE);
   const selectedMatchMembersRef = useRef<MatchMember[]>(selectedMatchMembers);
@@ -55,8 +57,16 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     () => resolveSelectedMatchType(selectedMatchMembers),
     [selectedMatchMembers],
   );
+  const trimmedMatchName = matchName.trim();
+  const matchNameValidationError =
+    matchNameMode === "manual" && !trimmedMatchName
+      ? "매치 이름을 입력해주세요."
+      : null;
   const canCreateMatch =
-    isOnline && !!selectedMatchType && areTeamsValid(teams, selectedMatchType);
+    isOnline &&
+    !!selectedMatchType &&
+    areTeamsValid(teams, selectedMatchType) &&
+    !matchNameValidationError;
   const canAddMatchMember = isOnline && !!token && selectedMatchMembers.length < 4;
   const previewTeams = useMemo(
     () => buildPreviewTeams(selectedMatchMembers, teams, selectedMatchType),
@@ -225,6 +235,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          ...(matchNameMode === "manual" ? { name: trimmedMatchName } : {}),
           mode: selectedMatchMode,
           teams: teams.map((team, teamIndex) => ({
             name: `Team ${teamIndex === 0 ? "A" : "B"}`,
@@ -335,6 +346,64 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               selectedMatchMode={selectedMatchMode}
               onChange={setSelectedMatchMode}
             />
+
+            <section className="flex flex-col gap-2">
+              <p className="bs-text-title text-amber-950">매치 이름</p>
+              <RadioGroup
+                aria-label="매치 이름 입력 방식"
+                value={matchNameMode}
+                onChange={(value) => setMatchNameMode(value as "auto" | "manual")}
+                orientation="horizontal"
+                className="flex gap-5"
+              >
+                {([
+                  { value: "auto", label: "자동" },
+                  { value: "manual", label: "입력폼" },
+                ] as const).map((option) => (
+                  <Radio key={option.value} value={option.value}>
+                    <div
+                      onClick={() => setMatchNameMode(option.value)}
+                      className="cursor-pointer"
+                    >
+                      <Radio.Content className="flex select-none items-center gap-2 py-1">
+                        <Radio.Control className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
+                          <Radio.Indicator className="flex size-full items-center justify-center">
+                            {({ isSelected }) => (
+                              <span
+                                className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
+                                  isSelected
+                                    ? "scale-100 opacity-100"
+                                    : "scale-0 opacity-0"
+                                }`}
+                              />
+                            )}
+                          </Radio.Indicator>
+                        </Radio.Control>
+                        <span
+                          className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
+                            matchNameMode === option.value ? "opacity-100" : "opacity-45"
+                          }`}
+                        >
+                          {option.label}
+                        </span>
+                      </Radio.Content>
+                    </div>
+                  </Radio>
+                ))}
+              </RadioGroup>
+              {matchNameMode === "manual" ? (
+                <input
+                  type="text"
+                  value={matchName}
+                  onChange={(event) => {
+                    setMatchName(event.target.value);
+                    setCreateMatchError(null);
+                  }}
+                  placeholder="매치 이름 입력"
+                  className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base text-amber-950 outline-none"
+                />
+              ) : null}
+            </section>
           </>
         )}
       </Drawer.Body>
@@ -344,8 +413,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             <Separator />
           </div>
           <Drawer.Footer className="flex flex-col gap-2 px-5 pt-3">
-            {createMatchError ? (
-              <p className="bs-text-body text-error">{createMatchError}</p>
+            {createMatchError || matchNameValidationError ? (
+              <p className="bs-text-body text-error">
+                {createMatchError ?? matchNameValidationError}
+              </p>
             ) : null}
             <div className="grid w-full grid-cols-3 gap-2">
               <Button

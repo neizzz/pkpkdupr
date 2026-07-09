@@ -1,4 +1,4 @@
-import type { Match, MatchMode, MatchScore } from "@pkpkdupr/shared/match";
+import type { Match, MatchMode, MatchScore, Session } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
 
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
@@ -16,10 +16,29 @@ export class DbRequestError extends Error {
 const toDateOrNull = (value: string | Date | null | undefined) =>
   value == null ? null : new Date(value);
 
+const hydrateSession = (record: any): Session | undefined => {
+  if (!record.session?.date) {
+    return undefined;
+  }
+
+  return {
+    name:
+      typeof record.session.name === "string" && record.session.name.trim()
+        ? record.session.name.trim()
+        : undefined,
+    date: new Date(record.session.date),
+  };
+};
+
 const hydrateMatch = (record: any): Match => ({
   ...record,
   mode: (record.mode as MatchMode | undefined) ?? DEFAULT_MATCH_MODE,
   source: record.source ?? "player_created",
+  name:
+    typeof record.name === "string" && record.name.trim()
+      ? record.name.trim()
+      : undefined,
+  session: hydrateSession(record),
   teams: [
     {
       ...record.teams[0],

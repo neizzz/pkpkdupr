@@ -59,6 +59,9 @@ export const matches = sqliteTable("matches", {
     .notNull()
     .default("player_created"),
   creatorPlayerId: text("creator_player_id").notNull(),
+  name: text("name"),
+  sessionName: text("session_name"),
+  sessionDate: integer("session_date", { mode: "timestamp" }),
   status: text("status").notNull(),
   location: text("location").notNull(),
   scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),

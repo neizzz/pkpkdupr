@@ -13,6 +13,7 @@ import {
   matchTypeValues,
   type MatchMode,
   type MatchScore,
+  type Session,
   type MatchType,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
@@ -93,6 +94,7 @@ const playerStatuses: PlayerStatus[] = ["active", "inactive"];
 const playerGenders: Array<Player["gender"]> = ["M", "F"];
 
 type CreateMatchRequest = {
+  name?: string;
   type?: MatchType;
   mode?: MatchMode;
   teams?: [
@@ -105,8 +107,15 @@ type CreateMatchRequest = {
 
 type MatchTeamRequest = { name?: string; playerIds?: string[] };
 
+type MatchSessionRequest = {
+  name?: string;
+  date?: string;
+};
+
 type AdminBatchMatchRequest = {
+  session?: MatchSessionRequest;
   matches?: Array<{
+    name?: string;
     type?: MatchType;
     mode?: MatchMode;
     teams?: [MatchTeamRequest, MatchTeamRequest];
@@ -118,6 +127,35 @@ type AdminBatchMatchRequest = {
 
 type SubmitMatchResultRequest = {
   scores?: MatchScore[];
+};
+
+const normalizeOptionalName = (value: unknown) =>
+  typeof value === "string" && value.trim() ? value.trim() : undefined;
+
+const normalizeMatchSession = (
+  session: MatchSessionRequest | undefined,
+): Session | undefined => {
+  if (!session) {
+    return undefined;
+  }
+
+  const name = normalizeOptionalName(session.name);
+  const dateValue = typeof session.date === "string" ? session.date : undefined;
+
+  if (!name && !dateValue) {
+    return undefined;
+  }
+
+  if (!dateValue) {
+    throw new Error("세션 날짜를 입력해주세요.");
+  }
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("유효한 세션 날짜가 필요합니다.");
+  }
+
+  return { name, date };
 };
 
 const isMatchType = (value: unknown): value is MatchType =>
@@ -488,7 +526,7 @@ app.post("/api/matches", async (req, res) => {
       return;
     }
 
-    const { type, mode, teams, location, scheduledAt } =
+    const { name, type, mode, teams, location, scheduledAt } =
       req.body as CreateMatchRequest;
     if (type != null && !isMatchType(type)) {
       return res.status(400).json({ error: "유효한 매치 타입이 필요합니다." });
@@ -546,6 +584,7 @@ app.post("/api/matches", async (req, res) => {
     }
 
     const match = await matchRepository.create({
+      name: normalizeOptionalName(name),
       type: resolvedMatchType,
       mode: mode ?? DEFAULT_MATCH_MODE,
       source: "player_created",
@@ -574,10 +613,13 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       return;
     }
 
-    const payloadMatches = (req.body as AdminBatchMatchRequest).matches;
+    const { matches: payloadMatches, session: requestedSession } =
+      req.body as AdminBatchMatchRequest;
     if (!Array.isArray(payloadMatches) || payloadMatches.length === 0) {
       return res.status(400).json({ error: "한 개 이상의 경기가 필요합니다." });
     }
+
+    const commonSession = normalizeMatchSession(requestedSession);
 
     const createdBy = await authService.getPlayerById(decoded.playerId);
     if (!createdBy || createdBy.status !== "active") {
@@ -595,7 +637,7 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
     );
     const matchesToCreate = payloadMatches.map((requestedMatch, index) => {
       const label = `${index + 1}번째 경기`;
-      const { type, mode, teams, location, scheduledAt, scores } = requestedMatch;
+      const { name, type, mode, teams, location, scheduledAt, scores } = requestedMatch;
 
       if (!isMatchType(type)) {
         throw new Error(`${label}: 유효한 매치 타입이 필요합니다.`);
@@ -631,6 +673,8 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
 
       return {
         id: `admin-match-${Date.now()}-${index}-${randomUUID()}`,
+        name: normalizeOptionalName(name),
+        session: commonSession,
         type,
         mode: resolvedMode,
         source: "admin_created_result" as const,

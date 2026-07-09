@@ -15,6 +15,7 @@ import {
 import type { Player } from "@pkpkdupr/shared/player";
 
 export interface AdminBatchMatchRequest {
+  name?: string;
   type: MatchType;
   teams: [
     { name: string; playerIds: string[] },
@@ -25,12 +26,22 @@ export interface AdminBatchMatchRequest {
   scores: MatchScore[];
 }
 
+export interface AdminBatchMatchSessionRequest {
+  name?: string;
+  date?: string;
+}
+
+export interface AdminBatchMatchSubmitPayload {
+  session?: AdminBatchMatchSessionRequest;
+  matches: AdminBatchMatchRequest[];
+}
+
 interface AdminMatchBatchFormProps {
   players: Array<Pick<Player, "id" | "username" | "gender" | "status">>;
   isSubmitting: boolean;
   protectedAdminUsername?: string;
   resetKey?: number;
-  onSubmit: (matches: AdminBatchMatchRequest[]) => Promise<void>;
+  onSubmit: (payload: AdminBatchMatchSubmitPayload) => Promise<void>;
 }
 
 type ScoreRowDraft = {
@@ -45,6 +56,7 @@ type SlotRequirement = {
 
 type MatchDraft = {
   id: string;
+  name: string;
   type: MatchType;
   location: string;
   scheduledAt: string;
@@ -148,12 +160,18 @@ const getSelectableMatchTypes = (topLevelType: MatchTopLevelType) =>
 
 const createEmptyDraft = (): MatchDraft => ({
   id: `admin-batch-draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  name: "",
   type: "singles",
   location: "",
   scheduledAt: toLocalDateTimeValue(),
   teams: createEmptyTeams("singles"),
   scores: [createEmptyScoreRow()],
 });
+
+const normalizeOptionalText = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+};
 
 const normalizeHeader = (value: string) => value.replace(/\s+/g, "");
 
@@ -382,11 +400,15 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   const [mode, setMode] = useState<FormMode>("manual");
   const [drafts, setDrafts] = useState<MatchDraft[]>(() => [createEmptyDraft()]);
   const [pastedText, setPastedText] = useState("");
+  const [sessionName, setSessionName] = useState("");
+  const [sessionDate, setSessionDate] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setDrafts([createEmptyDraft()]);
     setPastedText("");
+    setSessionName("");
+    setSessionDate("");
     setError(null);
     setMode("manual");
   }, [resetKey]);
@@ -408,11 +430,33 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     () => buildImportedPreview(pastedText, players, protectedAdminUsername),
     [pastedText, players, protectedAdminUsername],
   );
+  const normalizedSessionName = normalizeOptionalText(sessionName);
+  const normalizedSessionDate = normalizeOptionalText(sessionDate);
 
   const updateDraft = (draftId: string, updater: (draft: MatchDraft) => MatchDraft) => {
     setDrafts((currentDrafts) =>
       currentDrafts.map((draft) => (draft.id === draftId ? updater(draft) : draft)),
     );
+  };
+
+  const buildSessionPayload = () => {
+    if (!normalizedSessionName && !normalizedSessionDate) {
+      return undefined;
+    }
+
+    if (!normalizedSessionDate) {
+      throw new Error("세션 날짜를 입력해주세요.");
+    }
+
+    const sessionDateValue = new Date(normalizedSessionDate);
+    if (Number.isNaN(sessionDateValue.getTime())) {
+      throw new Error("세션 날짜를 확인해주세요.");
+    }
+
+    return {
+      name: normalizedSessionName,
+      date: sessionDateValue.toISOString(),
+    };
   };
 
   const handleDraftTypeChange = (draftId: string, type: MatchType) => {
@@ -494,6 +538,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     setError(null);
 
     try {
+      const session = buildSessionPayload();
       const payload = drafts.map((draft, draftIndex) => {
         const label = `${draftIndex + 1}번째 경기`;
         const scheduledDate = new Date(draft.scheduledAt);
@@ -543,6 +588,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
         });
 
         return {
+          name: normalizeOptionalText(draft.name),
           type: draft.type,
           teams: [
             { name: "Team A", playerIds: [...draft.teams[0]] },
@@ -557,7 +603,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
         };
       });
 
-      await onSubmit(payload);
+      await onSubmit({ session, matches: payload });
     } catch (submitError) {
       setError(
         submitError instanceof Error ? submitError.message : "경기 저장에 실패했습니다.",
@@ -589,7 +635,8 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     }
 
     try {
-      await onSubmit(importedPreview.validMatches);
+      const session = buildSessionPayload();
+      await onSubmit({ session, matches: importedPreview.validMatches });
     } catch (submitError) {
       setError(
         submitError instanceof Error ? submitError.message : "경기 저장에 실패했습니다.",
@@ -653,6 +700,46 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
         </div>
       ) : null}
 
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-3">
+          <h3 className="font-semibold text-slate-800">공통 세션 정보</h3>
+          <p className="text-sm text-slate-500">
+            수동 입력과 시트 붙여넣기 결과에 동일하게 적용됩니다.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              세션 이름
+            </label>
+            <input
+              type="text"
+              value={sessionName}
+              onChange={(event) => {
+                setSessionName(event.target.value);
+                setError(null);
+              }}
+              placeholder="선택 입력"
+              className="w-full rounded-lg border bg-white px-4 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              세션 날짜
+            </label>
+            <input
+              type="datetime-local"
+              value={sessionDate}
+              onChange={(event) => {
+                setSessionDate(event.target.value);
+                setError(null);
+              }}
+              className="w-full rounded-lg border bg-white px-4 py-2"
+            />
+          </div>
+        </div>
+      </div>
+
       {mode === "manual" ? (
         <form onSubmit={handleManualSubmit} className="space-y-4">
           {drafts.map((draft, draftIndex) => {
@@ -702,7 +789,24 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      매치 이름
+                    </label>
+                    <input
+                      type="text"
+                      value={draft.name}
+                      onChange={(event) =>
+                        updateDraft(draft.id, (currentDraft) => ({
+                          ...currentDraft,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="선택 입력"
+                      className="w-full rounded-lg border bg-white px-4 py-2"
+                    />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       종목

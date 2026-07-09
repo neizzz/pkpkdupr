@@ -217,6 +217,9 @@ const initSchema = async () => {
       mode TEXT NOT NULL DEFAULT '${DEFAULT_MATCH_MODE}' CHECK (mode IN ('single-game', 'best-of-3')),
       source TEXT NOT NULL DEFAULT 'player_created',
       creator_player_id TEXT NOT NULL DEFAULT '',
+      name TEXT,
+      session_name TEXT,
+      session_date INTEGER,
       status TEXT NOT NULL,
       location TEXT NOT NULL,
       scheduled_at INTEGER NOT NULL,
@@ -233,6 +236,9 @@ const initSchema = async () => {
   );
   await safeExec(`ALTER TABLE matches ADD COLUMN source TEXT NOT NULL DEFAULT 'player_created'`);
   await safeExec(`ALTER TABLE matches ADD COLUMN creator_player_id TEXT NOT NULL DEFAULT ''`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN name TEXT`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN session_name TEXT`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN session_date INTEGER`);
   await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_at INTEGER`);
 
