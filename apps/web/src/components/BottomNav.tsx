@@ -623,7 +623,7 @@ const BottomNav: React.FC = () => {
       <Tabs
         selectedKey={selectedTab}
         onSelectionChange={handleSelectionChange}
-        className="relative flex h-full max-w-full flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)]"
+        className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)]"
       >
         <div className="app-fixed-bottom fixed left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end gap-3 px-3 pb-3 pt-2">
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">

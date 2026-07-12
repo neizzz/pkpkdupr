@@ -57,7 +57,7 @@ function AppRoutes() {
 
   if (isLoading) {
     return (
-      <div className="flex app-page-fill items-center justify-center overflow-hidden">
+      <div className="flex h-full w-full items-center justify-center overflow-hidden">
         <Spinner
           aria-label="앱 로딩 중"
           className="text-[#409eff]"
@@ -140,7 +140,6 @@ function App() {
 
     const updateViewportMetrics = () => {
       const visualViewport = window.visualViewport;
-      const shellWidth = window.innerWidth;
       const keyboardOffset = isKeyboardInputFocused
         ? Math.max(
             0,
@@ -150,10 +149,6 @@ function App() {
           )
         : 0;
 
-      document.documentElement.style.setProperty(
-        "--app-shell-width",
-        `${Math.round(shellWidth)}px`,
-      );
       document.documentElement.style.setProperty(
         "--app-keyboard-offset",
         `${Math.round(keyboardOffset)}px`,
@@ -190,15 +185,15 @@ function App() {
     <div
       className={
         isFullWidthDevPage
-          ? "app-shell-height w-full overflow-hidden bg-amber-50"
-          : "app-shell-height flex w-full min-w-0 justify-center overflow-hidden bg-gray-900"
+          ? "h-full w-full min-w-[320px] overflow-hidden bg-amber-50"
+          : "flex h-full w-full min-w-[320px] justify-center overflow-hidden bg-gray-900"
       }
     >
       <main
         className={
           isFullWidthDevPage
-            ? "app-shell-height w-full min-w-0 overflow-y-auto overflow-x-hidden"
-            : "app-shell-height w-full min-w-0 max-w-[430px] overflow-hidden bg-white shadow-none min-[431px]:shadow-lg"
+            ? "h-full w-full overflow-y-auto overflow-x-hidden"
+            : "h-full w-full max-w-[480px] overflow-hidden bg-white shadow-none min-[481px]:shadow-lg"
         }
       >
         <AppUpdateProvider>
