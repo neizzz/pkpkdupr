@@ -356,53 +356,69 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 orientation="horizontal"
                 className="flex gap-5"
               >
-                {([
-                  { value: "auto", label: "자동" },
-                  { value: "manual", label: "입력폼" },
-                ] as const).map((option) => (
-                  <Radio key={option.value} value={option.value}>
-                    <div
-                      onClick={() => setMatchNameMode(option.value)}
-                      className="cursor-pointer"
-                    >
-                      <Radio.Content className="flex select-none items-center gap-2 py-1">
-                        <Radio.Control className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
-                          <Radio.Indicator className="flex size-full items-center justify-center">
-                            {({ isSelected }) => (
-                              <span
-                                className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
-                                  isSelected
-                                    ? "scale-100 opacity-100"
-                                    : "scale-0 opacity-0"
-                                }`}
-                              />
-                            )}
-                          </Radio.Indicator>
-                        </Radio.Control>
-                        <span
-                          className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
-                            matchNameMode === option.value ? "opacity-100" : "opacity-45"
-                          }`}
-                        >
-                          {option.label}
-                        </span>
-                      </Radio.Content>
-                    </div>
-                  </Radio>
-                ))}
+                <Radio value="auto">
+                  <div
+                    onClick={() => setMatchNameMode("auto")}
+                    className="cursor-pointer"
+                  >
+                    <Radio.Content className="flex select-none items-center gap-2 py-1">
+                      <Radio.Control className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
+                        <Radio.Indicator className="flex size-full items-center justify-center">
+                          {({ isSelected }) => (
+                            <span
+                              className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
+                                isSelected
+                                  ? "scale-100 opacity-100"
+                                  : "scale-0 opacity-0"
+                              }`}
+                            />
+                          )}
+                        </Radio.Indicator>
+                      </Radio.Control>
+                      <span
+                        className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
+                          matchNameMode === "auto" ? "opacity-100" : "opacity-45"
+                        }`}
+                      >
+                        자동
+                      </span>
+                    </Radio.Content>
+                  </div>
+                </Radio>
+                <Radio value="manual" className="min-w-0 flex-1">
+                  <div
+                    onClick={() => setMatchNameMode("manual")}
+                    className="cursor-pointer"
+                  >
+                    <Radio.Content className="flex items-center gap-2 py-1">
+                      <Radio.Control className="flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white">
+                        <Radio.Indicator className="flex size-full items-center justify-center">
+                          {({ isSelected }) => (
+                            <span
+                              className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
+                                isSelected
+                                  ? "scale-100 opacity-100"
+                                  : "scale-0 opacity-0"
+                              }`}
+                            />
+                          )}
+                        </Radio.Indicator>
+                      </Radio.Control>
+                      <input
+                        type="text"
+                        value={matchName}
+                        onFocus={() => setMatchNameMode("manual")}
+                        onChange={(event) => {
+                          setMatchName(event.target.value);
+                          setCreateMatchError(null);
+                        }}
+                        placeholder="매치 이름 입력"
+                        className="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-3 text-base text-amber-950 outline-none"
+                      />
+                    </Radio.Content>
+                  </div>
+                </Radio>
               </RadioGroup>
-              {matchNameMode === "manual" ? (
-                <input
-                  type="text"
-                  value={matchName}
-                  onChange={(event) => {
-                    setMatchName(event.target.value);
-                    setCreateMatchError(null);
-                  }}
-                  placeholder="매치 이름 입력"
-                  className="app-mobile-input w-full rounded-2xl border border-border px-4 py-3 text-base text-amber-950 outline-none"
-                />
-              ) : null}
             </section>
           </>
         )}
