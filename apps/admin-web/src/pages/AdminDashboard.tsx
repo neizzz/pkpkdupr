@@ -101,6 +101,20 @@ const toLocalDateTimeInputValue = (value?: string | null) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
+const serializeLocalDateTimeInput = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("세션 날짜를 확인해주세요.");
+  }
+
+  return date.toISOString();
+};
+
 const genderLabelMap: Record<PlayerGender, string> = {
   M: "남",
   F: "여",
@@ -721,6 +735,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
+      const serializedSessionDate = serializeLocalDateTimeInput(nextSessionDate);
       setSavingMatchMetadataIds((prev) =>
         prev.includes(matchId) ? prev : [...prev, matchId],
       );
@@ -736,7 +751,7 @@ const AdminDashboard: React.FC = () => {
         body: JSON.stringify({
           name: nextName,
           sessionName: nextSessionName,
-          sessionDate: nextSessionDate,
+          sessionDate: serializedSessionDate,
         }),
       });
 
@@ -831,6 +846,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
+      const serializedSessionDate = serializeLocalDateTimeInput(nextSessionDate);
       setIsSavingBulkMatchMetadata(true);
       setSavingMatchMetadataIds((prev) => [
         ...new Set([...prev, ...matchesToUpdate.map((match) => match.id)]),
@@ -848,7 +864,7 @@ const AdminDashboard: React.FC = () => {
             },
             body: JSON.stringify({
               sessionName: nextSessionName,
-              sessionDate: nextSessionDate,
+              sessionDate: serializedSessionDate,
             }),
           });
 
