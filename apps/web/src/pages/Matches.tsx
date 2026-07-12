@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Switch } from "@heroui/react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button, Switch } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import { useAuth } from "@/context/AuthContext";
 import Match, { type MatchInfo } from "@/components/Match";
@@ -12,9 +12,21 @@ interface MatchesProps {
 }
 
 const CACHED_MATCHES_KEY = "pkpkdupr:matches:v2-public-dupr";
+const CACHED_MY_MATCHES_KEY = `${CACHED_MATCHES_KEY}:my`;
 const LEGACY_CACHED_MATCHES_KEYS = ["pkpkdupr:matches"];
+const MATCHES_PAGE_SIZE = 20;
 const OFFLINE_FALLBACK_MESSAGE =
   "최신 정보를 불러오지 못해 저장된 매치 목록을 표시합니다.";
+
+interface CachedMatches {
+  matches: MatchInfo[];
+  total: number;
+}
+
+interface MatchesResponse {
+  matches: MatchInfo[];
+  total: number;
+}
 
 const clearLegacyCachedMatches = () => {
   for (const key of LEGACY_CACHED_MATCHES_KEYS) {
@@ -22,24 +34,63 @@ const clearLegacyCachedMatches = () => {
   }
 };
 
-const readCachedMatches = (): MatchInfo[] | null => {
+const getCachedMatchesKey = (isMyMatchOnly: boolean) =>
+  isMyMatchOnly ? CACHED_MY_MATCHES_KEY : CACHED_MATCHES_KEY;
+
+const readCachedMatches = (key: string): CachedMatches | null => {
   try {
-    const cachedMatches = localStorage.getItem(CACHED_MATCHES_KEY);
-    return cachedMatches ? (JSON.parse(cachedMatches) as MatchInfo[]) : null;
+    const cachedMatches = localStorage.getItem(key);
+    if (!cachedMatches) {
+      return null;
+    }
+
+    const parsed = JSON.parse(cachedMatches) as unknown;
+    if (Array.isArray(parsed)) {
+      return { matches: parsed as MatchInfo[], total: parsed.length };
+    }
+
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      Array.isArray((parsed as CachedMatches).matches) &&
+      typeof (parsed as CachedMatches).total === "number"
+    ) {
+      const { matches, total } = parsed as CachedMatches;
+      return { matches, total: Math.max(matches.length, total) };
+    }
+
+    return null;
   } catch {
     return null;
   }
+};
+
+const writeCachedMatches = (key: string, cachedMatches: CachedMatches) => {
+  localStorage.setItem(key, JSON.stringify(cachedMatches));
+};
+
+const mergeMatches = (currentMatches: MatchInfo[], nextMatches: MatchInfo[]) => {
+  const existingMatchIds = new Set(currentMatches.map((match) => match.id));
+  return [
+    ...currentMatches,
+    ...nextMatches.filter((match) => !existingMatchIds.has(match.id)),
+  ];
 };
 
 const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const { player, token } = useAuth();
   const isOnline = useOnlineStatus();
   const [matches, setMatches] = useState<MatchInfo[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextPage, setNextPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const latestRequestIdRef = useRef(0);
   const [pendingMatchAction, setPendingMatchAction] = useState<{
     matchId: string;
     type: "submit-result" | "approve-result" | "cancel-approval";
@@ -49,51 +100,105 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     clearLegacyCachedMatches();
   }, []);
 
-  const loadMatches = useCallback(async () => {
+  const loadMatches = useCallback(async (page = 0, append = false) => {
     if (!token) {
+      latestRequestIdRef.current += 1;
       setMatches([]);
+      setTotal(0);
+      setNextPage(0);
       setIsLoading(false);
       return;
     }
 
-    try {
-      setIsLoading(true);
-      setError(null);
-      setNotice(null);
+    const requestId = latestRequestIdRef.current + 1;
+    latestRequestIdRef.current = requestId;
+    const cachedMatchesKey = getCachedMatchesKey(isMyMatchOnly);
 
-      const res = await fetch(buildApiUrl("/api/matches"), {
-        headers: { Authorization: `Bearer ${token}` },
+    try {
+      if (append) {
+        setIsLoadingMore(true);
+        setLoadMoreError(null);
+      } else {
+        setMatches([]);
+        setTotal(0);
+        setNextPage(0);
+        setIsLoading(true);
+        setError(null);
+        setLoadMoreError(null);
+        setNotice(null);
+      }
+
+      const searchParams = new URLSearchParams({
+        page: String(page),
+        limit: String(MATCHES_PAGE_SIZE),
       });
+      if (isMyMatchOnly && player?.id) {
+        searchParams.set("playerId", player.id);
+      }
+
+      const res = await fetch(
+        buildApiUrl(`/api/matches?${searchParams.toString()}`),
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || "매치 목록을 불러오지 못했습니다.");
       }
 
-      const data = (await res.json()) as {
-        matches: MatchInfo[];
-        total: number;
-      };
-      setMatches(data.matches);
-      localStorage.setItem(CACHED_MATCHES_KEY, JSON.stringify(data.matches));
+      const data = (await res.json()) as MatchesResponse;
+      if (latestRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setMatches((currentMatches) => {
+        const nextMatches = append
+          ? mergeMatches(currentMatches, data.matches)
+          : data.matches;
+        writeCachedMatches(cachedMatchesKey, {
+          matches: nextMatches,
+          total: data.total,
+        });
+        return nextMatches;
+      });
+      setTotal(data.total);
+      setNextPage(page + 1);
     } catch (err) {
+      if (latestRequestIdRef.current !== requestId) {
+        return;
+      }
+
       if (!isOnline) {
-        const cachedMatches = readCachedMatches();
-        if (cachedMatches) {
-          setMatches(cachedMatches);
+        const cachedMatches = readCachedMatches(cachedMatchesKey);
+        if (cachedMatches && !append) {
+          setMatches(cachedMatches.matches);
+          setTotal(cachedMatches.total);
+          setNextPage(Math.ceil(cachedMatches.matches.length / MATCHES_PAGE_SIZE));
           setNotice(OFFLINE_FALLBACK_MESSAGE);
           setError(null);
           return;
         }
       }
 
-      setError(
-        err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.",
-      );
+      const message =
+        err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.";
+      if (append) {
+        setLoadMoreError(message);
+      } else {
+        setError(message);
+      }
     } finally {
-      setIsLoading(false);
+      if (latestRequestIdRef.current === requestId) {
+        if (append) {
+          setIsLoadingMore(false);
+        } else {
+          setIsLoading(false);
+        }
+      }
     }
-  }, [isOnline, token]);
+  }, [isMyMatchOnly, isOnline, player?.id, token]);
 
   useEffect(() => {
     void loadMatches();
@@ -105,27 +210,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const myMatchCount = useMemo(
-    () =>
-      matches.filter((match) =>
-        match.teams.some((team) =>
-          team.players.some((teamPlayer) => teamPlayer.id === player?.id),
-        ),
-      ).length,
-    [matches, player?.id],
-  );
-
-  const displayedMatches = useMemo(() => {
-    if (!isMyMatchOnly) {
-      return matches;
-    }
-
-    return matches.filter((match) =>
-      match.teams.some((team) =>
-        team.players.some((teamPlayer) => teamPlayer.id === player?.id),
-      ),
-    );
-  }, [isMyMatchOnly, matches, player?.id]);
+  const hasMoreMatches = isOnline && matches.length < total;
 
   const handleSubmitResult = useCallback(
     async (matchId: string, scores: MatchScore[]) => {
@@ -238,7 +323,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           {!isLoading && matches.length > 0 ? (
             <div className="flex items-center justify-between gap-3">
               <p className="text-sm text-[#888]">
-                전체 {matches.length}경기 · 내 경기 {myMatchCount}경기
+                {isMyMatchOnly ? "내 경기" : "전체"} {matches.length} / {total}
+                경기
               </p>
               <Switch
                 aria-label="내경기만 보기"
@@ -277,7 +363,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           <TabPanelStatus ariaLabel="매치 목록 로딩 중" isLoading />
         ) : error ? (
           <TabPanelStatus message={error} tone="error" />
-        ) : displayedMatches.length === 0 ? (
+        ) : matches.length === 0 ? (
           <TabPanelStatus
             message={
               isMyMatchOnly
@@ -287,7 +373,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           />
         ) : (
           <div className="flex flex-col gap-3">
-            {displayedMatches.map((match) => (
+            {matches.map((match) => (
               <Match
                 key={match.id}
                 match={match}
@@ -311,6 +397,21 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                 }
               />
             ))}
+            {loadMoreError ? (
+              <p className="text-center text-sm font-medium text-error" role="alert">
+                {loadMoreError}
+              </p>
+            ) : null}
+            {hasMoreMatches ? (
+              <Button
+                type="button"
+                className="app-action-button rounded-2xl border border-[#409eff] bg-white font-semibold text-[#409eff]"
+                isDisabled={isLoadingMore}
+                onPress={() => void loadMatches(nextPage, true)}
+              >
+                {isLoadingMore ? "불러오는 중..." : "더 보기"}
+              </Button>
+            ) : null}
           </div>
         )}
       </div>
