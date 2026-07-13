@@ -116,6 +116,7 @@ const Me: React.FC = () => {
         <MemberProfile
           player={player}
           isMe
+          showDetailHeader={false}
           headerAction={settingsButton}
           matchStats={matchStats}
         />

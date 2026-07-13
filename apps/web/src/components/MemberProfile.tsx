@@ -23,6 +23,7 @@ interface MemberProfileProps {
   player: PlayerInfo | null;
   memberName?: string;
   isMe: boolean;
+  showDetailHeader?: boolean;
   headerAction?: React.ReactNode;
   matchStats?: MemberProfileMatchStats;
 }
@@ -31,6 +32,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   player,
   memberName,
   isMe,
+  showDetailHeader = true,
   headerAction,
   matchStats,
 }) => {
@@ -86,7 +88,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   return (
     <div className="min-h-full p-2">
       <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
-        <DetailPageHeader title="Member Profile" />
+        {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
         <div className="flex items-start gap-4">
           <Avatar
             size="sm"
