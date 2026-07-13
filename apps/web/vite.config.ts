@@ -45,10 +45,10 @@ export default defineConfig({
         navigateFallbackAllowlist: [/^\/$/, /^\/login$/],
       },
       includeAssets: [
-        "favicon.svg",
-        "pwa-192x192.png",
-        "pwa-512x512.png",
-        "pwa-maskable-512x512.png",
+        "favicon-v2.png",
+        "pwa-192x192-v2.png",
+        "pwa-512x512-v2.png",
+        "pwa-maskable-512x512-v2.png",
       ],
       manifest: {
         name: "PkpkDUPR",
@@ -63,17 +63,17 @@ export default defineConfig({
         theme_color: "#ffffff",
         icons: [
           {
-            src: "/pwa-192x192.png",
+            src: "/pwa-192x192-v2.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "/pwa-512x512.png",
+            src: "/pwa-512x512-v2.png",
             sizes: "512x512",
             type: "image/png",
           },
           {
-            src: "/pwa-maskable-512x512.png",
+            src: "/pwa-maskable-512x512-v2.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
