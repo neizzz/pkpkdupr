@@ -9,6 +9,7 @@ interface UserChipProps {
   onRemove?: () => void;
   removeLabel?: string;
   isMe?: boolean;
+  size?: "default" | "match";
   endAdornment?: React.ReactNode;
   reserveRemoveSlot?: boolean;
   onPress?: () => void;
@@ -22,6 +23,7 @@ const UserChip: React.FC<UserChipProps> = ({
   onRemove,
   removeLabel,
   isMe = false,
+  size = "default",
   endAdornment,
   reserveRemoveSlot = false,
   onPress,
@@ -39,12 +41,19 @@ const UserChip: React.FC<UserChipProps> = ({
       : "border-1 border-[#f8626c]/15 shadow-[0_0_0_1px_rgba(248,98,108,0.16)]";
   const shouldReserveRemoveSlot = !!onRemove || reserveRemoveSlot;
   const canPress = isPressable && !isDisabled && !!onPress;
+  const isMatchSize = size === "match";
+  const chipWidthClass = isMatchSize
+    ? "w-[clamp(6rem,32vw,10rem)]"
+    : "w-[clamp(4.5rem,23vw,7.5rem)]";
+  const reservedChipGridClass = isMatchSize
+    ? "grid-cols-[minmax(0,clamp(6rem,32vw,10rem))_auto]"
+    : "grid-cols-[minmax(0,clamp(4.5rem,23vw,7.5rem))_auto]";
 
   return (
     <div
       className={
         shouldReserveRemoveSlot
-          ? "grid min-w-0 max-w-full grid-cols-[minmax(0,7.5rem)_auto] items-center gap-1"
+          ? `grid min-w-0 max-w-full ${reservedChipGridClass} items-center gap-1`
           : "flex min-w-0 max-w-full items-center gap-1"
       }
     >
@@ -63,17 +72,27 @@ const UserChip: React.FC<UserChipProps> = ({
               }
             : undefined
         }
-        className={`relative h-6 min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? "w-full pr-2" : "w-30 pr-3"} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+        className={`relative ${isMatchSize ? "h-8" : "h-6"} min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? "w-full pr-2" : `${chipWidthClass} pr-3`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
       >
         <div className="flex min-w-0 max-w-full items-center gap-1">
           <Avatar
             size="xs"
             avatarUrl={player.avatarUrl}
             name={player.username}
-            className={`bg-white/80 ${genderAvatarClass}`}
+            className={`bg-white/80 ${genderAvatarClass} ${
+              isMatchSize ? "h-8 w-8" : ""
+            }`}
             isMe={isMe}
           />
-          <span className="min-w-0 truncate text-sm font-medium text-current">
+          <span
+            className={`min-w-0 truncate ${
+              isMatchSize
+                ? "text-[clamp(0.875rem,3.5vw,1rem)]"
+                : "text-[clamp(0.75rem,3vw,0.875rem)]"
+            } text-current ${
+              isMe ? "font-bold" : "font-medium"
+            }`}
+          >
             {player.username}
           </span>
           {endAdornment ? (

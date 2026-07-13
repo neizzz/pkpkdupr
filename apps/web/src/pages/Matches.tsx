@@ -3,7 +3,9 @@ import { Button, Switch } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import { useAuth } from "@/context/AuthContext";
 import Match, { type MatchInfo } from "@/components/Match";
+import MatchDetail from "@/components/MatchDetail";
 import TabPanelStatus from "@/components/TabPanelStatus";
+import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
 
@@ -80,6 +82,8 @@ const mergeMatches = (currentMatches: MatchInfo[], nextMatches: MatchInfo[]) => 
 const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const { player, token } = useAuth();
   const isOnline = useOnlineStatus();
+  const { pushDepth, restoreScrollTop, saveScrollPosition, scrollToTop } =
+    useTabNavigation();
   const [matches, setMatches] = useState<MatchInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [nextPage, setNextPage] = useState(0);
@@ -89,7 +93,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
   const latestRequestIdRef = useRef(0);
   const [pendingMatchAction, setPendingMatchAction] = useState<{
     matchId: string;
@@ -205,10 +210,15 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   }, [loadMatches, reloadKey]);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    if (!selectedMatchId) {
+      return;
+    }
 
-    return () => window.clearInterval(intervalId);
-  }, []);
+    const refreshedMatch = matches.find((match) => match.id === selectedMatchId);
+    if (refreshedMatch) {
+      setSelectedMatch(refreshedMatch);
+    }
+  }, [matches, selectedMatchId]);
 
   const hasMoreMatches = isOnline && matches.length < total;
 
@@ -315,6 +325,52 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     [isOnline, loadMatches, token],
   );
 
+  const closeMatchDetail = useCallback(() => {
+    setSelectedMatchId(null);
+    setSelectedMatch(null);
+    restoreScrollTop("match");
+  }, [restoreScrollTop]);
+
+  const openMatchDetail = useCallback(
+    (match: MatchInfo) => {
+      saveScrollPosition("match");
+      pushDepth("match", {
+        id: `match-detail:${match.id}`,
+        kind: "match-detail",
+        onClose: closeMatchDetail,
+      });
+      setSelectedMatchId(match.id);
+      setSelectedMatch(match);
+      window.requestAnimationFrame(() => scrollToTop("auto"));
+    },
+    [closeMatchDetail, pushDepth, saveScrollPosition, scrollToTop],
+  );
+
+  if (selectedMatch) {
+    return (
+      <MatchDetail
+        match={selectedMatch}
+        currentPlayerId={player?.id}
+        onSubmitResult={handleSubmitResult}
+        onApproveResult={handleApproveResult}
+        onCancelApproval={handleCancelApproval}
+        isOnline={isOnline}
+        isSubmittingResult={
+          pendingMatchAction?.matchId === selectedMatch.id &&
+          pendingMatchAction.type === "submit-result"
+        }
+        isApprovingResult={
+          pendingMatchAction?.matchId === selectedMatch.id &&
+          pendingMatchAction.type === "approve-result"
+        }
+        isCancellingApproval={
+          pendingMatchAction?.matchId === selectedMatch.id &&
+          pendingMatchAction.type === "cancel-approval"
+        }
+      />
+    );
+  }
+
   return (
     <div className="flex min-h-full p-2">
       <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
@@ -378,23 +434,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                 key={match.id}
                 match={match}
                 currentPlayerId={player?.id}
-                nowMs={nowMs}
-                onSubmitResult={handleSubmitResult}
-                onApproveResult={handleApproveResult}
-                onCancelApproval={handleCancelApproval}
-                isOnline={isOnline}
-                isSubmittingResult={
-                  pendingMatchAction?.matchId === match.id &&
-                  pendingMatchAction.type === "submit-result"
-                }
-                isApprovingResult={
-                  pendingMatchAction?.matchId === match.id &&
-                  pendingMatchAction.type === "approve-result"
-                }
-                isCancellingApproval={
-                  pendingMatchAction?.matchId === match.id &&
-                  pendingMatchAction.type === "cancel-approval"
-                }
+                onPress={openMatchDetail}
               />
             ))}
             {loadMoreError ? (

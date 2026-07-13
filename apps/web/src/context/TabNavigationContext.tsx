@@ -2,7 +2,11 @@ import React, { createContext, useContext } from "react";
 
 export type TabKey = "match" | "members" | "me";
 
-export type TabDepthKind = "member-profile" | "bottom-sheet" | "dropdown";
+export type TabDepthKind =
+  | "match-detail"
+  | "member-profile"
+  | "bottom-sheet"
+  | "dropdown";
 
 export interface TabDepthEntry {
   id: string;
