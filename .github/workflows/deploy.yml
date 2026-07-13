@@ -142,42 +142,26 @@ jobs:
           \`\`\`
 
           3. \`${DEPLOY_PATH}\`에서 배포를 실행합니다.
-             - \`.env\`가 없으면 \`.env.example\`을 복사합니다.
-             - \`scripts/manual-deploy.sh\`는 실행 전에 아래 값을 자동 동기화합니다.
-               - \`DOMAIN\`
-               - \`WEB_PUBLIC_PORT\`
-               - \`ADMIN_STACK_PORT\`
-               - \`VITE_API_BASE_URL\`
-               - \`GF_SERVER_ROOT_URL\`
+             - 최초 설치 시에만 \`.env.example\`을 \`.env\`로 복사하고, 실제 운영 값(도메인, DuckDNS 토큰, JWT secret, 관리자 계정, sqlite-web 비밀번호)을 직접 설정합니다.
+             - \`scripts/manual-deploy.sh\`는 기존 \`${DEPLOY_PATH}/.env\`를 변경하지 않습니다.
+             - 최초 설치, 인증서/SWAG 설정 생성 또는 런타임 설정 복구가 필요하면 \`scripts/install-server.sh\`를 먼저 실행합니다.
 
           \`\`\`bash
           cd "${DEPLOY_PATH}"
-          chmod +x scripts/manual-deploy.sh scripts/update-server.sh scripts/upsert-env.sh
+          chmod +x scripts/install-server.sh scripts/manual-deploy.sh scripts/update-server.sh
           [ -f .env ] || cp .env.example .env
 
-          # 최초 설치 또는 런타임 설정 drift 복구가 필요하면
+          # 최초 설치 또는 인증서/SWAG 설정 복구가 필요한 경우
           bash scripts/install-server.sh
 
           # 일반 배포: 서버에 GHCR 로그인 상태가 이미 있는 경우
-          bash scripts/manual-deploy.sh --image-tag '${IMAGE_TAG}' --public-domain '${TARGET_DOMAIN}'
+          bash scripts/manual-deploy.sh --image-tag '${IMAGE_TAG}'
 
           # 이번 배포에만 GHCR 자격증명을 함께 넘기고 싶다면
           bash scripts/manual-deploy.sh \\
             --image-tag '${IMAGE_TAG}' \\
-            --public-domain '${TARGET_DOMAIN}' \\
             --ghcr-username '<GHCR_USERNAME>' \\
             --ghcr-token '<GHCR_TOKEN>'
-
-          # 포트/관리자 계정을 함께 덮어쓰고 싶다면
-          bash scripts/manual-deploy.sh \\
-            --image-tag '${IMAGE_TAG}' \\
-            --public-domain '${TARGET_DOMAIN}' \\
-            --web-public-port 443 \\
-            --admin-stack-port 3333 \\
-            --api-admin-username '<API_ADMIN_USERNAME>' \\
-            --api-admin-password '<API_ADMIN_PASSWORD>' \\
-            --gf-admin-user '<GF_ADMIN_USER>' \\
-            --gf-admin-password '<GF_ADMIN_PASSWORD>'
           \`\`\`
 
           4. 배포 후 아래 URL로 정상 동작을 확인합니다.
@@ -186,5 +170,6 @@ jobs:
           - API health: \`https://${TARGET_DOMAIN}:3333/api/health\`
           - API ping: \`https://${TARGET_DOMAIN}:3333/api/ping\`
           - Admin: \`https://${TARGET_DOMAIN}:3333/admin/\`
-          - Grafana: \`https://${TARGET_DOMAIN}:3333/grafana/\`
+          - Uptime Kuma: \`https://${TARGET_DOMAIN}:3333/uptime/\`
+          - sqlite-web (read-only): \`https://${TARGET_DOMAIN}:3333/db/\`
           EOF
