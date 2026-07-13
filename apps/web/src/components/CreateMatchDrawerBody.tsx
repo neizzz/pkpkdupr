@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Drawer, Radio, RadioGroup, Separator } from "@heroui/react";
+import { Button, Drawer, Separator } from "@heroui/react";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type { MatchMode } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
@@ -58,15 +58,12 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     [selectedMatchMembers],
   );
   const trimmedMatchName = matchName.trim();
-  const matchNameValidationError =
-    matchNameMode === "manual" && !trimmedMatchName
-      ? "매치 이름을 입력해주세요."
-      : null;
+  const isManualMatchNameEmpty = matchNameMode === "manual" && !trimmedMatchName;
   const canCreateMatch =
     isOnline &&
     !!selectedMatchType &&
     areTeamsValid(teams, selectedMatchType) &&
-    !matchNameValidationError;
+    !isManualMatchNameEmpty;
   const canAddMatchMember = isOnline && !!token && selectedMatchMembers.length < 4;
   const previewTeams = useMemo(
     () => buildPreviewTeams(selectedMatchMembers, teams, selectedMatchType),
@@ -349,76 +346,73 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
             <section className="flex flex-col gap-2">
               <p className="bs-text-title text-amber-950">매치 이름</p>
-              <RadioGroup
+              <div
+                role="radiogroup"
                 aria-label="매치 이름 입력 방식"
-                value={matchNameMode}
-                onChange={(value) => setMatchNameMode(value as "auto" | "manual")}
-                orientation="horizontal"
-                className="flex gap-5"
+                className="flex items-center gap-5"
               >
-                <Radio value="auto">
-                  <div
-                    onClick={() => setMatchNameMode("auto")}
-                    className="cursor-pointer"
+                <label className="flex shrink-0 cursor-pointer items-center gap-2 py-1">
+                  <input
+                    type="radio"
+                    name="match-name-mode"
+                    value="auto"
+                    checked={matchNameMode === "auto"}
+                    onChange={() => setMatchNameMode("auto")}
+                    className="sr-only"
+                  />
+                  <span className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
+                    <span
+                      className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
+                        matchNameMode === "auto"
+                          ? "scale-100 opacity-100"
+                          : "scale-0 opacity-0"
+                      }`}
+                    />
+                  </span>
+                  <span
+                    className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
+                      matchNameMode === "auto" ? "opacity-100" : "opacity-45"
+                    }`}
                   >
-                    <Radio.Content className="flex select-none items-center gap-2 py-1">
-                      <Radio.Control className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
-                        <Radio.Indicator className="flex size-full items-center justify-center">
-                          {({ isSelected }) => (
-                            <span
-                              className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
-                                isSelected
-                                  ? "scale-100 opacity-100"
-                                  : "scale-0 opacity-0"
-                              }`}
-                            />
-                          )}
-                        </Radio.Indicator>
-                      </Radio.Control>
+                    자동
+                  </span>
+                </label>
+                <div className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                  <label
+                    aria-label="수동 입력"
+                    className="flex shrink-0 cursor-pointer items-center"
+                  >
+                    <input
+                      type="radio"
+                      name="match-name-mode"
+                      value="manual"
+                      checked={matchNameMode === "manual"}
+                      onChange={() => setMatchNameMode("manual")}
+                      className="sr-only"
+                    />
+                    <span className="flex size-5 items-center justify-center rounded-full border border-slate-300 bg-white">
                       <span
-                        className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
-                          matchNameMode === "auto" ? "opacity-100" : "opacity-45"
+                        className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
+                          matchNameMode === "manual"
+                            ? "scale-100 opacity-100"
+                            : "scale-0 opacity-0"
                         }`}
-                      >
-                        자동
-                      </span>
-                    </Radio.Content>
-                  </div>
-                </Radio>
-                <Radio value="manual" className="min-w-0 flex-1">
-                  <div
-                    onClick={() => setMatchNameMode("manual")}
-                    className="cursor-pointer"
-                  >
-                    <Radio.Content className="flex items-center gap-2 py-1">
-                      <Radio.Control className="flex size-5 shrink-0 items-center justify-center rounded-full border border-slate-300 bg-white">
-                        <Radio.Indicator className="flex size-full items-center justify-center">
-                          {({ isSelected }) => (
-                            <span
-                              className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
-                                isSelected
-                                  ? "scale-100 opacity-100"
-                                  : "scale-0 opacity-0"
-                              }`}
-                            />
-                          )}
-                        </Radio.Indicator>
-                      </Radio.Control>
-                      <input
-                        type="text"
-                        value={matchName}
-                        onFocus={() => setMatchNameMode("manual")}
-                        onChange={(event) => {
-                          setMatchName(event.target.value);
-                          setCreateMatchError(null);
-                        }}
-                        placeholder="매치 이름 입력"
-                        className="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-3 text-base text-amber-950 outline-none"
                       />
-                    </Radio.Content>
-                  </div>
-                </Radio>
-              </RadioGroup>
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={matchName}
+                    onFocus={() => setMatchNameMode("manual")}
+                    onChange={(event) => {
+                      setMatchName(event.target.value);
+                      setCreateMatchError(null);
+                    }}
+                    placeholder="매치 이름 입력"
+                    className="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-3 text-base text-amber-950 outline-none"
+                  />
+                </div>
+              </div>
             </section>
           </>
         )}
@@ -429,9 +423,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             <Separator />
           </div>
           <Drawer.Footer className="flex flex-col gap-2 px-5 pt-3">
-            {createMatchError || matchNameValidationError ? (
+            {createMatchError ? (
               <p className="bs-text-body text-error">
-                {createMatchError ?? matchNameValidationError}
+                {createMatchError}
               </p>
             ) : null}
             <div className="grid w-full grid-cols-3 gap-2">
