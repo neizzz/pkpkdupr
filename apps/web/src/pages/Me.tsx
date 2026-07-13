@@ -96,7 +96,12 @@ const Me: React.FC = () => {
       lastSuccessfulLoadAtRef.current !== null,
     );
 
-    return () => abortController.abort();
+    return () => {
+      abortController.abort();
+      // React Strict Mode와 인증 정보 갱신으로 effect가 다시 실행될 때,
+      // 취소된 첫 요청 때문에 다음 요청까지 막히지 않도록 한다.
+      wasTabActiveRef.current = false;
+    };
   }, [loadMatchStats, selectedTab]);
 
   useEffect(() => {
