@@ -199,7 +199,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           <p className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}>
             Score
           </p>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white/80">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white/80 shadow-sm">
             <table className="w-full table-fixed border-collapse text-sm text-amber-950">
               <colgroup>
                 <col className="w-[40%]" />
