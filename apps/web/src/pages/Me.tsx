@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { IoSettingsOutline } from "react-icons/io5";
 import BottomSheet from "@/components/BottomSheet";
@@ -9,41 +9,46 @@ import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { buildApiUrl } from "@/lib/api";
+import { isTabRefreshDue } from "@/lib/tabRefresh";
 import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
 
 const Me: React.FC = () => {
   const { player, token } = useAuth();
-  const { closeDepth, pushDepth } = useTabNavigation();
+  const { closeDepth, pushDepth, selectedTab } = useTabNavigation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
+  const lastSuccessfulLoadAtRef = useRef<number | null>(null);
+  const wasTabActiveRef = useRef(false);
+  const playerId = player?.id;
 
   const closeSettings = useCallback(() => {
     setIsSettingsOpen(false);
   }, []);
 
-  useEffect(() => {
-    if (!token || !player?.id) {
-      setMatchStats(createEmptyMatchStats());
-      setIsMatchStatsLoading(false);
-      return;
-    }
+  const loadMatchStats = useCallback(
+    async (signal: AbortSignal, preserveVisibleData = false) => {
+      if (!token || !playerId) {
+        lastSuccessfulLoadAtRef.current = null;
+        setMatchStats(createEmptyMatchStats());
+        setIsMatchStatsLoading(false);
+        return;
+      }
 
-    const abortController = new AbortController();
-
-    const loadMatchStats = async () => {
-      setIsMatchStatsLoading(true);
+      if (!preserveVisibleData) {
+        setIsMatchStatsLoading(true);
+      }
 
       try {
         const searchParams = new URLSearchParams({
-          playerId: player.id,
+          playerId,
           limit: "1000",
         });
         const res = await fetch(
           buildApiUrl(`/api/matches?${searchParams.toString()}`),
           {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: abortController.signal,
+            headers: { Authorization: `Bearer ${token}` },
+            signal,
           },
         );
 
@@ -56,24 +61,51 @@ const Me: React.FC = () => {
           total: number;
         };
 
-        if (!abortController.signal.aborted) {
-          setMatchStats(buildMatchStats(data.matches, player.id));
+        if (!signal.aborted) {
+          setMatchStats(buildMatchStats(data.matches, playerId));
+          lastSuccessfulLoadAtRef.current = Date.now();
         }
       } catch {
-        if (!abortController.signal.aborted) {
+        if (!signal.aborted && !preserveVisibleData) {
           setMatchStats(createEmptyMatchStats());
         }
       } finally {
-        if (!abortController.signal.aborted) {
+        if (!signal.aborted && !preserveVisibleData) {
           setIsMatchStatsLoading(false);
         }
       }
-    };
+    },
+    [playerId, token],
+  );
 
-    void loadMatchStats();
+  useEffect(() => {
+    const isTabActive = selectedTab === "me";
+    if (!isTabActive) {
+      wasTabActiveRef.current = false;
+      return;
+    }
+
+    if (wasTabActiveRef.current) return;
+
+    wasTabActiveRef.current = true;
+    if (!isTabRefreshDue(lastSuccessfulLoadAtRef.current)) return;
+
+    const abortController = new AbortController();
+    void loadMatchStats(
+      abortController.signal,
+      lastSuccessfulLoadAtRef.current !== null,
+    );
 
     return () => abortController.abort();
-  }, [player?.id, token]);
+  }, [loadMatchStats, selectedTab]);
+
+  useEffect(() => {
+    if (!token || !playerId) {
+      lastSuccessfulLoadAtRef.current = null;
+      setMatchStats(createEmptyMatchStats());
+      setIsMatchStatsLoading(false);
+    }
+  }, [playerId, token]);
 
   const openSettings = () => {
     pushDepth("me", {
@@ -124,6 +156,7 @@ const Me: React.FC = () => {
 
       <BottomSheet
         isOpen={isSettingsOpen}
+        isActive={selectedTab === "me"}
         onOpenChange={handleSettingsOpenChange}
         ariaLabel="프로필 설정"
         className="px-5 pt-6"

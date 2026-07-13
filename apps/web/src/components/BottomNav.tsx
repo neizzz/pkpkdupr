@@ -49,10 +49,10 @@ const emptyDepthStacks = (): TabDepthStacks => ({
   me: [],
 });
 
-const emptyScrollPositions = (): Record<TabKey, number> => ({
-  match: 0,
-  members: 0,
-  me: 0,
+const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
+  match: false,
+  members: false,
+  me: true,
 });
 
 const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
@@ -81,6 +81,8 @@ const BottomNav: React.FC = () => {
   const { token, logout } = useAuth();
   const isOnline = useOnlineStatus();
   const [selectedTab, setSelectedTab] = useState<TabKey>("me");
+  const [visitedTabs, setVisitedTabs] =
+    useState<Record<TabKey, boolean>>(initiallyVisitedTabs);
   const [depthStacks, setDepthStacks] =
     useState<TabDepthStacks>(emptyDepthStacks);
   const [isGlobalMenuOpen, setIsGlobalMenuOpen] = useState(false);
@@ -108,10 +110,9 @@ const BottomNav: React.FC = () => {
     members: [],
     me: [],
   });
-  const scrollPositionsRef = useRef<Record<TabKey, number>>(
-    emptyScrollPositions(),
-  );
+  const scrollPositionsRef = useRef<Record<string, number>>({});
   const historySequenceRef = useRef(0);
+  const currentHistoryDepthRef = useRef<TabDepthHistoryState | null>(null);
   const afterCloseCallbacksRef = useRef(new Map<string, () => void>());
   const closingDepthKeysRef = useRef(new Set<string>());
 
@@ -131,21 +132,36 @@ const BottomNav: React.FC = () => {
     [],
   );
 
+  const getScrollPositionKey = useCallback((tabKey: TabKey) => {
+    const tabDepthStack = depthEntriesRef.current[tabKey];
+    const activeDepth = tabDepthStack[tabDepthStack.length - 1];
+
+    return `${tabKey}:${activeDepth?.id ?? "root"}`;
+  }, []);
+
   const saveScrollPosition = useCallback(
     (tabKey = selectedTabRef.current) => {
-      scrollPositionsRef.current[tabKey] = getScrollTop();
+      scrollPositionsRef.current[getScrollPositionKey(tabKey)] = getScrollTop();
     },
-    [getScrollTop],
+    [getScrollPositionKey, getScrollTop],
   );
 
-  const restoreScrollTop = useCallback((tabKey = selectedTabRef.current) => {
-    window.requestAnimationFrame(() => {
-      const scrollContainer = scrollContainerRef.current;
-      if (!scrollContainer) return;
+  const restoreScrollTop = useCallback(
+    (tabKey = selectedTabRef.current) => {
+      const scrollPositionKey = getScrollPositionKey(tabKey);
 
-      scrollContainer.scrollTop = scrollPositionsRef.current[tabKey] ?? 0;
-    });
-  }, []);
+      window.requestAnimationFrame(() => {
+        if (selectedTabRef.current !== tabKey) return;
+
+        const scrollContainer = scrollContainerRef.current;
+        if (!scrollContainer) return;
+
+        scrollContainer.scrollTop =
+          scrollPositionsRef.current[scrollPositionKey] ?? 0;
+      });
+    },
+    [getScrollPositionKey],
+  );
 
   const scrollToTop = useCallback((behavior: ScrollBehavior = "smooth") => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior });
@@ -205,16 +221,14 @@ const BottomNav: React.FC = () => {
         };
         syncDepthStacks();
         historySequenceRef.current += 1;
-        window.history.pushState(
-          {
-            [HISTORY_DEPTH_STATE_KEY]: true,
-            tabKey,
-            depthId: entry.id,
-            sequence: historySequenceRef.current,
-          } satisfies TabDepthHistoryState,
-          "",
-          window.location.href,
-        );
+        const historyState = {
+          [HISTORY_DEPTH_STATE_KEY]: true,
+          tabKey,
+          depthId: entry.id,
+          sequence: historySequenceRef.current,
+        } satisfies TabDepthHistoryState;
+        window.history.pushState(historyState, "", window.location.href);
+        currentHistoryDepthRef.current = historyState;
       }
 
       return () => {
@@ -278,6 +292,11 @@ const BottomNav: React.FC = () => {
       if (nextTab === currentTab) return;
 
       saveScrollPosition(currentTab);
+      setVisitedTabs((currentVisitedTabs) =>
+        currentVisitedTabs[nextTab]
+          ? currentVisitedTabs
+          : { ...currentVisitedTabs, [nextTab]: true },
+      );
       selectedTabRef.current = nextTab;
       setSelectedTab(nextTab);
       restoreScrollTop(nextTab);
@@ -487,14 +506,23 @@ const BottomNav: React.FC = () => {
   }, [selectedTab]);
 
   useEffect(() => {
-    const handlePopState = () => {
-      const activeTab = selectedTabRef.current;
-      const activeStack = depthEntriesRef.current[activeTab];
-      const topEntry = activeStack[activeStack.length - 1];
+    const handlePopState = (event: PopStateEvent) => {
+      const historyDepth = currentHistoryDepthRef.current;
+      if (historyDepth) {
+        removeDepthEntry(historyDepth.tabKey, historyDepth.depthId);
+      } else {
+        const activeTab = selectedTabRef.current;
+        const activeStack = depthEntriesRef.current[activeTab];
+        const topEntry = activeStack[activeStack.length - 1];
 
-      if (!topEntry) return;
+        if (topEntry) {
+          removeDepthEntry(activeTab, topEntry.id);
+        }
+      }
 
-      removeDepthEntry(activeTab, topEntry.id);
+      currentHistoryDepthRef.current = isTabDepthHistoryState(event.state)
+        ? event.state
+        : null;
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -618,6 +646,9 @@ const BottomNav: React.FC = () => {
     ],
   );
 
+  const isGlobalMenuVisible =
+    isGlobalMenuOpen && globalMenuTabKey === selectedTab;
+
   return (
     <TabNavigationProvider value={navigationContextValue}>
       <Tabs
@@ -668,21 +699,21 @@ const BottomNav: React.FC = () => {
           </Tabs.ListContainer>
 
           <Dropdown
-            isOpen={isGlobalMenuOpen}
+            isOpen={isGlobalMenuVisible}
             onOpenChange={handleGlobalMenuOpenChange}
           >
             <Button
               isIconOnly
               aria-label="Global plus menu"
               className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-lg transition-colors ${
-                isGlobalMenuOpen
+                isGlobalMenuVisible
                   ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
                   : "bg-[#409eff] hover:bg-[#409eff]/90"
               }`}
             >
               <IoAdd
                 className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
-                  isGlobalMenuOpen ? "rotate-45" : "rotate-0"
+                  isGlobalMenuVisible ? "rotate-45" : "rotate-0"
                 }`}
                 style={{ width: "28px", height: "28px" }}
               />
@@ -746,19 +777,22 @@ const BottomNav: React.FC = () => {
         >
           <Tabs.Panel
             id="match"
-            className="app-panel-bottom-pad min-h-full bg-gray-50"
+            shouldForceMount={visitedTabs.match}
+            className="app-panel-bottom-pad min-h-full bg-gray-50 data-[inert=true]:hidden"
           >
             <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
-            className="app-panel-bottom-pad min-h-full bg-gray-50"
+            shouldForceMount={visitedTabs.members}
+            className="app-panel-bottom-pad min-h-full bg-gray-50 data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"
-            className="app-panel-bottom-pad min-h-full bg-white"
+            shouldForceMount={visitedTabs.me}
+            className="app-panel-bottom-pad min-h-full bg-white data-[inert=true]:hidden"
           >
             <Me />
           </Tabs.Panel>
@@ -775,6 +809,7 @@ const BottomNav: React.FC = () => {
 
         <BottomSheet
           isOpen={isQrOpen}
+          isActive={qrTabKey === selectedTab}
           onOpenChange={handleQrOpenChange}
           ariaLabel="Player QR code"
         >
@@ -789,6 +824,7 @@ const BottomNav: React.FC = () => {
 
         <BottomSheet
           isOpen={isCreateMatchOpen}
+          isActive={createMatchTabKey === selectedTab}
           onOpenChange={handleCreateMatchOpenChange}
           ariaLabel="Create match"
         >
@@ -803,6 +839,7 @@ const BottomNav: React.FC = () => {
 
         <BottomSheet
           isOpen={isAppSettingsOpen}
+          isActive={appSettingsTabKey === selectedTab}
           onOpenChange={handleAppSettingsOpenChange}
           ariaLabel="앱 설정"
           className="px-5 pt-6"

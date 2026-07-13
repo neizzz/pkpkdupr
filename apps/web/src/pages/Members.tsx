@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
+import { isTabRefreshDue } from "@/lib/tabRefresh";
 import {
   formatRating,
   getCompositeDoublesRating,
@@ -35,6 +36,7 @@ const Members: React.FC = () => {
     pushDepth,
     restoreScrollTop,
     saveScrollPosition,
+    selectedTab,
     scrollToTop,
   } = useTabNavigation();
   const [members, setMembers] = useState<PlayerInfo[]>([]);
@@ -44,19 +46,24 @@ const Members: React.FC = () => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedMemberMatchStats, setSelectedMemberMatchStats] =
     useState(createEmptyMatchStats);
+  const lastSuccessfulLoadAtRef = useRef<number | null>(null);
+  const wasTabActiveRef = useRef(false);
 
-  useEffect(() => {
-    const loadMembers = async () => {
+  const loadMembers = useCallback(
+    async (preserveVisibleData = false) => {
       if (!token) {
         setMembers([]);
         setIsLoading(false);
+        lastSuccessfulLoadAtRef.current = null;
         return;
       }
 
       try {
-        setIsLoading(true);
-        setError(null);
-        setNotice(null);
+        if (!preserveVisibleData) {
+          setIsLoading(true);
+          setError(null);
+          setNotice(null);
+        }
 
         const res = await fetch(buildApiUrl("/api/players"), {
           headers: { Authorization: `Bearer ${token}` },
@@ -72,29 +79,50 @@ const Members: React.FC = () => {
         const data = (await res.json()) as PlayerInfo[];
         setMembers(data);
         localStorage.setItem(CACHED_MEMBERS_KEY, JSON.stringify(data));
+        lastSuccessfulLoadAtRef.current = Date.now();
       } catch (err) {
         if (!isOnline) {
           const cachedMembers = readCachedMembers();
           if (cachedMembers) {
             setMembers(cachedMembers);
-            setNotice(OFFLINE_FALLBACK_MESSAGE);
-            setError(null);
+            if (!preserveVisibleData) {
+              setNotice(OFFLINE_FALLBACK_MESSAGE);
+              setError(null);
+            }
             return;
           }
         }
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "멤버 목록을 불러오지 못했습니다.",
-        );
+        if (!preserveVisibleData) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "멤버 목록을 불러오지 못했습니다.",
+          );
+        }
       } finally {
-        setIsLoading(false);
+        if (!preserveVisibleData) {
+          setIsLoading(false);
+        }
       }
-    };
+    },
+    [isOnline, token],
+  );
 
-    void loadMembers();
-  }, [isOnline, token]);
+  useEffect(() => {
+    const isTabActive = selectedTab === "members";
+    if (!isTabActive) {
+      wasTabActiveRef.current = false;
+      return;
+    }
+
+    if (wasTabActiveRef.current) return;
+
+    wasTabActiveRef.current = true;
+    if (!isTabRefreshDue(lastSuccessfulLoadAtRef.current)) return;
+
+    void loadMembers(members.length > 0);
+  }, [loadMembers, members.length, selectedTab]);
 
   useEffect(() => {
     if (!token || !selectedMemberId) {

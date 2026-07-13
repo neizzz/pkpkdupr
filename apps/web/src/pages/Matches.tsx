@@ -8,6 +8,7 @@ import TabPanelStatus from "@/components/TabPanelStatus";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
+import { isTabRefreshDue } from "@/lib/tabRefresh";
 
 interface MatchesProps {
   reloadKey?: number;
@@ -82,8 +83,13 @@ const mergeMatches = (currentMatches: MatchInfo[], nextMatches: MatchInfo[]) => 
 const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const { player, token } = useAuth();
   const isOnline = useOnlineStatus();
-  const { pushDepth, restoreScrollTop, saveScrollPosition, scrollToTop } =
-    useTabNavigation();
+  const {
+    pushDepth,
+    restoreScrollTop,
+    saveScrollPosition,
+    selectedTab,
+    scrollToTop,
+  } = useTabNavigation();
   const [matches, setMatches] = useState<MatchInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [nextPage, setNextPage] = useState(0);
@@ -96,6 +102,11 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
   const latestRequestIdRef = useRef(0);
+  const lastSuccessfulLoadAtRef = useRef<number | null>(null);
+  const wasTabActiveRef = useRef(false);
+  const pendingReloadRef = useRef(false);
+  const previousReloadKeyRef = useRef(reloadKey);
+  const previousIsMyMatchOnlyRef = useRef(isMyMatchOnly);
   const [pendingMatchAction, setPendingMatchAction] = useState<{
     matchId: string;
     type: "submit-result" | "approve-result" | "cancel-approval";
@@ -105,109 +116,159 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     clearLegacyCachedMatches();
   }, []);
 
-  const loadMatches = useCallback(async (page = 0, append = false) => {
-    if (!token) {
-      latestRequestIdRef.current += 1;
-      setMatches([]);
-      setTotal(0);
-      setNextPage(0);
-      setIsLoading(false);
-      return;
-    }
-
-    const requestId = latestRequestIdRef.current + 1;
-    latestRequestIdRef.current = requestId;
-    const cachedMatchesKey = getCachedMatchesKey(isMyMatchOnly);
-
-    try {
-      if (append) {
-        setIsLoadingMore(true);
-        setLoadMoreError(null);
-      } else {
+  const loadMatches = useCallback(
+    async (page = 0, append = false, preserveVisibleData = false) => {
+      if (!token) {
+        latestRequestIdRef.current += 1;
         setMatches([]);
         setTotal(0);
         setNextPage(0);
-        setIsLoading(true);
-        setError(null);
-        setLoadMoreError(null);
-        setNotice(null);
-      }
-
-      const searchParams = new URLSearchParams({
-        page: String(page),
-        limit: String(MATCHES_PAGE_SIZE),
-      });
-      if (isMyMatchOnly && player?.id) {
-        searchParams.set("playerId", player.id);
-      }
-
-      const res = await fetch(
-        buildApiUrl(`/api/matches?${searchParams.toString()}`),
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "매치 목록을 불러오지 못했습니다.");
-      }
-
-      const data = (await res.json()) as MatchesResponse;
-      if (latestRequestIdRef.current !== requestId) {
+        setIsLoading(false);
+        lastSuccessfulLoadAtRef.current = null;
         return;
       }
 
-      setMatches((currentMatches) => {
-        const nextMatches = append
-          ? mergeMatches(currentMatches, data.matches)
-          : data.matches;
-        writeCachedMatches(cachedMatchesKey, {
-          matches: nextMatches,
-          total: data.total,
-        });
-        return nextMatches;
-      });
-      setTotal(data.total);
-      setNextPage(page + 1);
-    } catch (err) {
-      if (latestRequestIdRef.current !== requestId) {
-        return;
-      }
+      const requestId = latestRequestIdRef.current + 1;
+      latestRequestIdRef.current = requestId;
+      const cachedMatchesKey = getCachedMatchesKey(isMyMatchOnly);
 
-      if (!isOnline) {
-        const cachedMatches = readCachedMatches(cachedMatchesKey);
-        if (cachedMatches && !append) {
-          setMatches(cachedMatches.matches);
-          setTotal(cachedMatches.total);
-          setNextPage(Math.ceil(cachedMatches.matches.length / MATCHES_PAGE_SIZE));
-          setNotice(OFFLINE_FALLBACK_MESSAGE);
+      try {
+        if (append) {
+          setIsLoadingMore(true);
+          setLoadMoreError(null);
+        } else if (!preserveVisibleData) {
+          setMatches([]);
+          setTotal(0);
+          setNextPage(0);
+          setIsLoading(true);
           setError(null);
+          setLoadMoreError(null);
+          setNotice(null);
+        }
+
+        const searchParams = new URLSearchParams({
+          page: String(page),
+          limit: String(MATCHES_PAGE_SIZE),
+        });
+        if (isMyMatchOnly && player?.id) {
+          searchParams.set("playerId", player.id);
+        }
+
+        const res = await fetch(
+          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "매치 목록을 불러오지 못했습니다.");
+        }
+
+        const data = (await res.json()) as MatchesResponse;
+        if (latestRequestIdRef.current !== requestId) {
           return;
         }
-      }
 
-      const message =
-        err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.";
-      if (append) {
-        setLoadMoreError(message);
-      } else {
-        setError(message);
-      }
-    } finally {
-      if (latestRequestIdRef.current === requestId) {
+        setMatches((currentMatches) => {
+          const nextMatches = append
+            ? mergeMatches(currentMatches, data.matches)
+            : data.matches;
+          writeCachedMatches(cachedMatchesKey, {
+            matches: nextMatches,
+            total: data.total,
+          });
+          return nextMatches;
+        });
+        setTotal(data.total);
+        setNextPage(page + 1);
+        if (!append) {
+          lastSuccessfulLoadAtRef.current = Date.now();
+        }
+      } catch (err) {
+        if (latestRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        if (!isOnline) {
+          const cachedMatches = readCachedMatches(cachedMatchesKey);
+          if (cachedMatches && !append && !preserveVisibleData) {
+            setMatches(cachedMatches.matches);
+            setTotal(cachedMatches.total);
+            setNextPage(
+              Math.ceil(cachedMatches.matches.length / MATCHES_PAGE_SIZE),
+            );
+            setNotice(OFFLINE_FALLBACK_MESSAGE);
+            setError(null);
+            return;
+          }
+        }
+
+        const message =
+          err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.";
         if (append) {
-          setIsLoadingMore(false);
-        } else {
-          setIsLoading(false);
+          setLoadMoreError(message);
+        } else if (!preserveVisibleData) {
+          setError(message);
+        }
+      } finally {
+        if (latestRequestIdRef.current === requestId) {
+          if (append) {
+            setIsLoadingMore(false);
+          } else if (!preserveVisibleData) {
+            setIsLoading(false);
+          }
         }
       }
-    }
-  }, [isMyMatchOnly, isOnline, player?.id, token]);
+    },
+    [isMyMatchOnly, isOnline, player?.id, token],
+  );
 
   useEffect(() => {
+    const isTabActive = selectedTab === "match";
+    if (!isTabActive) {
+      wasTabActiveRef.current = false;
+      return;
+    }
+
+    if (wasTabActiveRef.current) return;
+
+    wasTabActiveRef.current = true;
+    if (
+      !pendingReloadRef.current &&
+      !isTabRefreshDue(lastSuccessfulLoadAtRef.current)
+    ) {
+      return;
+    }
+
+    pendingReloadRef.current = false;
+    void loadMatches(0, false, lastSuccessfulLoadAtRef.current !== null);
+  }, [loadMatches, selectedTab]);
+
+  useEffect(() => {
+    if (previousReloadKeyRef.current === reloadKey) return;
+
+    previousReloadKeyRef.current = reloadKey;
+    if (selectedTab !== "match") {
+      pendingReloadRef.current = true;
+      return;
+    }
+
+    void loadMatches(0, false, matches.length > 0);
+  }, [loadMatches, matches.length, reloadKey, selectedTab]);
+
+  useEffect(() => {
+    if (previousIsMyMatchOnlyRef.current === isMyMatchOnly) return;
+
+    previousIsMyMatchOnlyRef.current = isMyMatchOnly;
+    if (selectedTab !== "match") {
+      pendingReloadRef.current = true;
+      return;
+    }
+
     void loadMatches();
-  }, [loadMatches, reloadKey]);
+  }, [isMyMatchOnly, loadMatches, selectedTab]);
 
   useEffect(() => {
     if (!selectedMatchId) {

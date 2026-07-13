@@ -10,6 +10,7 @@ interface BottomSheetProps {
   children: React.ReactElement | React.ReactElement[];
   className?: string;
   isDismissable?: boolean;
+  isActive?: boolean;
 }
 
 const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -19,6 +20,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
   children,
   className,
   isDismissable = true,
+  isActive = true,
 }) => {
   const [shouldRender, setShouldRender] = React.useState(isOpen);
   const [isVisible, setIsVisible] = React.useState(isOpen);
@@ -102,7 +104,10 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      aria-hidden={!isActive}
+      className={`fixed inset-0 z-50 flex items-end justify-center ${
+        isActive ? "" : "pointer-events-none invisible"
+      }`}
       onMouseDown={(event) => {
         if (isDismissable && event.target === event.currentTarget) {
           onOpenChange(false);
