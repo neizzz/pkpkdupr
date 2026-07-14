@@ -28,6 +28,7 @@ interface AuthContextType {
   updateProfile: (input: { avatarUrl?: string | null }) => Promise<PlayerInfo>;
   uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
   deleteAvatar: () => Promise<PlayerInfo>;
+  refreshMe: () => Promise<PlayerInfo>;
   logout: () => void;
 }
 
@@ -296,6 +297,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return data;
   };
 
+  const refreshMe = async () => {
+    if (!token) {
+      throw new Error("로그인이 필요합니다.");
+    }
+
+    const refreshedPlayer = await fetchMe(token);
+    if (!refreshedPlayer) {
+      throw new Error("내 정보를 새로고침하지 못했습니다.");
+    }
+
+    return refreshedPlayer;
+  };
+
   const logout = () => {
     clearStoredAuthState();
     setToken(null);
@@ -316,6 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         updateProfile,
         uploadAvatar,
         deleteAvatar,
+        refreshMe,
         logout,
       }}
     >

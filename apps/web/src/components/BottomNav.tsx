@@ -22,12 +22,16 @@ import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
 import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
+import PullToRefreshIndicator, {
+  type PullToRefreshStatus,
+} from "@/components/PullToRefreshIndicator";
 import { useAuth } from "@/context/AuthContext";
 import {
   TabNavigationProvider,
   type TabDepthEntry,
   type TabDepthStacks,
   type TabKey,
+  type PullToRefreshHandler,
 } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
@@ -56,6 +60,8 @@ const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
 });
 
 const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
+const PULL_TO_REFRESH_THRESHOLD = 72;
+const PULL_GESTURE_DIRECTION_THRESHOLD = 8;
 
 interface TabDepthHistoryState {
   [HISTORY_DEPTH_STATE_KEY]: true;
@@ -94,6 +100,9 @@ const BottomNav: React.FC = () => {
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [appSettingsTabKey, setAppSettingsTabKey] = useState<TabKey>("me");
   const [matchesReloadKey, setMatchesReloadKey] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullToRefreshStatus, setPullToRefreshStatus] =
+    useState<PullToRefreshStatus>("idle");
   const isCreateMatchQrScannerOpenRef = useRef(false);
   const [qrToken, setQrToken] = useState<PlayerQrTokenResponse | null>(null);
   const [isQrLoading, setIsQrLoading] = useState(false);
@@ -115,6 +124,23 @@ const BottomNav: React.FC = () => {
   const currentHistoryDepthRef = useRef<TabDepthHistoryState | null>(null);
   const afterCloseCallbacksRef = useRef(new Map<string, () => void>());
   const closingDepthKeysRef = useRef(new Set<string>());
+  const pullToRefreshHandlersRef = useRef<
+    Partial<Record<TabKey, PullToRefreshHandler>>
+  >({});
+  const pullStartRef = useRef<{
+    identifier: number;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+  } | null>(null);
+  const pullDistanceRef = useRef(0);
+  const isPullGestureActiveRef = useRef(false);
+  const pullGestureAxisRef = useRef<"undecided" | "vertical" | "horizontal">(
+    "undecided",
+  );
+  const isPullRefreshingRef = useRef(false);
+  const pullStatusTimeoutRef = useRef<number | null>(null);
 
   const depthCallbackKey = (tabKey: TabKey, depthId: string) =>
     `${tabKey}:${depthId}`;
@@ -166,6 +192,19 @@ const BottomNav: React.FC = () => {
   const scrollToTop = useCallback((behavior: ScrollBehavior = "smooth") => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior });
   }, []);
+
+  const registerPullToRefresh = useCallback(
+    (tabKey: TabKey, handler: PullToRefreshHandler) => {
+      pullToRefreshHandlersRef.current[tabKey] = handler;
+
+      return () => {
+        if (pullToRefreshHandlersRef.current[tabKey] === handler) {
+          delete pullToRefreshHandlersRef.current[tabKey];
+        }
+      };
+    },
+    [],
+  );
 
   const removeDepthEntry = useCallback(
     (tabKey: TabKey, depthId: string) => {
@@ -621,6 +660,232 @@ const BottomNav: React.FC = () => {
     [],
   );
 
+  const isGlobalMenuVisible =
+    isGlobalMenuOpen && globalMenuTabKey === selectedTab;
+  const hasBlockingLayer = useMemo(() => {
+    const activeDepthEntries = depthEntriesRef.current[selectedTab];
+    const hasBlockingDepth = activeDepthEntries.some(
+      (entry) => entry.kind === "bottom-sheet" || entry.kind === "dropdown",
+    );
+
+    return (
+      hasBlockingDepth ||
+      isGlobalMenuVisible ||
+      (isQrOpen && qrTabKey === selectedTab) ||
+      (isCreateMatchOpen && createMatchTabKey === selectedTab) ||
+      (isAppSettingsOpen && appSettingsTabKey === selectedTab)
+    );
+  }, [
+    appSettingsTabKey,
+    createMatchTabKey,
+    depthStacks,
+    isAppSettingsOpen,
+    isCreateMatchOpen,
+    isGlobalMenuVisible,
+    isQrOpen,
+    qrTabKey,
+    selectedTab,
+  ]);
+
+  const resetPullToRefresh = useCallback((status: PullToRefreshStatus = "idle") => {
+    pullStartRef.current = null;
+    pullDistanceRef.current = 0;
+    isPullGestureActiveRef.current = false;
+    pullGestureAxisRef.current = "undecided";
+    setPullDistance(0);
+    setPullToRefreshStatus(status);
+  }, []);
+
+  const schedulePullToRefreshReset = useCallback(
+    (status: PullToRefreshStatus, delay: number) => {
+      if (pullStatusTimeoutRef.current != null) {
+        window.clearTimeout(pullStatusTimeoutRef.current);
+      }
+      pullStatusTimeoutRef.current = window.setTimeout(() => {
+        pullStatusTimeoutRef.current = null;
+        isPullRefreshingRef.current = false;
+        resetPullToRefresh();
+      }, delay);
+      setPullToRefreshStatus(status);
+    },
+    [resetPullToRefresh],
+  );
+
+  useEffect(
+    () => () => {
+      if (pullStatusTimeoutRef.current != null) {
+        window.clearTimeout(pullStatusTimeoutRef.current);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const preventScrollWhilePullIndicatorVisible = (event: TouchEvent) => {
+      if (pullStartRef.current && isPullGestureActiveRef.current) {
+        event.preventDefault();
+      }
+    };
+
+    scrollContainer.addEventListener(
+      "touchmove",
+      preventScrollWhilePullIndicatorVisible,
+      { passive: false },
+    );
+
+    return () => {
+      scrollContainer.removeEventListener(
+        "touchmove",
+        preventScrollWhilePullIndicatorVisible,
+      );
+    };
+  }, []);
+
+  const handlePullTouchStart = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      if (
+        event.touches.length !== 1 ||
+        isPullRefreshingRef.current ||
+        hasBlockingLayer ||
+        !pullToRefreshHandlersRef.current[selectedTab] ||
+        (scrollContainerRef.current?.scrollTop ?? 0) > 0
+      ) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      pullStartRef.current = {
+        identifier: touch.identifier,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
+        lastY: touch.clientY,
+      };
+      pullDistanceRef.current = 0;
+      isPullGestureActiveRef.current = false;
+      pullGestureAxisRef.current = "undecided";
+    },
+    [hasBlockingLayer, selectedTab],
+  );
+
+  const updatePullDistance = useCallback(
+    (touch: React.Touch) => {
+      const start = pullStartRef.current;
+      if (!start || hasBlockingLayer || isPullRefreshingRef.current) {
+        return false;
+      }
+
+      if (pullGestureAxisRef.current !== "vertical") {
+        const totalDeltaX = touch.clientX - start.startX;
+        const totalDeltaY = touch.clientY - start.startY;
+        if (
+          Math.max(Math.abs(totalDeltaX), Math.abs(totalDeltaY)) <
+          PULL_GESTURE_DIRECTION_THRESHOLD
+        ) {
+          return true;
+        }
+
+        if (Math.abs(totalDeltaX) > Math.abs(totalDeltaY)) {
+          pullGestureAxisRef.current = "horizontal";
+          resetPullToRefresh();
+          return false;
+        }
+
+        pullGestureAxisRef.current = "vertical";
+      }
+
+      const deltaY = touch.clientY - start.lastY;
+      pullStartRef.current = {
+        ...start,
+        lastX: touch.clientX,
+        lastY: touch.clientY,
+      };
+
+      const distance = Math.min(
+        Math.max(0, pullDistanceRef.current + deltaY * 0.55),
+        PULL_TO_REFRESH_THRESHOLD * 1.25,
+      );
+      pullDistanceRef.current = distance;
+      if (distance > 0) {
+        isPullGestureActiveRef.current = true;
+      }
+      setPullDistance(distance);
+      setPullToRefreshStatus(
+        distance === 0
+          ? "idle"
+          : distance >= PULL_TO_REFRESH_THRESHOLD
+            ? "armed"
+            : "pulling",
+      );
+      return true;
+    },
+    [hasBlockingLayer, resetPullToRefresh],
+  );
+
+  const handlePullTouchMove = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const start = pullStartRef.current;
+      if (!start) return;
+
+      if (event.touches.length !== 1) {
+        resetPullToRefresh();
+        return;
+      }
+
+      const touch = Array.from(event.touches).find(
+        (candidate) => candidate.identifier === start.identifier,
+      );
+      if (!touch) return;
+
+      updatePullDistance(touch);
+    },
+    [resetPullToRefresh, updatePullDistance],
+  );
+
+  const handlePullTouchRefresh = useCallback(async () => {
+    const shouldRefresh =
+      !hasBlockingLayer &&
+      pullDistanceRef.current >= PULL_TO_REFRESH_THRESHOLD &&
+      !isPullRefreshingRef.current;
+    const refreshHandler = pullToRefreshHandlersRef.current[selectedTab];
+
+    if (!shouldRefresh || !refreshHandler) {
+      resetPullToRefresh();
+      return;
+    }
+
+    pullStartRef.current = null;
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+    isPullRefreshingRef.current = true;
+    setPullToRefreshStatus("refreshing");
+
+    try {
+      await refreshHandler();
+      schedulePullToRefreshReset("refreshing", 350);
+    } catch {
+      schedulePullToRefreshReset("error", 1600);
+    }
+  }, [hasBlockingLayer, resetPullToRefresh, schedulePullToRefreshReset, selectedTab]);
+
+  const handlePullTouchEnd = useCallback(
+    (event: React.TouchEvent<HTMLDivElement>) => {
+      const start = pullStartRef.current;
+      if (!start) return;
+
+      const endingTouch = Array.from(event.changedTouches).find(
+        (touch) => touch.identifier === start.identifier,
+      );
+      if (!endingTouch || !updatePullDistance(endingTouch)) return;
+
+      void handlePullTouchRefresh();
+    },
+    [handlePullTouchRefresh, updatePullDistance],
+  );
+
   const navigationContextValue = useMemo(
     () => ({
       selectedTab,
@@ -632,6 +897,7 @@ const BottomNav: React.FC = () => {
       restoreScrollTop,
       scrollToTop,
       getScrollTop,
+      registerPullToRefresh,
     }),
     [
       closeDepth,
@@ -639,15 +905,13 @@ const BottomNav: React.FC = () => {
       getScrollTop,
       pushDepth,
       requestCloseTopDepth,
+      registerPullToRefresh,
       restoreScrollTop,
       saveScrollPosition,
       scrollToTop,
       selectedTab,
     ],
   );
-
-  const isGlobalMenuVisible =
-    isGlobalMenuOpen && globalMenuTabKey === selectedTab;
 
   return (
     <TabNavigationProvider value={navigationContextValue}>
@@ -773,8 +1037,17 @@ const BottomNav: React.FC = () => {
 
         <div
           ref={scrollContainerRef}
-          className="app-scroll-area app-tab-panel-scroll-area flex-1"
+          className="app-scroll-area app-tab-panel-scroll-area relative flex-1"
+          onTouchStart={handlePullTouchStart}
+          onTouchMove={handlePullTouchMove}
+          onTouchEnd={handlePullTouchEnd}
+          onTouchCancel={() => resetPullToRefresh()}
         >
+          <PullToRefreshIndicator
+            distance={pullDistance}
+            status={pullToRefreshStatus}
+            threshold={PULL_TO_REFRESH_THRESHOLD}
+          />
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}

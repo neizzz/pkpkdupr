@@ -38,6 +38,7 @@ const Members: React.FC = () => {
     saveScrollPosition,
     selectedTab,
     scrollToTop,
+    registerPullToRefresh,
   } = useTabNavigation();
   const [members, setMembers] = useState<PlayerInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +51,7 @@ const Members: React.FC = () => {
   const wasTabActiveRef = useRef(false);
 
   const loadMembers = useCallback(
-    async (preserveVisibleData = false) => {
+    async (preserveVisibleData = false, throwOnError = false) => {
       if (!token) {
         setMembers([]);
         setIsLoading(false);
@@ -80,6 +81,8 @@ const Members: React.FC = () => {
         setMembers(data);
         localStorage.setItem(CACHED_MEMBERS_KEY, JSON.stringify(data));
         lastSuccessfulLoadAtRef.current = Date.now();
+        setError(null);
+        setNotice(null);
       } catch (err) {
         if (!isOnline) {
           const cachedMembers = readCachedMembers();
@@ -100,6 +103,10 @@ const Members: React.FC = () => {
               : "멤버 목록을 불러오지 못했습니다.",
           );
         }
+
+        if (throwOnError) {
+          throw err;
+        }
       } finally {
         if (!preserveVisibleData) {
           setIsLoading(false);
@@ -107,6 +114,52 @@ const Members: React.FC = () => {
       }
     },
     [isOnline, token],
+  );
+
+  const loadSelectedMemberMatchStats = useCallback(
+    async (
+      memberId: string,
+      preserveVisibleData = false,
+      throwOnError = false,
+    ) => {
+      if (!token) {
+        setSelectedMemberMatchStats(createEmptyMatchStats());
+        return;
+      }
+
+      if (!preserveVisibleData) {
+        setSelectedMemberMatchStats(createEmptyMatchStats());
+      }
+
+      try {
+        const searchParams = new URLSearchParams({
+          playerId: memberId,
+          limit: "1000",
+        });
+        const res = await fetch(
+          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        if (!res.ok) {
+          throw new Error("매치 목록을 불러오지 못했습니다.");
+        }
+
+        const data = (await res.json()) as {
+          matches: MatchInfo[];
+          total: number;
+        };
+        setSelectedMemberMatchStats(buildMatchStats(data.matches, memberId));
+      } catch (err) {
+        if (!preserveVisibleData) {
+          setSelectedMemberMatchStats(createEmptyMatchStats());
+        }
+        if (throwOnError) {
+          throw err;
+        }
+      }
+    },
+    [token],
   );
 
   useEffect(() => {
@@ -130,49 +183,24 @@ const Members: React.FC = () => {
       return;
     }
 
-    const abortController = new AbortController();
+    void loadSelectedMemberMatchStats(selectedMemberId);
+  }, [loadSelectedMemberMatchStats, selectedMemberId, token]);
 
-    const loadSelectedMemberMatchStats = async () => {
-      setSelectedMemberMatchStats(createEmptyMatchStats());
-
-      try {
-        const searchParams = new URLSearchParams({
-          playerId: selectedMemberId,
-          limit: "1000",
-        });
-        const res = await fetch(
-          buildApiUrl(`/api/matches?${searchParams.toString()}`),
-          {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: abortController.signal,
-          },
-        );
-
-        if (!res.ok) {
-          throw new Error("매치 목록을 불러오지 못했습니다.");
+  useEffect(
+    () =>
+      registerPullToRefresh("members", async () => {
+        await loadMembers(true, true);
+        if (selectedMemberId) {
+          await loadSelectedMemberMatchStats(selectedMemberId, true, true);
         }
-
-        const data = (await res.json()) as {
-          matches: MatchInfo[];
-          total: number;
-        };
-
-        if (!abortController.signal.aborted) {
-          setSelectedMemberMatchStats(
-            buildMatchStats(data.matches, selectedMemberId),
-          );
-        }
-      } catch {
-        if (!abortController.signal.aborted) {
-          setSelectedMemberMatchStats(createEmptyMatchStats());
-        }
-      }
-    };
-
-    void loadSelectedMemberMatchStats();
-
-    return () => abortController.abort();
-  }, [selectedMemberId, token]);
+      }),
+    [
+      loadMembers,
+      loadSelectedMemberMatchStats,
+      registerPullToRefresh,
+      selectedMemberId,
+    ],
+  );
 
   const closeMemberProfile = useCallback(() => {
     setSelectedMemberId(null);

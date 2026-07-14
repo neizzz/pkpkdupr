@@ -15,6 +15,7 @@ export interface TabDepthEntry {
 }
 
 export type TabDepthStacks = Record<TabKey, string[]>;
+export type PullToRefreshHandler = () => Promise<void>;
 
 export interface TabNavigationContextValue {
   selectedTab: TabKey;
@@ -30,6 +31,10 @@ export interface TabNavigationContextValue {
   restoreScrollTop: (tabKey?: TabKey) => void;
   scrollToTop: (behavior?: ScrollBehavior) => void;
   getScrollTop: () => number;
+  registerPullToRefresh: (
+    tabKey: TabKey,
+    handler: PullToRefreshHandler,
+  ) => () => void;
 }
 
 const TabNavigationContext = createContext<TabNavigationContextValue | null>(

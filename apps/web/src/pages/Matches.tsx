@@ -89,6 +89,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     saveScrollPosition,
     selectedTab,
     scrollToTop,
+    registerPullToRefresh,
   } = useTabNavigation();
   const [matches, setMatches] = useState<MatchInfo[]>([]);
   const [total, setTotal] = useState(0);
@@ -117,7 +118,12 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   }, []);
 
   const loadMatches = useCallback(
-    async (page = 0, append = false, preserveVisibleData = false) => {
+    async (
+      page = 0,
+      append = false,
+      preserveVisibleData = false,
+      throwOnError = false,
+    ) => {
       if (!token) {
         latestRequestIdRef.current += 1;
         setMatches([]);
@@ -185,6 +191,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         setNextPage(page + 1);
         if (!append) {
           lastSuccessfulLoadAtRef.current = Date.now();
+          setError(null);
+          setNotice(null);
         }
       } catch (err) {
         if (latestRequestIdRef.current !== requestId) {
@@ -212,6 +220,10 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         } else if (!preserveVisibleData) {
           setError(message);
         }
+
+        if (throwOnError) {
+          throw err;
+        }
       } finally {
         if (latestRequestIdRef.current === requestId) {
           if (append) {
@@ -223,6 +235,31 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       }
     },
     [isMyMatchOnly, isOnline, player?.id, token],
+  );
+
+  const loadSelectedMatch = useCallback(
+    async (matchId: string) => {
+      if (!token) {
+        throw new Error("로그인이 필요해요.");
+      }
+
+      const res = await fetch(buildApiUrl(`/api/matches/${matchId}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "매치를 불러오지 못했습니다.");
+      }
+
+      const refreshedMatch = (await res.json()) as MatchInfo;
+      setSelectedMatch(refreshedMatch);
+      setMatches((currentMatches) =>
+        currentMatches.map((match) =>
+          match.id === refreshedMatch.id ? refreshedMatch : match,
+        ),
+      );
+    },
+    [token],
   );
 
   useEffect(() => {
@@ -280,6 +317,19 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       setSelectedMatch(refreshedMatch);
     }
   }, [matches, selectedMatchId]);
+
+  useEffect(
+    () =>
+      registerPullToRefresh("match", async () => {
+        if (selectedMatch) {
+          await loadSelectedMatch(selectedMatch.id);
+          return;
+        }
+
+        await loadMatches(0, false, true, true);
+      }),
+    [loadMatches, loadSelectedMatch, registerPullToRefresh, selectedMatch],
+  );
 
   const hasMoreMatches = isOnline && matches.length < total;
 

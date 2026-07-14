@@ -13,8 +13,9 @@ import { isTabRefreshDue } from "@/lib/tabRefresh";
 import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
 
 const Me: React.FC = () => {
-  const { player, token } = useAuth();
-  const { closeDepth, pushDepth, selectedTab } = useTabNavigation();
+  const { player, token, refreshMe } = useAuth();
+  const { closeDepth, pushDepth, selectedTab, registerPullToRefresh } =
+    useTabNavigation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
@@ -27,7 +28,11 @@ const Me: React.FC = () => {
   }, []);
 
   const loadMatchStats = useCallback(
-    async (signal: AbortSignal, preserveVisibleData = false) => {
+    async (
+      signal: AbortSignal,
+      preserveVisibleData = false,
+      throwOnError = false,
+    ) => {
       if (!token || !playerId) {
         lastSuccessfulLoadAtRef.current = null;
         setMatchStats(createEmptyMatchStats());
@@ -68,6 +73,9 @@ const Me: React.FC = () => {
       } catch {
         if (!signal.aborted && !preserveVisibleData) {
           setMatchStats(createEmptyMatchStats());
+        }
+        if (!signal.aborted && throwOnError) {
+          throw new Error("내 경기 통계를 새로고침하지 못했습니다.");
         }
       } finally {
         if (!signal.aborted && !preserveVisibleData) {
@@ -111,6 +119,16 @@ const Me: React.FC = () => {
       setIsMatchStatsLoading(false);
     }
   }, [playerId, token]);
+
+  useEffect(
+    () =>
+      registerPullToRefresh("me", async () => {
+        await refreshMe();
+        const abortController = new AbortController();
+        await loadMatchStats(abortController.signal, true, true);
+      }),
+    [loadMatchStats, refreshMe, registerPullToRefresh],
+  );
 
   const openSettings = () => {
     pushDepth("me", {
