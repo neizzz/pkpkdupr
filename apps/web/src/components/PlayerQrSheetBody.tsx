@@ -36,7 +36,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
               value={qrToken.payload}
               size={180}
               bgColor="#ffffff"
-              fgColor="#a16207"
+              fgColor="#000000"
             />
           </div>
           <p

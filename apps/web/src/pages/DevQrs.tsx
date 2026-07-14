@@ -39,7 +39,7 @@ const DevQrCard: React.FC<{ token: DevPlayerQrToken }> = ({ token }) => (
         value={token.payload}
         size={132}
         bgColor="#ffffff"
-        fgColor="#a16207"
+        fgColor="#000000"
       />
     </div>
   </div>
