@@ -339,9 +339,12 @@ const initSchema = async () => {
       id TEXT PRIMARY KEY,
       match_id TEXT NOT NULL,
       team_index INTEGER NOT NULL,
-      player_id TEXT NOT NULL
+      player_id TEXT NOT NULL,
+      dupr_rating_json TEXT
     )
   `);
+
+  await safeExec(`ALTER TABLE match_participants ADD COLUMN dupr_rating_json TEXT`);
 
   await client.execute(`
     UPDATE matches
@@ -591,6 +594,17 @@ app.post("/internal/matches", async (req, res) => {
     res.json(match);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/matches/participant-dupr-snapshots", async (req, res) => {
+  try {
+    const result = await matchRepository.fillMissingParticipantDuprSnapshots(
+      Array.isArray(req.body?.snapshots) ? req.body.snapshots : [],
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
   }
 });
 

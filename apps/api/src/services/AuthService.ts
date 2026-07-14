@@ -11,6 +11,7 @@ import {
   PlayerRatingChangeSource,
   PlayerStatus,
   PlayerStatusChangeLog,
+  PublicPlayerDupr,
   StoredPlayerDupr,
   createDefaultPlayerDupr,
   createDefaultPlayerDuprMetrics,
@@ -23,6 +24,7 @@ import {
   roundDuprRating,
   setDuprMetricByCategory,
   setDuprRatingByCategory,
+  toPublicPlayerDupr,
 } from "@pkpkdupr/shared/player";
 import type {
   DevPlayerQrTokenListResponse,
@@ -359,6 +361,13 @@ interface DuprRecalculationResult {
   players: StoredPlayerRecord[];
   stateByPlayerId: Map<string, StoredPlayerDupr>;
   relatedMatchCountByPlayerId: Map<string, number>;
+  matchParticipantDuprSnapshots: MatchParticipantDuprSnapshot[];
+}
+
+interface MatchParticipantDuprSnapshot {
+  matchId: string;
+  playerId: string;
+  duprRating: PublicPlayerDupr | null;
 }
 
 interface RecalculateDuprRatingsOptions {
@@ -1158,6 +1167,7 @@ export class AuthService {
 
     const relatedMatchCountByPlayerId = new Map<string, number>();
     const lastPlayedAtMsByCategoryKey = new Map<string, number>();
+    const matchParticipantDuprSnapshots: MatchParticipantDuprSnapshot[] = [];
     const replayMatches = completedMatches
       .filter((match) => match.status === "completed" && match.completedAt)
       .sort(
@@ -1194,6 +1204,14 @@ export class AuthService {
       if (participants.length < 2) {
         continue;
       }
+
+      matchParticipantDuprSnapshots.push(
+        ...participants.map((participant) => ({
+          matchId: match.id,
+          playerId: participant.playerId,
+          duprRating: toPublicPlayerDupr(participant.state),
+        })),
+      );
 
       const inactiveElapsedMsByPlayerId = Object.fromEntries(
         participants.map((participant) => {
@@ -1236,7 +1254,31 @@ export class AuthService {
       });
     }
 
-    return { players, stateByPlayerId, relatedMatchCountByPlayerId };
+    return {
+      players,
+      stateByPlayerId,
+      relatedMatchCountByPlayerId,
+      matchParticipantDuprSnapshots,
+    };
+  }
+
+  private async fillMissingMatchParticipantDuprSnapshots(
+    snapshots: MatchParticipantDuprSnapshot[],
+  ): Promise<{
+    updatedParticipantCount: number;
+    updatedMatchCount: number;
+  }> {
+    if (!snapshots.length) {
+      return { updatedParticipantCount: 0, updatedMatchCount: 0 };
+    }
+
+    return await this.dbRequest<{
+      updatedParticipantCount: number;
+      updatedMatchCount: number;
+    }>("/internal/matches/participant-dupr-snapshots", {
+      method: "PATCH",
+      body: JSON.stringify({ snapshots }),
+    });
   }
 
   private buildOfficialDuprImpacts(
@@ -1367,6 +1409,9 @@ export class AuthService {
     for (const [playerId, state] of this.getChangedDuprStates(recalculation)) {
       await this.updateStoredPlayerDuprState(playerId, state);
     }
+    await this.fillMissingMatchParticipantDuprSnapshots(
+      recalculation.matchParticipantDuprSnapshots,
+    );
 
     const createdAt = new Date();
     const ratingChangeLogs = await Promise.all(
@@ -1397,6 +1442,8 @@ export class AuthService {
   ): Promise<{
     ratingChangeLogs: PlayerRatingChangeLog[];
     changedPlayerCount: number;
+    restoredMatchDuprSnapshotCount: number;
+    restoredMatchDuprSnapshotMatchCount: number;
   }> {
     const recalculation = await this.calculateDuprRecalculation(completedMatches);
     const impacts = this.buildOfficialDuprImpacts(recalculation);
@@ -1404,6 +1451,9 @@ export class AuthService {
     for (const [playerId, state] of this.getChangedDuprStates(recalculation)) {
       await this.updateStoredPlayerDuprState(playerId, state);
     }
+    const snapshotRestore = await this.fillMissingMatchParticipantDuprSnapshots(
+      recalculation.matchParticipantDuprSnapshots,
+    );
 
     const createdAt = new Date();
     const ratingChangeLogs =
@@ -1426,6 +1476,8 @@ export class AuthService {
     return {
       ratingChangeLogs,
       changedPlayerCount: impacts.length,
+      restoredMatchDuprSnapshotCount: snapshotRestore.updatedParticipantCount,
+      restoredMatchDuprSnapshotMatchCount: snapshotRestore.updatedMatchCount,
     };
   }
 

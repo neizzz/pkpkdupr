@@ -643,10 +643,12 @@ const AdminDashboard: React.FC = () => {
         changedPlayerCount: number;
         completedMatchCount: number;
         ratingChangeLogs: PlayerRatingChangeLog[];
+        restoredMatchDuprSnapshotCount: number;
+        restoredMatchDuprSnapshotMatchCount: number;
       };
       await loadDashboardData();
       setSuccess(
-        `레이팅 재계산이 완료되었습니다. 완료 매치 ${data.completedMatchCount}개 기준, ${data.changedPlayerCount}명 변동 (${data.ratingChangeLogs.length}건 기록).`,
+        `레이팅 재계산이 완료되었습니다. 완료 매치 ${data.completedMatchCount}개 기준, ${data.changedPlayerCount}명 변동 (${data.ratingChangeLogs.length}건 기록), 매치 DUPR 스냅샷 ${data.restoredMatchDuprSnapshotCount}건 복원 (${data.restoredMatchDuprSnapshotMatchCount}개 매치).`,
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");

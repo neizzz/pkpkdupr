@@ -84,6 +84,7 @@ export const matchParticipants = sqliteTable("match_participants", {
   matchId: text("match_id").notNull(),
   teamIndex: integer("team_index").notNull(),
   playerId: text("player_id").notNull(),
+  duprRatingJson: text("dupr_rating_json"),
 });
 
 export const matchResultApprovals = sqliteTable("match_result_approvals", {

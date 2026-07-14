@@ -16,6 +16,7 @@ import {
 import {
   normalizeNullablePlayerDupr,
   type Player,
+  type PublicPlayerDupr,
 } from "@pkpkdupr/shared/player";
 import { and, desc, eq } from "drizzle-orm";
 import {
@@ -76,6 +77,12 @@ export interface UpdateMatchMetadataInput {
   sessionDate?: Date | null;
 }
 
+export interface MatchParticipantDuprSnapshot {
+  matchId: string;
+  playerId: string;
+  duprRating: PublicPlayerDupr | null;
+}
+
 const toDateOrNull = (value: Date | string | number | null | undefined) =>
   value == null ? null : new Date(value);
 
@@ -106,6 +113,34 @@ const toApproval = (approval: StoredMatchApproval): MatchResultApproval => ({
   playerId: approval.playerId,
   approvedAt: toDate(approval.approvedAt),
 });
+
+const parseParticipantDuprSnapshot = (
+  value: string | null,
+): PublicPlayerDupr | null | undefined => {
+  if (value == null) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed == null) {
+      return null;
+    }
+    if (!parsed || typeof parsed !== "object") {
+      return undefined;
+    }
+
+    const { singles, doubles } = parsed as Record<string, unknown>;
+    const isPublicRating = (rating: unknown): rating is number | null =>
+      rating == null || (typeof rating === "number" && Number.isFinite(rating));
+
+    return isPublicRating(singles) && isPublicRating(doubles)
+      ? { singles, doubles }
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 const areScoresEqual = (currentScores: MatchScore[] = [], nextScores: MatchScore[]) =>
   currentScores.length === nextScores.length &&
@@ -204,6 +239,47 @@ export class MatchRepository {
       throw new Error("매치 생성에 실패했습니다.");
     }
     return created;
+  }
+
+  async fillMissingParticipantDuprSnapshots(
+    snapshots: MatchParticipantDuprSnapshot[],
+  ): Promise<{
+    updatedParticipantCount: number;
+    updatedMatchCount: number;
+  }> {
+    const updatedMatchIds = new Set<string>();
+    let updatedParticipantCount = 0;
+
+    for (const snapshot of snapshots) {
+      if (!snapshot.matchId || !snapshot.playerId) {
+        continue;
+      }
+
+      const result = await this.client.execute({
+        sql: `
+          UPDATE match_participants
+          SET dupr_rating_json = ?
+          WHERE match_id = ?
+            AND player_id = ?
+            AND dupr_rating_json IS NULL
+        `,
+        args: [
+          JSON.stringify(snapshot.duprRating ?? null),
+          snapshot.matchId,
+          snapshot.playerId,
+        ],
+      });
+
+      if (result.rowsAffected) {
+        updatedParticipantCount += result.rowsAffected;
+        updatedMatchIds.add(snapshot.matchId);
+      }
+    }
+
+    return {
+      updatedParticipantCount,
+      updatedMatchCount: updatedMatchIds.size,
+    };
   }
 
   async submitResult(
@@ -527,9 +603,16 @@ export class MatchRepository {
           (participant: StoredMatchParticipant) =>
             participant.teamIndex === teamIndex,
         )
-        .map((participant: StoredMatchParticipant) =>
-          playerById.get(participant.playerId),
-        )
+        .map((participant: StoredMatchParticipant) => {
+          const player = playerById.get(participant.playerId);
+          const duprRating = parseParticipantDuprSnapshot(
+            participant.duprRatingJson,
+          );
+
+          return player && duprRating !== undefined
+            ? { ...player, duprRating }
+            : player;
+        })
         .filter((player: Player | undefined): player is Player =>
           Boolean(player),
         ),
@@ -573,6 +656,7 @@ export class MatchRepository {
           matchId,
           teamIndex,
           playerId: player.id,
+          duprRatingJson: JSON.stringify(player.duprRating ?? null),
         });
       }
     }
