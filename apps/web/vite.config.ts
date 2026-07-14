@@ -19,6 +19,8 @@ const fallbackAppVersion =
   ).version ?? "0.0.0";
 
 const appVersion = (() => {
+  const envVersion = process.env.VITE_APP_VERSION?.trim();
+  if (envVersion) return envVersion;
   try {
     return execSync("git describe --tags --abbrev=0", {
       cwd: configDir,

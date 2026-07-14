@@ -1,7 +1,9 @@
 FROM node:22-slim AS builder
 WORKDIR /app
 ARG VITE_API_BASE_URL=
+ARG VITE_APP_VERSION=
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
 COPY pnpm-lock.yaml ./
 COPY pnpm-workspace.yaml ./
 COPY package.json ./
