@@ -73,6 +73,35 @@ const readJson = async (response) => {
   }
 };
 
+const readText = async (response) => response.text();
+
+const verifyPage = async (
+  response,
+  {
+    expectedText,
+    forbiddenTexts = ["404 not found", "notfound"],
+  } = {},
+) => {
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} 응답`);
+  }
+
+  const body = (await readText(response)).toLowerCase();
+
+  if (
+    forbiddenTexts.some(
+      (forbiddenText) =>
+        forbiddenText && body.includes(forbiddenText.toLowerCase()),
+    )
+  ) {
+    throw new Error(`페이지 본문에 오류 마커가 포함되었습니다: ${body.slice(0, 160)}`);
+  }
+
+  if (expectedText && !body.includes(expectedText.toLowerCase())) {
+    throw new Error(`기대 텍스트를 찾지 못했습니다: ${expectedText}`);
+  }
+};
+
 const checks = [
   {
     name: "API health",
@@ -106,41 +135,25 @@ const checks = [
     name: "Web root",
     target: "web",
     path: "/",
-    verify: async (response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} 응답`);
-      }
-    },
+    verify: async (response) => verifyPage(response),
   },
   {
     name: "Admin web",
     target: "admin",
     path: "/admin/",
-    verify: async (response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} 응답`);
-      }
-    },
+    verify: async (response) => verifyPage(response),
   },
   {
     name: "Uptime Kuma",
     target: "admin",
     path: "/uptime/",
-    verify: async (response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} 응답`);
-      }
-    },
+    verify: async (response) => verifyPage(response, { expectedText: "uptime kuma" }),
   },
   {
     name: "SQLite Web",
     target: "admin",
     path: "/db/",
-    verify: async (response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} 응답`);
-      }
-    },
+    verify: async (response) => verifyPage(response, { expectedText: "sqlite-web" }),
   },
 ];
 

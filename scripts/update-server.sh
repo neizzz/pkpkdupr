@@ -12,10 +12,20 @@ IMAGE_TAG_INPUT="${1:-${IMAGE_TAG:-latest}}"
 DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
 WEB_PUBLIC_PORT_DEFAULT="443"
 ADMIN_STACK_PORT_DEFAULT="3333"
+SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
+SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "❌ '$1' 명령이 필요합니다." >&2
+    exit 1
+  fi
+}
+
+require_file() {
+  local path="$1"
+  if [[ ! -f "${path}" ]]; then
+    echo "❌ 필요한 파일이 없습니다: ${path}" >&2
     exit 1
   fi
 }
@@ -39,23 +49,57 @@ sync_duckdns_credentials() {
   echo "✅ DuckDNS credential 파일 동기화 완료: ${credentials_file}"
 }
 
-wait_for_url() {
-  local url="$1"
+wait_for_file() {
+  local path="$1"
   local attempts="${2:-60}"
 
   for _ in $(seq 1 "${attempts}"); do
-    if curl -fsS "${url}" >/dev/null 2>&1; then
+    if [[ -f "${path}" ]]; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "❌ 필요한 파일이 생성되지 않았습니다: ${path}" >&2
+  exit 1
+}
+
+wait_for_url() {
+  local url="$1"
+  local expected_text="${2:-}"
+  local forbidden_text="${3:-}"
+  local attempts="${4:-60}"
+  local response=""
+
+  for _ in $(seq 1 "${attempts}"); do
+    response="$(curl -fsSL "${url}" 2>/dev/null || true)"
+    if [[ -n "${response}" ]]; then
+      if [[ -n "${expected_text}" ]] && ! grep -Fqi -- "${expected_text}" <<<"${response}"; then
+        sleep 5
+        continue
+      fi
+      if [[ -n "${forbidden_text}" ]] && grep -Fqi -- "${forbidden_text}" <<<"${response}"; then
+        sleep 5
+        continue
+      fi
       return 0
     fi
     sleep 5
   done
 
   echo "❌ URL 응답 대기 실패: ${url}" >&2
+  if [[ -n "${expected_text}" ]]; then
+    echo "   - 기대 텍스트: ${expected_text}" >&2
+  fi
+  if [[ -n "${forbidden_text}" ]]; then
+    echo "   - 금지 텍스트: ${forbidden_text}" >&2
+  fi
   exit 1
 }
 
 require_command docker
 require_command curl
+require_command sed
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "❌ .env 파일이 없습니다. 먼저 scripts/install-server.sh를 실행하세요." >&2
@@ -63,6 +107,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 fi
 
 docker compose version >/dev/null
+require_file "${SWAG_TEMPLATE}"
 
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
@@ -94,6 +139,13 @@ ADMIN_STACK_PORT_VALUE="${ADMIN_STACK_PORT_VALUE:-${ADMIN_STACK_PORT_DEFAULT}}"
 WEB_BASE_URL="https://${DOMAIN_VALUE}"
 ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"
 
+echo "🧩 SWAG 프록시 설정 동기화 중..."
+docker compose --env-file "${ENV_FILE}" up -d proxy
+wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
+mkdir -p "$(dirname "${SWAG_TARGET}")"
+sed "s/__DOMAIN__/${DOMAIN_VALUE}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
+echo "✅ SWAG site config 동기화 완료: ${SWAG_TARGET}"
+
 echo "📥 이미지 pull 중 (tag=${IMAGE_TAG})..."
 docker compose --env-file "${ENV_FILE}" pull web admin-web api db-server uptime-kuma sqlite-web
 
@@ -108,12 +160,12 @@ echo "🪵 최근 로그"
 docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api db-server uptime-kuma sqlite-web || true
 
 echo "🔎 HTTPS 응답 확인 중..."
-wait_for_url "${WEB_BASE_URL}/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/api/health"
-wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping"
-wait_for_url "${ADMIN_STACK_BASE_URL}/admin/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/db/"
+wait_for_url "${WEB_BASE_URL}/" "" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/api/health" "\"status\":\"ok\""
+wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping" "\"message\":\"pong\""
+wait_for_url "${ADMIN_STACK_BASE_URL}/admin/" "" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/" "uptime kuma" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/db/" "sqlite-web" "404 not found"
 
 if command -v node >/dev/null 2>&1; then
   echo "🩺 Node healthy check 실행"

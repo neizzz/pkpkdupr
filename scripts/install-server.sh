@@ -69,16 +69,34 @@ wait_for_file() {
 
 wait_for_url() {
   local url="$1"
-  local attempts="${2:-60}"
+  local expected_text="${2:-}"
+  local forbidden_text="${3:-}"
+  local attempts="${4:-60}"
+  local response=""
 
   for _ in $(seq 1 "${attempts}"); do
-    if curl -fsS "${url}" >/dev/null 2>&1; then
+    response="$(curl -fsSL "${url}" 2>/dev/null || true)"
+    if [[ -n "${response}" ]]; then
+      if [[ -n "${expected_text}" ]] && ! grep -Fqi -- "${expected_text}" <<<"${response}"; then
+        sleep 5
+        continue
+      fi
+      if [[ -n "${forbidden_text}" ]] && grep -Fqi -- "${forbidden_text}" <<<"${response}"; then
+        sleep 5
+        continue
+      fi
       return 0
     fi
     sleep 5
   done
 
   echo "❌ URL 응답 대기 실패: ${url}" >&2
+  if [[ -n "${expected_text}" ]]; then
+    echo "   - 기대 텍스트: ${expected_text}" >&2
+  fi
+  if [[ -n "${forbidden_text}" ]]; then
+    echo "   - 금지 텍스트: ${forbidden_text}" >&2
+  fi
   exit 1
 }
 
@@ -169,12 +187,12 @@ docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" logs --tail=40 pro
 WEB_BASE_URL="https://${DOMAIN_VALUE}"
 ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"
 echo "🔎 HTTPS 응답 확인 중..."
-wait_for_url "${WEB_BASE_URL}/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/api/health"
-wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping"
-wait_for_url "${ADMIN_STACK_BASE_URL}/admin/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/"
-wait_for_url "${ADMIN_STACK_BASE_URL}/db/"
+wait_for_url "${WEB_BASE_URL}/" "" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/api/health" "\"status\":\"ok\""
+wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping" "\"message\":\"pong\""
+wait_for_url "${ADMIN_STACK_BASE_URL}/admin/" "" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/" "uptime kuma" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/db/" "sqlite-web" "404 not found"
 
 if command -v node >/dev/null 2>&1; then
   echo "🩺 Node healthy check 실행"
