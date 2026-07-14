@@ -81,6 +81,11 @@ const toDateOrNull = (value: Date | string | number | null | undefined) =>
 
 const toDate = (value: Date | string | number) => new Date(value);
 
+// Drizzle's `timestamp` integer mode persists Unix seconds. Raw libSQL queries
+// bypass that conversion, so match mutation timestamps must be converted here.
+const toUnixTimestampSeconds = (value: Date) =>
+  Math.floor(value.getTime() / 1000);
+
 const toPublicPlayer = (record: StoredPlayer): Player => ({
   id: record.id,
   username: record.username,
@@ -255,8 +260,8 @@ export class MatchRepository {
         args: [
           "pending-approval",
           submittedByPlayerId,
-          submittedAt.getTime(),
-          submittedAt.getTime(),
+          toUnixTimestampSeconds(submittedAt),
+          toUnixTimestampSeconds(submittedAt),
           matchId,
         ],
       });
@@ -286,7 +291,7 @@ export class MatchRepository {
           approvalId,
           matchId,
           submittedByPlayerId,
-          submittedAt.getTime(),
+          toUnixTimestampSeconds(submittedAt),
         ],
       });
       if (!shouldResetApprovals) {
@@ -357,7 +362,12 @@ export class MatchRepository {
           INSERT INTO match_result_approvals (id, match_id, player_id, approved_at)
           VALUES (?, ?, ?, ?)
         `,
-        args: [approvalId, matchId, playerId, approvedAt.getTime()],
+        args: [
+          approvalId,
+          matchId,
+          playerId,
+          toUnixTimestampSeconds(approvedAt),
+        ],
       });
 
       await this.completeMatchIfFullyApproved(matchId, approvedAt, transaction);
@@ -630,7 +640,11 @@ export class MatchRepository {
               )
           )
       `,
-      args: [completedAt.getTime(), completedAt.getTime(), matchId],
+      args: [
+        toUnixTimestampSeconds(completedAt),
+        toUnixTimestampSeconds(completedAt),
+        matchId,
+      ],
     });
   }
 

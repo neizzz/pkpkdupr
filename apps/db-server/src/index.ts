@@ -368,6 +368,35 @@ const initSchema = async () => {
     )
   `);
 
+  // Match mutations used raw libSQL statements which stored milliseconds while
+  // Drizzle's timestamp columns expect Unix seconds. Repair already-written
+  // values once at startup; normal timestamps are far below this threshold.
+  await client.execute(`
+    UPDATE matches
+    SET
+      result_submitted_at = CASE
+        WHEN result_submitted_at >= 100000000000 THEN result_submitted_at / 1000
+        ELSE result_submitted_at
+      END,
+      completed_at = CASE
+        WHEN completed_at >= 100000000000 THEN completed_at / 1000
+        ELSE completed_at
+      END,
+      updated_at = CASE
+        WHEN updated_at >= 100000000000 THEN updated_at / 1000
+        ELSE updated_at
+      END
+    WHERE result_submitted_at >= 100000000000
+       OR completed_at >= 100000000000
+       OR updated_at >= 100000000000
+  `);
+
+  await client.execute(`
+    UPDATE match_result_approvals
+    SET approved_at = approved_at / 1000
+    WHERE approved_at >= 100000000000
+  `);
+
   await client.execute(`
     CREATE TABLE IF NOT EXISTS official_dupr_adjustment_logs (
       id TEXT PRIMARY KEY,
