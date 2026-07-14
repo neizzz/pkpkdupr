@@ -506,7 +506,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             {hasMoreMatches ? (
               <Button
                 type="button"
-                className="app-action-button rounded-2xl border border-[#409eff] bg-white font-semibold text-[#409eff]"
+                className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
                 isDisabled={isLoadingMore}
                 onPress={() => void loadMatches(nextPage, true)}
               >
