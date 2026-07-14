@@ -19,7 +19,10 @@ import {
 } from "@pkpkdupr/shared/match";
 import type { Player, PlayerStatus } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
-import { DbRequestError, MatchRepository } from "./repositories/MatchRepository";
+import {
+  DbRequestError,
+  MatchRepository,
+} from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 
 const app: express.Express = express();
@@ -258,14 +261,10 @@ const validateCreateMatchTeams = (
     );
   }
 
-  return teams.every(
-    (team) => team.length === 2,
-  );
+  return teams.every((team) => team.length === 2);
 };
 
-const inferMatchTypeFromTeams = (
-  teams: [Player[], Player[]],
-): MatchType => {
+const inferMatchTypeFromTeams = (teams: [Player[], Player[]]): MatchType => {
   if (teams.every((team) => team.length === 1)) {
     const [firstPlayer, secondPlayer] = teams.flat();
 
@@ -285,7 +284,9 @@ const inferMatchTypeFromTeams = (
   const [teamA, teamB] = teams;
   const allPlayers = [...teamA, ...teamB];
   const menCount = allPlayers.filter((player) => player.gender === "M").length;
-  const womenCount = allPlayers.filter((player) => player.gender === "F").length;
+  const womenCount = allPlayers.filter(
+    (player) => player.gender === "F",
+  ).length;
 
   if (isMixedDoublesTeamValid(teamA) && isMixedDoublesTeamValid(teamB)) {
     return "mixed-doubles";
@@ -302,7 +303,9 @@ const inferMatchTypeFromTeams = (
   return "unrestricted-doubles";
 };
 
-const normalizeRequestedTeamPlayerIds = (teams: [MatchTeamRequest, MatchTeamRequest]) => {
+const normalizeRequestedTeamPlayerIds = (
+  teams: [MatchTeamRequest, MatchTeamRequest],
+) => {
   const flatPlayerIds = teams.flatMap((team) => team.playerIds ?? []);
   const uniquePlayerIds = new Set(flatPlayerIds);
 
@@ -400,7 +403,10 @@ const getLocalAvatarPath = (avatarUrl?: string | null) => {
   }
 
   const fileName = path.basename(avatarUrl);
-  if (!fileName || fileName !== avatarUrl.slice(AVATAR_UPLOAD_ROUTE.length + 1)) {
+  if (
+    !fileName ||
+    fileName !== avatarUrl.slice(AVATAR_UPLOAD_ROUTE.length + 1)
+  ) {
     return null;
   }
 
@@ -481,9 +487,15 @@ app.post("/api/login", async (req, res) => {
   try {
     const { username, password, rememberMe } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ error: "username과 password는 필수입니다." });
+      return res
+        .status(400)
+        .json({ error: "username과 password는 필수입니다." });
     }
-    const result = await authService.login(username, password, rememberMe === true);
+    const result = await authService.login(
+      username,
+      password,
+      rememberMe === true,
+    );
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -570,7 +582,8 @@ app.get("/api/matches", async (req, res) => {
 
     const page = Number(req.query.page ?? 0);
     const limit = Number(req.query.limit ?? 20);
-    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : undefined;
+    const playerId =
+      typeof req.query.playerId === "string" ? req.query.playerId : undefined;
 
     const result = playerId
       ? await matchRepository.findByPlayerId(playerId, page, limit)
@@ -608,7 +621,9 @@ app.post("/api/matches", async (req, res) => {
       creator.status !== "active" ||
       creator.username === PROTECTED_ADMIN_USERNAME
     ) {
-      return res.status(403).json({ error: "매치를 생성할 수 없는 계정입니다." });
+      return res
+        .status(403)
+        .json({ error: "매치를 생성할 수 없는 계정입니다." });
     }
 
     const publicPlayers = await authService.getPublicPlayers();
@@ -625,10 +640,7 @@ app.post("/api/matches", async (req, res) => {
     const matchTeams = buildMatchTeamsFromRequests(teams, playersById);
     const resolvedMatchType = type
       ? type
-      : inferMatchTypeFromTeams([
-          matchTeams[0].players,
-          matchTeams[1].players,
-        ]);
+      : inferMatchTypeFromTeams([matchTeams[0].players, matchTeams[1].players]);
 
     if (
       !validateCreateMatchTeams(resolvedMatchType, [
@@ -686,7 +698,9 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
 
     const createdBy = await authService.getPlayerById(decoded.playerId);
     if (!createdBy || createdBy.status !== "active") {
-      return res.status(403).json({ error: "유효한 관리자 계정이 필요합니다." });
+      return res
+        .status(403)
+        .json({ error: "유효한 관리자 계정이 필요합니다." });
     }
 
     const allPlayers = await authService.getAllPlayers();
@@ -700,7 +714,8 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
     );
     const matchesToCreate = payloadMatches.map((requestedMatch, index) => {
       const label = `${index + 1}번째 경기`;
-      const { name, type, mode, teams, location, scheduledAt, scores } = requestedMatch;
+      const { name, type, mode, teams, location, scheduledAt, scores } =
+        requestedMatch;
 
       if (!isMatchType(type)) {
         throw new Error(`${label}: 유효한 매치 타입이 필요합니다.`);
@@ -719,7 +734,12 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       }
 
       const matchTeams = buildMatchTeamsFromRequests(teams, playersById);
-      if (!validateCreateMatchTeams(type, [matchTeams[0].players, matchTeams[1].players])) {
+      if (
+        !validateCreateMatchTeams(type, [
+          matchTeams[0].players,
+          matchTeams[1].players,
+        ])
+      ) {
         throw new Error(
           `${label}: ${matchTypeLabels[type]}에 맞는 유효한 팀 구성이 필요합니다.`,
         );
@@ -760,11 +780,16 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
     }
 
     const { matches } = await matchRepository.findAll(0, 10000);
-    const completedMatches = matches.filter((match) => match.status === "completed");
-    const recalculation = await authService.recalculateDuprRatings(completedMatches, {
-      source: "manual_recalculation",
-      sourceLogId: `admin-match-batch-${Date.now()}-${randomUUID()}`,
-    });
+    const completedMatches = matches.filter(
+      (match) => match.status === "completed",
+    );
+    const recalculation = await authService.recalculateDuprRatings(
+      completedMatches,
+      {
+        source: "manual_recalculation",
+        sourceLogId: `admin-match-batch-${Date.now()}-${randomUUID()}`,
+      },
+    );
 
     res.status(201).json({
       matches: createdMatches,
@@ -786,43 +811,74 @@ app.get("/api/admin/matches", requireAdmin, async (_req, res) => {
   }
 });
 
-app.patch("/api/admin/matches/:matchId/metadata", requireAdmin, async (req, res) => {
-  try {
-    const body = req.body as AdminMatchMetadataUpdateRequest;
-    const hasName = Object.prototype.hasOwnProperty.call(body, "name");
-    const hasSessionName = Object.prototype.hasOwnProperty.call(body, "sessionName");
-    const hasSessionDate = Object.prototype.hasOwnProperty.call(body, "sessionDate");
+app.patch(
+  "/api/admin/matches/:matchId/metadata",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const body = req.body as AdminMatchMetadataUpdateRequest;
+      const hasName = Object.prototype.hasOwnProperty.call(body, "name");
+      const hasSessionName = Object.prototype.hasOwnProperty.call(
+        body,
+        "sessionName",
+      );
+      const hasSessionDate = Object.prototype.hasOwnProperty.call(
+        body,
+        "sessionDate",
+      );
 
-    if (!hasName && !hasSessionName && !hasSessionDate) {
-      return res.status(400).json({ error: "수정할 필드가 없습니다." });
+      if (!hasName && !hasSessionName && !hasSessionDate) {
+        return res.status(400).json({ error: "수정할 필드가 없습니다." });
+      }
+
+      const normalizedSessionName = hasSessionName
+        ? normalizeOptionalName(body.sessionName)
+        : undefined;
+      const normalizedSessionDate = hasSessionDate
+        ? normalizeOptionalDateString(body.sessionDate)
+        : undefined;
+
+      validateSessionMetadataUpdate({
+        hasSessionName,
+        hasSessionDate,
+        sessionName: normalizedSessionName,
+        sessionDate: normalizedSessionDate ?? null,
+      });
+
+      const match = await matchRepository.updateMetadata(req.params.matchId, {
+        ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
+        ...(hasSessionName
+          ? { sessionName: normalizedSessionName ?? null }
+          : {}),
+        ...(hasSessionDate
+          ? { sessionDate: normalizedSessionDate ?? null }
+          : {}),
+      });
+
+      res.json(match);
+    } catch (err) {
+      if (err instanceof DbRequestError && err.status === 404) {
+        return res.status(404).json({ error: err.message });
+      }
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+app.get("/api/matches/:matchId", async (req, res) => {
+  try {
+    if (!(await getAuthPayload(req, res))) {
+      return;
     }
 
-    const normalizedSessionName = hasSessionName
-      ? normalizeOptionalName(body.sessionName)
-      : undefined;
-    const normalizedSessionDate = hasSessionDate
-      ? normalizeOptionalDateString(body.sessionDate)
-      : undefined;
-
-    validateSessionMetadataUpdate({
-      hasSessionName,
-      hasSessionDate,
-      sessionName: normalizedSessionName,
-      sessionDate: normalizedSessionDate ?? null,
-    });
-
-    const match = await matchRepository.updateMetadata(req.params.matchId, {
-      ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
-      ...(hasSessionName ? { sessionName: normalizedSessionName ?? null } : {}),
-      ...(hasSessionDate ? { sessionDate: normalizedSessionDate ?? null } : {}),
-    });
+    const match = await matchRepository.findById(req.params.matchId);
+    if (!match) {
+      return res.status(404).json({ error: "매치를 찾을 수 없습니다." });
+    }
 
     res.json(match);
   } catch (err) {
-    if (err instanceof DbRequestError && err.status === 404) {
-      return res.status(404).json({ error: err.message });
-    }
-    res.status(400).json({ error: (err as Error).message });
+    res.status(500).json({ error: (err as Error).message });
   }
 });
 
@@ -862,6 +918,10 @@ app.post("/api/matches/:matchId/approval", async (req, res) => {
       decoded.playerId,
     );
 
+    if (match.status === "completed") {
+      await authService.applyMatchResultToRatings(match);
+    }
+
     res.json(match);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
@@ -897,7 +957,9 @@ app.post("/api/change-password", async (req, res) => {
     }
     const { currentPassword, newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: "비밀번호는 6자 이상이어야 합니다." });
+      return res
+        .status(400)
+        .json({ error: "비밀번호는 6자 이상이어야 합니다." });
     }
     await authService.changePassword(
       decoded.playerId,
@@ -923,7 +985,9 @@ app.patch("/api/me/profile", async (req, res) => {
       avatarUrl.trim().length > 0 &&
       avatarUrl.trim().length > 2048
     ) {
-      return res.status(400).json({ error: "프로필 이미지 URL이 너무 깁니다." });
+      return res
+        .status(400)
+        .json({ error: "프로필 이미지 URL이 너무 깁니다." });
     }
 
     const player = await authService.updatePlayerProfile(decoded.playerId, {
@@ -1022,55 +1086,65 @@ app.get("/api/admin/player-status-logs", requireAdmin, async (_req, res) => {
   }
 });
 
-app.patch("/api/admin/players/:playerId/gender", requireAdmin, async (req, res) => {
-  try {
-    const decoded = await getAuthPayload(req, res);
-    if (!decoded) {
-      return;
+app.patch(
+  "/api/admin/players/:playerId/gender",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+
+      const { gender } = req.body as { gender?: Player["gender"] };
+      if (!gender || !playerGenders.includes(gender)) {
+        return res
+          .status(400)
+          .json({ error: "gender는 M 또는 F 여야 합니다." });
+      }
+
+      const result = await authService.updatePlayerGender(
+        req.params.playerId,
+        gender,
+        decoded.playerId,
+      );
+
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
     }
+  },
+);
 
-    const { gender } = req.body as { gender?: Player["gender"] };
-    if (!gender || !playerGenders.includes(gender)) {
-      return res.status(400).json({ error: "gender는 M 또는 F 여야 합니다." });
+app.patch(
+  "/api/admin/players/:playerId/status",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+
+      const { status } = req.body as { status?: PlayerStatus };
+      if (!status || !playerStatuses.includes(status)) {
+        return res
+          .status(400)
+          .json({ error: "status는 active 또는 inactive 여야 합니다." });
+      }
+
+      const result = await authService.updatePlayerStatus(
+        req.params.playerId,
+        status,
+        decoded.playerId,
+      );
+
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
-
-    const result = await authService.updatePlayerGender(
-      req.params.playerId,
-      gender,
-      decoded.playerId,
-    );
-
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
-  }
-});
-
-app.patch("/api/admin/players/:playerId/status", requireAdmin, async (req, res) => {
-  try {
-    const decoded = await getAuthPayload(req, res);
-    if (!decoded) {
-      return;
-    }
-
-    const { status } = req.body as { status?: PlayerStatus };
-    if (!status || !playerStatuses.includes(status)) {
-      return res
-        .status(400)
-        .json({ error: "status는 active 또는 inactive 여야 합니다." });
-    }
-
-    const result = await authService.updatePlayerStatus(
-      req.params.playerId,
-      status,
-      decoded.playerId,
-    );
-
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
+  },
+);
 
 app.post(
   "/api/admin/players/:playerId/password-reset",
@@ -1122,30 +1196,34 @@ app.post("/api/admin/ratings/recalculate", requireAdmin, async (_req, res) => {
   }
 });
 
-app.post("/api/admin/players/:playerId/official-dupr", requireAdmin, async (req, res) => {
-  try {
-    const decoded = await getAuthPayload(req, res);
-    if (!decoded) {
-      return;
+app.post(
+  "/api/admin/players/:playerId/official-dupr",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+
+      const { matches } = await matchRepository.findAll(0, 10000);
+      const result = await authService.applyOfficialDuprAdjustment(
+        {
+          playerId: req.params.playerId,
+          changedByPlayerId: decoded.playerId,
+          ratings: req.body.ratings,
+          confidence: req.body.confidence,
+          reason: req.body.reason,
+        },
+        matches.filter((match) => match.status === "completed"),
+      );
+
+      res.json(result);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
     }
-
-    const { matches } = await matchRepository.findAll(0, 10000);
-    const result = await authService.applyOfficialDuprAdjustment(
-      {
-        playerId: req.params.playerId,
-        changedByPlayerId: decoded.playerId,
-        ratings: req.body.ratings,
-        confidence: req.body.confidence,
-        reason: req.body.reason,
-      },
-      matches.filter((match) => match.status === "completed"),
-    );
-
-    res.json(result);
-  } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
-  }
-});
+  },
+);
 
 app.post(
   "/api/admin/players/:playerId/official-dupr/preview",
@@ -1185,9 +1263,7 @@ app.post("/api/admin/register", requireAdmin, async (req, res) => {
 
     const { username, gender } = req.body;
     if (!username || !gender) {
-      return res
-        .status(400)
-        .json({ error: "username, gender는 필수입니다." });
+      return res.status(400).json({ error: "username, gender는 필수입니다." });
     }
     const player = await authService.registerAdmin(
       { username, password: INITIAL_ADMIN_CREATED_PASSWORD, gender },

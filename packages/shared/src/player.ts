@@ -48,7 +48,8 @@ export interface OfficialDuprAdjustmentLog {
 
 export type PlayerRatingChangeSource =
   | "official_adjustment_recalculation"
-  | "manual_recalculation";
+  | "manual_recalculation"
+  | "match_completed";
 
 export interface PlayerRatingChangeLog {
   id: string;
@@ -80,12 +81,7 @@ export const DUPR_MIN_RATING = 2;
 export const DUPR_MAX_RATING = 8;
 const LEGACY_DUPR_DEFAULT_RATING = 3.5;
 const LEGACY_SINGLES_KEYS = ["standard", "unrestricted"] as const;
-const LEGACY_DOUBLES_KEYS = [
-  "mixed",
-  "men",
-  "women",
-  "unrestricted",
-] as const;
+const LEGACY_DOUBLES_KEYS = ["mixed", "men", "women", "unrestricted"] as const;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -207,13 +203,17 @@ const normalizeTrackRating = (
   value: unknown,
   fallback: number,
   legacyKeys: readonly string[],
-) => collapseLegacyRatings(value, legacyKeys) ?? normalizeDuprRatingValue(value ?? fallback);
+) =>
+  collapseLegacyRatings(value, legacyKeys) ??
+  normalizeDuprRatingValue(value ?? fallback);
 
 const normalizeTrackMetric = (
   value: unknown,
   fallback: PlayerDuprMetric = { confidence: 0, accuracy: null },
   legacyKeys: readonly string[],
-) => collapseLegacyMetricValues(value, legacyKeys) ?? normalizeMetricValue(value, fallback);
+) =>
+  collapseLegacyMetricValues(value, legacyKeys) ??
+  normalizeMetricValue(value, fallback);
 
 export const getCompositeSinglesRating = (
   duprRating?: PlayerDupr | PublicPlayerDupr | null,
@@ -389,7 +389,8 @@ export const toPublicPlayerDupr = (
 
 export const normalizeNullablePlayerDupr = (
   value: unknown,
-): PublicPlayerDupr | null => toPublicPlayerDupr(normalizeStoredPlayerDupr(value));
+): PublicPlayerDupr | null =>
+  toPublicPlayerDupr(normalizeStoredPlayerDupr(value));
 
 export const serializeStoredPlayerDupr = (value: StoredPlayerDupr) =>
   JSON.stringify({

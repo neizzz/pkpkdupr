@@ -142,12 +142,15 @@ const hydrateStatusChangeLog = (record: any): PlayerStatusChangeLog => ({
 
 const averagePresent = (values: Array<number | null | undefined>) => {
   const presentValues = values.filter(
-    (value): value is number => typeof value === "number" && Number.isFinite(value),
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value),
   );
   if (!presentValues.length) {
     return null;
   }
-  return presentValues.reduce((sum, value) => sum + value, 0) / presentValues.length;
+  return (
+    presentValues.reduce((sum, value) => sum + value, 0) / presentValues.length
+  );
 };
 
 const normalizeLegacyDuprTrackPatchValue = (
@@ -278,7 +281,9 @@ const hydrateOfficialDuprAdjustmentLog = (
   confidence: normalizeOfficialDuprConfidencePatch(record.confidence),
   previousRating: normalizePlayerDupr(record.previousRating),
   nextRating: normalizePlayerDupr(record.nextRating),
-  preUpdateAccuracy: normalizeOfficialDuprAccuracyPatch(record.preUpdateAccuracy),
+  preUpdateAccuracy: normalizeOfficialDuprAccuracyPatch(
+    record.preUpdateAccuracy,
+  ),
   createdAt: toDate(record.createdAt),
 });
 
@@ -743,9 +748,7 @@ export class AuthService {
     return toPublicPlayer(stored);
   }
 
-  async createPlayerQrToken(
-    playerId: string,
-  ): Promise<PlayerQrTokenResponse> {
+  async createPlayerQrToken(playerId: string): Promise<PlayerQrTokenResponse> {
     const stored = await this.getStoredPlayerById(playerId);
     if (!stored) {
       throw new Error("사용자를 찾을 수 없습니다.");
@@ -848,7 +851,9 @@ export class AuthService {
     }
 
     if (stored.username === "admin") {
-      throw new Error("기본 관리자 계정 비밀번호는 이 기능으로 초기화할 수 없습니다.");
+      throw new Error(
+        "기본 관리자 계정 비밀번호는 이 기능으로 초기화할 수 없습니다.",
+      );
     }
 
     if (typeof newPassword !== "string" || newPassword.length < 6) {
@@ -923,7 +928,9 @@ export class AuthService {
     }
 
     if (stored.username === API_ADMIN_USERNAME) {
-      throw new Error("기본 관리자 계정 성별은 이 기능으로 변경할 수 없습니다.");
+      throw new Error(
+        "기본 관리자 계정 성별은 이 기능으로 변경할 수 없습니다.",
+      );
     }
 
     if (stored.gender === nextGender) {
@@ -1036,7 +1043,9 @@ export class AuthService {
       const hasConfidence = confidenceValue != null;
 
       if (hasRating !== hasConfidence) {
-        throw new Error("rating과 confidence는 같은 종목에 함께 입력해야 합니다.");
+        throw new Error(
+          "rating과 confidence는 같은 종목에 함께 입력해야 합니다.",
+        );
       }
       if (!hasRating || !hasConfidence) {
         continue;
@@ -1172,7 +1181,8 @@ export class AuthService {
       .filter((match) => match.status === "completed" && match.completedAt)
       .sort(
         (a, b) =>
-          new Date(a.completedAt!).getTime() - new Date(b.completedAt!).getTime(),
+          new Date(a.completedAt!).getTime() -
+          new Date(b.completedAt!).getTime(),
       );
 
     for (const match of replayMatches) {
@@ -1196,8 +1206,9 @@ export class AuthService {
               state,
             };
           })
-          .filter((participant): participant is NonNullable<typeof participant> =>
-            Boolean(participant),
+          .filter(
+            (participant): participant is NonNullable<typeof participant> =>
+              Boolean(participant),
           ),
       );
 
@@ -1219,7 +1230,9 @@ export class AuthService {
           const lastPlayedAtMs = lastPlayedAtMsByCategoryKey.get(categoryKey);
           return [
             participant.playerId,
-            lastPlayedAtMs == null ? 0 : Math.max(0, completedAtMs - lastPlayedAtMs),
+            lastPlayedAtMs == null
+              ? 0
+              : Math.max(0, completedAtMs - lastPlayedAtMs),
           ];
         }),
       );
@@ -1301,10 +1314,13 @@ export class AuthService {
           previousRating: player.duprState.rating,
           nextRating: nextState.rating,
           delta,
-          relatedMatchCount: result.relatedMatchCountByPlayerId.get(player.id) ?? 0,
+          relatedMatchCount:
+            result.relatedMatchCountByPlayerId.get(player.id) ?? 0,
         };
       })
-      .filter((impact): impact is OfficialDuprAdjustmentImpact => Boolean(impact))
+      .filter((impact): impact is OfficialDuprAdjustmentImpact =>
+        Boolean(impact),
+      )
       .sort((a, b) => {
         const deltaMagnitudeA =
           Math.abs(a.delta.singles) + Math.abs(a.delta.doubles);
@@ -1356,9 +1372,10 @@ export class AuthService {
       reason: input.reason,
       id: "official-dupr-preview",
     });
-    const recalculation = await this.calculateDuprRecalculation(completedMatches, [
-      previewLog,
-    ]);
+    const recalculation = await this.calculateDuprRecalculation(
+      completedMatches,
+      [previewLog],
+    );
 
     return {
       player: toPublicPlayer(stored),
@@ -1403,7 +1420,8 @@ export class AuthService {
       }),
     );
 
-    const recalculation = await this.calculateDuprRecalculation(completedMatches);
+    const recalculation =
+      await this.calculateDuprRecalculation(completedMatches);
     const impacts = this.buildOfficialDuprImpacts(recalculation);
 
     for (const [playerId, state] of this.getChangedDuprStates(recalculation)) {
@@ -1445,7 +1463,8 @@ export class AuthService {
     restoredMatchDuprSnapshotCount: number;
     restoredMatchDuprSnapshotMatchCount: number;
   }> {
-    const recalculation = await this.calculateDuprRecalculation(completedMatches);
+    const recalculation =
+      await this.calculateDuprRecalculation(completedMatches);
     const impacts = this.buildOfficialDuprImpacts(recalculation);
 
     for (const [playerId, state] of this.getChangedDuprStates(recalculation)) {
@@ -1478,6 +1497,148 @@ export class AuthService {
       changedPlayerCount: impacts.length,
       restoredMatchDuprSnapshotCount: snapshotRestore.updatedParticipantCount,
       restoredMatchDuprSnapshotMatchCount: snapshotRestore.updatedMatchCount,
+    };
+  }
+
+  async applyMatchResultToRatings(match: Match): Promise<{
+    ratingChangeLogs: PlayerRatingChangeLog[];
+    changedPlayerCount: number;
+  }> {
+    const winnerTeamIndex = buildWinnerTeamIndex(match);
+    if (winnerTeamIndex == null || !match.completedAt) {
+      return { ratingChangeLogs: [], changedPlayerCount: 0 };
+    }
+
+    const allPlayers = (await this.dbRequest<any[]>("/internal/players")).map(
+      hydratePlayer,
+    );
+    const participantPlayerIds = match.teams.flatMap((team) =>
+      team.players.map((p) => p.id),
+    );
+    const participantsByPlayerId = new Map(
+      allPlayers
+        .filter((p) => participantPlayerIds.includes(p.id))
+        .map((p) => [p.id, p]),
+    );
+
+    if (participantPlayerIds.length < 2) {
+      return { ratingChangeLogs: [], changedPlayerCount: 0 };
+    }
+
+    const { matches: allMatches } = await this.dbRequest<{
+      matches: any[];
+      total: number;
+    }>("/internal/matches?page=0&limit=10000");
+    const previousCompletedMatches = allMatches
+      .filter(
+        (m: any) =>
+          m.status === "completed" &&
+          m.id !== match.id &&
+          m.completedAt &&
+          new Date(m.completedAt).getTime() <=
+            new Date(match.completedAt!).getTime(),
+      )
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
+      );
+
+    const lastPlayedAtMsByPlayerId = new Map<string, number>();
+    for (const prevMatch of previousCompletedMatches) {
+      const prevParticipantIds = prevMatch.teams.flatMap((t: any) =>
+        t.players.map((p: any) => p.id),
+      );
+      for (const pid of prevParticipantIds) {
+        if (!lastPlayedAtMsByPlayerId.has(pid)) {
+          lastPlayedAtMsByPlayerId.set(
+            pid,
+            new Date(prevMatch.completedAt).getTime(),
+          );
+        }
+      }
+      if (lastPlayedAtMsByPlayerId.size >= participantPlayerIds.length) {
+        break;
+      }
+    }
+
+    const completedAtMs = new Date(match.completedAt).getTime();
+
+    const ratingInputs = participantPlayerIds
+      .map((playerId) => {
+        const player = participantsByPlayerId.get(playerId);
+        if (!player) return null;
+        return {
+          playerId,
+          teamIndex: match.teams.findIndex((team) =>
+            team.players.some((p) => p.id === playerId),
+          ) as 0 | 1,
+          state: player.duprState,
+        };
+      })
+      .filter((input): input is NonNullable<typeof input> => Boolean(input));
+
+    const inactiveElapsedMsByPlayerId: Record<string, number> = {};
+    for (const input of ratingInputs) {
+      const lastPlayedAtMs = lastPlayedAtMsByPlayerId.get(input.playerId);
+      inactiveElapsedMsByPlayerId[input.playerId] =
+        lastPlayedAtMs == null
+          ? 0
+          : Math.max(0, completedAtMs - lastPlayedAtMs);
+    }
+
+    const replayResult = this.ratingService.replayMatch({
+      type: match.type,
+      winnerTeamIndex,
+      participants: ratingInputs,
+      scores: match.scores,
+      inactiveElapsedMsByPlayerId,
+    });
+
+    const previousStates = new Map(
+      ratingInputs.map((input) => [input.playerId, input.state]),
+    );
+
+    for (const [playerId, nextState] of Object.entries(replayResult)) {
+      await this.updateStoredPlayerDuprState(playerId, nextState);
+    }
+
+    const snapshots: MatchParticipantDuprSnapshot[] = ratingInputs.map(
+      (input) => ({
+        matchId: match.id,
+        playerId: input.playerId,
+        duprRating: toPublicPlayerDupr(previousStates.get(input.playerId)!),
+      }),
+    );
+    await this.fillMissingMatchParticipantDuprSnapshots(snapshots);
+
+    const createdAt = new Date();
+    const sourceLogId = `match-completed-${match.id}-${Date.now()}`;
+    const ratingChangeLogs: PlayerRatingChangeLog[] = [];
+
+    for (const [playerId, nextState] of Object.entries(replayResult)) {
+      const previousState = previousStates.get(playerId);
+      if (!previousState) continue;
+      const delta = buildDuprDelta(nextState.rating, previousState.rating);
+      if (!hasDuprChange(delta)) continue;
+
+      const player = participantsByPlayerId.get(playerId);
+      if (!player) continue;
+
+      const log = await this.insertPlayerRatingChangeLog({
+        playerId,
+        source: "match_completed",
+        sourceLogId,
+        previousRating: previousState.rating,
+        nextRating: nextState.rating,
+        delta,
+        createdAt,
+      });
+      ratingChangeLogs.push(log);
+    }
+
+    return {
+      ratingChangeLogs,
+      changedPlayerCount: Object.keys(replayResult).length,
     };
   }
 
