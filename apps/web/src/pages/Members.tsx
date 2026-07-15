@@ -275,12 +275,12 @@ const Members: React.FC = () => {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="min-w-0">
-                          <p className="truncate text-base font-semibold text-pkpk-sub-font">
+                          <p className="truncate text-base font-semibold text-pkpk-main-font">
                             {member.username}
                           </p>
                         </div>
 
-                        <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-[#888]">
+                        <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-pkpk-dupr-font">
                           <span className="font-bold">S</span>
                           <span className="tabular-nums">
                             {formatRating(singlesRating)}

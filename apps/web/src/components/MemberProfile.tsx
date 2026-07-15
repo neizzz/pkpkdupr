@@ -101,7 +101,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="mt-1 truncate text-2xl font-bold text-pkpk-sub-font">
+                  <h2 className="mt-1 truncate text-2xl font-bold text-pkpk-main-font">
                     {displayName}
                   </h2>
                 </div>

@@ -40,10 +40,10 @@ import Members from "@/pages/Members";
 import Me from "@/pages/Me";
 
 const TAB_KEYS: TabKey[] = ["match", "members", "me"];
-const DEFAULT_THEME_COLOR = "#ffffff";
+const DEFAULT_THEME_COLOR = "#8b1e77";
 const TAB_THEME_COLOR_MAP: Record<TabKey, string> = {
-  match: "#f9fafb",
-  members: "#f9fafb",
+  match: DEFAULT_THEME_COLOR,
+  members: DEFAULT_THEME_COLOR,
   me: DEFAULT_THEME_COLOR,
 };
 

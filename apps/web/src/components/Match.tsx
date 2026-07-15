@@ -130,7 +130,7 @@ const Match: React.FC<MatchProps> = ({
         >
           {statusLabelMap[match.status]}
         </span>
-        <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-sub-font">
+        <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-main-font">
           {displayTitle}
         </p>
         {sessionLabel ? (
@@ -155,7 +155,7 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-[#888]`}
+                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-pkpk-dupr-font`}
                 >
                   DUPR{" "}
                   <span className="font-bold">
@@ -174,7 +174,7 @@ const Match: React.FC<MatchProps> = ({
                 </div>
               </div>
             ))}
-            <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-pkpk-sub-font">
+            <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-pkpk-main-font">
               <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
                 {displayedTeamSetScores[0]}
               </span>
@@ -196,7 +196,7 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-[#888]`}
+                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-pkpk-dupr-font`}
                 >
                   DUPR{" "}
                   <span className="font-bold">

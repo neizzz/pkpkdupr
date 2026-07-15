@@ -162,7 +162,7 @@ const PwaInstallPrompt: React.FC = () => {
     <div className="app-install-prompt-bottom fixed left-1/2 z-30 app-shell-width -translate-x-1/2 px-3">
       <Alert
         status={installPrompt.kind === "installable" ? "accent" : "warning"}
-        className="items-center rounded-2xl border border-[#409eff]/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
+        className="items-center rounded-2xl border border-pkpk-primary-bg/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
       >
         <Alert.Indicator className="shrink-0 self-center" />
         <Alert.Content className="min-w-0 gap-0 self-center">
@@ -174,7 +174,7 @@ const PwaInstallPrompt: React.FC = () => {
               <>
                 Safari 하단 중앙의{" "}
                 <span
-                  className="inline-flex translate-y-0.5 items-center gap-0.5 rounded-md border border-border bg-white px-1 py-0.5 text-[#409eff]"
+                  className="inline-flex translate-y-0.5 items-center gap-0.5 rounded-md border border-border bg-white px-1 py-0.5 text-pkpk-primary-bg"
                   aria-label="공유하기 버튼"
                   role="img"
                 >
@@ -195,7 +195,7 @@ const PwaInstallPrompt: React.FC = () => {
         {installPrompt.kind === "installable" && deferredPrompt ? (
           <Button
             size="sm"
-            className="shrink-0 rounded-full bg-[#409eff] px-3 text-white"
+            className="shrink-0 rounded-full bg-pkpk-primary-bg px-3 text-white"
             onPress={() => void handleInstall()}
           >
             앱 설치

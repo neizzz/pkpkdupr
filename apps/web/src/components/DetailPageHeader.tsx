@@ -19,12 +19,12 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   }
 
   return (
-    <div className="sticky top-0 z-10 flex h-11 items-center justify-center bg-pkpk-secondary-bg px-3">
+    <div className="sticky top-0 z-10 flex h-12 items-center justify-center bg-pkpk-secondary-bg px-3">
       <TabBackButton
         tabKey={targetTabKey}
         className="absolute left-0 !bg-transparent !text-pkpk-secondary-font shadow-none hover:!bg-transparent"
       />
-      <h2 className="text-lg font-bold text-pkpk-secondary-font">{title}</h2>
+      <h2 className="text-xl font-bold text-pkpk-secondary-font">{title}</h2>
     </div>
   );
 };

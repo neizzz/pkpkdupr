@@ -444,7 +444,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                             <div className="min-w-0 text-right text-xs font-medium tabular-nums text-slate-900">
                               {formatRating(previous)}
                               <span className="mx-1 text-slate-400">→</span>
-                              <span className="font-semibold">
+                              <span className="font-semibold text-pkpk-dupr-font">
                                 {formatRating(next)}
                               </span>
                             </div>

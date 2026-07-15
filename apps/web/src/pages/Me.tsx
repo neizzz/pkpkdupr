@@ -156,7 +156,7 @@ const Me: React.FC = () => {
       type="button"
       size="sm"
       variant="ghost"
-      className="rounded-full border-0 px-3 !text-pkpk-secondary-font"
+      className="rounded-full border-0 px-0 !text-pkpk-secondary-font"
       onPress={openSettings}
     >
       <IoSettingsOutline className="size-4" />

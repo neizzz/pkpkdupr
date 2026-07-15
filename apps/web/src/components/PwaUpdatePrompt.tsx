@@ -95,7 +95,7 @@ const PwaUpdatePrompt: React.FC = () => {
     <div className="app-install-prompt-bottom fixed left-1/2 z-30 app-shell-width -translate-x-1/2 px-3">
       <Alert
         status="accent"
-        className="items-center rounded-2xl border border-[#409eff]/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
+        className="items-center rounded-2xl border border-pkpk-primary-bg/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
       >
         <Alert.Indicator className="shrink-0 self-center" />
         <Alert.Content className="min-w-0 gap-0 self-center">
@@ -108,7 +108,7 @@ const PwaUpdatePrompt: React.FC = () => {
         </Alert.Content>
         <Button
           size="sm"
-          className="shrink-0 rounded-full bg-[#409eff] px-3 text-white"
+          className="shrink-0 rounded-full bg-pkpk-primary-bg px-3 text-white"
           isDisabled={isCheckingForUpdate || isApplyingUpdate}
           onPress={() => void handleApplyUpdate()}
         >
