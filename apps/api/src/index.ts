@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import { randomUUID } from "crypto";
 import path from "path";
 import {
+  computeMatchStartsAt,
   DEFAULT_MATCH_MODE,
   MATCH_RESULT_MAX_SCORE_COUNT,
   isSinglesMatchType,
@@ -106,6 +107,7 @@ type CreateMatchRequest = {
   ];
   location?: string;
   scheduledAt?: string;
+  matchStartsAt?: string;
 };
 
 type MatchTeamRequest = { name?: string; playerIds?: string[] };
@@ -504,17 +506,21 @@ app.post("/api/login", async (req, res) => {
 
 app.get("/api/me", async (req, res) => {
   try {
-    const session = await getAuthSession(req, res);
-    if (!session) {
-      return;
+    const header = req.headers.authorization;
+    const token = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
+
+    if (!token) {
+      return res.json({});
     }
+
+    const session = await authService.authenticateAccessToken(token);
     res.json({
       ...session.player,
       isFirstLogin: session.isFirstLogin,
       accessToken: session.refreshedAccessToken,
     });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+  } catch {
+    res.json({});
   }
 });
 
@@ -602,7 +608,7 @@ app.post("/api/matches", async (req, res) => {
       return;
     }
 
-    const { name, type, mode, teams, location, scheduledAt } =
+    const { name, type, mode, teams, location, scheduledAt, matchStartsAt } =
       req.body as CreateMatchRequest;
     if (type != null && !isMatchType(type)) {
       return res.status(400).json({ error: "유효한 매치 타입이 필요합니다." });
@@ -658,6 +664,15 @@ app.post("/api/matches", async (req, res) => {
       return res.status(400).json({ error: "유효한 경기 시간이 필요합니다." });
     }
 
+    const matchStartsAtDate = matchStartsAt
+      ? new Date(matchStartsAt)
+      : computeMatchStartsAt();
+    if (Number.isNaN(matchStartsAtDate.getTime())) {
+      return res
+        .status(400)
+        .json({ error: "유효한 매치 시작 시간이 필요합니다." });
+    }
+
     const match = await matchRepository.create({
       name: normalizeOptionalName(name),
       type: resolvedMatchType,
@@ -672,6 +687,7 @@ app.post("/api/matches", async (req, res) => {
       approvals: [],
       location: location?.trim() || "Court TBD",
       scheduledAt: scheduledDate,
+      matchStartsAt: matchStartsAtDate,
       completedAt: null,
     });
 
@@ -770,6 +786,7 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
         approvals: [],
         location: location?.trim() || "Court TBD",
         scheduledAt: scheduledDate,
+        matchStartsAt: computeMatchStartsAt(scheduledDate),
         completedAt: scheduledDate,
       };
     });
@@ -871,12 +888,14 @@ app.get("/api/matches/:matchId", async (req, res) => {
       return;
     }
 
-    const match = await matchRepository.findById(req.params.matchId);
-    if (!match) {
+    const result = await matchRepository.findByIdWithRatingChanges(
+      req.params.matchId,
+    );
+    if (!result) {
       return res.status(404).json({ error: "매치를 찾을 수 없습니다." });
     }
 
-    res.json(match);
+    res.json({ ...result.match, ratingChanges: result.ratingChanges });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -1185,6 +1204,7 @@ app.post("/api/admin/ratings/recalculate", requireAdmin, async (_req, res) => {
     const result = await authService.recalculateDuprRatings(completedMatches, {
       source: "manual_recalculation",
       sourceLogId: `manual-recalculation-${Date.now()}-${randomUUID()}`,
+      perMatchLogs: true,
     });
 
     res.json({

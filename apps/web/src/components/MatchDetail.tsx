@@ -3,11 +3,14 @@ import { Button, Card, Separator } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import {
   getMaxScoreCountForMatchMode,
+  getMatchTopLevelType,
   MATCH_RESULT_MAX_SCORE_COUNT,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
+import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import Match, { type MatchInfo } from "@/components/Match";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import { formatRating } from "@/utils/dupr";
 
 interface MatchDetailProps {
   match: MatchInfo;
@@ -62,7 +65,8 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     isOnline &&
     !!onSubmitResult;
   const approvalByPlayerId = useMemo(
-    () => new Map(match.approvals.map((approval) => [approval.playerId, approval])),
+    () =>
+      new Map(match.approvals.map((approval) => [approval.playerId, approval])),
     [match.approvals],
   );
   const hasApproved =
@@ -95,6 +99,22 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
       ),
     [match.scores],
   );
+  const ratingChangeByPlayerId = useMemo(
+    () =>
+      new Map<string, PlayerRatingChangeLog>(
+        (match.ratingChanges ?? []).map((change) => [change.playerId, change]),
+      ),
+    [match.ratingChanges],
+  );
+  const ratingCategory = useMemo(
+    () =>
+      getMatchTopLevelType(match.type) === "singles"
+        ? ("singles" as const)
+        : ("doubles" as const),
+    [match.type],
+  );
+  const hasRatingChanges =
+    match.status === "completed" && (match.ratingChanges?.length ?? 0) > 0;
 
   useEffect(() => {
     setScoreRows(
@@ -196,7 +216,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
         />
 
         <section>
-          <p className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}>
+          <p
+            className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+          >
             Score
           </p>
           <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white/80 shadow-sm">
@@ -210,7 +232,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
               </colgroup>
               <thead className="bg-amber-100/60 text-xs font-semibold text-amber-800">
                 <tr>
-                  <th scope="col" className="border-r border-amber-100 px-2 py-2 text-left">Sets</th>
+                  <th
+                    scope="col"
+                    className="border-r border-amber-100 px-2 py-2 text-left"
+                  >
+                    Sets
+                  </th>
                   {Array.from({ length: SCORE_TABLE_SET_COUNT }, (_, index) => (
                     <th
                       key={index}
@@ -220,7 +247,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                       {index + 1}
                     </th>
                   ))}
-                  <th scope="col" className="px-1 py-2 text-center">Total</th>
+                  <th scope="col" className="px-1 py-2 text-center">
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -234,7 +263,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                         {team.players.map((player, playerIndex) => (
                           <React.Fragment key={player.id}>
                             {playerIndex > 0 ? (
-                              <span aria-hidden="true" className="shrink-0">/</span>
+                              <span aria-hidden="true" className="shrink-0">
+                                /
+                              </span>
                             ) : null}
                             <span className="min-w-0 flex-1 truncate">
                               {player.username}
@@ -279,7 +310,11 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 className="rounded-2xl text-[#409eff]"
                 onPress={() => setIsResultFormOpen((value) => !value)}
               >
-                {isResultFormOpen ? "닫기" : hasResultScores ? "수정" : "결과 입력"}
+                {isResultFormOpen
+                  ? "닫기"
+                  : hasResultScores
+                    ? "수정"
+                    : "결과 입력"}
               </Button>
             </div>
           ) : null}
@@ -328,7 +363,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
               ))}
             </div>
             {resultError ? (
-              <p className="mt-2 text-xs font-medium text-red-500">{resultError}</p>
+              <p className="mt-2 text-xs font-medium text-red-500">
+                {resultError}
+              </p>
             ) : null}
             <div className="mt-3 flex justify-end gap-2">
               <Button
@@ -358,13 +395,81 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           </Card>
         ) : null}
 
+        {hasRatingChanges ? (
+          <section>
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
+              Rating Change
+            </p>
+            <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+              {(() => {
+                const entries = match.teams
+                  .flatMap((team) => team.players)
+                  .flatMap((player) => {
+                    const change = ratingChangeByPlayerId.get(player.id);
+                    return change ? [{ player, change }] : [];
+                  });
+
+                return entries.map(({ player, change }, index) => {
+                  const previous = change.previousRating[ratingCategory];
+                  const next = change.nextRating[ratingCategory];
+                  const delta = change.delta[ratingCategory];
+                  const deltaSign = delta > 0 ? "+" : "";
+                  const deltaColorClass =
+                    delta > 0
+                      ? "text-emerald-600"
+                      : delta < 0
+                        ? "text-red-500"
+                        : "text-[#888]";
+
+                  return (
+                    <React.Fragment key={player.id}>
+                      <div className="flex items-center justify-between gap-3 py-0">
+                        <p
+                          className={`min-w-0 truncate text-sm ${
+                            player.id === currentPlayerId
+                              ? "font-bold text-amber-950"
+                              : "font-medium text-amber-950"
+                          }`}
+                        >
+                          {player.username}
+                        </p>
+                        <div className="min-w-0 text-right text-xs font-medium tabular-nums">
+                          <p className="text-amber-950">
+                            {formatRating(previous)}
+                            <span className="mx-1 text-[#888]">→</span>
+                            <span className="font-semibold">
+                              {formatRating(next)}
+                            </span>
+                          </p>
+                          <p className={`mt-0.5 ${deltaColorClass}`}>
+                            ({deltaSign}
+                            {delta.toFixed(3)})
+                          </p>
+                        </div>
+                      </div>
+                      {index < entries.length - 1 ? (
+                        <Separator className="-mx-3 w-[calc(100%+1.5rem)]" />
+                      ) : null}
+                    </React.Fragment>
+                  );
+                });
+              })()}
+            </Card>
+          </section>
+        ) : null}
+
         <section>
           <div className="flex items-center justify-between gap-3">
-            <p className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}>
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
               결과 승인
             </p>
             <span className="text-xs font-medium text-[#888]">
-              승인 {match.approvals.length}/{match.teams.flatMap((team) => team.players).length}
+              승인 {match.approvals.length}/
+              {match.teams.flatMap((team) => team.players).length}
             </span>
           </div>
           <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
@@ -444,7 +549,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           <p className="text-xs font-medium text-red-500">{resultError}</p>
         ) : null}
 
-        <div className={`pb-2 text-right text-xs font-medium ${subTextClassName}`}>
+        <div
+          className={`pb-2 text-right text-xs font-medium ${subTextClassName}`}
+        >
           <p>Created at {formatDateTime(match.createdAt)}</p>
           <p className="mt-1">Updated at {formatDateTime(match.updatedAt)}</p>
         </div>

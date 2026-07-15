@@ -1,5 +1,11 @@
-import type { Match, MatchMode, MatchScore, Session } from "@pkpkdupr/shared/match";
+import type {
+  Match,
+  MatchMode,
+  MatchScore,
+  Session,
+} from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
+import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
 
@@ -29,6 +35,17 @@ const hydrateSession = (record: any): Session | undefined => {
     date: new Date(record.session.date),
   };
 };
+
+const hydrateRatingChangeLog = (record: any): PlayerRatingChangeLog => ({
+  id: record.id,
+  playerId: record.playerId,
+  source: record.source,
+  sourceLogId: record.sourceLogId,
+  previousRating: record.previousRating,
+  nextRating: record.nextRating,
+  delta: record.delta,
+  createdAt: new Date(record.createdAt),
+});
 
 const hydrateMatch = (record: any): Match => ({
   ...record,
@@ -70,6 +87,7 @@ const hydrateMatch = (record: any): Match => ({
     }),
   ),
   scheduledAt: new Date(record.scheduledAt),
+  matchStartsAt: new Date(record.matchStartsAt),
   completedAt: toDateOrNull(record.completedAt),
   createdAt: new Date(record.createdAt),
   updatedAt: new Date(record.updatedAt),
@@ -79,7 +97,10 @@ const hydrateMatch = (record: any): Match => ({
  * MatchRepository - API 서버에서 DB 서버의 match 저장소를 호출합니다.
  */
 export class MatchRepository {
-  private async dbRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  private async dbRequest<T>(
+    path: string,
+    options: RequestInit = {},
+  ): Promise<T> {
     const res = await fetch(`${DB_SERVER_URL}${path}`, {
       ...options,
       headers: {
@@ -105,6 +126,32 @@ export class MatchRepository {
       return hydrateMatch(
         await this.dbRequest<any>(`/internal/matches/${matchId}`),
       );
+    } catch (error) {
+      if ((error as Error).message.includes("찾을 수 없습니다")) {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  /** ID로 단일 경기 조회 + 이 경기에 의한 DUPR 변동 로그 함께 반환 */
+  async findByIdWithRatingChanges(
+    matchId: string,
+  ): Promise<
+    { match: Match; ratingChanges: PlayerRatingChangeLog[] } | undefined
+  > {
+    try {
+      const [match, ratingChangeRecords] = await Promise.all([
+        this.dbRequest<any>(`/internal/matches/${matchId}`),
+        this.dbRequest<any[]>(
+          `/internal/matches/${matchId}/rating-change-logs`,
+        ),
+      ]);
+
+      return {
+        match: hydrateMatch(match),
+        ratingChanges: (ratingChangeRecords ?? []).map(hydrateRatingChangeLog),
+      };
     } catch (error) {
       if ((error as Error).message.includes("찾을 수 없습니다")) {
         return undefined;

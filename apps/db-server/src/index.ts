@@ -5,7 +5,10 @@ import {
   shouldStorePlayerDuprAsNull,
 } from "@pkpkdupr/shared/player";
 import { getDb, getDbClient } from "./db/client";
-import { PlayerRepository, type CreateStoredPlayerInput } from "./repositories/PlayerRepository";
+import {
+  PlayerRepository,
+  type CreateStoredPlayerInput,
+} from "./repositories/PlayerRepository";
 import {
   PlayerCreationLogRepository,
   type CreatePlayerCreationLogInput,
@@ -90,7 +93,9 @@ const ensurePlayersDuprRatingNullable = async () => {
   }
 
   await client.execute(`DROP TABLE IF EXISTS players_notnull_dupr_backup`);
-  await client.execute(`ALTER TABLE players RENAME TO players_notnull_dupr_backup`);
+  await client.execute(
+    `ALTER TABLE players RENAME TO players_notnull_dupr_backup`,
+  );
   await client.execute(`
     CREATE TABLE players (
       id TEXT PRIMARY KEY,
@@ -150,13 +155,23 @@ const initSchema = async () => {
     )
   `);
 
-  await safeExec(`ALTER TABLE players ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
+  await safeExec(
+    `ALTER TABLE players ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`,
+  );
   await safeExec(`ALTER TABLE players ADD COLUMN avatar_url TEXT`);
-  await safeExec(`ALTER TABLE players ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`);
-  await safeExec(`ALTER TABLE players ADD COLUMN is_first_login INTEGER NOT NULL DEFAULT 1`);
+  await safeExec(
+    `ALTER TABLE players ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
+  );
+  await safeExec(
+    `ALTER TABLE players ADD COLUMN is_first_login INTEGER NOT NULL DEFAULT 1`,
+  );
   await ensurePlayersDuprRatingNullable();
-  await client.execute(`UPDATE players SET status = 'inactive' WHERE status = 'deleted'`);
-  await client.execute(`UPDATE players SET status = 'active' WHERE status IS NULL OR status = ''`);
+  await client.execute(
+    `UPDATE players SET status = 'inactive' WHERE status = 'deleted'`,
+  );
+  await client.execute(
+    `UPDATE players SET status = 'active' WHERE status IS NULL OR status = ''`,
+  );
 
   await client.execute(`
     UPDATE players
@@ -235,13 +250,29 @@ const initSchema = async () => {
   await safeExec(
     `ALTER TABLE matches ADD COLUMN mode TEXT NOT NULL DEFAULT '${DEFAULT_MATCH_MODE}'`,
   );
-  await safeExec(`ALTER TABLE matches ADD COLUMN source TEXT NOT NULL DEFAULT 'player_created'`);
-  await safeExec(`ALTER TABLE matches ADD COLUMN creator_player_id TEXT NOT NULL DEFAULT ''`);
+  await safeExec(
+    `ALTER TABLE matches ADD COLUMN source TEXT NOT NULL DEFAULT 'player_created'`,
+  );
+  await safeExec(
+    `ALTER TABLE matches ADD COLUMN creator_player_id TEXT NOT NULL DEFAULT ''`,
+  );
   await safeExec(`ALTER TABLE matches ADD COLUMN name TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN session_name TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN session_date INTEGER`);
-  await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`);
+  await safeExec(
+    `ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`,
+  );
   await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_at INTEGER`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN match_starts_at INTEGER`);
+
+  await client.execute(`
+    UPDATE matches
+    SET match_starts_at = CASE
+      WHEN scheduled_at % (30 * 60 * 1000) = 0 THEN scheduled_at
+      ELSE scheduled_at + ((30 * 60 * 1000) - (scheduled_at % (30 * 60 * 1000)))
+    END
+    WHERE match_starts_at IS NULL
+  `);
 
   await client.execute(`
     UPDATE matches
@@ -344,7 +375,9 @@ const initSchema = async () => {
     )
   `);
 
-  await safeExec(`ALTER TABLE match_participants ADD COLUMN dupr_rating_json TEXT`);
+  await safeExec(
+    `ALTER TABLE match_participants ADD COLUMN dupr_rating_json TEXT`,
+  );
 
   await client.execute(`
     UPDATE matches
@@ -472,7 +505,9 @@ app.get("/internal/players/:id", async (req, res) => {
 
 app.post("/internal/players", async (req, res) => {
   try {
-    const player = await playerRepository.create(req.body as CreateStoredPlayerInput);
+    const player = await playerRepository.create(
+      req.body as CreateStoredPlayerInput,
+    );
     res.json(player);
   } catch (error) {
     const message = (error as Error).message;
@@ -496,7 +531,10 @@ app.post("/internal/players/init-admin", async (req, res) => {
 
 app.patch("/internal/players/:id/status", async (req, res) => {
   try {
-    const player = await playerRepository.updateStatus(req.params.id, req.body.status);
+    const player = await playerRepository.updateStatus(
+      req.params.id,
+      req.body.status,
+    );
     if (!player) {
       return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
     }
@@ -508,7 +546,10 @@ app.patch("/internal/players/:id/status", async (req, res) => {
 
 app.patch("/internal/players/:id/gender", async (req, res) => {
   try {
-    const player = await playerRepository.updateGender(req.params.id, req.body.gender);
+    const player = await playerRepository.updateGender(
+      req.params.id,
+      req.body.gender,
+    );
     if (!player) {
       return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
     }
@@ -711,6 +752,17 @@ app.post("/internal/player-status-change-logs", async (req, res) => {
 app.get("/internal/player-rating-change-logs", async (_req, res) => {
   try {
     res.json(await playerRatingChangeLogRepository.findAll());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/matches/:matchId/rating-change-logs", async (req, res) => {
+  try {
+    const logs = await playerRatingChangeLogRepository.findByMatchId(
+      req.params.matchId,
+    );
+    res.json(logs);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

@@ -367,6 +367,16 @@ interface DuprRecalculationResult {
   stateByPlayerId: Map<string, StoredPlayerDupr>;
   relatedMatchCountByPlayerId: Map<string, number>;
   matchParticipantDuprSnapshots: MatchParticipantDuprSnapshot[];
+  perMatchChanges: Array<{
+    matchId: string;
+    completedAt: Date;
+    players: Array<{
+      playerId: string;
+      previousRating: PlayerDupr;
+      nextRating: PlayerDupr;
+      delta: PlayerDupr;
+    }>;
+  }>;
 }
 
 interface MatchParticipantDuprSnapshot {
@@ -378,6 +388,7 @@ interface MatchParticipantDuprSnapshot {
 interface RecalculateDuprRatingsOptions {
   source?: PlayerRatingChangeSource;
   sourceLogId?: string;
+  perMatchLogs?: boolean;
 }
 
 const duprPatchEntries = (["singles", "doubles"] as const).map((category) => ({
@@ -1177,6 +1188,7 @@ export class AuthService {
     const relatedMatchCountByPlayerId = new Map<string, number>();
     const lastPlayedAtMsByCategoryKey = new Map<string, number>();
     const matchParticipantDuprSnapshots: MatchParticipantDuprSnapshot[] = [];
+    const perMatchChanges: DuprRecalculationResult["perMatchChanges"] = [];
     const replayMatches = completedMatches
       .filter((match) => match.status === "completed" && match.completedAt)
       .sort(
@@ -1255,9 +1267,33 @@ export class AuthService {
         correctionWeightByPlayerId,
       );
 
-      Object.entries(replayResult).forEach(([playerId, state]) => {
-        stateByPlayerId.set(playerId, state);
-      });
+      const matchPlayerChanges: Array<{
+        playerId: string;
+        previousRating: PlayerDupr;
+        nextRating: PlayerDupr;
+        delta: PlayerDupr;
+      }> = [];
+      for (const [playerId, nextState] of Object.entries(replayResult)) {
+        const previousState = stateByPlayerId.get(playerId);
+        if (!previousState) continue;
+
+        const delta = buildDuprDelta(nextState.rating, previousState.rating);
+        matchPlayerChanges.push({
+          playerId,
+          previousRating: previousState.rating,
+          nextRating: nextState.rating,
+          delta,
+        });
+        stateByPlayerId.set(playerId, nextState);
+      }
+
+      if (matchPlayerChanges.length > 0) {
+        perMatchChanges.push({
+          matchId: match.id,
+          completedAt: new Date(match.completedAt!),
+          players: matchPlayerChanges,
+        });
+      }
 
       participants.forEach((participant) => {
         lastPlayedAtMsByCategoryKey.set(
@@ -1272,6 +1308,7 @@ export class AuthService {
       stateByPlayerId,
       relatedMatchCountByPlayerId,
       matchParticipantDuprSnapshots,
+      perMatchChanges,
     };
   }
 
@@ -1459,9 +1496,11 @@ export class AuthService {
     options: RecalculateDuprRatingsOptions = {},
   ): Promise<{
     ratingChangeLogs: PlayerRatingChangeLog[];
+    perMatchLogs: PlayerRatingChangeLog[];
     changedPlayerCount: number;
     restoredMatchDuprSnapshotCount: number;
     restoredMatchDuprSnapshotMatchCount: number;
+    perMatchLogCount: number;
   }> {
     const recalculation =
       await this.calculateDuprRecalculation(completedMatches);
@@ -1492,11 +1531,34 @@ export class AuthService {
           )
         : [];
 
+    const perMatchLogs: PlayerRatingChangeLog[] = [];
+    if (options.perMatchLogs) {
+      for (const change of recalculation.perMatchChanges) {
+        const sourceLogId = `match-completed-${change.matchId}-${change.completedAt.getTime()}`;
+        for (const playerChange of change.players) {
+          if (!hasDuprChange(playerChange.delta)) continue;
+
+          const log = await this.insertPlayerRatingChangeLog({
+            playerId: playerChange.playerId,
+            source: "match_completed",
+            sourceLogId,
+            previousRating: playerChange.previousRating,
+            nextRating: playerChange.nextRating,
+            delta: playerChange.delta,
+            createdAt: change.completedAt,
+          });
+          perMatchLogs.push(log);
+        }
+      }
+    }
+
     return {
       ratingChangeLogs,
+      perMatchLogs,
       changedPlayerCount: impacts.length,
       restoredMatchDuprSnapshotCount: snapshotRestore.updatedParticipantCount,
       restoredMatchDuprSnapshotMatchCount: snapshotRestore.updatedMatchCount,
+      perMatchLogCount: perMatchLogs.length,
     };
   }
 

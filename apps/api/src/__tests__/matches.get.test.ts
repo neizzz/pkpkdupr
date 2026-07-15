@@ -4,7 +4,10 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { MatchRepository } from "../repositories/MatchRepository";
-import { AuthService, type AuthenticatedSession } from "../services/AuthService";
+import {
+  AuthService,
+  type AuthenticatedSession,
+} from "../services/AuthService";
 
 const now = new Date("2026-07-14T10:00:00.000Z");
 const player: Player = {
@@ -38,6 +41,7 @@ const match: Match = {
   approvals: [],
   location: "Court TBD",
   scheduledAt: now,
+  matchStartsAt: now,
   completedAt: null,
   createdAt: now,
   updatedAt: now,
@@ -45,9 +49,10 @@ const match: Match = {
 
 describe("GET /api/matches/:matchId", () => {
   beforeEach(() => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
-      session,
-    );
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(session);
     vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
   });
 
@@ -56,14 +61,21 @@ describe("GET /api/matches/:matchId", () => {
   });
 
   it("인증된 사용자에게 단건 매치를 반환한다", async () => {
-    vi.spyOn(MatchRepository.prototype, "findById").mockResolvedValue(match);
+    vi.spyOn(
+      MatchRepository.prototype,
+      "findByIdWithRatingChanges",
+    ).mockResolvedValue({ match, ratingChanges: [] });
 
     const response = await request(app)
       .get(`/api/matches/${match.id}`)
       .set("Authorization", "Bearer test-token");
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({ id: match.id, type: "singles" });
+    expect(response.body).toMatchObject({
+      id: match.id,
+      type: "singles",
+      ratingChanges: [],
+    });
   });
 
   it("인증 토큰이 없으면 401을 반환한다", async () => {
@@ -73,7 +85,10 @@ describe("GET /api/matches/:matchId", () => {
   });
 
   it("없는 매치는 404를 반환한다", async () => {
-    vi.spyOn(MatchRepository.prototype, "findById").mockResolvedValue(undefined);
+    vi.spyOn(
+      MatchRepository.prototype,
+      "findByIdWithRatingChanges",
+    ).mockResolvedValue(undefined);
 
     const response = await request(app)
       .get("/api/matches/missing-match")

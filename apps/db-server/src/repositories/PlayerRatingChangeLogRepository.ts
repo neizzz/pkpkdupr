@@ -1,5 +1,5 @@
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, like } from "drizzle-orm";
 import { playerRatingChangeLogs } from "../db/schema";
 
 export type CreatePlayerRatingChangeLogInput = PlayerRatingChangeLog;
@@ -49,6 +49,24 @@ export class PlayerRatingChangeLogRepository {
     const rows = await this.db
       .select()
       .from(playerRatingChangeLogs)
+      .orderBy(desc(playerRatingChangeLogs.createdAt))
+      .all();
+    return rows.map(hydrateLog);
+  }
+
+  async findByMatchId(matchId: string): Promise<PlayerRatingChangeLog[]> {
+    const rows = await this.db
+      .select()
+      .from(playerRatingChangeLogs)
+      .where(
+        and(
+          eq(playerRatingChangeLogs.source, "match_completed"),
+          like(
+            playerRatingChangeLogs.sourceLogId,
+            `match-completed-${matchId}-%`,
+          ),
+        ),
+      )
       .orderBy(desc(playerRatingChangeLogs.createdAt))
       .all();
     return rows.map(hydrateLog);

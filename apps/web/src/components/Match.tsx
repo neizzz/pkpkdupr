@@ -6,6 +6,7 @@ import {
   getMatchTopLevelType,
   matchTopLevelTypeLabels,
 } from "@pkpkdupr/shared/match";
+import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import UserChip from "@/components/UserChip";
 import { formatRating, getDisplayRatingForMatchType } from "@/utils/dupr";
 
@@ -32,6 +33,7 @@ export type MatchInfo = Omit<
     playerId: string;
     approvedAt: string;
   }>;
+  ratingChanges?: PlayerRatingChangeLog[];
 };
 
 interface MatchProps {
@@ -75,7 +77,10 @@ const getTeamSetScore = (scores: MatchInfo["scores"], teamIndex: 0 | 1) =>
     teamIndex === 0 ? score.scoreA > score.scoreB : score.scoreB > score.scoreA,
   ).length;
 
-const getTeamAverageDupr = (match: MatchInfo, team: MatchInfo["teams"][number]) => {
+const getTeamAverageDupr = (
+  match: MatchInfo,
+  team: MatchInfo["teams"][number],
+) => {
   let total = 0;
 
   for (const player of team.players) {
@@ -119,73 +124,45 @@ const Match: React.FC<MatchProps> = ({
         onPress ? "transition-colors hover:bg-amber-50" : ""
       }`}
     >
-        <div className="min-w-0">
-          <span className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}>
-            {statusLabelMap[match.status]}
-          </span>
-          <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-amber-950">
-            {displayTitle}
+      <div className="min-w-0">
+        <span
+          className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}
+        >
+          {statusLabelMap[match.status]}
+        </span>
+        <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-amber-950">
+          {displayTitle}
+        </p>
+        {sessionLabel ? (
+          <p
+            className={`mt-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium ${subTextClassName}`}
+          >
+            {sessionLabel}
           </p>
-          {sessionLabel ? (
-            <p className={`mt-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium ${subTextClassName}`}>
-              {sessionLabel}
-            </p>
-          ) : null}
-        </div>
+        ) : null}
+      </div>
 
-        <div className="mt-3 w-full">
-          {shouldShowTeamSetScores ? (
-            <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
-              {match.teams.map((team, index) => (
-                <div
-                  key={team.id}
-                  className={`row-start-1 flex min-w-0 flex-col gap-1.5 ${
-                    index === 0
-                      ? "col-start-1 items-start text-left"
-                      : "col-start-3 items-end text-right"
-                  }`}
+      <div className="mt-3 w-full">
+        {shouldShowTeamSetScores ? (
+          <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
+            {match.teams.map((team, index) => (
+              <div
+                key={team.id}
+                className={`row-start-1 flex min-w-0 flex-col gap-1.5 ${
+                  index === 0
+                    ? "col-start-1 items-start text-left"
+                    : "col-start-3 items-end text-right"
+                }`}
+              >
+                <p
+                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-[#888]`}
                 >
-                  <p
-                    className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-[#888]`}
-                  >
-                    DUPR <span className="font-bold">{formatRating(teamAverageDuprs[index])}</span>
-                  </p>
-                  <div className="flex min-w-0 flex-col gap-1">
-                    {team.players.map((teamPlayer) => (
-                      <UserChip
-                        key={teamPlayer.id}
-                        player={teamPlayer}
-                        isMe={teamPlayer.id === currentPlayerId}
-                        size="match"
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-              <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-amber-950">
-                <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
-                  {displayedTeamSetScores[0]}
-                </span>
-                <span className="text-[clamp(1.25rem,5vw,1.5rem)] font-bold leading-none text-[#888]">:</span>
-                <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
-                  {displayedTeamSetScores[1]}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="grid w-full grid-cols-2 gap-3">
-              {match.teams.map((team, index) => (
-                <div
-                  key={team.id}
-                  className={`flex min-w-0 flex-col gap-1.5 ${
-                    index === 0 ? "items-start text-left" : "items-end text-right"
-                  }`}
-                >
-                  <p
-                    className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-[#888]`}
-                  >
-                    DUPR <span className="font-bold">{formatRating(teamAverageDuprs[index])}</span>
-                  </p>
+                  DUPR{" "}
+                  <span className="font-bold">
+                    {formatRating(teamAverageDuprs[index])}
+                  </span>
+                </p>
+                <div className="flex min-w-0 flex-col gap-1">
                   {team.players.map((teamPlayer) => (
                     <UserChip
                       key={teamPlayer.id}
@@ -195,16 +172,56 @@ const Match: React.FC<MatchProps> = ({
                     />
                   ))}
                 </div>
-              ))}
+              </div>
+            ))}
+            <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-amber-950">
+              <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
+                {displayedTeamSetScores[0]}
+              </span>
+              <span className="text-[clamp(1.25rem,5vw,1.5rem)] font-bold leading-none text-[#888]">
+                :
+              </span>
+              <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
+                {displayedTeamSetScores[1]}
+              </span>
             </div>
-          )}
-        </div>
-        {showChevron ? (
-          <IoChevronForward
-            aria-hidden="true"
-            className="absolute right-3 top-3 size-5 text-[#888]"
-          />
-        ) : null}
+          </div>
+        ) : (
+          <div className="grid w-full grid-cols-2 gap-3">
+            {match.teams.map((team, index) => (
+              <div
+                key={team.id}
+                className={`flex min-w-0 flex-col gap-1.5 ${
+                  index === 0 ? "items-start text-left" : "items-end text-right"
+                }`}
+              >
+                <p
+                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-[#888]`}
+                >
+                  DUPR{" "}
+                  <span className="font-bold">
+                    {formatRating(teamAverageDuprs[index])}
+                  </span>
+                </p>
+                {team.players.map((teamPlayer) => (
+                  <UserChip
+                    key={teamPlayer.id}
+                    player={teamPlayer}
+                    isMe={teamPlayer.id === currentPlayerId}
+                    size="match"
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {showChevron ? (
+        <IoChevronForward
+          aria-hidden="true"
+          className="absolute right-3 top-3 size-5 text-[#888]"
+        />
+      ) : null}
     </Card>
   );
 
