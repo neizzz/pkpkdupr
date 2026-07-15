@@ -96,7 +96,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
             </div>
           </div>
           <div>
-            <p className="bs-text-head text-pkpk-sub-font">
+            <p className="bs-text-head text-pkpk-main-font">
               {pendingQrMember.username}님을 매치 멤버로 추가할까요?
             </p>
             <p className="bs-text-caption mt-2 text-pkpk-sub-font">

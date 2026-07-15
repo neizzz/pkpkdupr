@@ -9,9 +9,9 @@
   --color-pkpk-secondary-bg: #8b1e77;
   --color-pkpk-accent-bg: #eaff19;
   --color-pkpk-bg: #f8f9fa;
+  --color-pkpk-sub-bg: #9da4b2;
   --color-pkpk-dark: #0d0b1a;
   --color-pkpk-muted: #5c6880;
-  --color-pkpk-gray: #bbb --color-pkpk-primary-font: #ffffff; /* primary-bg 내 폰트색으로 사용 */
   --color-pkpk-secondary-font: #ffffff; /* secondary-bg 내 폰트색으로 사용 */
   --color-pkpk-main-font: #0d0b1a;
   --color-pkpk-sub-font: #5c6880;
@@ -136,7 +136,10 @@
   }
 
   .app-bottom-sheet-surface {
-    max-height: calc(var(--app-shell-height) - var(--app-keyboard-offset));
+    max-height: calc(
+      var(--app-shell-height) - var(--app-keyboard-offset) - 3rem -
+        env(safe-area-inset-top)
+    );
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-padding-bottom: calc(1rem + var(--app-keyboard-offset));

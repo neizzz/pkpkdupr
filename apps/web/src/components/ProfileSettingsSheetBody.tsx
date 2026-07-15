@@ -178,7 +178,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="bs-text-head text-center text-pkpk-sub-font">
+      <h2 className="bs-text-head text-center text-pkpk-main-font">
         프로필 설정
       </h2>
 

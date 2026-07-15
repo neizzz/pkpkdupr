@@ -45,7 +45,7 @@ const AppSettingsSheetBody: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="bs-text-head text-center text-pkpk-sub-font">앱 설정</h2>
+      <h2 className="bs-text-head text-center text-pkpk-main-font">앱 설정</h2>
 
       {(message || error) && (
         <div

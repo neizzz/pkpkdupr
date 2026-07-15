@@ -301,7 +301,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   return (
     <>
-      <h2 className="bs-text-head px-5 pt-4 text-center text-pkpk-sub-font">
+      <h2 className="bs-text-head px-5 pt-4 text-center text-pkpk-main-font">
         매치 생성
       </h2>
       <Drawer.Body className="flex flex-col gap-5 px-5 pb-4">
