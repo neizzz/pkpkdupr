@@ -78,73 +78,75 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
       key={card.label}
       className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-4 py-5 shadow-sm"
     >
-      <p className="text-lg font-semibold leading-[0.85] text-amber-950">
+      <p className="text-lg font-semibold leading-[0.85] text-pkpk-sub-font">
         {card.value}
       </p>
-      <p className="text-xs leading-[0.7] text-amber-700/80">{card.label}</p>
+      <p className="text-xs leading-[0.7] text-pkpk-sub-font">{card.label}</p>
     </Card>
   );
 
   return (
-    <div className="min-h-full p-2">
-      <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
-        {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
-        <div className="flex items-start gap-4">
-          <Avatar
-            size="sm"
-            avatarUrl={player?.avatarUrl}
-            name={displayName}
-            isMe={isMe}
-          />
+    <div className="min-h-full">
+      {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
+      <div className="p-2">
+        <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
+          <div className="flex items-start gap-4">
+            <Avatar
+              size="sm"
+              avatarUrl={player?.avatarUrl}
+              name={displayName}
+              isMe={isMe}
+            />
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="mt-1 truncate text-2xl font-bold text-amber-950">
-                  {displayName}
-                </h2>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {headerAction}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="mt-1 truncate text-2xl font-bold text-pkpk-sub-font">
+                    {displayName}
+                  </h2>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {headerAction}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-amber-950">
-            PkpkDUPR Rating
-          </h3>
-          {matchStats ? (
-            <div className="mt-4 flex flex-col gap-4">
-              {duprItems.map((item) => (
-                <div key={item.type}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
-                    {item.label}
-                  </p>
-                  <div className="mt-2 grid grid-cols-3 gap-3">
-                    {item.cards.map(renderStatCard)}
+          <div>
+            <h3 className="text-sm font-semibold text-pkpk-sub-font">
+              PkpkDUPR Rating
+            </h3>
+            {matchStats ? (
+              <div className="mt-4 flex flex-col gap-4">
+                {duprItems.map((item) => (
+                  <div key={item.type}>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
+                      {item.label}
+                    </p>
+                    <div className="mt-2 grid grid-cols-3 gap-3">
+                      {item.cards.map(renderStatCard)}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {duprItems.map((item) => (
-                <Card
-                  key={item.type}
-                  className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-4 py-5 shadow-sm"
-                >
-                  <p className="text-lg font-semibold leading-[0.85] text-amber-950">
-                    {item.rating}
-                  </p>
-                  <p className="text-xs leading-[0.7] text-amber-700/80">
-                    {item.label}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {duprItems.map((item) => (
+                  <Card
+                    key={item.type}
+                    className="rounded-2xl bg-[rgba(255,205,0,0.07)] px-4 py-5 shadow-sm"
+                  >
+                    <p className="text-lg font-semibold leading-[0.85] text-pkpk-sub-font">
+                      {item.rating}
+                    </p>
+                    <p className="text-xs leading-[0.7] text-pkpk-sub-font">
+                      {item.label}
+                    </p>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

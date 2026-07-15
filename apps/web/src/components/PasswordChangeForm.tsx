@@ -116,7 +116,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
       {title || description ? (
         <div className="flex flex-col gap-1">
           {title ? (
-            <h3 className="bs-text-title text-amber-950">{title}</h3>
+            <h3 className="bs-text-title text-pkpk-sub-font">{title}</h3>
           ) : null}
           {description ? (
             <p className="text-sm leading-5 text-[#666]">{description}</p>
@@ -125,7 +125,7 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
       ) : null}
 
       {!isOnline ? (
-        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-amber-700">
+        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-pkpk-sub-font">
           패스워드 변경은 온라인 연결이 필요합니다.
         </div>
       ) : null}
@@ -178,7 +178,9 @@ const PasswordChangeForm: React.FC<PasswordChangeFormProps> = ({
       </label>
 
       <div className="flex items-end justify-between gap-3">
-        <p className="bs-text-caption min-h-4 text-error">{validationMessage}</p>
+        <p className="bs-text-caption min-h-4 text-error">
+          {validationMessage}
+        </p>
         <Button
           type="submit"
           className="app-action-button rounded-2xl bg-[#409eff] px-6 text-white"

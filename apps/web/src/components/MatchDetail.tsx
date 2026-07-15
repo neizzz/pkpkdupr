@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Card, Separator } from "@heroui/react";
+import { Button, Card, Chip, Separator } from "@heroui/react";
+import { IoArrowDown, IoArrowUp } from "react-icons/io5";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import {
   getMaxScoreCountForMatchMode,
@@ -24,7 +25,7 @@ interface MatchDetailProps {
   isCancellingApproval?: boolean;
 }
 
-const subTextClassName = "text-[#888]";
+const subTextClassName = "text-pkpk-sub-font";
 
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -205,223 +206,299 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   };
 
   return (
-    <div className="min-h-full p-2">
-      <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
-        <DetailPageHeader title="Match Detail" tabKey="match" />
+    <div className="min-h-full">
+      <DetailPageHeader title="Match Detail" tabKey="match" />
+      <div className="p-2">
+        <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
+          <Match
+            match={match}
+            currentPlayerId={currentPlayerId}
+            showChevron={false}
+          />
 
-        <Match
-          match={match}
-          currentPlayerId={currentPlayerId}
-          showChevron={false}
-        />
-
-        <section>
-          <p
-            className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
-          >
-            Score
-          </p>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white/80 shadow-sm">
-            <table className="w-full table-fixed border-collapse text-sm text-amber-950">
-              <colgroup>
-                <col className="w-[40%]" />
-                {Array.from({ length: SCORE_TABLE_SET_COUNT }, (_, index) => (
-                  <col key={index} />
-                ))}
-                <col />
-              </colgroup>
-              <thead className="bg-amber-100/60 text-xs font-semibold text-amber-800">
-                <tr>
-                  <th
-                    scope="col"
-                    className="border-r border-amber-100 px-2 py-2 text-left"
-                  >
-                    Sets
-                  </th>
-                  {Array.from({ length: SCORE_TABLE_SET_COUNT }, (_, index) => (
-                    <th
-                      key={index}
-                      scope="col"
-                      className="border-r border-amber-100 px-1 py-2 text-center"
-                    >
-                      {index + 1}
-                    </th>
-                  ))}
-                  <th scope="col" className="px-1 py-2 text-center">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {match.teams.map((team, teamIndex) => (
-                  <tr key={team.id} className="border-t border-amber-100">
-                    <th
-                      scope="row"
-                      className="border-r border-amber-100 px-2 py-3 text-left font-semibold"
-                    >
-                      <div className="flex min-w-0 items-center">
-                        {team.players.map((player, playerIndex) => (
-                          <React.Fragment key={player.id}>
-                            {playerIndex > 0 ? (
-                              <span aria-hidden="true" className="shrink-0">
-                                /
-                              </span>
-                            ) : null}
-                            <span className="min-w-0 flex-1 truncate">
-                              {player.username}
-                            </span>
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    </th>
-                    {Array.from(
-                      { length: SCORE_TABLE_SET_COUNT },
-                      (_, scoreIndex) => {
-                        const score = match.scores?.[scoreIndex];
-                        const value = score
-                          ? teamIndex === 0
-                            ? score.scoreA
-                            : score.scoreB
-                          : "-";
-
-                        return (
-                          <td
-                            key={scoreIndex}
-                            className="border-r border-amber-100 px-1 py-3 text-center font-medium tabular-nums"
-                          >
-                            {value}
-                          </td>
-                        );
-                      },
-                    )}
-                    <td className="px-1 py-3 text-center text-base font-bold tabular-nums">
-                      {hasResultScores ? totalPoints[teamIndex] : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {canSubmitResult ? (
-            <div className="mt-3 flex justify-end">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="rounded-2xl text-[#409eff]"
-                onPress={() => setIsResultFormOpen((value) => !value)}
-              >
-                {isResultFormOpen
-                  ? "닫기"
-                  : hasResultScores
-                    ? "수정"
-                    : "결과 입력"}
-              </Button>
-            </div>
-          ) : null}
-        </section>
-
-        {shouldShowResultForm ? (
-          <Card className="rounded-3xl bg-white p-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
-              {hasResultScores ? "Edit Result" : "Result"}
-            </p>
-            <p className="mt-1 text-xs text-[#888]">
-              {match.mode === "single-game"
-                ? "단판은 스코어 1개만 입력할 수 있어요."
-                : "2선승은 2개 또는 3개 스코어를 입력할 수 있어요."}
-            </p>
-            <div className="mt-2 flex flex-col gap-2">
-              {scoreRows.map((row, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <span className="w-10 shrink-0 text-xs font-semibold text-[#888]">
-                    G{index + 1}
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={row.scoreA}
-                    onChange={(event) =>
-                      updateScoreRow(index, "scoreA", event.target.value)
-                    }
-                    className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-amber-950 outline-none"
-                    placeholder="점수"
-                  />
-                  <span className="text-sm font-semibold text-[#888]">:</span>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={row.scoreB}
-                    onChange={(event) =>
-                      updateScoreRow(index, "scoreB", event.target.value)
-                    }
-                    className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-amber-950 outline-none"
-                    placeholder="점수"
-                  />
-                </div>
-              ))}
-            </div>
-            {resultError ? (
-              <p className="mt-2 text-xs font-medium text-red-500">
-                {resultError}
-              </p>
-            ) : null}
-            <div className="mt-3 flex justify-end gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="rounded-2xl text-[#409eff]"
-                onPress={() => {
-                  setScoreRows((rows) =>
-                    rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
-                      ? rows
-                      : [...rows, createEmptyScoreRow()],
-                  );
-                }}
-                isDisabled={isSubmittingResult || !canAddScoreRow}
-              >
-                {match.mode === "single-game" ? "단판" : "세트 추가"}
-              </Button>
-              <Button
-                size="sm"
-                className="rounded-2xl bg-[#409eff] font-semibold text-white"
-                onPress={() => void handleSubmitResult()}
-                isDisabled={isSubmittingResult}
-              >
-                {resultActionLabel}
-              </Button>
-            </div>
-          </Card>
-        ) : null}
-
-        {hasRatingChanges ? (
           <section>
             <p
               className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
             >
-              Rating Change
+              Score
             </p>
-            <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
-              {(() => {
-                const entries = match.teams
-                  .flatMap((team) => team.players)
-                  .flatMap((player) => {
-                    const change = ratingChangeByPlayerId.get(player.id);
-                    return change ? [{ player, change }] : [];
-                  });
+            <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white/80 shadow-sm">
+              <table className="w-full table-fixed border-collapse text-sm text-pkpk-sub-font">
+                <colgroup>
+                  <col className="w-[40%]" />
+                  {Array.from({ length: SCORE_TABLE_SET_COUNT }, (_, index) => (
+                    <col key={index} />
+                  ))}
+                  <col />
+                </colgroup>
+                <thead className="bg-amber-100/60 text-xs font-semibold text-pkpk-sub-font">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="border-r border-amber-100 px-2 py-2 text-left"
+                    >
+                      Sets
+                    </th>
+                    {Array.from(
+                      { length: SCORE_TABLE_SET_COUNT },
+                      (_, index) => (
+                        <th
+                          key={index}
+                          scope="col"
+                          className="border-r border-amber-100 px-1 py-2 text-center"
+                        >
+                          {index + 1}
+                        </th>
+                      ),
+                    )}
+                    <th scope="col" className="px-1 py-2 text-center">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {match.teams.map((team, teamIndex) => (
+                    <tr key={team.id} className="border-t border-amber-100">
+                      <th
+                        scope="row"
+                        className="border-r border-amber-100 px-2 py-3 text-left font-semibold"
+                      >
+                        <div className="flex min-w-0 items-center">
+                          {team.players.map((player, playerIndex) => (
+                            <React.Fragment key={player.id}>
+                              {playerIndex > 0 ? (
+                                <span aria-hidden="true" className="shrink-0">
+                                  /
+                                </span>
+                              ) : null}
+                              <span className="min-w-0 flex-1 truncate">
+                                {player.username}
+                              </span>
+                            </React.Fragment>
+                          ))}
+                        </div>
+                      </th>
+                      {Array.from(
+                        { length: SCORE_TABLE_SET_COUNT },
+                        (_, scoreIndex) => {
+                          const score = match.scores?.[scoreIndex];
+                          const value = score
+                            ? teamIndex === 0
+                              ? score.scoreA
+                              : score.scoreB
+                            : "-";
 
-                return entries.map(({ player, change }, index) => {
-                  const previous = change.previousRating[ratingCategory];
-                  const next = change.nextRating[ratingCategory];
-                  const delta = change.delta[ratingCategory];
-                  const deltaSign = delta > 0 ? "+" : "";
-                  const deltaColorClass =
-                    delta > 0
-                      ? "text-emerald-600"
-                      : delta < 0
-                        ? "text-red-500"
-                        : "text-[#888]";
+                          return (
+                            <td
+                              key={scoreIndex}
+                              className="border-r border-amber-100 px-1 py-3 text-center font-medium tabular-nums"
+                            >
+                              {value}
+                            </td>
+                          );
+                        },
+                      )}
+                      <td className="px-1 py-3 text-center text-base font-bold tabular-nums">
+                        {hasResultScores ? totalPoints[teamIndex] : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {canSubmitResult ? (
+              <div className="mt-3 flex justify-end">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-2xl text-[#409eff]"
+                  onPress={() => setIsResultFormOpen((value) => !value)}
+                >
+                  {isResultFormOpen
+                    ? "닫기"
+                    : hasResultScores
+                      ? "수정"
+                      : "결과 입력"}
+                </Button>
+              </div>
+            ) : null}
+          </section>
+
+          {shouldShowResultForm ? (
+            <Card className="rounded-3xl bg-white p-3 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
+                {hasResultScores ? "Edit Result" : "Result"}
+              </p>
+              <p className="mt-1 text-xs text-[#888]">
+                {match.mode === "single-game"
+                  ? "단판은 스코어 1개만 입력할 수 있어요."
+                  : "2선승은 2개 또는 3개 스코어를 입력할 수 있어요."}
+              </p>
+              <div className="mt-2 flex flex-col gap-2">
+                {scoreRows.map((row, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <span className="w-10 shrink-0 text-xs font-semibold text-[#888]">
+                      G{index + 1}
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={row.scoreA}
+                      onChange={(event) =>
+                        updateScoreRow(index, "scoreA", event.target.value)
+                      }
+                      className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-pkpk-sub-font outline-none"
+                      placeholder="점수"
+                    />
+                    <span className="text-sm font-semibold text-[#888]">:</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={row.scoreB}
+                      onChange={(event) =>
+                        updateScoreRow(index, "scoreB", event.target.value)
+                      }
+                      className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-pkpk-sub-font outline-none"
+                      placeholder="점수"
+                    />
+                  </div>
+                ))}
+              </div>
+              {resultError ? (
+                <p className="mt-2 text-xs font-medium text-red-500">
+                  {resultError}
+                </p>
+              ) : null}
+              <div className="mt-3 flex justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-2xl text-[#409eff]"
+                  onPress={() => {
+                    setScoreRows((rows) =>
+                      rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
+                        ? rows
+                        : [...rows, createEmptyScoreRow()],
+                    );
+                  }}
+                  isDisabled={isSubmittingResult || !canAddScoreRow}
+                >
+                  {match.mode === "single-game" ? "단판" : "세트 추가"}
+                </Button>
+                <Button
+                  size="sm"
+                  className="rounded-2xl bg-[#409eff] font-semibold text-white"
+                  onPress={() => void handleSubmitResult()}
+                  isDisabled={isSubmittingResult}
+                >
+                  {resultActionLabel}
+                </Button>
+              </div>
+            </Card>
+          ) : null}
+
+          {hasRatingChanges ? (
+            <section>
+              <p
+                className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+              >
+                Rating Change
+              </p>
+              <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+                {(() => {
+                  const entries = match.teams
+                    .flatMap((team) => team.players)
+                    .flatMap((player) => {
+                      const change = ratingChangeByPlayerId.get(player.id);
+                      return change ? [{ player, change }] : [];
+                    });
+
+                  return entries.map(({ player, change }, index) => {
+                    const previous = change.previousRating[ratingCategory];
+                    const next = change.nextRating[ratingCategory];
+                    const delta = change.delta[ratingCategory];
+                    const deltaColor =
+                      delta > 0
+                        ? "success"
+                        : delta < 0
+                          ? "danger"
+                          : ("default" as const);
+                    const DeltaIcon =
+                      delta > 0 ? IoArrowUp : delta < 0 ? IoArrowDown : null;
+
+                    return (
+                      <React.Fragment key={player.id}>
+                        <div className="flex items-center justify-between gap-3 py-0">
+                          <p
+                            className={`min-w-0 truncate text-sm ${
+                              player.id === currentPlayerId
+                                ? "font-bold text-slate-900"
+                                : "font-medium text-slate-900"
+                            }`}
+                          >
+                            {player.username}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 text-right text-xs font-medium tabular-nums text-slate-900">
+                              {formatRating(previous)}
+                              <span className="mx-1 text-slate-400">→</span>
+                              <span className="font-semibold">
+                                {formatRating(next)}
+                              </span>
+                            </div>
+                            <Chip
+                              size="sm"
+                              variant="soft"
+                              color={deltaColor}
+                              className="h-6 px-1.5"
+                            >
+                              <span className="flex items-center gap-0.5 text-[11px] font-semibold tabular-nums">
+                                {DeltaIcon ? (
+                                  <DeltaIcon className="size-3" />
+                                ) : null}
+                                {Math.abs(delta).toFixed(3)}
+                              </span>
+                            </Chip>
+                          </div>
+                        </div>
+                        {index < entries.length - 1 ? (
+                          <Separator className="-mx-3 w-[calc(100%+1.5rem)]" />
+                        ) : null}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
+              </Card>
+            </section>
+          ) : null}
+
+          <section>
+            <div className="flex items-center justify-between gap-3">
+              <p
+                className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+              >
+                Approval
+              </p>
+              <span className="text-xs font-medium text-[#888]">
+                승인 {match.approvals.length}/
+                {match.teams.flatMap((team) => team.players).length}
+              </span>
+            </div>
+            <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+              {match.teams
+                .flatMap((team) => team.players)
+                .map((player, index, players) => {
+                  const approval = approvalByPlayerId.get(player.id);
+                  const isMatchCreator = player.id === match.creatorPlayerId;
+                  const approvalLabel = isMatchCreator
+                    ? hasResultScores
+                      ? "매치 생성자(자동 승인)"
+                      : "매치 생성자(결과 입력 대기)"
+                    : approval
+                      ? "승인 완료"
+                      : "승인 대기";
 
                   return (
                     <React.Fragment key={player.id}>
@@ -429,131 +506,71 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                         <p
                           className={`min-w-0 truncate text-sm ${
                             player.id === currentPlayerId
-                              ? "font-bold text-amber-950"
-                              : "font-medium text-amber-950"
+                              ? "font-bold text-pkpk-sub-font"
+                              : "font-medium text-pkpk-sub-font"
                           }`}
                         >
                           {player.username}
                         </p>
-                        <div className="min-w-0 text-right text-xs font-medium tabular-nums">
-                          <p className="text-amber-950">
-                            {formatRating(previous)}
-                            <span className="mx-1 text-[#888]">→</span>
-                            <span className="font-semibold">
-                              {formatRating(next)}
-                            </span>
-                          </p>
-                          <p className={`mt-0.5 ${deltaColorClass}`}>
-                            ({deltaSign}
-                            {delta.toFixed(3)})
-                          </p>
+                        <div className="min-w-0 text-right text-xs font-medium">
+                          {approval ? (
+                            <>
+                              <p className="text-emerald-600">
+                                {approvalLabel}
+                              </p>
+                              <p className="mt-0.5 text-[#888]">
+                                {formatDateTime(approval.approvedAt)}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-[#888]">{approvalLabel}</p>
+                          )}
                         </div>
                       </div>
-                      {index < entries.length - 1 ? (
+                      {index < players.length - 1 ? (
                         <Separator className="-mx-3 w-[calc(100%+1.5rem)]" />
                       ) : null}
                     </React.Fragment>
                   );
-                });
-              })()}
+                })}
             </Card>
+            {canApproveResult || canCancelApproval ? (
+              <div className="mt-3 flex justify-end gap-2">
+                {canCancelApproval ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="rounded-2xl text-pkpk-sub-font"
+                    onPress={() => void handleCancelApproval()}
+                    isDisabled={isCancellingApproval}
+                  >
+                    합의 취소
+                  </Button>
+                ) : null}
+                {canApproveResult ? (
+                  <Button
+                    size="sm"
+                    className="rounded-2xl bg-[#409eff] font-semibold text-white"
+                    onPress={() => void handleApproveResult()}
+                    isDisabled={isApprovingResult}
+                  >
+                    결과 승인
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </section>
-        ) : null}
 
-        <section>
-          <div className="flex items-center justify-between gap-3">
-            <p
-              className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
-            >
-              결과 승인
-            </p>
-            <span className="text-xs font-medium text-[#888]">
-              승인 {match.approvals.length}/
-              {match.teams.flatMap((team) => team.players).length}
-            </span>
-          </div>
-          <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
-            {match.teams
-              .flatMap((team) => team.players)
-              .map((player, index, players) => {
-                const approval = approvalByPlayerId.get(player.id);
-                const isMatchCreator = player.id === match.creatorPlayerId;
-                const approvalLabel = isMatchCreator
-                  ? hasResultScores
-                    ? "매치 생성자(자동 승인)"
-                    : "매치 생성자(결과 입력 대기)"
-                  : approval
-                    ? "승인 완료"
-                    : "승인 대기";
-
-                return (
-                  <React.Fragment key={player.id}>
-                    <div className="flex items-center justify-between gap-3 py-0">
-                      <p
-                        className={`min-w-0 truncate text-sm ${
-                          player.id === currentPlayerId
-                            ? "font-bold text-amber-950"
-                            : "font-medium text-amber-950"
-                        }`}
-                      >
-                        {player.username}
-                      </p>
-                      <div className="min-w-0 text-right text-xs font-medium">
-                        {approval ? (
-                          <>
-                            <p className="text-emerald-600">{approvalLabel}</p>
-                            <p className="mt-0.5 text-[#888]">
-                              {formatDateTime(approval.approvedAt)}
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-[#888]">{approvalLabel}</p>
-                        )}
-                      </div>
-                    </div>
-                    {index < players.length - 1 ? (
-                      <Separator className="-mx-3 w-[calc(100%+1.5rem)]" />
-                    ) : null}
-                  </React.Fragment>
-                );
-              })}
-          </Card>
-          {canApproveResult || canCancelApproval ? (
-            <div className="mt-3 flex justify-end gap-2">
-              {canCancelApproval ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="rounded-2xl text-amber-700"
-                  onPress={() => void handleCancelApproval()}
-                  isDisabled={isCancellingApproval}
-                >
-                  합의 취소
-                </Button>
-              ) : null}
-              {canApproveResult ? (
-                <Button
-                  size="sm"
-                  className="rounded-2xl bg-[#409eff] font-semibold text-white"
-                  onPress={() => void handleApproveResult()}
-                  isDisabled={isApprovingResult}
-                >
-                  결과 승인
-                </Button>
-              ) : null}
-            </div>
+          {!shouldShowResultForm && resultError ? (
+            <p className="text-xs font-medium text-red-500">{resultError}</p>
           ) : null}
-        </section>
 
-        {!shouldShowResultForm && resultError ? (
-          <p className="text-xs font-medium text-red-500">{resultError}</p>
-        ) : null}
-
-        <div
-          className={`pb-2 text-right text-xs font-medium ${subTextClassName}`}
-        >
-          <p>Created at {formatDateTime(match.createdAt)}</p>
-          <p className="mt-1">Updated at {formatDateTime(match.updatedAt)}</p>
+          <div
+            className={`pb-2 text-right text-xs font-medium ${subTextClassName}`}
+          >
+            <p>Created at {formatDateTime(match.createdAt)}</p>
+            <p className="mt-1">Updated at {formatDateTime(match.updatedAt)}</p>
+          </div>
         </div>
       </div>
     </div>

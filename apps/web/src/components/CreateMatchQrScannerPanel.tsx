@@ -36,7 +36,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
 }) => (
   <div className="mt-6 flex flex-col gap-4">
     <div className="flex flex-col gap-2">
-      <p className="bs-text-title text-amber-950">팀 구성</p>
+      <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
       {teamGrid}
     </div>
 
@@ -63,7 +63,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
       {qrScannerStatus === "verifying" ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white px-5 text-center">
           <div className="size-10 animate-spin rounded-full border-[3px] border-[#409eff]/20 border-t-[#409eff]" />
-          <p className="bs-text-title text-amber-950">
+          <p className="bs-text-title text-pkpk-sub-font">
             QR 코드를 확인 중입니다...
           </p>
         </div>
@@ -79,7 +79,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
               isMe={pendingQrMember.id === currentPlayerId}
             />
             <div className="mt-3 min-w-0">
-              <p className="truncate font-semibold text-amber-950">
+              <p className="truncate font-semibold text-pkpk-sub-font">
                 {pendingQrMember.username}
               </p>
               <p
@@ -89,17 +89,17 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
               >
                 {getGenderLabel(pendingQrMember.gender)}
               </p>
-              <div className="mt-2 space-y-1 text-sm font-semibold text-amber-950">
+              <div className="mt-2 space-y-1 text-sm font-semibold text-pkpk-sub-font">
                 <p>S {formatRating(pendingQrMember.duprRating?.singles)}</p>
                 <p>D {formatRating(pendingQrMember.duprRating?.doubles)}</p>
               </div>
             </div>
           </div>
           <div>
-            <p className="bs-text-head text-amber-950">
+            <p className="bs-text-head text-pkpk-sub-font">
               {pendingQrMember.username}님을 매치 멤버로 추가할까요?
             </p>
-            <p className="bs-text-caption mt-2 text-amber-700/70">
+            <p className="bs-text-caption mt-2 text-pkpk-sub-font">
               추가하면 현재 매치 멤버 목록에 반영됩니다.
             </p>
           </div>

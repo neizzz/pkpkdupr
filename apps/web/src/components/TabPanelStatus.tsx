@@ -27,7 +27,7 @@ const TabPanelStatus: React.FC<TabPanelStatusProps> = ({
       {message ? (
         <p
           className={`text-sm font-medium ${
-            tone === "error" ? "text-error" : "text-amber-700/80"
+            tone === "error" ? "text-error" : "text-pkpk-sub-font"
           }`}
         >
           {message}

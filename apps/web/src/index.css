@@ -5,14 +5,17 @@
   --color-error: #f8626c;
   --color-border: #e6e6e6;
   --color-divider: #e6e6e6;
-
-  --color-pkpk-primary: #3b52cc;
-  --color-pkpk-secondary: #8b1e77;
-  --color-pkpk-bg: #e3f8ff;
-  --color-pkpk-surface: #ffffff;
+  --color-pkpk-primary-bg: #3b52cc;
+  --color-pkpk-secondary-bg: #8b1e77;
+  --color-pkpk-accent-bg: #eaff19;
+  --color-pkpk-bg: #f8f9fa;
   --color-pkpk-dark: #0d0b1a;
   --color-pkpk-muted: #5c6880;
-  --color-pkpk-accent: #eaff19;
+  --color-pkpk-gray: #bbb --color-pkpk-primary-font: #ffffff; /* primary-bg 내 폰트색으로 사용 */
+  --color-pkpk-secondary-font: #ffffff; /* secondary-bg 내 폰트색으로 사용 */
+  --color-pkpk-main-font: #0d0b1a;
+  --color-pkpk-sub-font: #5c6880;
+  --color-pkpk-accent-font: #eaff19;
 }
 
 :root {

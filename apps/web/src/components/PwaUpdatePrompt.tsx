@@ -99,7 +99,7 @@ const PwaUpdatePrompt: React.FC = () => {
       >
         <Alert.Indicator className="shrink-0 self-center" />
         <Alert.Content className="min-w-0 gap-0 self-center">
-          <Alert.Title className="text-sm font-bold text-amber-950">
+          <Alert.Title className="text-sm font-bold text-pkpk-sub-font">
             새 버전이 있어요.
           </Alert.Title>
           <Alert.Description className="text-xs font-semibold text-[#888]">

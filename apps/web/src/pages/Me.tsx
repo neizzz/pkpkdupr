@@ -5,6 +5,7 @@ import BottomSheet from "@/components/BottomSheet";
 import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
+import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
@@ -154,8 +155,8 @@ const Me: React.FC = () => {
     <Button
       type="button"
       size="sm"
-      variant="secondary"
-      className="rounded-full px-3 text-amber-700"
+      variant="ghost"
+      className="rounded-full border-0 px-3 !text-pkpk-secondary-font"
       onPress={openSettings}
     >
       <IoSettingsOutline className="size-4" />
@@ -165,6 +166,7 @@ const Me: React.FC = () => {
 
   return (
     <>
+      <TabPanelHeader title="Me">{settingsButton}</TabPanelHeader>
       {isMatchStatsLoading ? (
         <TabPanelStatus ariaLabel="내 프로필 로딩 중" isLoading />
       ) : (
@@ -172,7 +174,6 @@ const Me: React.FC = () => {
           player={player}
           isMe
           showDetailHeader={false}
-          headerAction={settingsButton}
           matchStats={matchStats}
         />
       )}

@@ -1,10 +1,7 @@
 import React from "react";
 import { Button } from "@heroui/react";
 import { IoChevronBack } from "react-icons/io5";
-import {
-  type TabKey,
-  useTabNavigation,
-} from "@/context/TabNavigationContext";
+import { type TabKey, useTabNavigation } from "@/context/TabNavigationContext";
 
 interface TabBackButtonProps {
   tabKey?: TabKey;
@@ -30,10 +27,7 @@ const TabBackButton: React.FC<TabBackButtonProps> = ({
       isIconOnly
       aria-label={label}
       variant="secondary"
-      className={[
-        "size-9 rounded-full text-amber-950",
-        className,
-      ]
+      className={["size-9 rounded-full text-pkpk-sub-font", className]
         .filter(Boolean)
         .join(" ")}
       onPress={() => requestCloseTopDepth(targetTabKey)}

@@ -122,7 +122,9 @@ const ProfileSettingsSheetBody: React.FC = () => {
     clearFeedback();
 
     if (!isOnline) {
-      setError("오프라인에서는 프로필 이미지를 변경할 수 없습니다. 온라인 연결이 필요합니다.");
+      setError(
+        "오프라인에서는 프로필 이미지를 변경할 수 없습니다. 온라인 연결이 필요합니다.",
+      );
       return;
     }
 
@@ -176,7 +178,9 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="bs-text-head text-center text-amber-950">프로필 설정</h2>
+      <h2 className="bs-text-head text-center text-pkpk-sub-font">
+        프로필 설정
+      </h2>
 
       {(message || error) && (
         <div
@@ -189,14 +193,16 @@ const ProfileSettingsSheetBody: React.FC = () => {
       )}
 
       {!isOnline ? (
-        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-amber-700">
+        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-pkpk-sub-font">
           프로필 이미지 변경은 온라인 연결이 필요합니다.
         </div>
       ) : null}
 
       <form onSubmit={handleSaveProfile} className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <h3 className="bs-text-title text-amber-950">프로필 이미지 변경</h3>
+          <h3 className="bs-text-title text-pkpk-sub-font">
+            프로필 이미지 변경
+          </h3>
         </div>
 
         <input
@@ -217,7 +223,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           <Button
             type="button"
             variant="secondary"
-            className="app-action-button rounded-2xl text-amber-800"
+            className="app-action-button rounded-2xl text-pkpk-sub-font"
             onPress={() => avatarInputRef.current?.click()}
             isDisabled={isSavingProfile || !isOnline}
           >

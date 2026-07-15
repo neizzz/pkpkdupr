@@ -29,6 +29,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 pb-6 pt-6 text-center">
+      <h2 className="bs-text-head text-center text-pkpk-sub-font">QR 코드</h2>
       {qrToken ? (
         <>
           <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-border">
@@ -41,7 +42,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
           </div>
           <p
             className={`bs-text-title ${
-              qrRemainingSeconds > 0 ? "text-amber-800" : "text-error"
+              qrRemainingSeconds > 0 ? "text-pkpk-sub-font" : "text-error"
             }`}
           >
             {qrRemainingSeconds > 0
@@ -52,7 +53,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
       ) : (
         <div className="flex min-h-[220px] items-center justify-center">
           <p
-            className={`bs-text-body ${isQrLoading ? "text-amber-700/70" : "text-error"}`}
+            className={`bs-text-body ${isQrLoading ? "text-pkpk-sub-font" : "text-error"}`}
           >
             {isQrLoading ? "QR 코드를 생성 중입니다..." : qrError}
           </p>

@@ -4,6 +4,7 @@ import type { MatchScore } from "@pkpkdupr/shared/match";
 import { useAuth } from "@/context/AuthContext";
 import Match, { type MatchInfo } from "@/components/Match";
 import MatchDetail from "@/components/MatchDetail";
+import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -72,7 +73,10 @@ const writeCachedMatches = (key: string, cachedMatches: CachedMatches) => {
   localStorage.setItem(key, JSON.stringify(cachedMatches));
 };
 
-const mergeMatches = (currentMatches: MatchInfo[], nextMatches: MatchInfo[]) => {
+const mergeMatches = (
+  currentMatches: MatchInfo[],
+  nextMatches: MatchInfo[],
+) => {
   const existingMatchIds = new Set(currentMatches.map((match) => match.id));
   return [
     ...currentMatches,
@@ -169,7 +173,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.error || "매치 목록을 불러오지 못했습니다.");
+          throw new Error(
+            errorData.error || "매치 목록을 불러오지 못했습니다.",
+          );
         }
 
         const data = (await res.json()) as MatchesResponse;
@@ -214,7 +220,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         }
 
         const message =
-          err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.";
+          err instanceof Error
+            ? err.message
+            : "매치 목록을 불러오지 못했습니다.";
         if (append) {
           setLoadMoreError(message);
         } else if (!preserveVisibleData) {
@@ -312,7 +320,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       return;
     }
 
-    const refreshedMatch = matches.find((match) => match.id === selectedMatchId);
+    const refreshedMatch = matches.find(
+      (match) => match.id === selectedMatchId,
+    );
     if (refreshedMatch) {
       setSelectedMatch(refreshedMatch);
     }
@@ -453,8 +463,15 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       setSelectedMatchId(match.id);
       setSelectedMatch(match);
       window.requestAnimationFrame(() => scrollToTop("auto"));
+      void loadSelectedMatch(match.id).catch(() => {});
     },
-    [closeMatchDetail, pushDepth, saveScrollPosition, scrollToTop],
+    [
+      closeMatchDetail,
+      loadSelectedMatch,
+      pushDepth,
+      saveScrollPosition,
+      scrollToTop,
+    ],
   );
 
   if (selectedMatch) {
@@ -483,90 +500,84 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   }
 
   return (
-    <div className="flex min-h-full p-2">
-      <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-amber-950">Matches</h2>
-          {!isLoading && matches.length > 0 ? (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-[#888]">
-                {isMyMatchOnly ? "내 경기" : "전체"} {matches.length} / {total}
-                경기
-              </p>
-              <Switch
-                aria-label="내경기만 보기"
-                className="shrink-0"
-                isSelected={isMyMatchOnly}
-                onChange={setIsMyMatchOnly}
-                size="sm"
-                style={
-                  {
-                    "--switch-control-bg": "#d1d5db",
-                    "--switch-control-bg-hover": "#cbd5e1",
-                    "--switch-control-bg-checked": "#409eff",
-                    "--switch-control-bg-checked-hover": "#2f8be6",
-                  } as React.CSSProperties
-                }
-              >
-                <Switch.Content className="-mx-2 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-[#409eff] touch-manipulation">
-                  <Switch.Control>
-                    <Switch.Thumb />
-                  </Switch.Control>
-                  <span className="text-sm font-semibold leading-none">
-                    내경기
-                  </span>
-                </Switch.Content>
-              </Switch>
-            </div>
-          ) : null}
+    <>
+      <TabPanelHeader title="Matches">
+        <Switch
+          aria-label="내경기만 보기"
+          className="shrink-0"
+          isSelected={isMyMatchOnly}
+          onChange={setIsMyMatchOnly}
+          size="sm"
+          style={
+            {
+              "--switch-control-bg": "#d1d5db",
+              "--switch-control-bg-hover": "#cbd5e1",
+              "--switch-control-bg-checked": "#eaff19",
+              "--switch-control-bg-checked-hover": "#d4e600",
+            } as React.CSSProperties
+          }
+        >
+          <Switch.Content className="-mx-2 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-pkpk-accent-font touch-manipulation">
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
+            <span className="text-sm font-bold leading-none">내경기</span>
+          </Switch.Content>
+        </Switch>
+      </TabPanelHeader>
+      <div className="flex min-h-full p-2">
+        <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
           {notice ? (
-            <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+            <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-pkpk-sub-font">
               {notice}
             </p>
           ) : null}
-        </div>
 
-        {isLoading ? (
-          <TabPanelStatus ariaLabel="매치 목록 로딩 중" isLoading />
-        ) : error ? (
-          <TabPanelStatus message={error} tone="error" />
-        ) : matches.length === 0 ? (
-          <TabPanelStatus
-            message={
-              isMyMatchOnly
-                ? "현재 표시할 내 경기가 없어요."
-                : "현재 표시할 매치가 없어요."
-            }
-          />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {matches.map((match) => (
-              <Match
-                key={match.id}
-                match={match}
-                currentPlayerId={player?.id}
-                onPress={openMatchDetail}
-              />
-            ))}
-            {loadMoreError ? (
-              <p className="text-center text-sm font-medium text-error" role="alert">
-                {loadMoreError}
-              </p>
-            ) : null}
-            {hasMoreMatches ? (
-              <Button
-                type="button"
-                className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-                isDisabled={isLoadingMore}
-                onPress={() => void loadMatches(nextPage, true)}
-              >
-                {isLoadingMore ? "불러오는 중..." : "더 보기"}
-              </Button>
-            ) : null}
-          </div>
-        )}
+          {isLoading ? (
+            <TabPanelStatus ariaLabel="매치 목록 로딩 중" isLoading />
+          ) : error ? (
+            <TabPanelStatus message={error} tone="error" />
+          ) : matches.length === 0 ? (
+            <TabPanelStatus
+              message={
+                isMyMatchOnly
+                  ? "현재 표시할 내 경기가 없어요."
+                  : "현재 표시할 매치가 없어요."
+              }
+            />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {matches.map((match) => (
+                <Match
+                  key={match.id}
+                  match={match}
+                  currentPlayerId={player?.id}
+                  onPress={openMatchDetail}
+                />
+              ))}
+              {loadMoreError ? (
+                <p
+                  className="text-center text-sm font-medium text-error"
+                  role="alert"
+                >
+                  {loadMoreError}
+                </p>
+              ) : null}
+              {hasMoreMatches ? (
+                <Button
+                  type="button"
+                  className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                  isDisabled={isLoadingMore}
+                  onPress={() => void loadMatches(nextPage, true)}
+                >
+                  {isLoadingMore ? "불러오는 중..." : "더 보기"}
+                </Button>
+              ) : null}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

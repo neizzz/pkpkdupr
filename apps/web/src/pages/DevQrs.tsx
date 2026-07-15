@@ -18,10 +18,10 @@ const DevQrCard: React.FC<{ token: DevPlayerQrToken }> = ({ token }) => (
   <div className="rounded-3xl border border-border bg-white p-3 shadow-sm">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0">
-        <p className="truncate text-sm font-bold text-amber-950">
+        <p className="truncate text-sm font-bold text-pkpk-sub-font">
           {token.player.username}
         </p>
-        <p className="mt-0.5 truncate text-[11px] text-amber-700/60">
+        <p className="mt-0.5 truncate text-[11px] text-pkpk-sub-font">
           {token.player.id}
         </p>
       </div>
@@ -51,8 +51,8 @@ const DevQrSection: React.FC<{
 }> = ({ title, tokens }) => (
   <section>
     <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-base font-bold text-amber-950">{title}</h2>
-      <span className="text-xs font-semibold text-amber-700/70">
+      <h2 className="text-base font-bold text-pkpk-sub-font">{title}</h2>
+      <span className="text-xs font-semibold text-pkpk-sub-font">
         {tokens.length}명
       </span>
     </div>
@@ -123,7 +123,7 @@ const DevQrs: React.FC = () => {
   if (!import.meta.env.DEV) {
     return (
       <div className="app-safe-bottom-pad flex h-full w-full items-center justify-center overflow-hidden bg-amber-50 px-6 pt-6 text-center">
-        <p className="text-sm font-semibold text-amber-800">
+        <p className="text-sm font-semibold text-pkpk-sub-font">
           Dev QR 페이지는 개발 환경에서만 사용할 수 있습니다.
         </p>
       </div>
@@ -134,19 +134,19 @@ const DevQrs: React.FC = () => {
     <div className="app-scroll-area app-safe-bottom-pad h-full w-full bg-amber-50 px-3 pt-6">
       <div className="mx-auto w-full max-w-7xl">
         <header>
-          <p className="text-xs font-semibold uppercase tracking-wide text-amber-500">
+          <p className="text-xs font-semibold uppercase tracking-wide text-pkpk-sub-font">
             Dev Only
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-amber-950">
+          <h1 className="mt-1 text-2xl font-bold text-pkpk-sub-font">
             Permanent Player QR
           </h1>
-          <p className="mt-2 text-sm text-amber-700/80">
+          <p className="mt-2 text-sm text-pkpk-sub-font">
             매치 멤버 추가 테스트용 영구 QR입니다.
           </p>
         </header>
 
         {isLoading ? (
-          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm text-amber-700/70 shadow-sm">
+          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm text-pkpk-sub-font shadow-sm">
             Dev QR 목록을 불러오는 중입니다...
           </div>
         ) : error ? (

@@ -13,13 +13,13 @@ const CreateMatchModeSelector: React.FC<CreateMatchModeSelectorProps> = ({
   onChange,
 }) => (
   <section className="flex flex-col gap-2">
-    <p className="bs-text-title text-amber-950">경기 모드</p>
+    <p className="bs-text-title text-pkpk-sub-font">경기 모드</p>
     <RadioGroup
       aria-label="경기 모드"
       value={selectedMatchMode}
       onChange={(value) => onChange(value as MatchMode)}
       orientation="horizontal"
-      className="flex gap-5"
+      className="flex items-start gap-5 p-0"
     >
       {(["single-game", "best-of-3"] as const).map((mode) => (
         <Radio key={mode} value={mode}>
@@ -30,14 +30,16 @@ const CreateMatchModeSelector: React.FC<CreateMatchModeSelectorProps> = ({
                   {({ isSelected }) => (
                     <span
                       className={`block size-2.5 rounded-full bg-[#409eff] transition-all duration-200 ease-out ${
-                        isSelected ? "scale-100 opacity-100" : "scale-0 opacity-0"
+                        isSelected
+                          ? "scale-100 opacity-100"
+                          : "scale-0 opacity-0"
                       }`}
                     />
                   )}
                 </Radio.Indicator>
               </Radio.Control>
               <span
-                className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
+                className={`bs-text-title text-pkpk-sub-font transition-all duration-200 ease-out ${
                   selectedMatchMode === mode ? "opacity-100" : "opacity-45"
                 }`}
               >

@@ -1,8 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button, Drawer, Separator } from "@heroui/react";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type { MatchMode } from "@pkpkdupr/shared/match";
-import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
+import {
+  computeMatchStartsAt,
+  DEFAULT_MATCH_MODE,
+} from "@pkpkdupr/shared/match";
 import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
@@ -41,30 +50,40 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   closeQrScannerRequestKey = 0,
 }) => {
   const { player, token } = useAuth();
-  const [selectedMatchMembers, setSelectedMatchMembers] = useState<MatchMember[]>([]);
+  const [selectedMatchMembers, setSelectedMatchMembers] = useState<
+    MatchMember[]
+  >([]);
   const [teams, setTeams] = useState<MatchTeams>(() => createEmptyTeams());
-  const [selectedSwapMemberId, setSelectedSwapMemberId] = useState<string | null>(null);
+  const [selectedSwapMemberId, setSelectedSwapMemberId] = useState<
+    string | null
+  >(null);
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [createMatchError, setCreateMatchError] = useState<string | null>(null);
   const [matchNameMode, setMatchNameMode] = useState<"auto" | "manual">("auto");
   const [matchName, setMatchName] = useState("");
   const [selectedMatchMode, setSelectedMatchMode] =
     useState<MatchMode>(DEFAULT_MATCH_MODE);
+  const matchStartsAt = useMemo(() => computeMatchStartsAt(), []);
   const selectedMatchMembersRef = useRef<MatchMember[]>(selectedMatchMembers);
 
-  const currentPlayerMember = useMemo(() => normalizeMatchMember(player), [player]);
+  const currentPlayerMember = useMemo(
+    () => normalizeMatchMember(player),
+    [player],
+  );
   const selectedMatchType = useMemo(
     () => resolveSelectedMatchType(selectedMatchMembers),
     [selectedMatchMembers],
   );
   const trimmedMatchName = matchName.trim();
-  const isManualMatchNameEmpty = matchNameMode === "manual" && !trimmedMatchName;
+  const isManualMatchNameEmpty =
+    matchNameMode === "manual" && !trimmedMatchName;
   const canCreateMatch =
     isOnline &&
     !!selectedMatchType &&
     areTeamsValid(teams, selectedMatchType) &&
     !isManualMatchNameEmpty;
-  const canAddMatchMember = isOnline && !!token && selectedMatchMembers.length < 4;
+  const canAddMatchMember =
+    isOnline && !!token && selectedMatchMembers.length < 4;
   const previewTeams = useMemo(
     () => buildPreviewTeams(selectedMatchMembers, teams, selectedMatchType),
     [selectedMatchMembers, selectedMatchType, teams],
@@ -90,7 +109,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
     const nextMembers = mergeUniqueMembers([
       currentPlayerMember,
-      ...selectedMatchMembers.filter((member) => member.id !== currentPlayerMember.id),
+      ...selectedMatchMembers.filter(
+        (member) => member.id !== currentPlayerMember.id,
+      ),
     ]).slice(0, 4);
 
     if (areSameMatchMembers(selectedMatchMembers, nextMembers)) {
@@ -176,13 +197,19 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       return;
     }
 
-    if (!canSwapMembers(teams, selectedMatchType, selectedSwapMemberId, member)) {
+    if (
+      !canSwapMembers(teams, selectedMatchType, selectedSwapMemberId, member)
+    ) {
       return;
     }
 
     setTeams((prev) => {
-      const sourceMember = prev.flat().find((teamMember) => teamMember.id === selectedSwapMemberId);
-      const targetMember = prev.flat().find((teamMember) => teamMember.id === member.id);
+      const sourceMember = prev
+        .flat()
+        .find((teamMember) => teamMember.id === selectedSwapMemberId);
+      const targetMember = prev
+        .flat()
+        .find((teamMember) => teamMember.id === member.id);
 
       if (!sourceMember || !targetMember) {
         return prev;
@@ -240,6 +267,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           })),
           location: "Court TBD",
           scheduledAt: new Date().toISOString(),
+          matchStartsAt: matchStartsAt.toISOString(),
         }),
       });
 
@@ -273,6 +301,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   return (
     <>
+      <h2 className="bs-text-head px-5 pt-4 text-center text-pkpk-sub-font">
+        매치 생성
+      </h2>
       <Drawer.Body className="flex flex-col gap-5 px-5 pb-4">
         {isQrScannerOpen ? (
           <CreateMatchQrScannerPanel
@@ -300,9 +331,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         ) : (
           <>
             <section className="flex flex-col gap-2">
-              <div className="relative mt-8 flex items-start justify-between gap-3">
+              <div className="relative mt-4 flex items-start justify-between gap-3">
                 <div>
-                  <p className="bs-text-title text-amber-950">팀 구성</p>
+                  <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
                 </div>
                 <button
                   type="button"
@@ -322,7 +353,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
               {selectedMatchType ? (
                 <>
-                  <p className="bs-text-caption text-amber-700/70">
+                  <p className="bs-text-caption text-pkpk-sub-font">
                     {selectedSwapMemberId
                       ? "교체할 상대 팀 멤버를 선택하세요."
                       : "멤버를 탭해서 팀을 교체할 수 있어요."}
@@ -345,11 +376,24 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             />
 
             <section className="flex flex-col gap-2">
-              <p className="bs-text-title text-amber-950">매치 이름</p>
+              <p className="bs-text-title text-pkpk-sub-font">
+                매치 시작(자동)
+              </p>
+              <p className="bs-text-body pt-1 text-slate-500">
+                {matchStartsAt.toLocaleTimeString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </p>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <p className="bs-text-title text-pkpk-sub-font">매치 이름</p>
               <div
                 role="radiogroup"
                 aria-label="매치 이름 입력 방식"
-                className="flex items-center gap-5"
+                className="flex items-start gap-5"
               >
                 <label className="flex shrink-0 cursor-pointer items-center gap-2 py-1">
                   <input
@@ -370,14 +414,14 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                     />
                   </span>
                   <span
-                    className={`bs-text-title text-amber-950 transition-all duration-200 ease-out ${
+                    className={`bs-text-title text-pkpk-sub-font transition-all duration-200 ease-out ${
                       matchNameMode === "auto" ? "opacity-100" : "opacity-45"
                     }`}
                   >
                     자동
                   </span>
                 </label>
-                <div className="flex min-w-0 flex-1 items-center gap-2 py-1">
+                <div className="flex min-w-0 flex-1 items-start gap-2 pt-1">
                   <label
                     aria-label="수동 입력"
                     className="flex shrink-0 cursor-pointer items-center"
@@ -409,7 +453,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                       setCreateMatchError(null);
                     }}
                     placeholder="매치 이름 입력"
-                    className="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-3 text-base text-amber-950 outline-none"
+                    className="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-2 text-base text-pkpk-sub-font outline-none"
                   />
                 </div>
               </div>
@@ -424,9 +468,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           </div>
           <Drawer.Footer className="flex flex-col gap-2 px-5 pt-3">
             {createMatchError ? (
-              <p className="bs-text-body text-error">
-                {createMatchError}
-              </p>
+              <p className="bs-text-body text-error">{createMatchError}</p>
             ) : null}
             <div className="grid w-full grid-cols-3 gap-2">
               <Button

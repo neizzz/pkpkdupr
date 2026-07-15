@@ -38,7 +38,7 @@ const CreateMatchTeamGrid: React.FC<CreateMatchTeamGridProps> = ({
           key={typedTeamIndex}
           className="rounded-2xl border border-border bg-white px-3 py-3"
         >
-          <p className="bs-text-caption font-semibold uppercase tracking-wide text-amber-700/70">
+          <p className="bs-text-caption font-semibold uppercase tracking-wide text-pkpk-sub-font">
             Team {typedTeamIndex === 0 ? "A" : "B"}
           </p>
           <div className="mt-2 flex flex-col gap-2">
@@ -58,7 +58,10 @@ const CreateMatchTeamGrid: React.FC<CreateMatchTeamGridProps> = ({
                 <div key={member.id} className="w-full max-w-full rounded-full">
                   <UserChip
                     player={member}
-                    onRemove={isMe ? undefined : () => onRemoveMember(member.id)}
+                    chipWidthClass="w-[clamp(5.5rem,38vw,9rem)]"
+                    onRemove={
+                      isMe ? undefined : () => onRemoveMember(member.id)
+                    }
                     isMe={isMe}
                     reserveRemoveSlot={isMe}
                     onPress={

@@ -946,7 +946,7 @@ const BottomNav: React.FC = () => {
               <Tabs.Tab
                 id="match"
                 onClick={() => handleActiveTabClick("match")}
-                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-[#409eff]"
+                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
                   <IoTennisballOutline className="text-base" />
@@ -957,7 +957,7 @@ const BottomNav: React.FC = () => {
               <Tabs.Tab
                 id="members"
                 onClick={() => handleActiveTabClick("members")}
-                className="min-h-[2.8rem] w-full text-default-500 data-[selected=true]:text-[#409eff]"
+                className="min-h-[2.8rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
                   <IoPeopleOutline className="text-base" />
@@ -968,7 +968,7 @@ const BottomNav: React.FC = () => {
               <Tabs.Tab
                 id="me"
                 onClick={() => handleActiveTabClick("me")}
-                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-[#409eff]"
+                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
                   <IoPersonCircleOutline className="text-base" />
@@ -989,7 +989,7 @@ const BottomNav: React.FC = () => {
               className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-lg transition-colors ${
                 isGlobalMenuVisible
                   ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
-                  : "bg-[#409eff] hover:bg-[#409eff]/90"
+                  : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
               }`}
             >
               <IoAdd
@@ -1017,7 +1017,7 @@ const BottomNav: React.FC = () => {
                   textValue="QR code"
                   isDisabled={!isOnline}
                 >
-                  <IoQrCodeSharp className="size-4 shrink-0 text-amber-700" />
+                  <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
                   <Label>QR 코드</Label>
                 </Dropdown.Item>
                 <Dropdown.Item
@@ -1025,11 +1025,11 @@ const BottomNav: React.FC = () => {
                   textValue="Create match"
                   isDisabled={!isOnline}
                 >
-                  <IoAddCircleOutline className="size-4 shrink-0 text-amber-700" />
+                  <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
                   <Label>매치 생성</Label>
                 </Dropdown.Item>
                 <Dropdown.Item id="settings" textValue="Settings">
-                  <IoSettingsOutline className="size-4 shrink-0 text-amber-700" />
+                  <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
                   <Label>설정</Label>
                 </Dropdown.Item>
               </Dropdown.Menu>
@@ -1067,21 +1067,21 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}
-            className="app-panel-bottom-pad min-h-full bg-gray-50 data-[inert=true]:hidden"
+            className="app-panel-bottom-pad min-h-full bg-pkpk-bg p-0 data-[inert=true]:hidden"
           >
             <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
-            className="app-panel-bottom-pad min-h-full bg-gray-50 data-[inert=true]:hidden"
+            className="app-panel-bottom-pad min-h-full bg-pkpk-bg p-0 data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"
             shouldForceMount={visitedTabs.me}
-            className="app-panel-bottom-pad min-h-full bg-white data-[inert=true]:hidden"
+            className="app-panel-bottom-pad min-h-full bg-pkpk-bg p-0 data-[inert=true]:hidden"
           >
             <Me />
           </Tabs.Panel>

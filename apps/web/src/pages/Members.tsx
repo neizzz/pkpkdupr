@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Avatar from "@/components/Avatar";
 import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
+import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
@@ -45,8 +46,9 @@ const Members: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [selectedMemberMatchStats, setSelectedMemberMatchStats] =
-    useState(createEmptyMatchStats);
+  const [selectedMemberMatchStats, setSelectedMemberMatchStats] = useState(
+    createEmptyMatchStats,
+  );
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
 
@@ -232,72 +234,72 @@ const Members: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-full p-2">
-      <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-amber-950">Members</h2>
-          {notice ? (
-            <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-              {notice}
-            </p>
-          ) : null}
-        </div>
+    <>
+      <TabPanelHeader title="Members" />
+      <div className="flex min-h-full p-2">
+        <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
+          <div>
+            {notice ? (
+              <p className="mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-pkpk-sub-font">
+                {notice}
+              </p>
+            ) : null}
+          </div>
 
-        <div className="flex flex-1 flex-col">
-          {isLoading ? (
-            <TabPanelStatus ariaLabel="멤버 목록 로딩 중" isLoading />
-          ) : error ? (
-            <TabPanelStatus message={error} tone="error" />
-          ) : members.length === 0 ? (
-            <TabPanelStatus message="현재 표시할 멤버가 없어요." />
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {members.map((member) => {
-                const rating = member.duprRating;
-                const singlesRating = getCompositeSinglesRating(rating);
-                const doublesRating = getCompositeDoublesRating(
-                  rating,
-                );
+          <div className="flex flex-1 flex-col">
+            {isLoading ? (
+              <TabPanelStatus ariaLabel="멤버 목록 로딩 중" isLoading />
+            ) : error ? (
+              <TabPanelStatus message={error} tone="error" />
+            ) : members.length === 0 ? (
+              <TabPanelStatus message="현재 표시할 멤버가 없어요." />
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {members.map((member) => {
+                  const rating = member.duprRating;
+                  const singlesRating = getCompositeSinglesRating(rating);
+                  const doublesRating = getCompositeDoublesRating(rating);
 
-                return (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => openMemberProfile(member.id)}
-                    className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-white/90 px-3 py-3 text-left shadow-sm transition-colors hover:bg-amber-50"
-                  >
-                    <Avatar
-                      size="sm"
-                      avatarUrl={member.avatarUrl}
-                      name={member.username}
-                      isMe={member.id === player?.id}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="min-w-0">
-                        <p className="truncate text-base font-semibold text-amber-950">
-                          {member.username}
-                        </p>
+                  return (
+                    <button
+                      key={member.id}
+                      type="button"
+                      onClick={() => openMemberProfile(member.id)}
+                      className="flex min-w-0 items-start gap-2.5 rounded-2xl bg-white/90 px-3 py-3 text-left shadow-sm transition-colors hover:bg-amber-50"
+                    >
+                      <Avatar
+                        size="sm"
+                        avatarUrl={member.avatarUrl}
+                        name={member.username}
+                        isMe={member.id === player?.id}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-pkpk-sub-font">
+                            {member.username}
+                          </p>
+                        </div>
+
+                        <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-[#888]">
+                          <span className="font-bold">S</span>
+                          <span className="tabular-nums">
+                            {formatRating(singlesRating)}
+                          </span>
+                          <span className="font-bold">D</span>
+                          <span className="tabular-nums">
+                            {formatRating(doublesRating)}
+                          </span>
+                        </div>
                       </div>
-
-                      <div className="mt-2 grid grid-cols-[0.75rem_auto] gap-x-1.5 gap-y-1 text-sm font-normal text-[#888]">
-                        <span className="font-bold">S</span>
-                        <span className="tabular-nums">
-                          {formatRating(singlesRating)}
-                        </span>
-                        <span className="font-bold">D</span>
-                        <span className="tabular-nums">
-                          {formatRating(doublesRating)}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

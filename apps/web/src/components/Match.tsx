@@ -130,7 +130,7 @@ const Match: React.FC<MatchProps> = ({
         >
           {statusLabelMap[match.status]}
         </span>
-        <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-amber-950">
+        <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-sub-font">
           {displayTitle}
         </p>
         {sessionLabel ? (
@@ -174,7 +174,7 @@ const Match: React.FC<MatchProps> = ({
                 </div>
               </div>
             ))}
-            <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-amber-950">
+            <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-pkpk-sub-font">
               <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
                 {displayedTeamSetScores[0]}
               </span>

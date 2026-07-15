@@ -45,7 +45,7 @@ const AppSettingsSheetBody: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="bs-text-head text-center text-amber-950">앱 설정</h2>
+      <h2 className="bs-text-head text-center text-pkpk-sub-font">앱 설정</h2>
 
       {(message || error) && (
         <div
@@ -58,20 +58,20 @@ const AppSettingsSheetBody: React.FC = () => {
       )}
 
       {!isOnline ? (
-        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-amber-700">
+        <div className="bs-text-body rounded-2xl bg-amber-50 px-3 py-2 text-pkpk-sub-font">
           오프라인에서는 업데이트 확인이 제한됩니다.
         </div>
       ) : null}
 
       <section className="flex flex-col gap-4">
         <div>
-          <h3 className="bs-text-title text-amber-950">앱 버전</h3>
+          <h3 className="bs-text-title text-pkpk-sub-font">앱 버전</h3>
           <p className="mt-1 text-sm font-semibold text-[#666]">{appVersion}</p>
         </div>
 
         <div className="flex flex-col gap-3">
           <div>
-            <h3 className="bs-text-title text-amber-950">업데이트</h3>
+            <h3 className="bs-text-title text-pkpk-sub-font">업데이트</h3>
             <p className="mt-1 text-sm text-[#666]">
               {isUpdateAvailable
                 ? "새 버전이 준비되어 있어요. 업데이트 후 다시 불러옵니다."

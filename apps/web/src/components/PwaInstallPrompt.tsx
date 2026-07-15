@@ -166,7 +166,7 @@ const PwaInstallPrompt: React.FC = () => {
       >
         <Alert.Indicator className="shrink-0 self-center" />
         <Alert.Content className="min-w-0 gap-0 self-center">
-          <Alert.Title className="text-sm font-bold text-amber-950">
+          <Alert.Title className="text-sm font-bold text-pkpk-sub-font">
             {installPrompt.title}
           </Alert.Title>
           {installPrompt.kind === "ios-safari" ? (

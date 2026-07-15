@@ -55,7 +55,7 @@ const Avatar: React.FC<AvatarProps> = ({
           className="rounded-full object-cover"
         />
       ) : null}
-      <HeroUiAvatar.Fallback className="flex items-center justify-center rounded-full bg-gray-100 text-amber-600 shadow-inner">
+      <HeroUiAvatar.Fallback className="flex items-center justify-center rounded-full bg-gray-100 text-pkpk-sub-font shadow-inner">
         <IoPerson className={iconSizeMap[size]} />
       </HeroUiAvatar.Fallback>
     </HeroUiAvatar>
