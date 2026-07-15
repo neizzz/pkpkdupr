@@ -687,14 +687,20 @@ const BottomNav: React.FC = () => {
     selectedTab,
   ]);
 
-  const resetPullToRefresh = useCallback((status: PullToRefreshStatus = "idle") => {
-    pullStartRef.current = null;
-    pullDistanceRef.current = 0;
-    isPullGestureActiveRef.current = false;
-    pullGestureAxisRef.current = "undecided";
-    setPullDistance(0);
-    setPullToRefreshStatus(status);
-  }, []);
+  const resetPullToRefresh = useCallback(
+    (status: PullToRefreshStatus = "idle") => {
+      pullStartRef.current = null;
+      pullDistanceRef.current = 0;
+      isPullGestureActiveRef.current = false;
+      pullGestureAxisRef.current = "undecided";
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.overflow = "";
+      }
+      setPullDistance(0);
+      setPullToRefreshStatus(status);
+    },
+    [],
+  );
 
   const schedulePullToRefreshReset = useCallback(
     (status: PullToRefreshStatus, delay: number) => {
@@ -724,34 +730,13 @@ const BottomNav: React.FC = () => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
 
-    const preventScrollWhilePullIndicatorVisible = (event: TouchEvent) => {
-      if (pullStartRef.current && isPullGestureActiveRef.current) {
-        event.preventDefault();
-      }
-    };
-
-    scrollContainer.addEventListener(
-      "touchmove",
-      preventScrollWhilePullIndicatorVisible,
-      { passive: false },
-    );
-
-    return () => {
-      scrollContainer.removeEventListener(
-        "touchmove",
-        preventScrollWhilePullIndicatorVisible,
-      );
-    };
-  }, []);
-
-  const handlePullTouchStart = useCallback(
-    (event: React.TouchEvent<HTMLDivElement>) => {
+    const handleTouchStart = (event: TouchEvent) => {
       if (
         event.touches.length !== 1 ||
         isPullRefreshingRef.current ||
         hasBlockingLayer ||
         !pullToRefreshHandlersRef.current[selectedTab] ||
-        (scrollContainerRef.current?.scrollTop ?? 0) > 0
+        (scrollContainer.scrollTop ?? 0) > 0
       ) {
         return;
       }
@@ -767,9 +752,33 @@ const BottomNav: React.FC = () => {
       pullDistanceRef.current = 0;
       isPullGestureActiveRef.current = false;
       pullGestureAxisRef.current = "undecided";
-    },
-    [hasBlockingLayer, selectedTab],
-  );
+    };
+
+    const preventScrollWhilePullIndicatorVisible = (event: TouchEvent) => {
+      if (pullStartRef.current && isPullGestureActiveRef.current) {
+        if (event.cancelable) {
+          event.preventDefault();
+        }
+      }
+    };
+
+    scrollContainer.addEventListener("touchstart", handleTouchStart, {
+      passive: false,
+    });
+    scrollContainer.addEventListener(
+      "touchmove",
+      preventScrollWhilePullIndicatorVisible,
+      { passive: false },
+    );
+
+    return () => {
+      scrollContainer.removeEventListener("touchstart", handleTouchStart);
+      scrollContainer.removeEventListener(
+        "touchmove",
+        preventScrollWhilePullIndicatorVisible,
+      );
+    };
+  }, [hasBlockingLayer, selectedTab]);
 
   const updatePullDistance = useCallback(
     (touch: React.Touch) => {
@@ -811,6 +820,9 @@ const BottomNav: React.FC = () => {
       pullDistanceRef.current = distance;
       if (distance > 0) {
         isPullGestureActiveRef.current = true;
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.style.overflow = "hidden";
+        }
       }
       setPullDistance(distance);
       setPullToRefreshStatus(
@@ -869,7 +881,12 @@ const BottomNav: React.FC = () => {
     } catch {
       schedulePullToRefreshReset("error", 1600);
     }
-  }, [hasBlockingLayer, resetPullToRefresh, schedulePullToRefreshReset, selectedTab]);
+  }, [
+    hasBlockingLayer,
+    resetPullToRefresh,
+    schedulePullToRefreshReset,
+    selectedTab,
+  ]);
 
   const handlePullTouchEnd = useCallback(
     (event: React.TouchEvent<HTMLDivElement>) => {
@@ -1038,7 +1055,6 @@ const BottomNav: React.FC = () => {
         <div
           ref={scrollContainerRef}
           className="app-scroll-area app-tab-panel-scroll-area relative flex-1"
-          onTouchStart={handlePullTouchStart}
           onTouchMove={handlePullTouchMove}
           onTouchEnd={handlePullTouchEnd}
           onTouchCancel={() => resetPullToRefresh()}
