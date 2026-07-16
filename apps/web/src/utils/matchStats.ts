@@ -1,10 +1,18 @@
 import { getMatchTopLevelType } from "@pkpkdupr/shared/match";
 import type { MatchInfo } from "@/components/Match";
-import type { MemberProfileMatchStats } from "@/components/MemberProfile";
+import type {
+  MemberProfileMatchStats,
+  MemberProfileRatingDelta,
+} from "@/components/MemberProfile";
 
 export const createEmptyMatchStats = (): MemberProfileMatchStats => ({
-  singles: { wins: 0, losses: 0 },
-  doubles: { wins: 0, losses: 0 },
+  singles: { matchWins: 0, matchLosses: 0, setWins: 0, setLosses: 0 },
+  doubles: { matchWins: 0, matchLosses: 0, setWins: 0, setLosses: 0 },
+});
+
+export const createEmptyRatingDelta = (): MemberProfileRatingDelta => ({
+  singles: { last7Days: 0, last30Days: 0 },
+  doubles: { last7Days: 0, last30Days: 0 },
 });
 
 const getWinningTeamIndex = (scores: MatchInfo["scores"]): 0 | 1 | null => {
@@ -66,12 +74,66 @@ export const buildMatchStats = (
       return;
     }
 
+    const category = getMatchTopLevelType(match.type);
+
     if (playerTeamIndex === winningTeamIndex) {
-      stats[getMatchTopLevelType(match.type)].wins += 1;
+      stats[category].matchWins += 1;
     } else {
-      stats[getMatchTopLevelType(match.type)].losses += 1;
+      stats[category].matchLosses += 1;
+    }
+
+    if (match.scores) {
+      for (const score of match.scores) {
+        const setWinner =
+          score.scoreA > score.scoreB
+            ? 0
+            : score.scoreB > score.scoreA
+              ? 1
+              : null;
+        if (setWinner === null) continue;
+
+        if (setWinner === playerTeamIndex) {
+          stats[category].setWins += 1;
+        } else {
+          stats[category].setLosses += 1;
+        }
+      }
     }
   });
 
   return stats;
+};
+
+export const buildRatingDelta = (
+  matches: MatchInfo[],
+  playerId: string,
+): MemberProfileRatingDelta => {
+  const delta = createEmptyRatingDelta();
+  const now = Date.now();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+
+  for (const match of matches) {
+    if (match.status !== "completed" || !match.ratingChanges) {
+      continue;
+    }
+
+    const change = match.ratingChanges.find((c) => c.playerId === playerId);
+    if (!change) continue;
+
+    const changeDate = new Date(change.createdAt).getTime();
+    const category = getMatchTopLevelType(match.type);
+
+    const categoryDelta =
+      category === "singles" ? change.delta.singles : change.delta.doubles;
+
+    if (now - changeDate <= sevenDaysMs) {
+      delta[category].last7Days += categoryDelta;
+    }
+    if (now - changeDate <= thirtyDaysMs) {
+      delta[category].last30Days += categoryDelta;
+    }
+  }
+
+  return delta;
 };
