@@ -92,6 +92,8 @@ jobs:
         with:
           context: .
           file: apps/admin-web/Dockerfile
+          build-args: |
+            VITE_APP_VERSION=${{ env.APP_VERSION }}
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/pkpkdupr-admin-web:${{ env.IMAGE_TAG }}

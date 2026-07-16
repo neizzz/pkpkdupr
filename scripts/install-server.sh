@@ -174,6 +174,15 @@ mkdir -p "$(dirname "${SWAG_TARGET}")"
 sed "s/__DOMAIN__/${DOMAIN_VALUE}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
 echo "✅ SWAG site config 동기화 완료: ${SWAG_TARGET}"
 
+if [[ -z "${VITE_APP_VERSION:-}" ]]; then
+  VITE_APP_VERSION="$(git -C "${SOURCE_REPO_ROOT}" describe --tags --abbrev=0 2>/dev/null || echo "")"
+  if [[ -z "${VITE_APP_VERSION}" ]]; then
+    VITE_APP_VERSION="0.0.0+$(git -C "${SOURCE_REPO_ROOT}" rev-parse --short=8 HEAD 2>/dev/null || echo unknown)"
+  fi
+  export VITE_APP_VERSION
+  echo "ℹ️ VITE_APP_VERSION=${VITE_APP_VERSION} (git tag 기반 자동 결정)"
+fi
+
 echo "🚀 전체 서비스 배포 중..."
 docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" up -d --build
 docker compose --env-file "${ENV_FILE}" "${COMPOSE_FILES[@]}" restart proxy

@@ -12,8 +12,10 @@ RUN corepack enable \
   && corepack prepare pnpm@11.7.0 --activate \
   && pnpm install --frozen-lockfile
 COPY . .
+ARG VITE_APP_VERSION=
 ENV VITE_BASE_PATH=/admin/
 ENV VITE_PROTECTED_ADMIN_USERNAME=admin
+ENV VITE_APP_VERSION=${VITE_APP_VERSION}
 RUN pnpm --filter @pkpkdupr/admin-web build
 
 FROM nginx:1.27-alpine

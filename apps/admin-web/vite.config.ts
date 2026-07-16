@@ -16,6 +16,8 @@ const fallbackAppVersion =
   ).version ?? "0.0.0";
 
 const appVersion = (() => {
+  const envVersion = process.env.VITE_APP_VERSION?.trim();
+  if (envVersion) return envVersion;
   try {
     return execSync("git describe --tags --abbrev=0", {
       cwd: __dirname,
@@ -27,25 +29,25 @@ const appVersion = (() => {
 })();
 
 export default defineConfig({
-    define: {
-        __APP_VERSION__: JSON.stringify(appVersion),
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
+  base: basePath,
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      "@pkpkdupr/shared": path.resolve(__dirname, "../../packages/shared/src"),
     },
-    base: basePath,
-    plugins: [react(), tailwindcss()],
-    resolve: {
-        alias: {
-             "@": path.resolve(__dirname, "./src"),
-             "@pkpkdupr/shared": path.resolve(__dirname, "../../packages/shared/src"),
-         },
-     },
-    server: {
-        host: "0.0.0.0",
-        port: 3100,
-        proxy: {
-             "/api": {
-                target: "http://localhost:4000",
-                changeOrigin: true,
-             },
-         },
-     },
+  },
+  server: {
+    host: "0.0.0.0",
+    port: 3100,
+    proxy: {
+      "/api": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
+    },
+  },
 });
