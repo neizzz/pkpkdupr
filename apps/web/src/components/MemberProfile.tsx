@@ -100,7 +100,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   });
 
   const handleCardClick = (type: MatchTopLevelType) => {
-    setExpandedType((current) => (current === type ? null : type));
+    setExpandedType(type);
   };
 
   const expandedItem = duprItems.find((item) => item.type === expandedType);
@@ -133,7 +133,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
       {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
       <div className="p-2">
         <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
-          <div className="flex flex-col items-center gap-2 pt-5">
+          <div className="flex flex-col items-center gap-2 pt-5 mb-1">
             <Avatar
               size="lg"
               avatarUrl={player?.avatarUrl}

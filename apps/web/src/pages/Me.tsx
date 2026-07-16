@@ -156,9 +156,8 @@ const Me: React.FC = () => {
       return;
     }
 
-    if (!closeDepth("me", "me-settings")) {
-      setIsSettingsOpen(false);
-    }
+    closeDepth("me", "me-settings");
+    setIsSettingsOpen(false);
   };
 
   const settingsButton = (

@@ -416,9 +416,8 @@ const BottomNav: React.FC = () => {
         return;
       }
 
-      if (!closeDepth(globalMenuTabKey, "global-menu")) {
-        setIsGlobalMenuOpen(false);
-      }
+      closeDepth(globalMenuTabKey, "global-menu");
+      setIsGlobalMenuOpen(false);
     },
     [closeDepth, globalMenuTabKey, openGlobalMenu],
   );
@@ -430,9 +429,8 @@ const BottomNav: React.FC = () => {
         return;
       }
 
-      if (!closeDepth(qrTabKey, "qr-sheet")) {
-        setIsQrOpen(false);
-      }
+      closeDepth(qrTabKey, "qr-sheet");
+      setIsQrOpen(false);
     },
     [closeDepth, openQrSheet, qrTabKey],
   );
@@ -449,9 +447,8 @@ const BottomNav: React.FC = () => {
         return;
       }
 
-      if (!closeDepth(createMatchTabKey, "create-match-sheet")) {
-        setIsCreateMatchOpen(false);
-      }
+      closeDepth(createMatchTabKey, "create-match-sheet");
+      setIsCreateMatchOpen(false);
     },
     [closeDepth, createMatchTabKey, openCreateMatchSheet],
   );
@@ -463,9 +460,8 @@ const BottomNav: React.FC = () => {
         return;
       }
 
-      if (!closeDepth(appSettingsTabKey, "app-settings-sheet")) {
-        setIsAppSettingsOpen(false);
-      }
+      closeDepth(appSettingsTabKey, "app-settings-sheet");
+      setIsAppSettingsOpen(false);
     },
     [appSettingsTabKey, closeDepth, openAppSettingsSheet],
   );
