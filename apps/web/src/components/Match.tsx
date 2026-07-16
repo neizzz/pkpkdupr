@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Card } from "@heroui/react";
-import { IoChevronForward } from "react-icons/io5";
+import { IoCalendarClearOutline, IoChevronForward } from "react-icons/io5";
 import type { Match as SharedMatch, MatchStatus } from "@pkpkdupr/shared/match";
 import {
   getMatchTopLevelType,
@@ -72,6 +72,24 @@ const formatDateOnly = (value: string) =>
     .replace(/\.\s/g, ".")
     .replace(/\.$/, "");
 
+const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+const formatMatchDateTime = (value: string | Date) => {
+  const parts = dateTimeFormatter.formatToParts(new Date(value));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    date: `${get("year")}.${get("month")}.${get("day")}`,
+    time: `${get("hour")}:${get("minute")}`,
+  };
+};
+
 const getTeamSetScore = (scores: MatchInfo["scores"], teamIndex: 0 | 1) =>
   (scores ?? []).filter((score) =>
     teamIndex === 0 ? score.scoreA > score.scoreB : score.scoreB > score.scoreA,
@@ -117,6 +135,9 @@ const Match: React.FC<MatchProps> = ({
       ? `${match.session.name} · ${formatDateOnly(match.session.date)}`
       : formatDateOnly(match.session.date)
     : null;
+  const { date: matchDate, time: matchTime } = formatMatchDateTime(
+    match.matchStartsAt,
+  );
 
   const card = (
     <Card
@@ -125,11 +146,34 @@ const Match: React.FC<MatchProps> = ({
       }`}
     >
       <div className="min-w-0">
-        <span
-          className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}
-        >
-          {statusLabelMap[match.status]}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-0.5 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums ${subTextClassName}`}
+          >
+            <IoCalendarClearOutline className="size-3.5" />
+            {matchDate}
+          </span>
+          <span
+            className={`text-[0.75rem] font-bold leading-none ${subTextClassName}`}
+          >
+            ·
+          </span>
+          <span
+            className={`text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums ${subTextClassName}`}
+          >
+            {matchTime}
+          </span>
+          <span
+            className={`text-[0.75rem] font-bold leading-none ${subTextClassName}`}
+          >
+            ·
+          </span>
+          <span
+            className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}
+          >
+            {statusLabelMap[match.status]}
+          </span>
+        </div>
         <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-main-font">
           {displayTitle}
         </p>
@@ -142,7 +186,7 @@ const Match: React.FC<MatchProps> = ({
         ) : null}
       </div>
 
-      <div className="mt-3 w-full">
+      <div className="mt-1 w-full">
         {shouldShowTeamSetScores ? (
           <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5">
             {match.teams.map((team, index) => (
@@ -155,12 +199,9 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-pkpk-dupr-font`}
+                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-dupr-font`}
                 >
-                  DUPR{" "}
-                  <span className="font-bold">
-                    {formatRating(teamAverageDuprs[index])}
-                  </span>
+                  {formatRating(teamAverageDuprs[index])}
                 </p>
                 <div className="flex min-w-0 flex-col gap-1">
                   {team.players.map((teamPlayer) => (
@@ -196,12 +237,9 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-pkpk-dupr-font`}
+                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-dupr-font`}
                 >
-                  DUPR{" "}
-                  <span className="font-bold">
-                    {formatRating(teamAverageDuprs[index])}
-                  </span>
+                  {formatRating(teamAverageDuprs[index])}
                 </p>
                 {team.players.map((teamPlayer) => (
                   <UserChip
