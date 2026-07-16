@@ -65,6 +65,7 @@ export interface CreateMatchInput {
   scores?: MatchScore[];
   location: string;
   scheduledAt: Date;
+  matchStartsAt: Date;
   completedAt: Date | null;
   resultSubmittedByPlayerId?: string | null;
   resultSubmittedAt?: Date | null;
@@ -142,7 +143,10 @@ const parseParticipantDuprSnapshot = (
   }
 };
 
-const areScoresEqual = (currentScores: MatchScore[] = [], nextScores: MatchScore[]) =>
+const areScoresEqual = (
+  currentScores: MatchScore[] = [],
+  nextScores: MatchScore[],
+) =>
   currentScores.length === nextScores.length &&
   currentScores.every(
     (currentScore, index) =>
@@ -223,6 +227,7 @@ export class MatchRepository {
       status: data.status,
       location: data.location,
       scheduledAt: new Date(data.scheduledAt),
+      matchStartsAt: new Date(data.matchStartsAt),
       completedAt: toDateOrNull(data.completedAt),
       resultSubmittedByPlayerId: data.resultSubmittedByPlayerId ?? null,
       resultSubmittedAt: toDateOrNull(data.resultSubmittedAt),
@@ -298,7 +303,10 @@ export class MatchRepository {
       throw new CompletedMatchResultEditError();
     }
 
-    if (existing.status !== "created" && existing.status !== "pending-approval") {
+    if (
+      existing.status !== "created" &&
+      existing.status !== "pending-approval"
+    ) {
       throw new Error("결과를 입력할 수 없는 매치 상태입니다.");
     }
 
@@ -463,10 +471,7 @@ export class MatchRepository {
     return completed;
   }
 
-  async cancelApproval(
-    matchId: string,
-    playerId: string,
-  ): Promise<Match> {
+  async cancelApproval(matchId: string, playerId: string): Promise<Match> {
     const existing = await this.findById(matchId);
     if (!existing) {
       throw new Error("매치를 찾을 수 없습니다.");
@@ -487,7 +492,9 @@ export class MatchRepository {
       throw new Error("매치 참여자만 합의를 취소할 수 있습니다.");
     }
 
-    if (!existing.approvals.some((approval) => approval.playerId === playerId)) {
+    if (
+      !existing.approvals.some((approval) => approval.playerId === playerId)
+    ) {
       throw new Error("취소할 합의 내역이 없습니다.");
     }
 
@@ -640,6 +647,7 @@ export class MatchRepository {
       approvals: approvals.map(toApproval),
       location: match.location,
       scheduledAt: toDate(match.scheduledAt),
+      matchStartsAt: toDate(match.matchStartsAt),
       createdAt: toDate(match.createdAt),
       completedAt: toDateOrNull(match.completedAt),
       updatedAt: toDate(match.updatedAt),

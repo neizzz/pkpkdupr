@@ -1,10 +1,13 @@
-import type { Match } from "@pkpkdupr/shared/match";
+import { computeMatchStartsAt, type Match } from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { MatchRepository } from "../repositories/MatchRepository";
-import { AuthService, type AuthenticatedSession } from "../services/AuthService";
+import {
+  AuthService,
+  type AuthenticatedSession,
+} from "../services/AuthService";
 
 const now = new Date("2026-07-08T10:00:00.000Z");
 
@@ -97,11 +100,14 @@ describe("POST /api/matches", () => {
   beforeEach(() => {
     capturedCreatePayload = null;
 
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
-      buildSession(),
-    );
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(buildSession());
     vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue(creator);
-    vi.spyOn(AuthService.prototype, "getPublicPlayers").mockResolvedValue(players);
+    vi.spyOn(AuthService.prototype, "getPublicPlayers").mockResolvedValue(
+      players,
+    );
     vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(creator);
     vi.spyOn(MatchRepository.prototype, "create").mockImplementation(
       async (input) => {
@@ -209,9 +215,10 @@ describe("POST /api/matches", () => {
           createdAt: now,
           updatedAt: now,
         });
-        vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
-          buildSession(femaleCreator),
-        );
+        vi.spyOn(
+          AuthService.prototype,
+          "authenticateAccessToken",
+        ).mockResolvedValue(buildSession(femaleCreator));
         vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue(
           femaleCreator,
         );
@@ -246,5 +253,72 @@ describe("POST /api/matches", () => {
 
     expect(response.status).toBe(201);
     expect(capturedCreatePayload?.type).toBe("mixed-doubles");
+  });
+
+  it("matchStartsAt을 보내면 해당 값이 사용된다", async () => {
+    const response = await request(app)
+      .post("/api/matches")
+      .set("Authorization", "Bearer test-token")
+      .send({
+        mode: "single-game",
+        teams: [
+          { name: "Team A", playerIds: [creator.id, "player-f-1"] },
+          { name: "Team B", playerIds: ["player-m-1", "player-f-2"] },
+        ],
+        scheduledAt: "2026-07-08T10:30:00.000Z",
+        matchStartsAt: "2026-07-08T11:00:00.000Z",
+      });
+
+    expect(response.status).toBe(201);
+    expect(capturedCreatePayload?.matchStartsAt).toEqual(
+      new Date("2026-07-08T11:00:00.000Z"),
+    );
+  });
+
+  it("matchStartsAt을 보내지 않으면 현재 시각 기준 30분 단위로 자동 계산된다", async () => {
+    const before = Date.now();
+
+    const response = await request(app)
+      .post("/api/matches")
+      .set("Authorization", "Bearer test-token")
+      .send({
+        mode: "single-game",
+        teams: [
+          { name: "Team A", playerIds: [creator.id, "player-f-1"] },
+          { name: "Team B", playerIds: ["player-m-1", "player-f-2"] },
+        ],
+        scheduledAt: "2026-07-08T10:30:00.000Z",
+      });
+
+    const after = Date.now();
+
+    expect(response.status).toBe(201);
+
+    const matchStartsAt = capturedCreatePayload?.matchStartsAt;
+    expect(matchStartsAt).toBeDefined();
+    expect(matchStartsAt!.getTime()).toBeGreaterThanOrEqual(
+      computeMatchStartsAt(new Date(before)).getTime(),
+    );
+    expect(matchStartsAt!.getTime()).toBeLessThanOrEqual(
+      computeMatchStartsAt(new Date(after)).getTime(),
+    );
+  });
+
+  it("유효하지 않은 matchStartsAt이면 400을 반환한다", async () => {
+    const response = await request(app)
+      .post("/api/matches")
+      .set("Authorization", "Bearer test-token")
+      .send({
+        mode: "single-game",
+        teams: [
+          { name: "Team A", playerIds: [creator.id, "player-f-1"] },
+          { name: "Team B", playerIds: ["player-m-1", "player-f-2"] },
+        ],
+        scheduledAt: "2026-07-08T10:30:00.000Z",
+        matchStartsAt: "not-a-date",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("유효한 매치 시작 시간이 필요합니다.");
   });
 });

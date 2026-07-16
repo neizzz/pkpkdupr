@@ -44,12 +44,16 @@ export const matchTopLevelTypeLabels: Record<MatchTopLevelType, string> = {
 export const isSinglesMatchType = (
   matchType: MatchType,
 ): matchType is (typeof singlesMatchTypeValues)[number] =>
-  singlesMatchTypeValues.includes(matchType as (typeof singlesMatchTypeValues)[number]);
+  singlesMatchTypeValues.includes(
+    matchType as (typeof singlesMatchTypeValues)[number],
+  );
 
 export const isDoublesMatchType = (
   matchType: MatchType,
 ): matchType is (typeof doublesMatchTypeValues)[number] =>
-  doublesMatchTypeValues.includes(matchType as (typeof doublesMatchTypeValues)[number]);
+  doublesMatchTypeValues.includes(
+    matchType as (typeof doublesMatchTypeValues)[number],
+  );
 
 export const getMatchTopLevelType = (
   matchType: MatchType,
@@ -178,6 +182,15 @@ export const validateMatchScoresForMode = (
   }
 };
 
+export const computeMatchStartsAt = (from: Date = new Date()): Date => {
+  const ms = from.getTime();
+  const intervalMs = 30 * 60 * 1000;
+  const remainder = ms % intervalMs;
+  return remainder === 0
+    ? new Date(ms)
+    : new Date(ms + (intervalMs - remainder));
+};
+
 export interface Match {
   id: string;
   type: MatchType;
@@ -194,6 +207,7 @@ export interface Match {
   approvals: MatchResultApproval[];
   location?: string;
   scheduledAt: Date;
+  matchStartsAt: Date;
   createdAt: Date;
   completedAt: Date | null;
   updatedAt: Date;

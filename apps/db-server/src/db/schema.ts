@@ -65,6 +65,7 @@ export const matches = sqliteTable("matches", {
   status: text("status").notNull(),
   location: text("location").notNull(),
   scheduledAt: integer("scheduled_at", { mode: "timestamp" }).notNull(),
+  matchStartsAt: integer("match_starts_at", { mode: "timestamp" }).notNull(),
   completedAt: integer("completed_at", { mode: "timestamp" }),
   resultSubmittedByPlayerId: text("result_submitted_by_player_id"),
   resultSubmittedAt: integer("result_submitted_at", { mode: "timestamp" }),
