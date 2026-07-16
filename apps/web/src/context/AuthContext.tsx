@@ -73,7 +73,10 @@ const persistAuthState = (
 ) => {
   localStorage.setItem(
     CACHED_AUTH_STATE_KEY,
-    JSON.stringify({ player, requiresPasswordChange } satisfies CachedAuthState),
+    JSON.stringify({
+      player,
+      requiresPasswordChange,
+    } satisfies CachedAuthState),
   );
 };
 
@@ -119,6 +122,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
       if (res.ok) {
         const data = (await res.json()) as MeResponse;
+        if (!data.id) {
+          throw new Error("Empty /api/me response");
+        }
         const {
           accessToken: refreshedAccessToken,
           isFirstLogin,

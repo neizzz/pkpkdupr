@@ -84,6 +84,7 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
+        importScripts: ["/cleanup-outdated-caches.js"],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [
@@ -94,22 +95,6 @@ export default defineConfig({
         ],
         runtimeCaching: [
           {
-            urlPattern:
-              /^https?:\/\/[^/]+\/api\/(?:me|players|matches)(?:\?.*)?$/,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "pkpkdupr-api-read-v1",
-              networkTimeoutSeconds: 3,
-              expiration: {
-                maxEntries: 30,
-                maxAgeSeconds: 24 * 60 * 60,
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
             urlPattern: /^https?:\/\/[^/]+\/uploads\/avatars\/.+$/,
             handler: "StaleWhileRevalidate",
             options: {
@@ -119,7 +104,7 @@ export default defineConfig({
                 maxAgeSeconds: 30 * 24 * 60 * 60,
               },
               cacheableResponse: {
-                statuses: [0, 200],
+                statuses: [200],
               },
             },
           },
