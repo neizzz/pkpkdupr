@@ -29,7 +29,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
   qrScannerStatus,
   qrScannerError,
   pendingQrMember,
-  currentPlayerId,
+  currentPlayerId: _currentPlayerId,
   onRetry,
   onConfirm,
   onClose,
@@ -76,7 +76,6 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
               size="sm"
               avatarUrl={pendingQrMember.avatarUrl}
               name={pendingQrMember.username}
-              isMe={pendingQrMember.id === currentPlayerId}
             />
             <div className="mt-3 min-w-0">
               <p className="truncate font-semibold text-pkpk-sub-font">

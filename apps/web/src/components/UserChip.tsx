@@ -10,6 +10,7 @@ interface UserChipProps {
   removeLabel?: string;
   isMe?: boolean;
   size?: "default" | "match";
+  chipWidthClass?: string;
   endAdornment?: React.ReactNode;
   reserveRemoveSlot?: boolean;
   onPress?: () => void;
@@ -24,6 +25,7 @@ const UserChip: React.FC<UserChipProps> = ({
   removeLabel,
   isMe = false,
   size = "default",
+  chipWidthClass,
   endAdornment,
   reserveRemoveSlot = false,
   onPress,
@@ -42,9 +44,11 @@ const UserChip: React.FC<UserChipProps> = ({
   const shouldReserveRemoveSlot = !!onRemove || reserveRemoveSlot;
   const canPress = isPressable && !isDisabled && !!onPress;
   const isMatchSize = size === "match";
-  const chipWidthClass = isMatchSize
-    ? "w-[clamp(6rem,32vw,10rem)]"
-    : "w-[clamp(4.5rem,23vw,7.5rem)]";
+  const resolvedChipWidthClass =
+    chipWidthClass ??
+    (isMatchSize
+      ? "w-[clamp(6rem,32vw,10rem)]"
+      : "w-[clamp(4.5rem,23vw,7.5rem)]");
   const reservedChipGridClass = isMatchSize
     ? "grid-cols-[minmax(0,clamp(6rem,32vw,10rem))_auto]"
     : "grid-cols-[minmax(0,clamp(4.5rem,23vw,7.5rem))_auto]";
@@ -72,7 +76,7 @@ const UserChip: React.FC<UserChipProps> = ({
               }
             : undefined
         }
-        className={`relative ${isMatchSize ? "h-8" : "h-6"} min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? "w-full pr-2" : `${chipWidthClass} pr-3`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+        className={`relative ${isMatchSize ? "h-8" : "h-6"} min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? "w-full pr-2" : `${resolvedChipWidthClass} pr-3`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
       >
         <div className="flex min-w-0 max-w-full items-center gap-1">
           <Avatar
@@ -82,16 +86,13 @@ const UserChip: React.FC<UserChipProps> = ({
             className={`bg-white/80 ${genderAvatarClass} ${
               isMatchSize ? "h-8 w-8" : ""
             }`}
-            isMe={isMe}
           />
           <span
             className={`min-w-0 truncate ${
               isMatchSize
                 ? "text-[clamp(0.875rem,3.5vw,1rem)]"
                 : "text-[clamp(0.75rem,3vw,0.875rem)]"
-            } text-current ${
-              isMe ? "font-bold" : "font-medium"
-            }`}
+            } text-current ${isMe ? "font-bold" : "font-medium"}`}
           >
             {player.username}
           </span>
@@ -114,14 +115,14 @@ const UserChip: React.FC<UserChipProps> = ({
             event.stopPropagation();
             onRemove();
           }}
-          className="shrink-0 rounded-full p-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
+          className="shrink-0 rounded-full pl-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
         >
           <IoClose className="size-3.5" />
         </button>
       ) : reserveRemoveSlot ? (
         <span
           aria-hidden="true"
-          className="invisible shrink-0 rounded-full p-0.5 text-current/70"
+          className="invisible shrink-0 rounded-full pl-0.5 text-current/70"
         >
           <IoClose className="size-3.5" />
         </span>

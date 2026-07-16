@@ -1,6 +1,7 @@
 import React from "react";
-import { Avatar as HeroAvatar, Badge } from "@heroui/react";
+import { Avatar as HeroAvatar } from "@heroui/react";
 import { IoPerson } from "react-icons/io5";
+import { MdOutlineCreate } from "react-icons/md";
 import { resolveAssetUrl } from "@/lib/api";
 
 interface AvatarProps {
@@ -8,7 +9,7 @@ interface AvatarProps {
   name?: string;
   size?: "xs" | "sm" | "md" | "lg";
   className?: string;
-  isMe?: boolean;
+  onEditClick?: () => void;
 }
 
 const sizeClassMap: Record<NonNullable<AvatarProps["size"]>, string> = {
@@ -25,6 +26,13 @@ const iconSizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
   lg: "text-4xl",
 };
 
+const editBadgeSizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
+  xs: "size-3",
+  sm: "size-4",
+  md: "size-5",
+  lg: "size-6",
+};
+
 const HeroUiAvatar = HeroAvatar as React.ComponentType<any> & {
   Image: React.ComponentType<any>;
   Fallback: React.ComponentType<any>;
@@ -35,7 +43,7 @@ const Avatar: React.FC<AvatarProps> = ({
   name,
   size = "md",
   className,
-  isMe = false,
+  onEditClick,
 }) => {
   const resolvedAvatarUrl = resolveAssetUrl(avatarUrl);
 
@@ -61,28 +69,25 @@ const Avatar: React.FC<AvatarProps> = ({
     </HeroUiAvatar>
   );
 
-  if (!isMe || size === "xs") {
+  if (!onEditClick) {
     return avatar;
   }
 
   return (
-    <Badge.Anchor>
+    <div className="relative inline-block shrink-0">
       {avatar}
-      <Badge
-        color="accent"
-        size={size === "sm" ? "sm" : "md"}
-        placement="top-left"
-        className={[
-          "rounded-full py-0 border-2 border-white",
-          size === "sm" ? "px-0.5" : "px-1.5",
-          size === "sm" ? "py-0.5" : "py-0",
-        ].join(" ")}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onEditClick();
+        }}
+        className={`absolute bottom-0 right-0 flex ${editBadgeSizeMap[size]} items-center justify-center rounded-full bg-white text-black shadow-sm ring-1 ring-border`}
+        aria-label="프로필 이미지 변경"
       >
-        <Badge.Label className="text-6 font-semibold leading-none">
-          ME
-        </Badge.Label>
-      </Badge>
-    </Badge.Anchor>
+        <MdOutlineCreate className="size-[60%]" />
+      </button>
+    </div>
   );
 };
 

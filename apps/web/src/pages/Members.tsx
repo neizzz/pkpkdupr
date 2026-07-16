@@ -15,7 +15,12 @@ import {
   getCompositeDoublesRating,
   getCompositeSinglesRating,
 } from "@/utils/dupr";
-import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
+import {
+  buildMatchStats,
+  buildRatingDelta,
+  createEmptyMatchStats,
+  createEmptyRatingDelta,
+} from "@/utils/matchStats";
 
 const CACHED_MEMBERS_KEY = "pkpkdupr:members";
 const OFFLINE_FALLBACK_MESSAGE =
@@ -48,6 +53,9 @@ const Members: React.FC = () => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedMemberMatchStats, setSelectedMemberMatchStats] = useState(
     createEmptyMatchStats,
+  );
+  const [selectedMemberRatingDelta, setSelectedMemberRatingDelta] = useState(
+    createEmptyRatingDelta,
   );
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
@@ -126,11 +134,13 @@ const Members: React.FC = () => {
     ) => {
       if (!token) {
         setSelectedMemberMatchStats(createEmptyMatchStats());
+        setSelectedMemberRatingDelta(createEmptyRatingDelta());
         return;
       }
 
       if (!preserveVisibleData) {
         setSelectedMemberMatchStats(createEmptyMatchStats());
+        setSelectedMemberRatingDelta(createEmptyRatingDelta());
       }
 
       try {
@@ -152,9 +162,11 @@ const Members: React.FC = () => {
           total: number;
         };
         setSelectedMemberMatchStats(buildMatchStats(data.matches, memberId));
+        setSelectedMemberRatingDelta(buildRatingDelta(data.matches, memberId));
       } catch (err) {
         if (!preserveVisibleData) {
           setSelectedMemberMatchStats(createEmptyMatchStats());
+          setSelectedMemberRatingDelta(createEmptyRatingDelta());
         }
         if (throwOnError) {
           throw err;
@@ -182,6 +194,7 @@ const Members: React.FC = () => {
   useEffect(() => {
     if (!token || !selectedMemberId) {
       setSelectedMemberMatchStats(createEmptyMatchStats());
+      setSelectedMemberRatingDelta(createEmptyRatingDelta());
       return;
     }
 
@@ -229,6 +242,7 @@ const Members: React.FC = () => {
         player={selectedMember}
         isMe={selectedMember.id === player?.id}
         matchStats={selectedMemberMatchStats}
+        ratingDelta={selectedMemberRatingDelta}
       />
     );
   }
@@ -271,7 +285,6 @@ const Members: React.FC = () => {
                         size="sm"
                         avatarUrl={member.avatarUrl}
                         name={member.username}
-                        isMe={member.id === player?.id}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="min-w-0">
