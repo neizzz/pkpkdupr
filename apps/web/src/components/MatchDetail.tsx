@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Card, Chip, Separator } from "@heroui/react";
-import { IoArrowDown, IoArrowUp } from "react-icons/io5";
+import { Button, Card, Separator } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import {
   getMaxScoreCountForMatchMode,
@@ -11,6 +10,7 @@ import {
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import Match, { type MatchInfo } from "@/components/Match";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import RatingDeltaChip from "@/components/RatingDeltaChip";
 import { formatRating } from "@/utils/dupr";
 
 interface MatchDetailProps {
@@ -419,14 +419,6 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                     const previous = change.previousRating[ratingCategory];
                     const next = change.nextRating[ratingCategory];
                     const delta = change.delta[ratingCategory];
-                    const deltaColor =
-                      delta > 0
-                        ? "success"
-                        : delta < 0
-                          ? "danger"
-                          : ("default" as const);
-                    const DeltaIcon =
-                      delta > 0 ? IoArrowUp : delta < 0 ? IoArrowDown : null;
 
                     return (
                       <React.Fragment key={player.id}>
@@ -448,19 +440,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                                 {formatRating(next)}
                               </span>
                             </div>
-                            <Chip
-                              size="sm"
-                              variant="soft"
-                              color={deltaColor}
-                              className="h-6 px-1.5"
-                            >
-                              <span className="flex items-center gap-0.5 text-[11px] font-semibold tabular-nums">
-                                {DeltaIcon ? (
-                                  <DeltaIcon className="size-3" />
-                                ) : null}
-                                {Math.abs(delta).toFixed(3)}
-                              </span>
-                            </Chip>
+                            <RatingDeltaChip delta={delta} />
                           </div>
                         </div>
                         {index < entries.length - 1 ? (
@@ -492,13 +472,16 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 .map((player, index, players) => {
                   const approval = approvalByPlayerId.get(player.id);
                   const isMatchCreator = player.id === match.creatorPlayerId;
-                  const approvalLabel = isMatchCreator
-                    ? hasResultScores
-                      ? "매치 생성자(자동 승인)"
-                      : "매치 생성자(결과 입력 대기)"
-                    : approval
-                      ? "승인 완료"
-                      : "승인 대기";
+                  const isAdminResult = match.source === "admin_created_result";
+                  const approvalLabel = isAdminResult
+                    ? "관리자 자동 승인"
+                    : isMatchCreator
+                      ? hasResultScores
+                        ? "매치 생성자(자동 승인)"
+                        : "매치 생성자(결과 입력 대기)"
+                      : approval
+                        ? "승인 완료"
+                        : "승인 대기";
 
                   return (
                     <React.Fragment key={player.id}>
@@ -513,14 +496,16 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                           {player.username}
                         </p>
                         <div className="min-w-0 text-right text-xs font-medium">
-                          {approval ? (
+                          {approval || isAdminResult ? (
                             <>
                               <p className="text-emerald-600">
                                 {approvalLabel}
                               </p>
-                              <p className="mt-0.5 text-[#888]">
-                                {formatDateTime(approval.approvedAt)}
-                              </p>
+                              {approval ? (
+                                <p className="mt-0.5 text-[#888]">
+                                  {formatDateTime(approval.approvedAt)}
+                                </p>
+                              ) : null}
                             </>
                           ) : (
                             <p className="text-[#888]">{approvalLabel}</p>
