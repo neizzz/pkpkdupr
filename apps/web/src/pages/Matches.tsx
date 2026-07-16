@@ -521,7 +521,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             <Switch.Control>
               <Switch.Thumb />
             </Switch.Control>
-            <span className="text-sm font-bold leading-none">내경기</span>
+            <span className="text-sm font-bold leading-none text-pkpk-primary-bg">
+              내경기
+            </span>
           </Switch.Content>
         </Switch>
       </TabPanelHeader>

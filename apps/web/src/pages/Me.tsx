@@ -11,7 +11,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
-import { buildMatchStats, createEmptyMatchStats } from "@/utils/matchStats";
+import {
+  buildMatchStats,
+  buildRatingDelta,
+  createEmptyMatchStats,
+  createEmptyRatingDelta,
+} from "@/utils/matchStats";
 
 const Me: React.FC = () => {
   const { player, token, refreshMe } = useAuth();
@@ -19,6 +24,7 @@ const Me: React.FC = () => {
     useTabNavigation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
+  const [ratingDelta, setRatingDelta] = useState(createEmptyRatingDelta);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
@@ -37,6 +43,7 @@ const Me: React.FC = () => {
       if (!token || !playerId) {
         lastSuccessfulLoadAtRef.current = null;
         setMatchStats(createEmptyMatchStats());
+        setRatingDelta(createEmptyRatingDelta());
         setIsMatchStatsLoading(false);
         return;
       }
@@ -69,11 +76,13 @@ const Me: React.FC = () => {
 
         if (!signal.aborted) {
           setMatchStats(buildMatchStats(data.matches, playerId));
+          setRatingDelta(buildRatingDelta(data.matches, playerId));
           lastSuccessfulLoadAtRef.current = Date.now();
         }
       } catch {
         if (!signal.aborted && !preserveVisibleData) {
           setMatchStats(createEmptyMatchStats());
+          setRatingDelta(createEmptyRatingDelta());
         }
         if (!signal.aborted && throwOnError) {
           throw new Error("내 경기 통계를 새로고침하지 못했습니다.");
@@ -117,6 +126,7 @@ const Me: React.FC = () => {
     if (!token || !playerId) {
       lastSuccessfulLoadAtRef.current = null;
       setMatchStats(createEmptyMatchStats());
+      setRatingDelta(createEmptyRatingDelta());
       setIsMatchStatsLoading(false);
     }
   }, [playerId, token]);
@@ -156,7 +166,7 @@ const Me: React.FC = () => {
       type="button"
       size="sm"
       variant="ghost"
-      className="rounded-full border-0 px-0 !text-pkpk-secondary-font"
+      className="rounded-full border-0 px-0 font-bold !text-pkpk-primary-bg"
       onPress={openSettings}
     >
       <IoSettingsOutline className="size-4" />
@@ -175,6 +185,7 @@ const Me: React.FC = () => {
           isMe
           showDetailHeader={false}
           matchStats={matchStats}
+          ratingDelta={ratingDelta}
         />
       )}
 
