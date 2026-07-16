@@ -27,12 +27,10 @@ const TabBackButton: React.FC<TabBackButtonProps> = ({
       isIconOnly
       aria-label={label}
       variant="secondary"
-      className={["size-9 rounded-full text-pkpk-sub-font", className]
-        .filter(Boolean)
-        .join(" ")}
+      className={["size-9 rounded-full", className].filter(Boolean).join(" ")}
       onPress={() => requestCloseTopDepth(targetTabKey)}
     >
-      <IoChevronBack className="size-5" />
+      <IoChevronBack className="size-5 back-button-icon" />
     </Button>
   );
 };

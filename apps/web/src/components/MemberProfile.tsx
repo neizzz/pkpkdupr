@@ -95,7 +95,8 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
       setWinLoss: stats ? `${stats.setWins}-${stats.setLosses}` : "-",
       delta7d: delta?.last7Days ?? 0,
       delta30d: delta?.last30Days ?? 0,
-      hasDelta: !!delta,
+      hasDelta7d: (delta?.last7Days ?? 0) !== 0,
+      hasDelta30d: (delta?.last30Days ?? 0) !== 0,
     };
   });
 
@@ -227,7 +228,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                   <div className="mt-1">
                     <RatingDeltaChip
                       delta={expandedItem.delta7d}
-                      hasData={expandedItem.hasDelta}
+                      hasData={expandedItem.hasDelta7d}
                     />
                   </div>
                 </div>
@@ -238,7 +239,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                   <div className="mt-1">
                     <RatingDeltaChip
                       delta={expandedItem.delta30d}
-                      hasData={expandedItem.hasDelta}
+                      hasData={expandedItem.hasDelta30d}
                     />
                   </div>
                 </div>

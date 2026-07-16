@@ -193,4 +193,8 @@
   .bs-text-caption {
     @apply text-sm leading-4;
   }
+
+  .back-button-icon {
+    color: var(--color-pkpk-primary-bg);
+  }
 }

@@ -209,7 +209,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     <div className="min-h-full">
       <DetailPageHeader title="Match Detail" tabKey="match" />
       <div className="p-2">
-        <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
+        <div className="mx-auto flex w-full flex-col gap-3">
           <Match
             match={match}
             currentPlayerId={currentPlayerId}

@@ -192,7 +192,7 @@ const Me: React.FC = () => {
         isOpen={isSettingsOpen}
         isActive={selectedTab === "me"}
         onOpenChange={handleSettingsOpenChange}
-        ariaLabel="프로필 설정"
+        ariaLabel="설정"
         className="px-5 pt-6"
       >
         <ProfileSettingsSheetBody />
