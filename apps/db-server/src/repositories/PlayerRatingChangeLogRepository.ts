@@ -71,4 +71,14 @@ export class PlayerRatingChangeLogRepository {
       .all();
     return rows.map(hydrateLog);
   }
+
+  async findByPlayerId(playerId: string): Promise<PlayerRatingChangeLog[]> {
+    const rows = await this.db
+      .select()
+      .from(playerRatingChangeLogs)
+      .where(eq(playerRatingChangeLogs.playerId, playerId))
+      .orderBy(desc(playerRatingChangeLogs.createdAt))
+      .all();
+    return rows.map(hydrateLog);
+  }
 }

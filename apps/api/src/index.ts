@@ -595,6 +595,27 @@ app.get("/api/matches", async (req, res) => {
       ? await matchRepository.findByPlayerId(playerId, page, limit)
       : await matchRepository.findAll(page, limit);
 
+    if (playerId) {
+      const ratingChangeLogs =
+        await matchRepository.getPlayerRatingChangeLogs(playerId);
+
+      const logsByMatch = new Map<string, typeof ratingChangeLogs>();
+      for (const log of ratingChangeLogs) {
+        if (log.source !== "match_completed") continue;
+        const matchId = log.sourceLogId
+          .replace(/^match-completed-/, "")
+          .replace(/-[^-]+$/, "");
+        const existing = logsByMatch.get(matchId) ?? [];
+        existing.push(log);
+        logsByMatch.set(matchId, existing);
+      }
+
+      result.matches = result.matches.map((match) => ({
+        ...match,
+        ratingChanges: logsByMatch.get(match.id) ?? [],
+      }));
+    }
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });

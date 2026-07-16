@@ -225,6 +225,16 @@ export class MatchRepository {
     return hydrateMatch(updated);
   }
 
+  /** 특정 플레이어의 rating 변동 로그 조회 */
+  async getPlayerRatingChangeLogs(
+    playerId: string,
+  ): Promise<PlayerRatingChangeLog[]> {
+    const records = await this.dbRequest<any[]>(
+      `/internal/player-rating-change-logs/by-player/${playerId}`,
+    );
+    return (records ?? []).map(hydrateRatingChangeLog);
+  }
+
   /** 특정 플레이어의 경기 이력 조회 */
   async findByPlayerId(
     playerId: string,

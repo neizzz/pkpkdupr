@@ -757,6 +757,20 @@ app.get("/internal/player-rating-change-logs", async (_req, res) => {
   }
 });
 
+app.get(
+  "/internal/player-rating-change-logs/by-player/:playerId",
+  async (req, res) => {
+    try {
+      const logs = await playerRatingChangeLogRepository.findByPlayerId(
+        req.params.playerId,
+      );
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  },
+);
+
 app.get("/internal/matches/:matchId/rating-change-logs", async (req, res) => {
   try {
     const logs = await playerRatingChangeLogRepository.findByMatchId(
