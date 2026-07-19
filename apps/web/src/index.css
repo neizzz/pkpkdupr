@@ -148,6 +148,18 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  @media (max-width: 480px) {
+    .app-scroll-area,
+    .app-bottom-sheet-surface {
+      scrollbar-width: none;
+    }
+
+    .app-scroll-area::-webkit-scrollbar,
+    .app-bottom-sheet-surface::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
   .app-bottom-sheet-padding {
     padding-bottom: calc(
       1rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
