@@ -59,7 +59,6 @@ interface MatchProps {
   showChevron?: boolean;
 }
 
-const subTextClassName = "text-[#888]";
 const titleChipClassName =
   "inline-flex h-6 items-center rounded-full px-2 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold leading-none";
 const teamChipWidthClass = "w-[clamp(6rem,32vw,10rem)]";
@@ -77,16 +76,6 @@ const statusBadgeClassMap: Record<MatchStatus, string> = {
   completed: "bg-emerald-100 text-emerald-700",
   cancelled: "bg-slate-200 text-slate-700",
 };
-
-const formatDateOnly = (value: string) =>
-  new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .format(new Date(value))
-    .replace(/\.\s/g, ".")
-    .replace(/\.$/, "");
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
@@ -146,11 +135,6 @@ const Match: React.FC<MatchProps> = ({
   );
   const displayTitle =
     match.name ?? matchTopLevelTypeLabels[getMatchTopLevelType(match.type)];
-  const sessionLabel = match.session
-    ? match.session.name
-      ? `${match.session.name} · ${formatDateOnly(match.session.date)}`
-      : formatDateOnly(match.session.date)
-    : null;
   const { date: matchDate, time: matchTime } = formatMatchDateTime(
     match.matchStartsAt,
   );
@@ -175,13 +159,6 @@ const Match: React.FC<MatchProps> = ({
             </span>
           }
         />
-        {sessionLabel ? (
-          <p
-            className={`mt-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium ${subTextClassName}`}
-          >
-            {sessionLabel}
-          </p>
-        ) : null}
       </div>
 
       <div className="mt-1 w-full">

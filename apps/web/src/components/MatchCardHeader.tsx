@@ -24,11 +24,11 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
     <div className="flex min-h-6 items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-sub-font">
         <IoCalendarClearOutline className="size-3.5 shrink-0 [&_*]:stroke-[40]" />
-        <span>{date}</span>
-        <span className="-mx-0.5 text-[0.75rem] font-bold leading-none">
+        <span className="relative top-px">{date}</span>
+        <span className="-mx-0.5 text-[0.75rem] font-bold leading-none text-pkpk-sub-font/50">
           ·
         </span>
-        <span>{time}</span>
+        <span className="relative top-px">{time}</span>
         {afterTime ? afterTime : null}
       </div>
       {(rightContent || showChevron) && (
