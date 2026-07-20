@@ -1,198 +1,92 @@
-# Repository Overview
+# PKELO 프로젝트 가이드
 
-## Project Description
+## 개요
 
-- **PkpkDupr**는 피클볼 플레이어 계정, DUPR 유사 평점, 경기 도메인 타입을 관리하는 pnpm 모노레포입니다.
-- 현재 구현의 중심은 **인증/회원 관리**, **관리자 대시보드**, **내부 DB 서버 분리**, **공유 타입 일원화**입니다.
+- 제품명은 **PKELO**이며, 저장소/패키지 식별자는 기존의 `pkpkdupr`를 유지합니다.
+- 피클볼 플레이어, 경기 기록, DUPR 유사 평점과 관리자 운영 도구를 관리하는 pnpm 모노레포입니다.
+- 변경은 공유 계약(`packages/shared`)부터 API, DB 서버, web/admin 소비처까지 한 흐름으로 확인합니다.
 
-## Current Architecture
-
-```text
-┌────────────────────┐      /api       ┌────────────────────┐
-│ apps/web           │ ──────────────▶ │ apps/api           │
-│ React 19 + Vite    │ ◀────────────── │ Express + JWT      │
-│ :3000              │                 │ :4000              │
-└────────────────────┘                 └─────────┬──────────┘
-                                                 │ internal HTTP
-┌────────────────────┐      /api                 │
-│ apps/admin-web     │ ──────────────────────────┘
-│ React 18 + Vite    │
-│ :3100              │                 ┌────────────────────┐
-└────────────────────┘                 │ apps/db-server     │
-                                       │ Express + libSQL   │
-                                       │ + Drizzle          │
-                                       │ :5001              │
-                                       └─────────┬──────────┘
-                                                 │
-                                       ┌────────────────────┐
-                                       │ packages/shared    │
-                                       │ player / match     │
-                                       │ domain types       │
-                                       └────────────────────┘
-```
-
-### App Responsibilities
-
-- **`apps/web`**
-  - 일반 사용자용 웹 앱
-  - 로그인, `/api/me` 기반 사용자 정보 로드
-  - `BottomNav` 기반 Match / Player / Me 탭 셸
-  - QR 코드 모달 UI 포함
-- **`apps/admin-web`**
-  - 관리자 로그인/대시보드
-  - 회원 생성
-  - 회원 상태(active/inactive) 변경
-  - 계정 생성 로그 / 상태 변경 로그 조회
-- **`apps/api`**
-  - 외부에 노출되는 퍼블릭 API
-  - JWT 발급/검증
-  - 관리자 권한 검사
-  - DB 서버와 HTTP로 통신하는 오케스트레이션 레이어
-- **`apps/db-server`**
-  - libSQL/Drizzle 기반 내부 저장소 서버
-  - 플레이어/로그 저장 및 스키마 초기화
-  - 레거시 `dupr_rating` 값 정규화와 기본 스키마 보정 수행
-- **`packages/shared`**
-  - `player.ts`, `match.ts` 도메인 타입 공유
-  - API/FE/Admin/DB 서버가 동일 타입 계약을 참조
-
-## Directory Structure
+## 아키텍처
 
 ```text
-├── package.json
-├── pnpm-workspace.yaml
-├── .continue/
-│   ├── slash_commands/
-│   │   └── review.md
-│   └── skills/
-│       └── commit/
-│           └── SKILL.md
-├── apps/
-│   ├── api/
-│   │   └── src/
-│   │       ├── config/
-│   │       ├── middleware/
-│   │       ├── repositories/
-│   │       ├── services/
-│   │       └── index.ts
-│   ├── db-server/
-│   │   └── src/
-│   │       ├── db/
-│   │       ├── repositories/
-│   │       └── index.ts
-│   ├── web/
-│   │   ├── AGENTS.md
-│   │   └── src/
-│   │       ├── components/
-│   │       ├── context/
-│   │       ├── pages/
-│   │       └── App.tsx
-│   └── admin-web/
-│       └── src/
-│           ├── context/
-│           ├── pages/
-│           └── App.tsx
-└── packages/
-    └── shared/
-        └── src/
-            ├── player.ts
-            └── match.ts
+apps/web (:8080) ─┐
+apps/admin-web (:3100) ─┼─> apps/api (:4000) ─internal HTTP─> apps/db-server (:5001)
+                       │
+                       └─> packages/shared (player, match, qr domain types)
 ```
 
-## Development Workflow
+| 영역 | 책임 |
+| --- | --- |
+| `apps/web` | React 19 사용자 앱. 인증, Match / Members / Me 탭, QR, PWA를 담당합니다. |
+| `apps/admin-web` | React 18 관리자 로그인과 회원·경기·평점 운영 화면을 담당합니다. |
+| `apps/api` | Express 공개 API, JWT 인증, 관리자 권한 검사, DB 서버 오케스트레이션을 담당합니다. |
+| `apps/db-server` | libSQL + Drizzle 저장 계층, 스키마 초기화와 내부 `/internal/*` API를 담당합니다. |
+| `packages/shared` | `player.ts`, `match.ts`, `qr.ts`의 공통 도메인 계약을 제공합니다. |
 
-### Quick Start
+## 개발 명령
 
 ```bash
-# 의존성 설치
 pnpm install
+pnpm dev                         # dev mock data와 전체 워크스페이스 실행
+pnpm dev:web                     # Vite web :8080
+pnpm dev:api                     # API :4000
+pnpm dev:admin                   # admin Vite :3100
+pnpm --filter @pkpkdupr/db-server dev  # DB server :5001
 
-# 전체 개발 서버 실행
-pnpm dev
-# 실행 대상:
-# - apps/web      :3000
-# - apps/admin-web:3100
-# - apps/api      :4000
-# - apps/db-server:5001
-
-# 개별 실행
-pnpm dev:web
-pnpm dev:api
-pnpm dev:admin
-pnpm --filter @pkpkdupr/db-server dev
-
-# 빌드
 pnpm build
 pnpm build:web
-pnpm build:admin
 pnpm build:api
-pnpm --filter @pkpkdupr/db-server build
+pnpm build:admin
+pnpm lint
+
+pnpm dev:monitoring              # Uptime Kuma :3300, sqlite-web :3301
+pnpm dev:monitoring:down
+PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333 pnpm check:healthy
 ```
 
-### Runtime Notes
+- 루트 `pnpm dev`는 `ENABLE_DEV_MOCK_DATA=true`와 `data/db/db.sqlite`를 사용합니다.
+- web Vite proxy는 `/api`, `/uploads`, `/uptime`, `/db`를 각각 API 또는 개발 모니터링 서비스로 연결합니다.
+- `apps/web/dist/`는 빌드 산출물이므로 커밋하지 않습니다.
 
-- 루트 `package.json`에는 **`pnpm >= 8.0.0`만 명시**되어 있습니다.
-- API는 기본적으로 `DB_SERVER_URL=http://localhost:5001`를 사용합니다.
-- JWT secret은 기본값 `dev-secret`을 사용하며, 운영/공유 환경에서는 환경변수로 덮어써야 합니다.
-- API 시작 시 기본 관리자 계정 **`admin / admin123`** 을 자동 초기화합니다.
+## Web 규칙
 
-## API Surface
+- 전역 라우트는 `/`, `/login`, `/force-change-password`, 개발 전용 `/dev/qrs`입니다.
+- 로그인 뒤의 Match / Members / Me는 `BottomNav.tsx`의 keep-alive 탭 셸이 소유합니다. 탭 상태와 URL 라우트를 무분별하게 중복하지 않습니다.
+- `apps/web/AGENTS.md`의 모바일·PWA·UI 세부 규칙을 함께 따릅니다.
+- 모바일 고정 하단 UI는 `env(safe-area-inset-bottom)`과 `--app-keyboard-offset`을 고려합니다. 스크롤 소유자는 `app-tab-panel-scroll-area`입니다.
+- PWA 아이콘은 URL 기반입니다. 아이콘을 변경하면 `apps/web/index.html`의 favicon/Apple touch icon과 `apps/web/vite.config.ts`의 manifest·`includeAssets`를 같이 확인합니다.
 
-### Public / Client-facing (`apps/api`)
+## API와 도메인 계약
 
-| Path | Method | Description |
-|------|--------|-------------|
-| `/api/health` | GET | API 상태 확인 |
-| `/api/ping` | GET | 단순 응답 확인 |
-| `/api/register` | POST | 일반 사용자 회원가입 |
-| `/api/login` | POST | 로그인 및 access token 발급 |
-| `/api/me` | GET | 현재 사용자 정보 조회 |
-| `/api/change-password` | POST | 로그인 사용자 비밀번호 변경 |
-| `/api/admin/players` | GET | 관리자용 회원 목록 조회 |
-| `/api/admin/register` | POST | 관리자용 회원 생성 |
-| `/api/admin/players/:playerId/status` | PATCH | 회원 상태 변경 |
-| `/api/admin/player-creation-logs` | GET | 계정 생성 로그 조회 |
-| `/api/admin/player-status-logs` | GET | 상태 변경 로그 조회 |
+주요 공개 API:
 
-### Internal (`apps/db-server`)
+- 상태: `GET /api/health`, `GET /api/ping`
+- 인증/프로필: `POST /api/register`, `POST /api/login`, `GET /api/me`, `POST /api/change-password`, `PATCH /api/me/profile`, avatar API
+- 플레이어/QR: `GET /api/players`, `GET /api/player-qr-token`, `POST /api/player-qr-token/verify`
+- 경기: `GET|POST /api/matches`, 경기 결과·승인 API, `GET /api/match-feed`, 세션 조회 API
+- 관리자: 선수/감사 로그, 경기 일괄 등록·메타데이터, 비밀번호 초기화, 평점 재계산, 공식 DUPR 조정 API
 
-`/internal/*` 엔드포인트는 API 서버가 호출하는 내부 저장 계층입니다.
+도메인 규칙:
 
-- `/internal/players`
-- `/internal/players/by-username/:username`
-- `/internal/players/:id`
-- `/internal/players/:id/status`
-- `/internal/players/:id/password`
-- `/internal/players/init-admin`
-- `/internal/player-creation-logs`
-- `/internal/player-status-change-logs`
+- `Player.duprRating`은 단일 숫자가 아니라 singles/doubles 분류와 metric을 포함하는 상태입니다. `null`인 NR 값도 허용합니다.
+- API와 DB 서버 사이의 `Date`는 JSON에서 문자열이므로 서비스 계층에서 hydrate 합니다.
+- 경기 타입·스코어·세션 계약은 `packages/shared/src/match.ts`가 기준입니다.
+- `packages/shared` 변경 시 web, admin-web, api, db-server 전체 소비처를 같은 변경 단위에서 점검합니다.
 
-## Shared Domain Model Notes
+## 운영과 배포
 
-- `Player.duprRating`은 단일 숫자가 아니라 다음 구조를 사용합니다.
-  - `total`
-  - `doubles.mixed`
-  - `doubles.men`
-  - `doubles.women`
-  - `singles`
-- API ↔ DB 서버 간 JSON 왕복 시 `Date`는 문자열로 전달되므로 서비스 계층에서 다시 `Date`로 hydrate 합니다.
-- 레거시 숫자형 `dupr_rating` 값은 DB 서버 시작 시 객체 구조로 정규화됩니다.
-- 플레이어 상태는 현재 `active | inactive` 두 가지입니다.
+- GitHub Actions는 GHCR 이미지 빌드/푸시까지만 담당합니다. 서버 반영은 SSH 환경에서 `scripts/manual-deploy.sh --image-tag <tag>`로 실행합니다.
+- 운영 proxy는 SWAG이며, 템플릿 원본은 `infra/swag/site-confs/default.conf.template`입니다.
+- 운영 경로:
+  - Web: `https://<DOMAIN>/`
+  - Admin/API/운영 도구: `https://<DOMAIN>:3333/{admin/,api/health,api/ping,uptime/,db/}`
+  - Uptime Kuma 초기 설정도 `/uptime/setup-database`를 사용합니다. 루트 `/setup-database`는 이 경로로 리다이렉트됩니다.
+- 실제 서버 SWAG 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`이며, 배포 스크립트가 템플릿에서 생성합니다.
+- `/uptime/`, `/db/`은 HTML 응답이므로 상태 코드뿐 아니라 기대 텍스트와 `404 not found` 여부를 함께 확인합니다.
 
-## Technology Stack
+## 작업 및 커밋 규칙
 
-| Area | Tech |
-|------|------|
-| Web | React 19, Vite 5, TypeScript 5, HeroUI 3, Tailwind CSS 4 |
-| Admin Web | React 18, Vite 5, TypeScript 5, Tailwind CSS 4 |
-| API | Express 4, bcryptjs, jsonwebtoken, TypeScript |
-| DB Server | Express 4, libSQL client, Drizzle ORM |
-| Shared | TypeScript source export package |
-| Workspace | pnpm workspace monorepo |
-
-## Commit Convention
-
-- 커밋 제목은 `feat:`, `fix:`, `refactor:`, `chore:` 중 하나로 시작합니다.
-- Prefix는 **파일 경로가 아니라 변경 성격**으로 결정합니다.
-- 커밋 전/리뷰 시에는 `packages/shared` 변경이 web/api/admin/db-server 계약에 미치는 영향을 함께 확인합니다.
-- 세부 커밋 규칙은 `.continue/skills/commit/SKILL.md`를 따릅니다.
+- 먼저 현재 변경과 기존 dirty tree를 확인하고, 관련 없는 변경은 명시적으로 제외합니다.
+- `git add .`, `git commit -a`, reset, rebase, force push를 사용하지 않습니다.
+- 커밋 제목은 `feat:`, `fix:`, `refactor:`, `chore:` 중 하나로 시작하며 변경 성격으로 선택합니다.
+- 변경 후에는 영향 범위에 맞는 빌드/테스트를 실행합니다. web 변경은 기본적으로 `pnpm build:web`를 우선합니다.

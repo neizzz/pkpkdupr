@@ -32,3 +32,6 @@ Thumbs.db
 
 # Debug
 npm-debug.log*
+
+# Qwen Code project state (local only)
+.qwen/
