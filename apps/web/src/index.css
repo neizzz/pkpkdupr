@@ -97,44 +97,19 @@
     max-width: 480px;
   }
 
-  .app-scroll-area {
+  .app-tab-panel-scroll-area {
     min-height: 0;
     min-width: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    overscroll-behavior: contain;
-    scroll-padding-bottom: calc(1rem + var(--app-keyboard-offset));
+    overscroll-behavior: none;
+    overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
   }
 
-  .app-tab-panel-scroll-area {
-    overscroll-behavior: none;
-    overscroll-behavior-y: none;
-    scroll-padding-bottom: calc(6rem + var(--app-keyboard-offset));
-  }
-
+  /* 일반 전체 화면에서 iOS 하단 안전영역만 보정하는 공용 유틸리티. */
   .app-safe-bottom-pad {
     padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  .app-fixed-bottom {
-    bottom: calc(env(safe-area-inset-bottom) + var(--app-keyboard-offset));
-  }
-
-  .app-panel-bottom-pad {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
-  }
-
-  .app-bottom-overlay-height {
-    height: calc(
-      5.5rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
-    );
-  }
-
-  .app-install-prompt-bottom {
-    bottom: calc(
-      4.75rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
-    );
   }
 
   .app-bottom-sheet-surface {
@@ -144,26 +119,19 @@
     );
     overflow-y: auto;
     overscroll-behavior: contain;
-    scroll-padding-bottom: calc(1rem + var(--app-keyboard-offset));
     -webkit-overflow-scrolling: touch;
   }
 
   @media (max-width: 480px) {
-    .app-scroll-area,
+    .app-tab-panel-scroll-area,
     .app-bottom-sheet-surface {
       scrollbar-width: none;
     }
 
-    .app-scroll-area::-webkit-scrollbar,
+    .app-tab-panel-scroll-area::-webkit-scrollbar,
     .app-bottom-sheet-surface::-webkit-scrollbar {
       display: none;
     }
-  }
-
-  .app-bottom-sheet-padding {
-    padding-bottom: calc(
-      1rem + env(safe-area-inset-bottom) + var(--app-keyboard-offset)
-    );
   }
 
   .app-mobile-input {

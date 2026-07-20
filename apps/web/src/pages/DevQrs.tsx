@@ -131,7 +131,7 @@ const DevQrs: React.FC = () => {
   }
 
   return (
-    <div className="app-scroll-area app-safe-bottom-pad h-full w-full bg-amber-50 px-3 pt-6">
+    <div className="app-safe-bottom-pad h-full w-full bg-amber-50 px-3 pt-6">
       <div className="mx-auto w-full max-w-7xl">
         <header>
           <p className="text-xs font-semibold uppercase tracking-wide text-pkpk-sub-font">

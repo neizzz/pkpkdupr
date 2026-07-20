@@ -151,7 +151,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           role="dialog"
           aria-label={ariaLabel}
           className={[
-            "app-bottom-sheet-surface app-bottom-sheet-padding relative w-full rounded-t-3xl bg-white shadow-2xl",
+            "app-bottom-sheet-surface relative w-full rounded-t-3xl bg-white pb-[calc(1rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] shadow-2xl",
             className,
           ]
             .filter(Boolean)

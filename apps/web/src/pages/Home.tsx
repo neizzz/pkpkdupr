@@ -22,7 +22,7 @@ const Home: React.FC = () => {
 
   return (
     <div className="app-safe-bottom-pad flex h-full w-full items-center justify-center overflow-hidden bg-gray-100 px-3 pt-6">
-      <div className="app-scroll-area max-h-full w-full text-center">
+      <div className="max-h-full w-full text-center">
         <h1 className="mb-4 text-4xl font-bold text-[#409eff]">PKELO</h1>
         <p className="mb-8 text-lg text-gray-700">
           Pickleball DUPR System에 오신 것을 환영합니다!
@@ -33,7 +33,9 @@ const Home: React.FC = () => {
             <div className="space-y-2 text-left">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-500">이름</span>
-                <span className="font-semibold">{player.username || player.id}</span>
+                <span className="font-semibold">
+                  {player.username || player.id}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <span>Singles</span>

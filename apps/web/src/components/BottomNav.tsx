@@ -933,7 +933,7 @@ const BottomNav: React.FC = () => {
         onSelectionChange={handleSelectionChange}
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="app-fixed-bottom fixed left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end gap-3 px-3 pb-3 pt-2">
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end gap-3 px-3 pb-3 pt-2">
           <Tabs.ListContainer className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
@@ -1050,7 +1050,7 @@ const BottomNav: React.FC = () => {
 
         <div
           ref={scrollContainerRef}
-          className="app-scroll-area app-tab-panel-scroll-area relative flex-1"
+          className="app-tab-panel-scroll-area relative flex-1"
           onTouchMove={handlePullTouchMove}
           onTouchEnd={handlePullTouchEnd}
           onTouchCancel={() => resetPullToRefresh()}
@@ -1063,21 +1063,21 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}
-            className="app-panel-bottom-pad min-h-full bg-pkpk-bg p-0 data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] data-[inert=true]:hidden"
           >
             <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
-            className="app-panel-bottom-pad min-h-full bg-pkpk-bg p-0 data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"
             shouldForceMount={visitedTabs.me}
-            className="app-panel-bottom-pad min-h-full bg-pkpk-bg p-0 data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] data-[inert=true]:hidden"
           >
             <Me />
           </Tabs.Panel>
@@ -1089,7 +1089,7 @@ const BottomNav: React.FC = () => {
 
         <div
           aria-hidden="true"
-          className="app-bottom-overlay-height pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-white via-white/100 to-transparent"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(5.5rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] bg-gradient-to-t from-white via-white/100 to-transparent"
         />
 
         <BottomSheet

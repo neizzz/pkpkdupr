@@ -9,7 +9,7 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({ title, children }) => {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    const container = document.querySelector(".app-scroll-area");
+    const container = document.querySelector(".app-tab-panel-scroll-area");
     if (!container) return;
 
     const onScroll = () => setIsScrolled(container.scrollTop > 1);

@@ -33,7 +33,7 @@ const Login: React.FC = () => {
 
   return (
     <div className="app-safe-bottom-pad flex h-full w-full flex-col items-center justify-center overflow-hidden px-3 pt-6">
-      <div className="app-scroll-area max-h-full w-full self-center">
+      <div className="max-h-full w-full self-center">
         <h1 className="mb-8 text-2xl font-bold">PKELO</h1>
 
         {notice && !error && (
