@@ -69,6 +69,12 @@ server {
         return 301 /uptime/;
     }
 
+    # Uptime Kuma가 초기 설정 화면을 루트 상대 경로로 열어도
+    # 공개 prefix(/uptime)를 유지하도록 보정합니다.
+    location = /setup-database {
+        return 301 /uptime/setup-database$is_args$args;
+    }
+
     location = /db {
         return 301 /db/;
     }
