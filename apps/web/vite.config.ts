@@ -53,9 +53,9 @@ export default defineConfig({
         "pwa-maskable-512x512-v2.png",
       ],
       manifest: {
-        name: "PkpkDUPR",
-        short_name: "PkpkDUPR",
-        description: "Pickleball DUPR match and member app",
+        name: "PKELO",
+        short_name: "PKELO",
+        description: "Pickleball Rating match and member app",
         id: "/",
         lang: "ko",
         start_url: "/",

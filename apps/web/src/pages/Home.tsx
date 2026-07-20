@@ -23,7 +23,7 @@ const Home: React.FC = () => {
   return (
     <div className="app-safe-bottom-pad flex h-full w-full items-center justify-center overflow-hidden bg-gray-100 px-3 pt-6">
       <div className="app-scroll-area max-h-full w-full text-center">
-        <h1 className="mb-4 text-4xl font-bold text-[#409eff]">🏓 PkpkDupr</h1>
+        <h1 className="mb-4 text-4xl font-bold text-[#409eff]">PKELO</h1>
         <p className="mb-8 text-lg text-gray-700">
           Pickleball DUPR System에 오신 것을 환영합니다!
         </p>
