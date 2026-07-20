@@ -95,6 +95,21 @@ export default defineConfig({
         ],
         runtimeCaching: [
           {
+            urlPattern:
+              /^https:\/\/cdn\.jsdelivr\.net\/gh\/orioncactus\/pretendard(?:@[^/]+)?\/dist\/web\/.+\.(?:css|woff2?)$/,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "pkpkdupr-pretendard-v1",
+              expiration: {
+                maxEntries: 20,
+                maxAgeSeconds: 365 * 24 * 60 * 60,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
             urlPattern: /^https?:\/\/[^/]+\/uploads\/avatars\/.+$/,
             handler: "StaleWhileRevalidate",
             options: {

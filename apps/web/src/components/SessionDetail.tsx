@@ -39,7 +39,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   onPressMatch,
 }) => (
   <div className="min-h-full">
-    <DetailPageHeader title={session.name} tabKey="match" />
+    <DetailPageHeader title="Session Detail" tabKey="match" />
     <div className="p-2">
       <div className="mx-auto flex w-full flex-col gap-3">
         <Card className="rounded-3xl bg-white/95 p-3 shadow-sm">
@@ -74,16 +74,21 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
         ) : matches.length === 0 ? (
           <TabPanelStatus message="이 세션에 표시할 경기가 없어요." />
         ) : (
-          <div className="flex flex-col gap-3">
-            {matches.map((match) => (
-              <Match
-                key={match.id}
-                match={match}
-                currentPlayerId={currentPlayerId}
-                onPress={onPressMatch}
-              />
-            ))}
-          </div>
+          <section>
+            <p className="text-xs font-semibold uppercase tracking-wide text-pkpk-sub-font">
+              Matches
+            </p>
+            <div className="mt-3 flex flex-col gap-3">
+              {matches.map((match) => (
+                <Match
+                  key={match.id}
+                  match={match}
+                  currentPlayerId={currentPlayerId}
+                  onPress={onPressMatch}
+                />
+              ))}
+            </div>
+          </section>
         )}
       </div>
     </div>
