@@ -222,7 +222,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             >
               Score
             </p>
-            <div className="mt-3 overflow-hidden rounded-2xl border border-amber-100 bg-white/80 shadow-sm">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 shadow-sm">
               <table className="w-full table-fixed border-collapse text-sm text-pkpk-sub-font">
                 <colgroup>
                   <col className="w-[40%]" />
@@ -231,11 +231,11 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                   ))}
                   <col />
                 </colgroup>
-                <thead className="bg-amber-100/60 text-xs font-semibold text-pkpk-sub-font">
+                <thead className="bg-pkpk-primary-bg/15 text-xs font-semibold text-pkpk-primary-bg">
                   <tr>
                     <th
                       scope="col"
-                      className="border-r border-amber-100 px-2 py-2 text-left"
+                      className="border-r border-pkpk-primary-bg/20 px-2 py-2 text-left"
                     >
                       Sets
                     </th>
@@ -245,7 +245,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                         <th
                           key={index}
                           scope="col"
-                          className="border-r border-amber-100 px-1 py-2 text-center"
+                          className="border-r border-pkpk-primary-bg/20 px-1 py-2 text-center"
                         >
                           {index + 1}
                         </th>
@@ -258,23 +258,16 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 </thead>
                 <tbody>
                   {match.teams.map((team, teamIndex) => (
-                    <tr key={team.id} className="border-t border-amber-100">
+                    <tr key={team.id} className="border-t border-pkpk-primary-bg/20">
                       <th
                         scope="row"
-                        className="border-r border-amber-100 px-2 py-3 text-left font-semibold"
+                        className="border-r border-pkpk-primary-bg/20 px-2 py-1.5 text-left font-semibold"
                       >
-                        <div className="flex min-w-0 items-center">
-                          {team.players.map((player, playerIndex) => (
-                            <React.Fragment key={player.id}>
-                              {playerIndex > 0 ? (
-                                <span aria-hidden="true" className="shrink-0">
-                                  /
-                                </span>
-                              ) : null}
-                              <span className="min-w-0 flex-1 truncate">
-                                {player.username}
-                              </span>
-                            </React.Fragment>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          {team.players.map((player) => (
+                            <span key={player.id} className="truncate">
+                              {player.username}
+                            </span>
                           ))}
                         </div>
                       </th>
@@ -291,14 +284,14 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                           return (
                             <td
                               key={scoreIndex}
-                              className="border-r border-amber-100 px-1 py-3 text-center font-medium tabular-nums"
+                              className="border-r border-pkpk-primary-bg/20 bg-white/80 px-1 py-1.5 text-center font-medium tabular-nums"
                             >
                               {value}
                             </td>
                           );
                         },
                       )}
-                      <td className="px-1 py-3 text-center text-base font-bold tabular-nums">
+                      <td className="bg-white/80 px-1 py-1.5 text-center text-base font-bold tabular-nums">
                         {hasResultScores ? totalPoints[teamIndex] : "-"}
                       </td>
                     </tr>
