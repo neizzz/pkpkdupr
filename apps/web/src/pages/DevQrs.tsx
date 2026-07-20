@@ -122,7 +122,7 @@ const DevQrs: React.FC = () => {
 
   if (!import.meta.env.DEV) {
     return (
-      <div className="app-safe-bottom-pad flex h-full w-full items-center justify-center overflow-hidden bg-amber-50 px-6 pt-6 text-center">
+      <div className="flex h-full w-full items-center justify-center overflow-hidden bg-amber-50 px-6 pt-6 pb-[var(--safe-bottom)] text-center">
         <p className="text-sm font-semibold text-pkpk-sub-font">
           Dev QR 페이지는 개발 환경에서만 사용할 수 있습니다.
         </p>
@@ -131,7 +131,7 @@ const DevQrs: React.FC = () => {
   }
 
   return (
-    <div className="app-safe-bottom-pad h-full w-full bg-amber-50 px-3 pt-6">
+    <div className="h-full w-full bg-amber-50 px-3 pt-6 pb-[var(--safe-bottom)]">
       <div className="mx-auto w-full max-w-7xl">
         <header>
           <p className="text-xs font-semibold uppercase tracking-wide text-pkpk-sub-font">

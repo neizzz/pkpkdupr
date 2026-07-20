@@ -24,6 +24,7 @@
 :root {
   --app-shell-height: 100vh;
   --app-keyboard-offset: 0px;
+  --safe-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 @supports (height: 100svh) {
@@ -116,11 +117,6 @@
     overscroll-behavior: none;
     overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
-  }
-
-  /* 일반 전체 화면에서 iOS 하단 안전영역만 보정하는 공용 유틸리티. */
-  .app-safe-bottom-pad {
-    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .app-bottom-sheet-surface {

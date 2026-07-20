@@ -21,7 +21,7 @@ const Home: React.FC = () => {
   };
 
   return (
-    <div className="app-safe-bottom-pad flex h-full w-full items-center justify-center overflow-hidden bg-gray-100 px-3 pt-6">
+    <div className="flex h-full w-full items-center justify-center overflow-hidden bg-gray-100 px-3 pt-6 pb-[var(--safe-bottom)]">
       <div className="max-h-full w-full text-center">
         <h1 className="mb-4 text-4xl font-bold text-[#409eff]">PKELO</h1>
         <p className="mb-8 text-lg text-gray-700">

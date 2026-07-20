@@ -159,7 +159,7 @@ const PwaInstallPrompt: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] left-1/2 z-30 app-shell-width -translate-x-1/2 px-3">
+    <div className="fixed bottom-[calc(4.75rem+var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-30 app-shell-width -translate-x-1/2 px-3">
       <Alert
         status={installPrompt.kind === "installable" ? "accent" : "warning"}
         className="items-center rounded-2xl border border-pkpk-primary-bg/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"

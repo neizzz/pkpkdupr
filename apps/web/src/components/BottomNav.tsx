@@ -943,9 +943,13 @@ const BottomNav: React.FC = () => {
       <Tabs
         selectedKey={selectedTab}
         onSelectionChange={handleSelectionChange}
-        className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[env(safe-area-inset-bottom)]"
+        className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-2">
+        <div
+          className={`fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-2 ${
+            isGlobalMenuVisible ? "z-[60]" : "z-20"
+          }`}
+        >
           <Tabs.ListContainer className="mr-[4.35rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
@@ -986,14 +990,7 @@ const BottomNav: React.FC = () => {
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
-        </div>
-
-        <div
-          className={`pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+var(--app-keyboard-offset))] left-1/2 flex app-shell-width -translate-x-1/2 justify-end px-3 pb-3 pt-2 ${
-            isGlobalMenuVisible ? "z-[60]" : "z-20"
-          }`}
-        >
-          <div className="pointer-events-auto">
+          <div className="pointer-events-auto absolute bottom-3 right-3">
             <Dropdown
               isOpen={isGlobalMenuVisible}
               onOpenChange={handleGlobalMenuOpenChange}
@@ -1079,21 +1076,21 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"
             shouldForceMount={visitedTabs.me}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+env(safe-area-inset-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Me />
           </Tabs.Panel>

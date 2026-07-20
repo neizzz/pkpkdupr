@@ -32,7 +32,7 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="app-safe-bottom-pad flex h-full w-full flex-col items-center justify-center overflow-hidden px-3 pt-6">
+    <div className="flex h-full w-full flex-col items-center justify-center overflow-hidden px-3 pt-6 pb-[var(--safe-bottom)]">
       <div className="max-h-full w-full self-center">
         <h1 className="mb-8 text-2xl font-bold">PKELO</h1>
 
