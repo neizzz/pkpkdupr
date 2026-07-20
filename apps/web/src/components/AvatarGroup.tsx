@@ -8,14 +8,15 @@ interface AvatarGroupItem {
 }
 
 interface AvatarGroupProps {
-    items: AvatarGroupItem[];
-    max?: number;
-    size?: "xs" | "sm" | "md" | "lg";
+  items: AvatarGroupItem[];
+  max?: number;
+  size?: "xs" | "session" | "sm" | "md" | "lg";
     className?: string;
 }
 
 const spacingClassMap: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
     xs: "-space-x-1",
+    session: "-space-x-2",
     sm: "-space-x-2",
     md: "-space-x-3",
     lg: "-space-x-4",
@@ -23,6 +24,7 @@ const spacingClassMap: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
 
 const counterSizeClassMap: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
     xs: "h-6 w-6 text-[10px]",
+    session: "h-9 w-9 text-xs",
     sm: "h-12 w-12 text-sm",
     md: "h-18 w-18 text-base",
     lg: "h-24 w-24 text-lg",
@@ -47,21 +49,27 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
                 .filter(Boolean)
                 .join(" ")}
         >
-            {visible.map((item) => (
-                <Avatar
+            {visible.map((item, index) => (
+                <div
                     key={item.id}
-                    avatarUrl={item.avatarUrl}
-                    name={item.name}
-                    size={size}
-                    className="ring-2 ring-white"
-                />
+                    className="relative"
+                    style={{ zIndex: index + 1 }}
+                >
+                    <Avatar
+                        avatarUrl={item.avatarUrl}
+                        name={item.name}
+                        size={size}
+                        className="ring-2 ring-white"
+                    />
+                </div>
             ))}
             {overflow > 0 && (
                 <div
                     className={[
-                        "flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 ring-2 ring-white",
+                        "relative flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 ring-2 ring-white",
                         counterSizeClassMap[size],
                     ].join(" ")}
+                    style={{ zIndex: visible.length + 1 }}
                 >
                     +{overflow}
                 </div>

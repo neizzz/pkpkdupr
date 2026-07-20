@@ -1,4 +1,4 @@
-import type { Match } from "@pkpkdupr/shared/match";
+import type { Match, MatchFeedItem } from "@pkpkdupr/shared/match";
 import type { Player, PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,7 +40,6 @@ const match: Match = {
   resultSubmittedAt: null,
   approvals: [],
   location: "Court TBD",
-  scheduledAt: now,
   matchStartsAt: now,
   completedAt: null,
   createdAt: now,
@@ -155,5 +154,126 @@ describe("GET /api/matches", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.matches[0].ratingChanges).toBeUndefined();
+  });
+});
+
+describe("GET /api/match-feed", () => {
+  beforeEach(() => {
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(session);
+    vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("세션 요약과 세션이 없는 경기를 카드 단위 피드로 반환한다", async () => {
+    const sessionMatch: Match = {
+      ...match,
+      id: "match-session-001",
+      session: { name: "토요 오전 세션", date: now },
+    };
+    const feedItems: MatchFeedItem[] = [
+      {
+        kind: "session",
+        session: {
+          name: "토요 오전 세션",
+          date: now,
+          matchCount: 2,
+          participants: [
+            { id: player.id, username: player.username, avatarUrl: "avatar-a" },
+            { id: "player-002", username: "other", avatarUrl: "avatar-b" },
+          ],
+          latestCreatedAt: now,
+        },
+      },
+      { kind: "match", match: { ...match, id: "match-no-session" } },
+    ];
+    const findFeed = vi
+      .spyOn(MatchRepository.prototype, "findFeed")
+      .mockResolvedValue({ items: feedItems, total: 2 });
+
+    const response = await request(app)
+      .get("/api/match-feed?page=1&limit=10&playerId=player-001")
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(findFeed).toHaveBeenCalledWith(1, 10, player.id);
+    expect(response.body).toMatchObject({ total: 2 });
+    expect(response.body.items).toHaveLength(2);
+    expect(response.body.items[0]).toMatchObject({
+      kind: "session",
+      session: {
+        name: "토요 오전 세션",
+        matchCount: 2,
+        participants: [
+          { id: player.id, username: player.username },
+          { id: "player-002", username: "other" },
+        ],
+      },
+    });
+    expect(response.body.items[1]).toMatchObject({
+      kind: "match",
+      match: { id: "match-no-session" },
+    });
+
+    expect(sessionMatch.session?.name).toBe("토요 오전 세션");
+  });
+
+  it("인증 토큰이 없으면 401을 반환한다", async () => {
+    const response = await request(app).get("/api/match-feed");
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe("GET /api/match-sessions/matches", () => {
+  beforeEach(() => {
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(session);
+    vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("선택한 세션의 전체 경기를 반환한다", async () => {
+    const sessionMatches: Match[] = [
+      { ...match, id: "match-session-001", session: { name: "토요 세션", date: now } },
+      { ...match, id: "match-session-002", session: { name: "토요 세션", date: now } },
+    ];
+    const findBySession = vi
+      .spyOn(MatchRepository.prototype, "findBySession")
+      .mockResolvedValue(sessionMatches);
+
+    const response = await request(app)
+      .get(
+        `/api/match-sessions/matches?name=${encodeURIComponent("토요 세션")}&date=${encodeURIComponent(now.toISOString())}`,
+      )
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(findBySession).toHaveBeenCalledWith("토요 세션", now);
+    expect(response.body.map((item: { id: string }) => item.id)).toEqual([
+      "match-session-001",
+      "match-session-002",
+    ]);
+  });
+
+  it("세션 식별자가 없거나 유효하지 않으면 400을 반환한다", async () => {
+    const response = await request(app)
+      .get("/api/match-sessions/matches?name=토요%20세션")
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({
+      error: "유효한 세션명과 세션 날짜가 필요합니다.",
+    });
   });
 });

@@ -83,7 +83,7 @@ app.use(AVATAR_UPLOAD_ROUTE, express.static(avatarUploadDir));
 app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
-    message: "PkpkDupr API is running!",
+    message: "PKELO API is running!",
     timestamp: new Date().toISOString(),
   });
 });
@@ -106,7 +106,6 @@ type CreateMatchRequest = {
     { name?: string; playerIds?: string[] },
   ];
   location?: string;
-  scheduledAt?: string;
   matchStartsAt?: string;
 };
 
@@ -125,7 +124,7 @@ type AdminBatchMatchRequest = {
     mode?: MatchMode;
     teams?: [MatchTeamRequest, MatchTeamRequest];
     location?: string;
-    scheduledAt?: string;
+    matchStartsAt?: string;
     scores?: MatchScore[];
   }>;
 };
@@ -622,6 +621,42 @@ app.get("/api/matches", async (req, res) => {
   }
 });
 
+app.get("/api/match-feed", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const page = Number(req.query.page ?? 0);
+    const limit = Number(req.query.limit ?? 20);
+    const playerId =
+      typeof req.query.playerId === "string" ? req.query.playerId : undefined;
+    res.json(await matchRepository.findFeed(page, limit, playerId));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/api/match-sessions/matches", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    const name = typeof req.query.name === "string" ? req.query.name.trim() : "";
+    const date = typeof req.query.date === "string" ? new Date(req.query.date) : null;
+    if (!name || !date || Number.isNaN(date.getTime())) {
+      return res.status(400).json({ error: "유효한 세션명과 세션 날짜가 필요합니다." });
+    }
+
+    res.json(await matchRepository.findBySession(name, date));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/matches", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -629,7 +664,7 @@ app.post("/api/matches", async (req, res) => {
       return;
     }
 
-    const { name, type, mode, teams, location, scheduledAt, matchStartsAt } =
+    const { name, type, mode, teams, location, matchStartsAt } =
       req.body as CreateMatchRequest;
     if (type != null && !isMatchType(type)) {
       return res.status(400).json({ error: "유효한 매치 타입이 필요합니다." });
@@ -680,11 +715,6 @@ app.post("/api/matches", async (req, res) => {
       });
     }
 
-    const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
-    if (Number.isNaN(scheduledDate.getTime())) {
-      return res.status(400).json({ error: "유효한 경기 시간이 필요합니다." });
-    }
-
     const matchStartsAtDate = matchStartsAt
       ? new Date(matchStartsAt)
       : computeMatchStartsAt();
@@ -707,7 +737,6 @@ app.post("/api/matches", async (req, res) => {
       resultSubmittedAt: null,
       approvals: [],
       location: location?.trim() || "Court TBD",
-      scheduledAt: scheduledDate,
       matchStartsAt: matchStartsAtDate,
       completedAt: null,
     });
@@ -751,7 +780,7 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
     );
     const matchesToCreate = payloadMatches.map((requestedMatch, index) => {
       const label = `${index + 1}번째 경기`;
-      const { name, type, mode, teams, location, scheduledAt, scores } =
+      const { name, type, mode, teams, location, matchStartsAt, scores } =
         requestedMatch;
 
       if (!isMatchType(type)) {
@@ -782,9 +811,11 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
         );
       }
 
-      const scheduledDate = scheduledAt ? new Date(scheduledAt) : new Date();
-      if (Number.isNaN(scheduledDate.getTime())) {
-        throw new Error(`${label}: 유효한 경기 시간이 필요합니다.`);
+      const matchStartsAtDate = matchStartsAt
+        ? new Date(matchStartsAt)
+        : new Date();
+      if (Number.isNaN(matchStartsAtDate.getTime())) {
+        throw new Error(`${label}: 유효한 매치 시작 시간이 필요합니다.`);
       }
 
       const normalizedScores = normalizeMatchScores(scores);
@@ -803,12 +834,11 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
         teams: matchTeams,
         scores: normalizedScores,
         resultSubmittedByPlayerId: createdBy.id,
-        resultSubmittedAt: scheduledDate,
+        resultSubmittedAt: matchStartsAtDate,
         approvals: [],
         location: location?.trim() || "Court TBD",
-        scheduledAt: scheduledDate,
-        matchStartsAt: computeMatchStartsAt(scheduledDate),
-        completedAt: scheduledDate,
+        matchStartsAt: matchStartsAtDate,
+        completedAt: matchStartsAtDate,
       };
     });
 

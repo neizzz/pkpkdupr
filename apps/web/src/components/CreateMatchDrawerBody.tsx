@@ -266,7 +266,6 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             playerIds: team.map((member) => member.id),
           })),
           location: "Court TBD",
-          scheduledAt: new Date().toISOString(),
           matchStartsAt: matchStartsAt.toISOString(),
         }),
       });

@@ -112,6 +112,20 @@ export interface Session {
   date: Date;
 }
 
+export interface MatchSessionParticipant {
+  id: string;
+  username: string;
+  avatarUrl?: string;
+}
+
+export interface MatchSessionSummary {
+  name: string;
+  date: Date;
+  matchCount: number;
+  participants: MatchSessionParticipant[];
+  latestCreatedAt: Date;
+}
+
 const getMatchWinCounts = (scores: MatchScore[]) =>
   scores.reduce<[number, number]>(
     (wins, score) => {
@@ -206,12 +220,15 @@ export interface Match {
   resultSubmittedAt: Date | null;
   approvals: MatchResultApproval[];
   location?: string;
-  scheduledAt: Date;
   matchStartsAt: Date;
   createdAt: Date;
   completedAt: Date | null;
   updatedAt: Date;
 }
+
+export type MatchFeedItem =
+  | { kind: "match"; match: Match }
+  | { kind: "session"; session: MatchSessionSummary };
 
 export interface MatchResult {
   matchId: string;

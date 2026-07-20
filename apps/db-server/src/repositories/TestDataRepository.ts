@@ -156,7 +156,7 @@ const mockMatches = [
     creatorPlayerId: "dev-player-alice",
     status: "completed",
     location: "Dev Court A",
-    scheduledAt: new Date("2026-06-05T19:00:00+09:00"),
+    matchStartsAt: new Date("2026-06-05T19:00:00+09:00"),
     completedAt: new Date("2026-06-05T20:10:00+09:00"),
     resultSubmittedByPlayerId: "dev-player-alice",
     resultSubmittedAt: new Date("2026-06-05T20:05:00+09:00"),
@@ -170,12 +170,60 @@ const mockMatches = [
     creatorPlayerId: "dev-player-alice",
     status: "created",
     location: "Dev Court B",
-    scheduledAt: new Date("2026-06-07T09:30:00+09:00"),
+    matchStartsAt: new Date("2026-06-07T09:30:00+09:00"),
     completedAt: null,
     resultSubmittedByPlayerId: null,
     resultSubmittedAt: null,
     createdAt: new Date("2026-06-06T13:20:00+09:00"),
     updatedAt: new Date("2026-06-06T13:20:00+09:00"),
+  },
+  {
+    id: "dev-session-open-play-001",
+    type: "mixed-doubles",
+    source: "admin_created_result",
+    creatorPlayerId: "dev-player-alice",
+    sessionName: "일요일 오픈 플레이",
+    sessionDate: new Date("2026-07-19T09:00:00+09:00"),
+    status: "completed",
+    location: "Dev Court A",
+    matchStartsAt: new Date("2026-07-19T09:00:00+09:00"),
+    completedAt: new Date("2026-07-19T09:25:00+09:00"),
+    resultSubmittedByPlayerId: "dev-player-alice",
+    resultSubmittedAt: new Date("2026-07-19T09:25:00+09:00"),
+    createdAt: new Date("2026-07-19T08:40:00+09:00"),
+    updatedAt: new Date("2026-07-19T09:25:00+09:00"),
+  },
+  {
+    id: "dev-session-open-play-002",
+    type: "mixed-doubles",
+    source: "admin_created_result",
+    creatorPlayerId: "dev-player-bob",
+    sessionName: "일요일 오픈 플레이",
+    sessionDate: new Date("2026-07-19T09:00:00+09:00"),
+    status: "completed",
+    location: "Dev Court B",
+    matchStartsAt: new Date("2026-07-19T09:35:00+09:00"),
+    completedAt: new Date("2026-07-19T10:00:00+09:00"),
+    resultSubmittedByPlayerId: "dev-player-bob",
+    resultSubmittedAt: new Date("2026-07-19T10:00:00+09:00"),
+    createdAt: new Date("2026-07-19T08:41:00+09:00"),
+    updatedAt: new Date("2026-07-19T10:00:00+09:00"),
+  },
+  {
+    id: "dev-session-open-play-003",
+    type: "mixed-doubles",
+    source: "admin_created_result",
+    creatorPlayerId: "dev-player-alice",
+    sessionName: "일요일 오픈 플레이",
+    sessionDate: new Date("2026-07-19T09:00:00+09:00"),
+    status: "completed",
+    location: "Dev Court C",
+    matchStartsAt: new Date("2026-07-19T10:10:00+09:00"),
+    completedAt: new Date("2026-07-19T10:35:00+09:00"),
+    resultSubmittedByPlayerId: "dev-player-alice",
+    resultSubmittedAt: new Date("2026-07-19T10:35:00+09:00"),
+    createdAt: new Date("2026-07-19T08:42:00+09:00"),
+    updatedAt: new Date("2026-07-19T10:35:00+09:00"),
   },
 ];
 
@@ -191,6 +239,24 @@ const mockMatchScores = [
     matchId: "dev-match-open-play-001",
     scoreA: 11,
     scoreB: 6,
+  },
+  {
+    id: "dev-session-open-play-001-game-1",
+    matchId: "dev-session-open-play-001",
+    scoreA: 11,
+    scoreB: 7,
+  },
+  {
+    id: "dev-session-open-play-002-game-1",
+    matchId: "dev-session-open-play-002",
+    scoreA: 8,
+    scoreB: 11,
+  },
+  {
+    id: "dev-session-open-play-003-game-1",
+    matchId: "dev-session-open-play-003",
+    scoreA: 11,
+    scoreB: 9,
   },
 ];
 
@@ -231,6 +297,78 @@ const mockMatchParticipants = [
     teamIndex: 1,
     playerId: "dev-player-hugo",
   },
+  {
+    id: "dev-session-open-play-001-team-0-alice",
+    matchId: "dev-session-open-play-001",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-session-open-play-001-team-0-bob",
+    matchId: "dev-session-open-play-001",
+    teamIndex: 0,
+    playerId: "dev-player-bob",
+  },
+  {
+    id: "dev-session-open-play-001-team-1-cara",
+    matchId: "dev-session-open-play-001",
+    teamIndex: 1,
+    playerId: "dev-player-cara",
+  },
+  {
+    id: "dev-session-open-play-001-team-1-finn",
+    matchId: "dev-session-open-play-001",
+    teamIndex: 1,
+    playerId: "dev-player-finn",
+  },
+  {
+    id: "dev-session-open-play-002-team-0-bob",
+    matchId: "dev-session-open-play-002",
+    teamIndex: 0,
+    playerId: "dev-player-bob",
+  },
+  {
+    id: "dev-session-open-play-002-team-0-gabe",
+    matchId: "dev-session-open-play-002",
+    teamIndex: 0,
+    playerId: "dev-player-gabe",
+  },
+  {
+    id: "dev-session-open-play-002-team-1-dana",
+    matchId: "dev-session-open-play-002",
+    teamIndex: 1,
+    playerId: "dev-player-dana",
+  },
+  {
+    id: "dev-session-open-play-002-team-1-hugo",
+    matchId: "dev-session-open-play-002",
+    teamIndex: 1,
+    playerId: "dev-player-hugo",
+  },
+  {
+    id: "dev-session-open-play-003-team-0-alice",
+    matchId: "dev-session-open-play-003",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-session-open-play-003-team-0-ella",
+    matchId: "dev-session-open-play-003",
+    teamIndex: 0,
+    playerId: "dev-player-ella",
+  },
+  {
+    id: "dev-session-open-play-003-team-1-finn",
+    matchId: "dev-session-open-play-003",
+    teamIndex: 1,
+    playerId: "dev-player-finn",
+  },
+  {
+    id: "dev-session-open-play-003-team-1-gabe",
+    matchId: "dev-session-open-play-003",
+    teamIndex: 1,
+    playerId: "dev-player-gabe",
+  },
 ];
 
 const mockMatchResultApprovals = [
@@ -261,7 +399,9 @@ export class TestDataRepository {
 
   async seedDevMockData() {
     for (const player of mockPlayers) {
-      const existing = await this.playerRepository.findByUsername(player.username);
+      const existing = await this.playerRepository.findByUsername(
+        player.username,
+      );
       if (!existing) {
         await this.playerRepository.create(player);
       }
@@ -311,7 +451,9 @@ export class TestDataRepository {
     }
   }
 
-  private async createStatusLogIfMissing(data: CreatePlayerStatusChangeLogInput) {
+  private async createStatusLogIfMissing(
+    data: CreatePlayerStatusChangeLogInput,
+  ) {
     const existing = await this.db
       .select()
       .from(playerStatusChangeLogs)

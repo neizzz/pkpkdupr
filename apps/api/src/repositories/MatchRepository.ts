@@ -1,7 +1,9 @@
 import type {
   Match,
+  MatchFeedItem,
   MatchMode,
   MatchScore,
+  MatchSessionSummary,
   Session,
 } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
@@ -86,12 +88,28 @@ const hydrateMatch = (record: any): Match => ({
       approvedAt: new Date(approval.approvedAt),
     }),
   ),
-  scheduledAt: new Date(record.scheduledAt),
   matchStartsAt: new Date(record.matchStartsAt),
   completedAt: toDateOrNull(record.completedAt),
   createdAt: new Date(record.createdAt),
   updatedAt: new Date(record.updatedAt),
 });
+
+const hydrateSessionSummary = (record: any): MatchSessionSummary => ({
+  name: record.name,
+  date: new Date(record.date),
+  matchCount: record.matchCount,
+  participants: (record.participants ?? []).map((participant: any) => ({
+    id: participant.id,
+    username: participant.username,
+    avatarUrl: participant.avatarUrl ?? undefined,
+  })),
+  latestCreatedAt: new Date(record.latestCreatedAt),
+});
+
+const hydrateMatchFeedItem = (record: any): MatchFeedItem =>
+  record.kind === "session"
+    ? { kind: "session", session: hydrateSessionSummary(record.session) }
+    : { kind: "match", match: hydrateMatch(record.match) };
 
 /**
  * MatchRepository - API 서버에서 DB 서버의 match 저장소를 호출합니다.
@@ -266,6 +284,39 @@ export class MatchRepository {
       matches: result.matches.map(hydrateMatch),
       total: result.total,
     };
+  }
+
+  async findFeed(
+    page: number = 0,
+    limit: number = 20,
+    playerId?: string,
+  ): Promise<{ items: MatchFeedItem[]; total: number }> {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (playerId) {
+      params.set("playerId", playerId);
+    }
+
+    const result = await this.dbRequest<{ items: any[]; total: number }>(
+      `/internal/match-feed?${params.toString()}`,
+    );
+    return {
+      items: result.items.map(hydrateMatchFeedItem),
+      total: result.total,
+    };
+  }
+
+  async findBySession(name: string, date: Date): Promise<Match[]> {
+    const params = new URLSearchParams({
+      name,
+      date: date.toISOString(),
+    });
+    const records = await this.dbRequest<any[]>(
+      `/internal/match-sessions/matches?${params.toString()}`,
+    );
+    return records.map(hydrateMatch);
   }
 
   async updateMetadata(

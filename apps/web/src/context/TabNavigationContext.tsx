@@ -4,6 +4,7 @@ export type TabKey = "match" | "members" | "me";
 
 export type TabDepthKind =
   | "match-detail"
+  | "session-detail"
   | "member-profile"
   | "bottom-sheet"
   | "dropdown";

@@ -76,7 +76,7 @@ type MatchInfo = {
   resultSubmittedAt: string | null;
   approvals: MatchApprovalInfo[];
   location?: string;
-  scheduledAt: string;
+  matchStartsAt: string;
   createdAt: string;
   completedAt: string | null;
   updatedAt: string;
@@ -1084,7 +1084,7 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-blue-600">🏓 PkpkDupr Admin</h1>
+        <h1 className="text-xl font-bold text-blue-600">PKELO Admin</h1>
         <div className="flex gap-4 items-center">
           <span className="text-sm text-gray-400">v{__APP_VERSION__}</span>
           <span className="text-sm text-gray-600">
@@ -1548,7 +1548,7 @@ const AdminDashboard: React.FC = () => {
                           </td>
                           <td className="px-4 py-4 min-w-[130px] text-xs text-gray-600">
                             <div className="space-y-1">
-                              <div>{formatDateTime(match.scheduledAt)}</div>
+                              <div>{formatDateTime(match.matchStartsAt)}</div>
                               {match.session?.date ? (
                                 <div className="text-slate-400">
                                   세션 날짜:{" "}

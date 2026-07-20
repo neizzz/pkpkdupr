@@ -7,13 +7,14 @@ import { resolveAssetUrl } from "@/lib/api";
 interface AvatarProps {
   avatarUrl?: string;
   name?: string;
-  size?: "xs" | "sm" | "md" | "lg";
+  size?: "xs" | "session" | "sm" | "md" | "lg";
   className?: string;
   onEditClick?: () => void;
 }
 
 const sizeClassMap: Record<NonNullable<AvatarProps["size"]>, string> = {
   xs: "h-6 w-6",
+  session: "h-9 w-9",
   sm: "h-12 w-12",
   md: "h-18 w-18",
   lg: "h-24 w-24",
@@ -21,6 +22,7 @@ const sizeClassMap: Record<NonNullable<AvatarProps["size"]>, string> = {
 
 const iconSizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
   xs: "text-md",
+  session: "text-xl",
   sm: "text-2xl",
   md: "text-3xl",
   lg: "text-4xl",
@@ -28,6 +30,7 @@ const iconSizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
 
 const editBadgeSizeMap: Record<NonNullable<AvatarProps["size"]>, string> = {
   xs: "size-3",
+  session: "size-4",
   sm: "size-4",
   md: "size-5",
   lg: "size-6",

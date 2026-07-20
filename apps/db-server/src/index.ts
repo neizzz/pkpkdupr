@@ -66,7 +66,8 @@ const safeExec = async (sql: string) => {
     const message = error instanceof Error ? error.message : String(error);
     if (
       message.includes("duplicate column name") ||
-      message.includes("already exists")
+      message.includes("already exists") ||
+      message.includes("no such column")
     ) {
       return;
     }
@@ -238,7 +239,7 @@ const initSchema = async () => {
       session_date INTEGER,
       status TEXT NOT NULL,
       location TEXT NOT NULL,
-      scheduled_at INTEGER NOT NULL,
+      match_starts_at INTEGER NOT NULL,
       completed_at INTEGER,
       result_submitted_by_player_id TEXT,
       result_submitted_at INTEGER,
@@ -267,12 +268,11 @@ const initSchema = async () => {
 
   await client.execute(`
     UPDATE matches
-    SET match_starts_at = CASE
-      WHEN scheduled_at % (30 * 60 * 1000) = 0 THEN scheduled_at
-      ELSE scheduled_at + ((30 * 60 * 1000) - (scheduled_at % (30 * 60 * 1000)))
-    END
+    SET match_starts_at = created_at
     WHERE match_starts_at IS NULL
   `);
+
+  await safeExec(`ALTER TABLE matches DROP COLUMN scheduled_at`);
 
   await client.execute(`
     UPDATE matches
@@ -612,6 +612,37 @@ app.get("/internal/matches", async (req, res) => {
       typeof req.query.playerId === "string" ? req.query.playerId : undefined;
 
     res.json(await matchRepository.findAll(page, limit, playerId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/match-feed", async (req, res) => {
+  try {
+    const page = Number(req.query.page ?? 0);
+    const limit = Number(req.query.limit ?? 20);
+    const playerId =
+      typeof req.query.playerId === "string" ? req.query.playerId : undefined;
+
+    res.json(await matchRepository.findFeed(page, limit, playerId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/match-sessions/matches", async (req, res) => {
+  try {
+    const name =
+      typeof req.query.name === "string" ? req.query.name.trim() : "";
+    const date =
+      typeof req.query.date === "string" ? new Date(req.query.date) : null;
+    if (!name || !date || Number.isNaN(date.getTime())) {
+      return res
+        .status(400)
+        .json({ error: "유효한 세션명과 세션 날짜가 필요합니다." });
+    }
+
+    res.json(await matchRepository.findBySession(name, date));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

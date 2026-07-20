@@ -1,8 +1,10 @@
 import type {
   MatchMode,
   Match,
+  MatchFeedItem,
   MatchResultApproval,
   MatchScore,
+  MatchSessionSummary,
   Session,
   MatchSource,
   MatchType,
@@ -64,7 +66,6 @@ export interface CreateMatchInput {
   teams: [Team, Team];
   scores?: MatchScore[];
   location: string;
-  scheduledAt: Date;
   matchStartsAt: Date;
   completedAt: Date | null;
   resultSubmittedByPlayerId?: string | null;
@@ -208,6 +209,75 @@ export class MatchRepository {
     };
   }
 
+  async findFeed(
+    page: number = 0,
+    limit: number = 20,
+    playerId?: string,
+  ): Promise<{ items: MatchFeedItem[]; total: number }> {
+    const allMatches = await this.loadAllMatches();
+    const sessionSummaries = this.buildSessionSummaries(allMatches);
+    const sessionParticipantIds = new Map<string, Set<string>>();
+    for (const match of allMatches) {
+      const sessionKey = this.getSessionKey(match);
+      if (!sessionKey) continue;
+
+      const participantIds = sessionParticipantIds.get(sessionKey) ?? new Set();
+      for (const team of match.teams) {
+        for (const participant of team.players) {
+          participantIds.add(participant.id);
+        }
+      }
+      sessionParticipantIds.set(sessionKey, participantIds);
+    }
+    const seenSessionKeys = new Set<string>();
+    const feedItems: MatchFeedItem[] = [];
+
+    for (const match of allMatches) {
+      const sessionKey = this.getSessionKey(match);
+      if (!sessionKey) {
+        if (!playerId || this.isPlayerInMatch(match, playerId)) {
+          feedItems.push({ kind: "match", match });
+        }
+        continue;
+      }
+
+      if (seenSessionKeys.has(sessionKey)) {
+        continue;
+      }
+      seenSessionKeys.add(sessionKey);
+
+      const summary = sessionSummaries.get(sessionKey);
+      if (
+        summary &&
+        (!playerId ||
+          sessionParticipantIds.get(sessionKey)?.has(playerId))
+      ) {
+        feedItems.push({ kind: "session", session: summary });
+      }
+    }
+
+    const start = page * limit;
+    return {
+      items: feedItems.slice(start, start + limit),
+      total: feedItems.length,
+    };
+  }
+
+  async findBySession(name: string, date: Date): Promise<Match[]> {
+    const normalizedName = name.trim();
+    const dateValue = date.getTime();
+    if (!normalizedName || Number.isNaN(dateValue)) {
+      return [];
+    }
+
+    const allMatches = await this.loadAllMatches();
+    return allMatches.filter(
+      (match) =>
+        match.session?.name?.trim() === normalizedName &&
+        match.session.date.getTime() === dateValue,
+    );
+  }
+
   async create(data: CreateMatchInput): Promise<Match> {
     const now = new Date();
 
@@ -226,7 +296,6 @@ export class MatchRepository {
       sessionDate: toDateOrNull(data.session?.date),
       status: data.status,
       location: data.location,
-      scheduledAt: new Date(data.scheduledAt),
       matchStartsAt: new Date(data.matchStartsAt),
       completedAt: toDateOrNull(data.completedAt),
       resultSubmittedByPlayerId: data.resultSubmittedByPlayerId ?? null,
@@ -646,7 +715,6 @@ export class MatchRepository {
       resultSubmittedAt: toDateOrNull(match.resultSubmittedAt),
       approvals: approvals.map(toApproval),
       location: match.location,
-      scheduledAt: toDate(match.scheduledAt),
       matchStartsAt: toDate(match.matchStartsAt),
       createdAt: toDate(match.createdAt),
       completedAt: toDateOrNull(match.completedAt),
@@ -654,6 +722,86 @@ export class MatchRepository {
     } as Match & { sessionName?: string };
 
     return hydratedMatch;
+  }
+
+  private async loadAllMatches(): Promise<Match[]> {
+    const storedMatches = await this.db
+      .select()
+      .from(matches)
+      .orderBy(desc(matches.createdAt))
+      .all();
+    return await Promise.all(
+      storedMatches.map((match: StoredMatch) => this.hydrateMatch(match)),
+    );
+  }
+
+  private getSessionKey(match: Match): string | null {
+    const name = match.session?.name?.trim();
+    if (!name || !match.session) {
+      return null;
+    }
+    return `${name}\u0000${match.session.date.toISOString()}`;
+  }
+
+  private isPlayerInMatch(match: Match, playerId: string) {
+    return match.teams.some((team) =>
+      team.players.some((player) => player.id === playerId),
+    );
+  }
+
+  private buildSessionSummaries(matchesToGroup: Match[]) {
+    const summaries = new Map<
+      string,
+      MatchSessionSummary & { participantIds: Set<string> }
+    >();
+
+    for (const match of matchesToGroup) {
+      const key = this.getSessionKey(match);
+      if (!key || !match.session?.name) {
+        continue;
+      }
+
+      const existing = summaries.get(key);
+      const summary =
+        existing ?? {
+          name: match.session.name.trim(),
+          date: match.session.date,
+          matchCount: 0,
+          participants: [],
+          latestCreatedAt: match.createdAt,
+          participantIds: new Set<string>(),
+        };
+
+      summary.matchCount += 1;
+      if (match.createdAt > summary.latestCreatedAt) {
+        summary.latestCreatedAt = match.createdAt;
+      }
+      for (const team of match.teams) {
+        for (const player of team.players) {
+          if (summary.participantIds.has(player.id)) {
+            continue;
+          }
+          summary.participantIds.add(player.id);
+          summary.participants.push({
+            id: player.id,
+            username: player.username,
+            avatarUrl: player.avatarUrl,
+          });
+        }
+      }
+      summary.participants.sort(
+        (left, right) =>
+          Number(Boolean(right.avatarUrl)) - Number(Boolean(left.avatarUrl)),
+      );
+      summaries.set(key, summary);
+    }
+
+    return new Map(
+      [...summaries.entries()].map(([key, summary]) => {
+        const { participantIds: _participantIds, ...session } = summary;
+        return [key, session];
+      }),
+    );
   }
 
   private async createParticipants(matchId: string, teams: [Team, Team]) {

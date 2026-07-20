@@ -22,7 +22,7 @@ export interface AdminBatchMatchRequest {
     { name: string; playerIds: string[] },
   ];
   location: string;
-  scheduledAt: string;
+  matchStartsAt: string;
   scores: MatchScore[];
 }
 
@@ -59,7 +59,7 @@ type MatchDraft = {
   name: string;
   type: MatchType;
   location: string;
-  scheduledAt: string;
+  matchStartsAt: string;
   teams: [string[], string[]];
   scores: ScoreRowDraft[];
 };
@@ -163,7 +163,7 @@ const createEmptyDraft = (): MatchDraft => ({
   name: "",
   type: "singles",
   location: "",
-  scheduledAt: toLocalDateTimeValue(),
+  matchStartsAt: toLocalDateTimeValue(),
   teams: createEmptyTeams("singles"),
   scores: [createEmptyScoreRow()],
 });
@@ -243,7 +243,10 @@ const buildImportedPreview = (
     };
   }
 
-  const getCell = (columns: string[], header: (typeof REQUIRED_IMPORT_HEADERS)[number]) =>
+  const getCell = (
+    columns: string[],
+    header: (typeof REQUIRED_IMPORT_HEADERS)[number],
+  ) =>
     columns[headerIndexByKey.get(normalizeHeader(header)) ?? -1]?.trim() ?? "";
 
   const playerByUsername = new Map(
@@ -284,7 +287,10 @@ const buildImportedPreview = (
       }
     });
 
-    if (new Set(usernames.filter(Boolean)).size !== usernames.filter(Boolean).length) {
+    if (
+      new Set(usernames.filter(Boolean)).size !==
+      usernames.filter(Boolean).length
+    ) {
       issues.push("같은 경기에서 참가자가 중복되었습니다.");
     }
 
@@ -298,8 +304,8 @@ const buildImportedPreview = (
       issues.push("점수가 유효하지 않습니다.");
     }
 
-    const scheduledAt = parseImportedDateToIso(dateLabel);
-    if (!scheduledAt) {
+    const matchStartsAt = parseImportedDateToIso(dateLabel);
+    if (!matchStartsAt) {
       issues.push(`날짜를 파싱할 수 없습니다: ${dateLabel}`);
     }
 
@@ -316,8 +322,12 @@ const buildImportedPreview = (
         Pick<Player, "gender" | "id">
       >;
       const allPlayers = [...teamA, ...teamB];
-      const menCount = allPlayers.filter((player) => player.gender === "M").length;
-      const womenCount = allPlayers.filter((player) => player.gender === "F").length;
+      const menCount = allPlayers.filter(
+        (player) => player.gender === "M",
+      ).length;
+      const womenCount = allPlayers.filter(
+        (player) => player.gender === "F",
+      ).length;
       const isMixedTeam = (team: Array<Pick<Player, "gender">>) =>
         team.length === 2 &&
         team.some((player) => player.gender === "M") &&
@@ -336,7 +346,7 @@ const buildImportedPreview = (
 
     const payload =
       issues.length === 0 &&
-      scheduledAt &&
+      matchStartsAt &&
       inferredType &&
       participantPlayers.every(Boolean)
         ? {
@@ -359,7 +369,7 @@ const buildImportedPreview = (
               { name: string; playerIds: string[] },
             ],
             location: IMPORT_DEFAULT_LOCATION,
-            scheduledAt,
+            matchStartsAt,
             scores: [{ scoreA, scoreB }],
           }
         : null;
@@ -380,7 +390,8 @@ const buildImportedPreview = (
     .map((row) => row.payload)
     .filter((payload): payload is AdminBatchMatchRequest => Boolean(payload));
   const errorCount =
-    headerIssues.length + rows.reduce((count, row) => count + row.issues.length, 0);
+    headerIssues.length +
+    rows.reduce((count, row) => count + row.issues.length, 0);
 
   return {
     headerIssues,
@@ -398,7 +409,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   onSubmit,
 }) => {
   const [mode, setMode] = useState<FormMode>("manual");
-  const [drafts, setDrafts] = useState<MatchDraft[]>(() => [createEmptyDraft()]);
+  const [drafts, setDrafts] = useState<MatchDraft[]>(() => [
+    createEmptyDraft(),
+  ]);
   const [pastedText, setPastedText] = useState("");
   const [sessionName, setSessionName] = useState("");
   const [sessionDate, setSessionDate] = useState("");
@@ -433,9 +446,14 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   const normalizedSessionName = normalizeOptionalText(sessionName);
   const normalizedSessionDate = normalizeOptionalText(sessionDate);
 
-  const updateDraft = (draftId: string, updater: (draft: MatchDraft) => MatchDraft) => {
+  const updateDraft = (
+    draftId: string,
+    updater: (draft: MatchDraft) => MatchDraft,
+  ) => {
     setDrafts((currentDrafts) =>
-      currentDrafts.map((draft) => (draft.id === draftId ? updater(draft) : draft)),
+      currentDrafts.map((draft) =>
+        draft.id === draftId ? updater(draft) : draft,
+      ),
     );
   };
 
@@ -506,7 +524,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     updateDraft(draftId, (draft) => ({
       ...draft,
       scores: draft.scores.map((scoreRow, currentIndex) =>
-        currentIndex === scoreIndex ? { ...scoreRow, [field]: value } : scoreRow,
+        currentIndex === scoreIndex
+          ? { ...scoreRow, [field]: value }
+          : scoreRow,
       ),
     }));
   };
@@ -516,9 +536,12 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     teamIndex: 0 | 1,
     slotIndex: number,
   ) => {
-    const [teamARequirements, teamBRequirements] = getSlotRequirements(draft.type);
-    const slotRequirement =
-      (teamIndex === 0 ? teamARequirements : teamBRequirements)[slotIndex];
+    const [teamARequirements, teamBRequirements] = getSlotRequirements(
+      draft.type,
+    );
+    const slotRequirement = (
+      teamIndex === 0 ? teamARequirements : teamBRequirements
+    )[slotIndex];
     const selectedIds = new Set(
       draft.teams.flatMap((team, currentTeamIndex) =>
         team.filter(
@@ -545,9 +568,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       const session = buildSessionPayload();
       const payload = drafts.map((draft, draftIndex) => {
         const label = `${draftIndex + 1}번째 경기`;
-        const scheduledDate = new Date(draft.scheduledAt);
-        if (Number.isNaN(scheduledDate.getTime())) {
-          throw new Error(`${label}: 경기 시간을 확인해주세요.`);
+        const matchStartsAtDate = new Date(draft.matchStartsAt);
+        if (Number.isNaN(matchStartsAtDate.getTime())) {
+          throw new Error(`${label}: 매치 시작 시간을 확인해주세요.`);
         }
 
         const playerIds = draft.teams.flat();
@@ -559,9 +582,13 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
           throw new Error(`${label}: 같은 참가자를 중복 선택할 수 없습니다.`);
         }
 
-        const missingPlayer = playerIds.find((playerId) => !playersById.has(playerId));
+        const missingPlayer = playerIds.find(
+          (playerId) => !playersById.has(playerId),
+        );
         if (missingPlayer) {
-          throw new Error(`${label}: 현재 회원 목록에 없는 참가자가 포함되어 있습니다.`);
+          throw new Error(
+            `${label}: 현재 회원 목록에 없는 참가자가 포함되어 있습니다.`,
+          );
         }
 
         if (draft.scores.length === 0) {
@@ -585,7 +612,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             scoreB < 0 ||
             scoreA === scoreB
           ) {
-            throw new Error(`${label}: ${scoreIndex + 1}번째 스코어를 확인해주세요.`);
+            throw new Error(
+              `${label}: ${scoreIndex + 1}번째 스코어를 확인해주세요.`,
+            );
           }
 
           return { scoreA, scoreB };
@@ -602,7 +631,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             { name: string; playerIds: string[] },
           ],
           location: draft.location.trim(),
-          scheduledAt: scheduledDate.toISOString(),
+          matchStartsAt: matchStartsAtDate.toISOString(),
           scores,
         };
       });
@@ -610,7 +639,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       await onSubmit({ session, matches: payload });
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "경기 저장에 실패했습니다.",
+        submitError instanceof Error
+          ? submitError.message
+          : "경기 저장에 실패했습니다.",
       );
     }
   };
@@ -643,7 +674,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       await onSubmit({ session, matches: importedPreview.validMatches });
     } catch (submitError) {
       setError(
-        submitError instanceof Error ? submitError.message : "경기 저장에 실패했습니다.",
+        submitError instanceof Error
+          ? submitError.message
+          : "경기 저장에 실패했습니다.",
       );
     }
   };
@@ -656,7 +689,8 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             경기 결과 일괄 입력
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            수동 입력 또는 Google Sheets 표 복붙으로 관리자 경기 결과를 즉시 완료 처리할 수 있습니다.
+            수동 입력 또는 Google Sheets 표 복붙으로 관리자 경기 결과를 즉시
+            완료 처리할 수 있습니다.
           </p>
         </div>
       </div>
@@ -694,7 +728,8 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
 
       {selectablePlayers.length === 0 ? (
         <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700">
-          선택 가능한 활성 회원이 없습니다. 먼저 회원을 생성하거나 inactive 상태를 해제해주세요.
+          선택 가능한 활성 회원이 없습니다. 먼저 회원을 생성하거나 inactive
+          상태를 해제해주세요.
         </p>
       ) : null}
 
@@ -846,13 +881,13 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                       }
                       className="w-full rounded-lg border bg-white px-4 py-2"
                     >
-                      {getSelectableMatchTypes(getMatchTopLevelType(draft.type)).map(
-                        (matchType) => (
-                          <option key={matchType} value={matchType}>
-                            {matchTypeLabels[matchType]}
-                          </option>
-                        ),
-                      )}
+                      {getSelectableMatchTypes(
+                        getMatchTopLevelType(draft.type),
+                      ).map((matchType) => (
+                        <option key={matchType} value={matchType}>
+                          {matchTypeLabels[matchType]}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -874,15 +909,15 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      경기 시간
+                      매치 시작 시간
                     </label>
                     <input
                       type="datetime-local"
-                      value={draft.scheduledAt}
+                      value={draft.matchStartsAt}
                       onChange={(event) =>
                         updateDraft(draft.id, (currentDraft) => ({
                           ...currentDraft,
-                          scheduledAt: event.target.value,
+                          matchStartsAt: event.target.value,
                         }))
                       }
                       className="w-full rounded-lg border bg-white px-4 py-2"
@@ -891,18 +926,20 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  {([
-                    {
-                      title: "Team A",
-                      requirements: teamARequirements,
-                      teamIndex: 0 as const,
-                    },
-                    {
-                      title: "Team B",
-                      requirements: teamBRequirements,
-                      teamIndex: 1 as const,
-                    },
-                  ] as const).map(({ title, requirements, teamIndex }) => (
+                  {(
+                    [
+                      {
+                        title: "Team A",
+                        requirements: teamARequirements,
+                        teamIndex: 0 as const,
+                      },
+                      {
+                        title: "Team B",
+                        requirements: teamBRequirements,
+                        teamIndex: 1 as const,
+                      },
+                    ] as const
+                  ).map(({ title, requirements, teamIndex }) => (
                     <div
                       key={title}
                       className="rounded-lg border border-slate-200 bg-white p-4"
@@ -927,13 +964,16 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                               className="w-full rounded-lg border bg-white px-4 py-2"
                             >
                               <option value="">참가자 선택</option>
-                              {getSelectablePlayers(draft, teamIndex, slotIndex).map(
-                                (player) => (
-                                  <option key={player.id} value={player.id}>
-                                    {player.username} ({player.gender === "M" ? "남" : "여"})
-                                  </option>
-                                ),
-                              )}
+                              {getSelectablePlayers(
+                                draft,
+                                teamIndex,
+                                slotIndex,
+                              ).map((player) => (
+                                <option key={player.id} value={player.id}>
+                                  {player.username} (
+                                  {player.gender === "M" ? "남" : "여"})
+                                </option>
+                              ))}
                             </select>
                           </div>
                         ))}
@@ -947,16 +987,22 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                     <div>
                       <h4 className="font-semibold text-slate-700">스코어</h4>
                       <p className="text-xs text-slate-500">
-                        최대 {MATCH_RESULT_MAX_SCORE_COUNT}개까지 입력할 수 있습니다.
+                        최대 {MATCH_RESULT_MAX_SCORE_COUNT}개까지 입력할 수
+                        있습니다.
                       </p>
                     </div>
                     <button
                       type="button"
-                      disabled={draft.scores.length >= MATCH_RESULT_MAX_SCORE_COUNT}
+                      disabled={
+                        draft.scores.length >= MATCH_RESULT_MAX_SCORE_COUNT
+                      }
                       onClick={() =>
                         updateDraft(draft.id, (currentDraft) => ({
                           ...currentDraft,
-                          scores: [...currentDraft.scores, createEmptyScoreRow()],
+                          scores: [
+                            ...currentDraft.scores,
+                            createEmptyScoreRow(),
+                          ],
                         }))
                       }
                       className="px-3 py-2 rounded-lg border border-slate-300 text-sm font-medium disabled:text-slate-300"
@@ -1068,9 +1114,13 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold text-slate-800">파싱 미리보기</h3>
+                  <h3 className="font-semibold text-slate-800">
+                    파싱 미리보기
+                  </h3>
                   <p className="text-sm text-slate-500">
-                    총 {importedPreview.rows.length}행 · 유효 {importedPreview.validMatches.length}행 · 에러 {importedPreview.errorCount}개
+                    총 {importedPreview.rows.length}행 · 유효{" "}
+                    {importedPreview.validMatches.length}행 · 에러{" "}
+                    {importedPreview.errorCount}개
                   </p>
                 </div>
                 <button
@@ -1111,18 +1161,33 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                     </thead>
                     <tbody>
                       {importedPreview.rows.map((row) => (
-                        <tr key={`${row.sourceRowNumber}-${row.matchNumber}`} className="border-b align-top">
-                          <td className="py-3 pr-3 text-slate-500">{row.sourceRowNumber}</td>
-                          <td className="py-3 pr-3">{row.matchNumber || "-"}</td>
+                        <tr
+                          key={`${row.sourceRowNumber}-${row.matchNumber}`}
+                          className="border-b align-top"
+                        >
+                          <td className="py-3 pr-3 text-slate-500">
+                            {row.sourceRowNumber}
+                          </td>
+                          <td className="py-3 pr-3">
+                            {row.matchNumber || "-"}
+                          </td>
                           <td className="py-3 pr-3">{row.dateLabel || "-"}</td>
                           <td className="py-3 pr-3">
                             <div className="space-y-1">
-                              <div>A: {row.usernames[0] || "-"}, {row.usernames[1] || "-"}</div>
-                              <div>B: {row.usernames[2] || "-"}, {row.usernames[3] || "-"}</div>
+                              <div>
+                                A: {row.usernames[0] || "-"},{" "}
+                                {row.usernames[1] || "-"}
+                              </div>
+                              <div>
+                                B: {row.usernames[2] || "-"},{" "}
+                                {row.usernames[3] || "-"}
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 pr-3">
-                            {row.inferredType ? matchTypeLabels[row.inferredType] : "-"}
+                            {row.inferredType
+                              ? matchTypeLabels[row.inferredType]
+                              : "-"}
                           </td>
                           <td className="py-3 pr-3 font-semibold text-slate-700">
                             {row.scoreLabel}
@@ -1146,7 +1211,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-slate-500">붙여넣은 데이터가 없습니다.</p>
+                <p className="text-sm text-slate-500">
+                  붙여넣은 데이터가 없습니다.
+                </p>
               )}
             </div>
           ) : null}

@@ -1,18 +1,22 @@
 import React, { useMemo } from "react";
 import { Card } from "@heroui/react";
-import { IoCalendarClearOutline, IoChevronForward } from "react-icons/io5";
-import type { Match as SharedMatch, MatchStatus } from "@pkpkdupr/shared/match";
+import type {
+  Match as SharedMatch,
+  MatchSessionSummary,
+  MatchStatus,
+} from "@pkpkdupr/shared/match";
 import {
   getMatchTopLevelType,
   matchTopLevelTypeLabels,
 } from "@pkpkdupr/shared/match";
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import UserChip from "@/components/UserChip";
+import MatchCardHeader from "@/components/MatchCardHeader";
 import { formatRating, getDisplayRatingForMatchType } from "@/utils/dupr";
 
 export type MatchInfo = Omit<
   SharedMatch,
-  | "scheduledAt"
+  | "matchStartsAt"
   | "createdAt"
   | "updatedAt"
   | "completedAt"
@@ -20,7 +24,7 @@ export type MatchInfo = Omit<
   | "session"
   | "approvals"
 > & {
-  scheduledAt: string;
+  matchStartsAt: string;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -35,6 +39,18 @@ export type MatchInfo = Omit<
   }>;
   ratingChanges?: PlayerRatingChangeLog[];
 };
+
+export type MatchSessionSummaryInfo = Omit<
+  MatchSessionSummary,
+  "date" | "latestCreatedAt"
+> & {
+  date: string;
+  latestCreatedAt: string;
+};
+
+export type MatchFeedItemInfo =
+  | { kind: "match"; match: MatchInfo }
+  | { kind: "session"; session: MatchSessionSummaryInfo };
 
 interface MatchProps {
   match: MatchInfo;
@@ -146,37 +162,19 @@ const Match: React.FC<MatchProps> = ({
       }`}
     >
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`inline-flex items-center gap-0.5 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums ${subTextClassName}`}
-          >
-            <IoCalendarClearOutline className="size-3.5" />
-            {matchDate}
-          </span>
-          <span
-            className={`text-[0.75rem] font-bold leading-none ${subTextClassName}`}
-          >
-            ·
-          </span>
-          <span
-            className={`text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums ${subTextClassName}`}
-          >
-            {matchTime}
-          </span>
-          <span
-            className={`text-[0.75rem] font-bold leading-none ${subTextClassName}`}
-          >
-            ·
-          </span>
-          <span
-            className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}
-          >
-            {statusLabelMap[match.status]}
-          </span>
-        </div>
-        <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-main-font">
-          {displayTitle}
-        </p>
+        <MatchCardHeader
+          date={matchDate}
+          time={matchTime}
+          title={displayTitle}
+          showChevron={showChevron}
+          afterTime={
+            <span
+              className={`${titleChipClassName} ${statusBadgeClassMap[match.status]}`}
+            >
+              {statusLabelMap[match.status]}
+            </span>
+          }
+        />
         {sessionLabel ? (
           <p
             className={`mt-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium ${subTextClassName}`}
@@ -254,12 +252,6 @@ const Match: React.FC<MatchProps> = ({
           </div>
         )}
       </div>
-      {showChevron ? (
-        <IoChevronForward
-          aria-hidden="true"
-          className="absolute right-3 top-3 size-5 text-[#888]"
-        />
-      ) : null}
     </Card>
   );
 

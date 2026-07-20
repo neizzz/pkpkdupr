@@ -1,11 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Switch } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
-import { useAuth } from "@/context/AuthContext";
-import Match, { type MatchInfo } from "@/components/Match";
+import Match, {
+  type MatchFeedItemInfo,
+  type MatchInfo,
+  type MatchSessionSummaryInfo,
+} from "@/components/Match";
 import MatchDetail from "@/components/MatchDetail";
+import SessionCard from "@/components/SessionCard";
+import SessionDetail from "@/components/SessionDetail";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
+import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
@@ -15,74 +21,79 @@ interface MatchesProps {
   reloadKey?: number;
 }
 
-const CACHED_MATCHES_KEY = "pkpkdupr:matches:v2-public-dupr";
-const CACHED_MY_MATCHES_KEY = `${CACHED_MATCHES_KEY}:my`;
-const LEGACY_CACHED_MATCHES_KEYS = ["pkpkdupr:matches"];
+const CACHED_MATCH_FEED_KEY = "pkpkdupr:matches:v3-session-feed";
+const CACHED_MY_MATCH_FEED_KEY = `${CACHED_MATCH_FEED_KEY}:my`;
+const LEGACY_CACHED_MATCH_KEYS = [
+  "pkpkdupr:matches",
+  "pkpkdupr:matches:v2-public-dupr",
+  "pkpkdupr:matches:v2-public-dupr:my",
+];
 const MATCHES_PAGE_SIZE = 20;
 const OFFLINE_FALLBACK_MESSAGE =
   "최신 정보를 불러오지 못해 저장된 매치 목록을 표시합니다.";
 
-interface CachedMatches {
-  matches: MatchInfo[];
+interface CachedMatchFeed {
+  items: MatchFeedItemInfo[];
   total: number;
 }
 
-interface MatchesResponse {
-  matches: MatchInfo[];
+interface MatchFeedResponse {
+  items: MatchFeedItemInfo[];
   total: number;
 }
 
 const clearLegacyCachedMatches = () => {
-  for (const key of LEGACY_CACHED_MATCHES_KEYS) {
+  for (const key of LEGACY_CACHED_MATCH_KEYS) {
     localStorage.removeItem(key);
   }
 };
 
-const getCachedMatchesKey = (isMyMatchOnly: boolean) =>
-  isMyMatchOnly ? CACHED_MY_MATCHES_KEY : CACHED_MATCHES_KEY;
+const getCachedMatchFeedKey = (isMyMatchOnly: boolean) =>
+  isMyMatchOnly ? CACHED_MY_MATCH_FEED_KEY : CACHED_MATCH_FEED_KEY;
 
-const readCachedMatches = (key: string): CachedMatches | null => {
+const readCachedMatchFeed = (key: string): CachedMatchFeed | null => {
   try {
-    const cachedMatches = localStorage.getItem(key);
-    if (!cachedMatches) {
+    const cachedFeed = localStorage.getItem(key);
+    if (!cachedFeed) return null;
+
+    const parsed = JSON.parse(cachedFeed) as Partial<CachedMatchFeed>;
+    if (!Array.isArray(parsed.items) || typeof parsed.total !== "number") {
       return null;
     }
 
-    const parsed = JSON.parse(cachedMatches) as unknown;
-    if (Array.isArray(parsed)) {
-      return { matches: parsed as MatchInfo[], total: parsed.length };
-    }
-
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      Array.isArray((parsed as CachedMatches).matches) &&
-      typeof (parsed as CachedMatches).total === "number"
-    ) {
-      const { matches, total } = parsed as CachedMatches;
-      return { matches, total: Math.max(matches.length, total) };
-    }
-
-    return null;
+    return {
+      items: parsed.items as MatchFeedItemInfo[],
+      total: Math.max(parsed.items.length, parsed.total),
+    };
   } catch {
     return null;
   }
 };
 
-const writeCachedMatches = (key: string, cachedMatches: CachedMatches) => {
-  localStorage.setItem(key, JSON.stringify(cachedMatches));
+const writeCachedMatchFeed = (key: string, cachedFeed: CachedMatchFeed) => {
+  localStorage.setItem(key, JSON.stringify(cachedFeed));
 };
 
-const mergeMatches = (
-  currentMatches: MatchInfo[],
-  nextMatches: MatchInfo[],
+const getFeedItemKey = (item: MatchFeedItemInfo) =>
+  item.kind === "match"
+    ? `match:${item.match.id}`
+    : `session:${item.session.name}\u0000${item.session.date}`;
+
+const mergeFeedItems = (
+  currentItems: MatchFeedItemInfo[],
+  nextItems: MatchFeedItemInfo[],
 ) => {
-  const existingMatchIds = new Set(currentMatches.map((match) => match.id));
+  const existingItemKeys = new Set(currentItems.map(getFeedItemKey));
   return [
-    ...currentMatches,
-    ...nextMatches.filter((match) => !existingMatchIds.has(match.id)),
+    ...currentItems,
+    ...nextItems.filter((item) => !existingItemKeys.has(getFeedItemKey(item))),
   ];
 };
+
+const isSameSession = (
+  left: MatchSessionSummaryInfo,
+  right: MatchSessionSummaryInfo,
+) => left.name === right.name && left.date === right.date;
 
 const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const { player, token } = useAuth();
@@ -95,7 +106,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     scrollToTop,
     registerPullToRefresh,
   } = useTabNavigation();
-  const [matches, setMatches] = useState<MatchInfo[]>([]);
+  const [feedItems, setFeedItems] = useState<MatchFeedItemInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [nextPage, setNextPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +115,13 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
+  const [selectedSession, setSelectedSession] =
+    useState<MatchSessionSummaryInfo | null>(null);
+  const [selectedSessionMatches, setSelectedSessionMatches] = useState<
+    MatchInfo[]
+  >([]);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
   const latestRequestIdRef = useRef(0);
@@ -121,7 +139,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     clearLegacyCachedMatches();
   }, []);
 
-  const loadMatches = useCallback(
+  const loadFeed = useCallback(
     async (
       page = 0,
       append = false,
@@ -130,7 +148,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     ) => {
       if (!token) {
         latestRequestIdRef.current += 1;
-        setMatches([]);
+        setFeedItems([]);
         setTotal(0);
         setNextPage(0);
         setIsLoading(false);
@@ -140,14 +158,14 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
       const requestId = latestRequestIdRef.current + 1;
       latestRequestIdRef.current = requestId;
-      const cachedMatchesKey = getCachedMatchesKey(isMyMatchOnly);
+      const cachedFeedKey = getCachedMatchFeedKey(isMyMatchOnly);
 
       try {
         if (append) {
           setIsLoadingMore(true);
           setLoadMoreError(null);
         } else if (!preserveVisibleData) {
-          setMatches([]);
+          setFeedItems([]);
           setTotal(0);
           setNextPage(0);
           setIsLoading(true);
@@ -165,12 +183,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         }
 
         const res = await fetch(
-          buildApiUrl(`/api/matches?${searchParams.toString()}`),
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
+          buildApiUrl(`/api/match-feed?${searchParams.toString()}`),
+          { headers: { Authorization: `Bearer ${token}` } },
         );
-
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(
@@ -178,20 +193,18 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           );
         }
 
-        const data = (await res.json()) as MatchesResponse;
-        if (latestRequestIdRef.current !== requestId) {
-          return;
-        }
+        const data = (await res.json()) as MatchFeedResponse;
+        if (latestRequestIdRef.current !== requestId) return;
 
-        setMatches((currentMatches) => {
-          const nextMatches = append
-            ? mergeMatches(currentMatches, data.matches)
-            : data.matches;
-          writeCachedMatches(cachedMatchesKey, {
-            matches: nextMatches,
+        setFeedItems((currentItems) => {
+          const nextItems = append
+            ? mergeFeedItems(currentItems, data.items)
+            : data.items;
+          writeCachedMatchFeed(cachedFeedKey, {
+            items: nextItems,
             total: data.total,
           });
-          return nextMatches;
+          return nextItems;
         });
         setTotal(data.total);
         setNextPage(page + 1);
@@ -201,18 +214,14 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           setNotice(null);
         }
       } catch (err) {
-        if (latestRequestIdRef.current !== requestId) {
-          return;
-        }
+        if (latestRequestIdRef.current !== requestId) return;
 
         if (!isOnline) {
-          const cachedMatches = readCachedMatches(cachedMatchesKey);
-          if (cachedMatches && !append && !preserveVisibleData) {
-            setMatches(cachedMatches.matches);
-            setTotal(cachedMatches.total);
-            setNextPage(
-              Math.ceil(cachedMatches.matches.length / MATCHES_PAGE_SIZE),
-            );
+          const cachedFeed = readCachedMatchFeed(cachedFeedKey);
+          if (cachedFeed && !append && !preserveVisibleData) {
+            setFeedItems(cachedFeed.items);
+            setTotal(cachedFeed.total);
+            setNextPage(Math.ceil(cachedFeed.items.length / MATCHES_PAGE_SIZE));
             setNotice(OFFLINE_FALLBACK_MESSAGE);
             setError(null);
             return;
@@ -220,18 +229,13 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         }
 
         const message =
-          err instanceof Error
-            ? err.message
-            : "매치 목록을 불러오지 못했습니다.";
+          err instanceof Error ? err.message : "매치 목록을 불러오지 못했습니다.";
         if (append) {
           setLoadMoreError(message);
         } else if (!preserveVisibleData) {
           setError(message);
         }
-
-        if (throwOnError) {
-          throw err;
-        }
+        if (throwOnError) throw err;
       } finally {
         if (latestRequestIdRef.current === requestId) {
           if (append) {
@@ -247,9 +251,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
   const loadSelectedMatch = useCallback(
     async (matchId: string) => {
-      if (!token) {
-        throw new Error("로그인이 필요해요.");
-      }
+      if (!token) throw new Error("로그인이 필요해요.");
 
       const res = await fetch(buildApiUrl(`/api/matches/${matchId}`), {
         headers: { Authorization: `Bearer ${token}` },
@@ -261,7 +263,14 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
       const refreshedMatch = (await res.json()) as MatchInfo;
       setSelectedMatch(refreshedMatch);
-      setMatches((currentMatches) =>
+      setFeedItems((currentItems) =>
+        currentItems.map((item) =>
+          item.kind === "match" && item.match.id === refreshedMatch.id
+            ? { kind: "match", match: refreshedMatch }
+            : item,
+        ),
+      );
+      setSelectedSessionMatches((currentMatches) =>
         currentMatches.map((match) =>
           match.id === refreshedMatch.id ? refreshedMatch : match,
         ),
@@ -270,13 +279,66 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     [token],
   );
 
+  const loadSessionMatches = useCallback(
+    async (
+      session: MatchSessionSummaryInfo,
+      preserveVisibleData = false,
+      throwOnError = false,
+    ) => {
+      if (!token) {
+        const nextError = "로그인이 필요해요.";
+        setSessionError(nextError);
+        if (throwOnError) throw new Error(nextError);
+        return;
+      }
+      if (!isOnline) {
+        const nextError = "오프라인에서는 세션의 전체 경기를 불러올 수 없습니다.";
+        setSessionError(nextError);
+        if (throwOnError) throw new Error(nextError);
+        return;
+      }
+
+      try {
+        if (!preserveVisibleData) {
+          setSelectedSessionMatches([]);
+          setIsLoadingSession(true);
+          setSessionError(null);
+        }
+        const searchParams = new URLSearchParams({
+          name: session.name,
+          date: session.date,
+        });
+        const res = await fetch(
+          buildApiUrl(`/api/match-sessions/matches?${searchParams.toString()}`),
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || "세션 경기를 불러오지 못했습니다.",
+          );
+        }
+
+        setSelectedSessionMatches((await res.json()) as MatchInfo[]);
+        setSessionError(null);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "세션 경기를 불러오지 못했습니다.";
+        setSessionError(message);
+        if (throwOnError) throw err;
+      } finally {
+        setIsLoadingSession(false);
+      }
+    },
+    [isOnline, token],
+  );
+
   useEffect(() => {
     const isTabActive = selectedTab === "match";
     if (!isTabActive) {
       wasTabActiveRef.current = false;
       return;
     }
-
     if (wasTabActiveRef.current) return;
 
     wasTabActiveRef.current = true;
@@ -288,8 +350,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     }
 
     pendingReloadRef.current = false;
-    void loadMatches(0, false, lastSuccessfulLoadAtRef.current !== null);
-  }, [loadMatches, selectedTab]);
+    void loadFeed(0, false, lastSuccessfulLoadAtRef.current !== null);
+  }, [loadFeed, selectedTab]);
 
   useEffect(() => {
     if (previousReloadKeyRef.current === reloadKey) return;
@@ -299,9 +361,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       pendingReloadRef.current = true;
       return;
     }
-
-    void loadMatches(0, false, matches.length > 0);
-  }, [loadMatches, matches.length, reloadKey, selectedTab]);
+    void loadFeed(0, false, feedItems.length > 0);
+  }, [feedItems.length, loadFeed, reloadKey, selectedTab]);
 
   useEffect(() => {
     if (previousIsMyMatchOnlyRef.current === isMyMatchOnly) return;
@@ -311,22 +372,30 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       pendingReloadRef.current = true;
       return;
     }
-
-    void loadMatches();
-  }, [isMyMatchOnly, loadMatches, selectedTab]);
+    void loadFeed();
+  }, [isMyMatchOnly, loadFeed, selectedTab]);
 
   useEffect(() => {
-    if (!selectedMatchId) {
-      return;
-    }
+    if (!selectedMatchId) return;
 
-    const refreshedMatch = matches.find(
-      (match) => match.id === selectedMatchId,
-    );
-    if (refreshedMatch) {
-      setSelectedMatch(refreshedMatch);
-    }
-  }, [matches, selectedMatchId]);
+    const refreshedMatch =
+      selectedSessionMatches.find((match) => match.id === selectedMatchId) ??
+      feedItems.find(
+        (item): item is Extract<MatchFeedItemInfo, { kind: "match" }> =>
+          item.kind === "match" && item.match.id === selectedMatchId,
+      )?.match;
+    if (refreshedMatch) setSelectedMatch(refreshedMatch);
+  }, [feedItems, selectedMatchId, selectedSessionMatches]);
+
+  useEffect(() => {
+    if (!selectedSession) return;
+
+    const refreshedSession = feedItems.find(
+      (item): item is Extract<MatchFeedItemInfo, { kind: "session" }> =>
+        item.kind === "session" && isSameSession(item.session, selectedSession),
+    )?.session;
+    if (refreshedSession) setSelectedSession(refreshedSession);
+  }, [feedItems, selectedSession]);
 
   useEffect(
     () =>
@@ -335,19 +404,32 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           await loadSelectedMatch(selectedMatch.id);
           return;
         }
-
-        await loadMatches(0, false, true, true);
+        if (selectedSession) {
+          await loadSessionMatches(selectedSession, true, true);
+          return;
+        }
+        await loadFeed(0, false, true, true);
       }),
-    [loadMatches, loadSelectedMatch, registerPullToRefresh, selectedMatch],
+    [
+      loadFeed,
+      loadSelectedMatch,
+      loadSessionMatches,
+      registerPullToRefresh,
+      selectedMatch,
+      selectedSession,
+    ],
   );
 
-  const hasMoreMatches = isOnline && matches.length < total;
+  const refreshFeedAndSession = useCallback(async () => {
+    await loadFeed();
+    if (selectedSession) {
+      await loadSessionMatches(selectedSession, true);
+    }
+  }, [loadFeed, loadSessionMatches, selectedSession]);
 
   const handleSubmitResult = useCallback(
     async (matchId: string, scores: MatchScore[]) => {
-      if (!token) {
-        throw new Error("로그인이 필요해요.");
-      }
+      if (!token) throw new Error("로그인이 필요해요.");
       if (!isOnline) {
         throw new Error(
           "오프라인에서는 결과를 입력할 수 없습니다. 온라인 연결이 필요합니다.",
@@ -364,25 +446,21 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           },
           body: JSON.stringify({ scores }),
         });
-
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(errorData.error || "결과를 입력하지 못했어요.");
         }
-
-        await loadMatches();
+        await refreshFeedAndSession();
       } finally {
         setPendingMatchAction(null);
       }
     },
-    [isOnline, loadMatches, token],
+    [isOnline, refreshFeedAndSession, token],
   );
 
   const handleApproveResult = useCallback(
     async (matchId: string) => {
-      if (!token) {
-        throw new Error("로그인이 필요해요.");
-      }
+      if (!token) throw new Error("로그인이 필요해요.");
       if (!isOnline) {
         throw new Error(
           "오프라인에서는 결과를 승인할 수 없습니다. 온라인 연결이 필요합니다.",
@@ -393,30 +471,23 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         setPendingMatchAction({ matchId, type: "approve-result" });
         const res = await fetch(
           buildApiUrl(`/api/matches/${matchId}/approval`),
-          {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          },
+          { method: "POST", headers: { Authorization: `Bearer ${token}` } },
         );
-
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(errorData.error || "결과를 승인하지 못했어요.");
         }
-
-        await loadMatches();
+        await refreshFeedAndSession();
       } finally {
         setPendingMatchAction(null);
       }
     },
-    [isOnline, loadMatches, token],
+    [isOnline, refreshFeedAndSession, token],
   );
 
   const handleCancelApproval = useCallback(
     async (matchId: string) => {
-      if (!token) {
-        throw new Error("로그인이 필요해요.");
-      }
+      if (!token) throw new Error("로그인이 필요해요.");
       if (!isOnline) {
         throw new Error(
           "오프라인에서는 합의를 취소할 수 없습니다. 온라인 연결이 필요합니다.",
@@ -427,28 +498,30 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         setPendingMatchAction({ matchId, type: "cancel-approval" });
         const res = await fetch(
           buildApiUrl(`/api/matches/${matchId}/approval`),
-          {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          },
+          { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
         );
-
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
           throw new Error(errorData.error || "합의를 취소하지 못했어요.");
         }
-
-        await loadMatches();
+        await refreshFeedAndSession();
       } finally {
         setPendingMatchAction(null);
       }
     },
-    [isOnline, loadMatches, token],
+    [isOnline, refreshFeedAndSession, token],
   );
 
   const closeMatchDetail = useCallback(() => {
     setSelectedMatchId(null);
     setSelectedMatch(null);
+    restoreScrollTop("match");
+  }, [restoreScrollTop]);
+
+  const closeSessionDetail = useCallback(() => {
+    setSelectedSession(null);
+    setSelectedSessionMatches([]);
+    setSessionError(null);
     restoreScrollTop("match");
   }, [restoreScrollTop]);
 
@@ -473,6 +546,31 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       scrollToTop,
     ],
   );
+
+  const openSessionDetail = useCallback(
+    (session: MatchSessionSummaryInfo) => {
+      saveScrollPosition("match");
+      pushDepth("match", {
+        id: `session-detail:${session.name}\u0000${session.date}`,
+        kind: "session-detail",
+        onClose: closeSessionDetail,
+      });
+      setSelectedSession(session);
+      setSelectedSessionMatches([]);
+      setSessionError(null);
+      window.requestAnimationFrame(() => scrollToTop("auto"));
+      void loadSessionMatches(session).catch(() => {});
+    },
+    [
+      closeSessionDetail,
+      loadSessionMatches,
+      pushDepth,
+      saveScrollPosition,
+      scrollToTop,
+    ],
+  );
+
+  const hasMoreItems = isOnline && feedItems.length < total;
 
   if (selectedMatch) {
     return (
@@ -499,6 +597,20 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     );
   }
 
+  if (selectedSession) {
+    return (
+      <SessionDetail
+        session={selectedSession}
+        matches={selectedSessionMatches}
+        currentPlayerId={player?.id}
+        isLoading={isLoadingSession}
+        error={sessionError}
+        onRetry={() => void loadSessionMatches(selectedSession)}
+        onPressMatch={openMatchDetail}
+      />
+    );
+  }
+
   return (
     <>
       <TabPanelHeader title="Matches">
@@ -512,8 +624,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             {
               "--switch-control-bg": "#d1d5db",
               "--switch-control-bg-hover": "#cbd5e1",
-              "--switch-control-bg-checked": "#eaff19",
-              "--switch-control-bg-checked-hover": "#d4e600",
+              "--switch-control-bg-checked": "#3b52cc",
+              "--switch-control-bg-checked-hover": "#2d42a8",
             } as React.CSSProperties
           }
         >
@@ -539,7 +651,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             <TabPanelStatus ariaLabel="매치 목록 로딩 중" isLoading />
           ) : error ? (
             <TabPanelStatus message={error} tone="error" />
-          ) : matches.length === 0 ? (
+          ) : feedItems.length === 0 ? (
             <TabPanelStatus
               message={
                 isMyMatchOnly
@@ -549,14 +661,22 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             />
           ) : (
             <div className="flex flex-col gap-3">
-              {matches.map((match) => (
-                <Match
-                  key={match.id}
-                  match={match}
-                  currentPlayerId={player?.id}
-                  onPress={openMatchDetail}
-                />
-              ))}
+              {feedItems.map((item) =>
+                item.kind === "session" ? (
+                  <SessionCard
+                    key={getFeedItemKey(item)}
+                    session={item.session}
+                    onPress={openSessionDetail}
+                  />
+                ) : (
+                  <Match
+                    key={item.match.id}
+                    match={item.match}
+                    currentPlayerId={player?.id}
+                    onPress={openMatchDetail}
+                  />
+                ),
+              )}
               {loadMoreError ? (
                 <p
                   className="text-center text-sm font-medium text-error"
@@ -565,12 +685,12 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                   {loadMoreError}
                 </p>
               ) : null}
-              {hasMoreMatches ? (
+              {hasMoreItems ? (
                 <Button
                   type="button"
                   className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
                   isDisabled={isLoadingMore}
-                  onPress={() => void loadMatches(nextPage, true)}
+                  onPress={() => void loadFeed(nextPage, true)}
                 >
                   {isLoadingMore ? "불러오는 중..." : "더 보기"}
                 </Button>

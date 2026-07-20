@@ -132,7 +132,6 @@ describe("POST /api/matches", () => {
           { name: "Team B", playerIds: teamPlayerIds[1] },
         ],
         location: "Court TBD",
-        scheduledAt: "2026-07-08T10:30:00.000Z",
       });
 
   it.each([
@@ -265,7 +264,6 @@ describe("POST /api/matches", () => {
           { name: "Team A", playerIds: [creator.id, "player-f-1"] },
           { name: "Team B", playerIds: ["player-m-1", "player-f-2"] },
         ],
-        scheduledAt: "2026-07-08T10:30:00.000Z",
         matchStartsAt: "2026-07-08T11:00:00.000Z",
       });
 
@@ -287,7 +285,6 @@ describe("POST /api/matches", () => {
           { name: "Team A", playerIds: [creator.id, "player-f-1"] },
           { name: "Team B", playerIds: ["player-m-1", "player-f-2"] },
         ],
-        scheduledAt: "2026-07-08T10:30:00.000Z",
       });
 
     const after = Date.now();
@@ -314,7 +311,6 @@ describe("POST /api/matches", () => {
           { name: "Team A", playerIds: [creator.id, "player-f-1"] },
           { name: "Team B", playerIds: ["player-m-1", "player-f-2"] },
         ],
-        scheduledAt: "2026-07-08T10:30:00.000Z",
         matchStartsAt: "not-a-date",
       });
 
