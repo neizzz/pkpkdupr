@@ -14,9 +14,10 @@
   --color-pkpk-dark: #0d0b1a;
   --color-pkpk-muted: #5c6880;
   --color-pkpk-main-font: #0d0b1a;
+  --color-pkpk-sub-font: #5c6880;
+  --color-pkpk-detail-font: #9da4b2;
   --color-pkpk-primary-font: #ffffff; /* primary-bg 내 폰트색으로 사용 */
   --color-pkpk-secondary-font: #ffffff; /* secondary-bg 내 폰트색으로 사용 */
-  --color-pkpk-sub-font: #5c6880;
   --color-pkpk-accent-font: #eaff19;
   --color-pkpk-dupr-font: #3b52cc;
 }
