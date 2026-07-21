@@ -18,7 +18,11 @@ import {
   type MatchType,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
-import type { Player, PlayerStatus } from "@pkpkdupr/shared/player";
+import type {
+  MemberListPlayer,
+  Player,
+  PlayerStatus,
+} from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
 import {
   DbRequestError,
@@ -530,8 +534,15 @@ app.get("/api/players", async (req, res) => {
       return;
     }
 
-    const players = await authService.getPublicPlayers();
-    res.json(players);
+    const [players, lastPlayedAtByPlayerId] = await Promise.all([
+      authService.getPublicPlayers(),
+      matchRepository.getLastCompletedAtByPlayerId(),
+    ]);
+    const memberList: MemberListPlayer[] = players.map((player) => ({
+      ...player,
+      lastPlayedAt: lastPlayedAtByPlayerId[player.id] ?? null,
+    }));
+    res.json(memberList);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }

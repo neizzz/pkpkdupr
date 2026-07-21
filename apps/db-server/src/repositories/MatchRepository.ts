@@ -20,7 +20,7 @@ import {
   type Player,
   type PublicPlayerDupr,
 } from "@pkpkdupr/shared/player";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull, max } from "drizzle-orm";
 import {
   matchParticipants,
   matchResultApprovals,
@@ -207,6 +207,33 @@ export class MatchRepository {
       matches: filteredMatches.slice(start, start + limit),
       total: filteredMatches.length,
     };
+  }
+
+  async findLastCompletedAtByPlayerId(): Promise<Record<string, Date>> {
+    const rows = await this.db
+      .select({
+        playerId: matchParticipants.playerId,
+        lastPlayedAt: max(matches.completedAt),
+      })
+      .from(matchParticipants)
+      .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+      .where(
+        and(
+          eq(matches.status, "completed"),
+          isNotNull(matches.completedAt),
+        ),
+      )
+      .groupBy(matchParticipants.playerId)
+      .all();
+
+    return Object.fromEntries(
+      rows.flatMap(({ playerId, lastPlayedAt }: {
+        playerId: string;
+        lastPlayedAt: Date | string | number | null;
+      }) =>
+        lastPlayedAt == null ? [] : [[playerId, toDate(lastPlayedAt)]],
+      ),
+    );
   }
 
   async findFeed(

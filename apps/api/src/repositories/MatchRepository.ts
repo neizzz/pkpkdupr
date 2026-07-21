@@ -262,6 +262,19 @@ export class MatchRepository {
     return await this.findAll(page, limit, playerId);
   }
 
+  async getLastCompletedAtByPlayerId(): Promise<Record<string, Date>> {
+    const records = await this.dbRequest<Record<string, string | Date>>(
+      "/internal/matches/last-played",
+    );
+
+    return Object.fromEntries(
+      Object.entries(records).map(([playerId, lastPlayedAt]) => [
+        playerId,
+        new Date(lastPlayedAt),
+      ]),
+    );
+  }
+
   /** 모든 경기 목록 */
   async findAll(
     page: number = 0,

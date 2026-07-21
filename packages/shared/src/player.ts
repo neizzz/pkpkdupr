@@ -437,6 +437,10 @@ export interface Player {
   updatedAt: Date;
 }
 
+export interface MemberListPlayer extends Player {
+  lastPlayedAt: Date | null;
+}
+
 export interface PlayerProfile extends Player {
   totalMatches: number;
   winRate: number;
