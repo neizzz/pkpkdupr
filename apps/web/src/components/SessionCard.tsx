@@ -67,7 +67,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
             avatarUrl: participant.avatarUrl,
             name: participant.username,
           }))}
-          max={4}
+          max={6}
           size="session"
         />
         <span className="flex shrink-0 items-center gap-1 text-xs leading-none font-medium text-[#888]">

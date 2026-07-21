@@ -9,6 +9,7 @@ import { IoChevronForward } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
 import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
+import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
@@ -35,6 +36,24 @@ const OFFLINE_FALLBACK_MESSAGE =
 type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
 };
+
+const MemberListSkeleton: React.FC = () => (
+  <div role="status" aria-label="멤버 목록 로딩 중">
+    {Array.from({ length: 6 }, (_, index) => (
+      <div
+        key={index}
+        className="relative flex w-full items-center gap-3 px-3 py-3"
+      >
+        <SkeletonBlock className="size-12 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 space-y-2">
+          <SkeletonBlock className="h-5 w-28" />
+          <SkeletonBlock className="h-3 w-36" />
+        </div>
+        <SkeletonBlock className="h-5 w-10" />
+      </div>
+    ))}
+  </div>
+);
 
 const getLastPlayedAtMs = (lastPlayedAt: string | null) => {
   if (!lastPlayedAt) return Number.NEGATIVE_INFINITY;
@@ -101,6 +120,8 @@ const Members: React.FC = () => {
   const [selectedMemberRatingDelta, setSelectedMemberRatingDelta] = useState(
     createEmptyRatingDelta,
   );
+  const [isSelectedMemberStatsLoading, setIsSelectedMemberStatsLoading] =
+    useState(false);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
 
@@ -179,12 +200,14 @@ const Members: React.FC = () => {
       if (!token) {
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
+        setIsSelectedMemberStatsLoading(false);
         return;
       }
 
       if (!preserveVisibleData) {
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
+        setIsSelectedMemberStatsLoading(true);
       }
 
       try {
@@ -215,6 +238,10 @@ const Members: React.FC = () => {
         if (throwOnError) {
           throw err;
         }
+      } finally {
+        if (!preserveVisibleData) {
+          setIsSelectedMemberStatsLoading(false);
+        }
       }
     },
     [token],
@@ -239,6 +266,7 @@ const Members: React.FC = () => {
     if (!token || !selectedMemberId) {
       setSelectedMemberMatchStats(createEmptyMatchStats());
       setSelectedMemberRatingDelta(createEmptyRatingDelta());
+      setIsSelectedMemberStatsLoading(false);
       return;
     }
 
@@ -263,6 +291,7 @@ const Members: React.FC = () => {
 
   const closeMemberProfile = useCallback(() => {
     setSelectedMemberId(null);
+    setIsSelectedMemberStatsLoading(false);
     restoreScrollTop("members");
   }, [restoreScrollTop]);
 
@@ -273,6 +302,7 @@ const Members: React.FC = () => {
       kind: "member-profile",
       onClose: closeMemberProfile,
     });
+    setIsSelectedMemberStatsLoading(true);
     setSelectedMemberId(memberId);
     window.requestAnimationFrame(() => scrollToTop("auto"));
   };
@@ -308,6 +338,7 @@ const Members: React.FC = () => {
         isMe={selectedMember.id === player?.id}
         matchStats={selectedMemberMatchStats}
         ratingDelta={selectedMemberRatingDelta}
+        isStatsLoading={isSelectedMemberStatsLoading}
       />
     );
   }
@@ -327,7 +358,7 @@ const Members: React.FC = () => {
 
           <div className="flex flex-1 flex-col">
             {isLoading ? (
-              <TabPanelStatus ariaLabel="멤버 목록 로딩 중" isLoading />
+              <MemberListSkeleton />
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
             ) : sortedMembers.length === 0 ? (
@@ -359,7 +390,7 @@ const Members: React.FC = () => {
                         <p className="truncate text-lg font-semibold text-pkpk-main-font">
                           {member.username}
                         </p>
-                        <p className="truncate text-sm text-pkpk-detail-font">
+                        <p className="truncate text-xs text-pkpk-detail-font">
                           {formatLastPlayedAt(member.lastPlayedAt)}
                         </p>
                       </div>

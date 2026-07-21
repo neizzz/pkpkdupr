@@ -9,8 +9,10 @@ import {
 } from "@pkpkdupr/shared/match";
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import Match, { type MatchInfo } from "@/components/Match";
+import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
+import SkeletonBlock from "@/components/SkeletonBlock";
 import { formatRating } from "@/utils/dupr";
 
 interface MatchDetailProps {
@@ -23,6 +25,7 @@ interface MatchDetailProps {
   isSubmittingResult?: boolean;
   isApprovingResult?: boolean;
   isCancellingApproval?: boolean;
+  isLoading?: boolean;
 }
 
 const subTextClassName = "text-pkpk-sub-font";
@@ -40,6 +43,165 @@ const formatDateTime = (value: string) =>
 const createEmptyScoreRow = () => ({ scoreA: "", scoreB: "" });
 const SCORE_TABLE_SET_COUNT = 3;
 
+export const MatchDetailSkeleton: React.FC = () => (
+  <div
+    className="min-h-full [&_section>p]:text-sm"
+    role="status"
+    aria-label="매치 상세 로딩 중"
+  >
+    <DetailPageHeader title="Match Detail" tabKey="match" />
+    <div className="p-2">
+      <div className="mx-auto flex w-full flex-col gap-3">
+        <Card className="rounded-3xl bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <SkeletonBlock className="size-10 shrink-0 rounded-full" />
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <SkeletonBlock className="h-4 w-32" />
+                <SkeletonBlock className="h-3 w-48 max-w-full" />
+              </div>
+            </div>
+            <SkeletonBlock className="h-5 w-10" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <SkeletonBlock className="h-12" />
+            <SkeletonBlock className="h-12" />
+          </div>
+        </Card>
+
+        <section>
+          <p
+            className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+          >
+            Score
+          </p>
+          <div className="mt-3 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 p-3 shadow-sm">
+            <SkeletonBlock className="h-4 w-full" />
+            <div className="mt-3 flex flex-col gap-2">
+              {Array.from({ length: 2 }, (_, index) => (
+                <div key={index} className="flex gap-2">
+                  <SkeletonBlock className="h-7 w-2/5" />
+                  <SkeletonBlock className="h-7 flex-1" />
+                  <SkeletonBlock className="h-7 flex-1" />
+                  <SkeletonBlock className="h-7 flex-1" />
+                  <SkeletonBlock className="h-7 flex-1" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <p
+            className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+          >
+            Rating Change
+          </p>
+          <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }, (_, index) => (
+                <div key={index} className="flex items-center justify-between gap-3">
+                  <SkeletonBlock className="h-4 w-24" />
+                  <SkeletonBlock className="h-5 w-28" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between gap-3">
+            <p
+              className={`!text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
+              Approval
+            </p>
+            <SkeletonBlock className="h-3 w-12" />
+          </div>
+          <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="flex items-center justify-between gap-3">
+                  <SkeletonBlock className="h-4 w-24" />
+                  <SkeletonBlock className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        </section>
+      </div>
+    </div>
+  </div>
+);
+
+const MatchDetailSectionsSkeleton: React.FC = () => (
+  <div className="contents [&_section>p]:text-sm">
+    <span className="sr-only" role="status">
+      매치 상세 정보 로딩 중
+    </span>
+    <section>
+      <p
+        className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+      >
+        Score
+      </p>
+      <div className="mt-3 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 p-3 shadow-sm">
+        <SkeletonBlock className="h-4 w-full" />
+        <div className="mt-3 flex flex-col gap-2">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div key={index} className="flex gap-2">
+              <SkeletonBlock className="h-7 w-2/5" />
+              <SkeletonBlock className="h-7 flex-1" />
+              <SkeletonBlock className="h-7 flex-1" />
+              <SkeletonBlock className="h-7 flex-1" />
+              <SkeletonBlock className="h-7 flex-1" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <p
+        className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+      >
+        Rating Change
+      </p>
+      <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className="flex items-center justify-between gap-3">
+              <SkeletonBlock className="h-4 w-24" />
+              <SkeletonBlock className="h-5 w-28" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </section>
+
+    <section>
+      <div className="flex items-center justify-between gap-3">
+        <p
+          className={`!text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+        >
+          Approval
+        </p>
+        <SkeletonBlock className="h-3 w-12" />
+      </div>
+      <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="flex items-center justify-between gap-3">
+              <SkeletonBlock className="h-4 w-24" />
+              <SkeletonBlock className="h-3 w-20" />
+            </div>
+          ))}
+        </div>
+      </Card>
+    </section>
+  </div>
+);
+
 const MatchDetail: React.FC<MatchDetailProps> = ({
   match,
   currentPlayerId,
@@ -50,6 +212,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   isSubmittingResult = false,
   isApprovingResult = false,
   isCancellingApproval = false,
+  isLoading = false,
 }) => {
   const [scoreRows, setScoreRows] = useState(() => [createEmptyScoreRow()]);
   const [resultError, setResultError] = useState<string | null>(null);
@@ -218,6 +381,29 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
           <section>
             <p
+              className={`text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
+              ID
+            </p>
+            <div className="mt-3">
+              <CopyableId
+                label="Match ID"
+                value={match.id}
+                showLabel={false}
+              />
+            </div>
+          </section>
+
+          {isLoading ? <MatchDetailSectionsSkeleton /> : null}
+          <div
+            className={
+              isLoading
+                ? "hidden"
+                : "flex flex-col gap-3 [&_section>p]:text-sm"
+            }
+          >
+            <section>
+            <p
               className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
             >
               Score
@@ -315,9 +501,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 </Button>
               </div>
             ) : null}
-          </section>
+            </section>
 
-          {shouldShowResultForm ? (
+            {shouldShowResultForm ? (
             <Card className="rounded-3xl bg-white p-3 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
                 {hasResultScores ? "Edit Result" : "Result"}
@@ -390,17 +576,17 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 </Button>
               </div>
             </Card>
-          ) : null}
+            ) : null}
 
-          {hasRatingChanges ? (
             <section>
-              <p
-                className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
-              >
-                Rating Change
-              </p>
-              <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
-                {(() => {
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            >
+              Rating Change
+            </p>
+            <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+              {hasRatingChanges ? (
+                (() => {
                   const entries = match.teams
                     .flatMap((team) => team.players)
                     .flatMap((player) => {
@@ -442,15 +628,19 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                       </React.Fragment>
                     );
                   });
-                })()}
-              </Card>
+                })()
+              ) : (
+                <p className="text-sm text-pkpk-sub-font">
+                  결과 합의 후 평점 변경 내역이 표시돼요.
+                </p>
+              )}
+            </Card>
             </section>
-          ) : null}
 
-          <section>
+            <section>
             <div className="flex items-center justify-between gap-3">
               <p
-                className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+                className={`!text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
               >
                 Approval
               </p>
@@ -537,17 +727,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 ) : null}
               </div>
             ) : null}
-          </section>
+            </section>
 
-          {!shouldShowResultForm && resultError ? (
+            {!shouldShowResultForm && resultError ? (
             <p className="text-xs font-medium text-red-500">{resultError}</p>
-          ) : null}
+            ) : null}
 
-          <div
-            className={`pb-2 text-right text-xs font-medium ${subTextClassName}`}
-          >
-            <p>Created at {formatDateTime(match.createdAt)}</p>
-            <p className="mt-1">Updated at {formatDateTime(match.updatedAt)}</p>
           </div>
         </div>
       </div>

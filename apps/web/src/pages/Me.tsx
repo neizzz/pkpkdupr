@@ -6,7 +6,6 @@ import type { MatchInfo } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
 import TabPanelHeader from "@/components/TabPanelHeader";
-import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { buildApiUrl } from "@/lib/api";
@@ -176,17 +175,15 @@ const Me: React.FC = () => {
   return (
     <>
       <TabPanelHeader title="Me">{settingsButton}</TabPanelHeader>
-      {isMatchStatsLoading ? (
-        <TabPanelStatus ariaLabel="내 프로필 로딩 중" isLoading />
-      ) : (
-        <MemberProfile
-          player={player}
-          isMe
-          showDetailHeader={false}
-          matchStats={matchStats}
-          ratingDelta={ratingDelta}
-        />
-      )}
+      <MemberProfile
+        player={player}
+        isMe
+        showDetailHeader={false}
+        matchStats={matchStats}
+        ratingDelta={ratingDelta}
+        isStatsLoading={isMatchStatsLoading}
+        showPlayerId
+      />
 
       <BottomSheet
         isOpen={isSettingsOpen}

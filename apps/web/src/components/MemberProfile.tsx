@@ -3,8 +3,10 @@ import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
 import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
 import { IoPeople, IoPerson } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
+import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
+import SkeletonBlock from "@/components/SkeletonBlock";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -41,7 +43,28 @@ interface MemberProfileProps {
   headerAction?: React.ReactNode;
   matchStats?: MemberProfileMatchStats;
   ratingDelta?: MemberProfileRatingDelta;
+  isStatsLoading?: boolean;
+  showPlayerId?: boolean;
 }
+
+const ProfileStatsSkeleton: React.FC = () => (
+  <div
+    className="flex flex-col gap-3"
+    role="status"
+    aria-label="프로필 통계 로딩 중"
+  >
+    <div className="grid grid-cols-2 gap-3">
+      {Array.from({ length: 2 }, (_, index) => (
+        <SkeletonBlock key={index} className="h-[4.75rem] rounded-xl" />
+      ))}
+    </div>
+    <div className="grid grid-cols-2 gap-3">
+      {Array.from({ length: 2 }, (_, index) => (
+        <SkeletonBlock key={index} className="h-[4.75rem] rounded-xl" />
+      ))}
+    </div>
+  </div>
+);
 
 const MemberProfile: React.FC<MemberProfileProps> = ({
   player,
@@ -51,6 +74,8 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   headerAction,
   matchStats,
   ratingDelta,
+  isStatsLoading = false,
+  showPlayerId = false,
 }) => {
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
@@ -152,9 +177,20 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 className="hidden"
               />
             ) : null}
-            <div className="flex items-center gap-2">
-              <h2 className="text-2xl text-pkpk-main-font">{displayName}</h2>
-              {headerAction}
+            <div className="flex max-w-full flex-col items-center gap-1">
+              <div className="flex max-w-full items-center gap-2">
+                <h2 className="min-w-0 truncate text-2xl text-pkpk-main-font">
+                  {displayName}
+                </h2>
+                {headerAction}
+              </div>
+              {showPlayerId && player?.id ? (
+                <CopyableId
+                  label="Player ID"
+                  value={player.id}
+                  showLabel={false}
+                />
+              ) : null}
             </div>
           </div>
 
@@ -190,7 +226,9 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
           </div>
 
-          {expandedItem ? (
+          {isStatsLoading ? (
+            <ProfileStatsSkeleton />
+          ) : expandedItem ? (
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-white px-4 py-3 shadow-sm">

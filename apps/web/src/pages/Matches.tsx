@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Switch } from "@heroui/react";
+import { Button, Card, Switch } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import Match, {
   type MatchFeedItemInfo,
   type MatchInfo,
   type MatchSessionSummaryInfo,
 } from "@/components/Match";
-import MatchDetail from "@/components/MatchDetail";
+import MatchDetail, { MatchDetailSkeleton } from "@/components/MatchDetail";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import SessionCard from "@/components/SessionCard";
 import SessionDetail from "@/components/SessionDetail";
+import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
@@ -42,6 +43,38 @@ interface MatchFeedResponse {
   items: MatchFeedItemInfo[];
   total: number;
 }
+
+const MatchFeedSkeleton: React.FC = () => (
+  <div
+    className="flex flex-col gap-3"
+    role="status"
+    aria-label="매치 목록 로딩 중"
+  >
+    {Array.from({ length: 4 }, (_, index) => (
+      <Card key={index} className="rounded-3xl bg-white/95 p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <SkeletonBlock className="h-3 w-28" />
+            <SkeletonBlock className="h-5 w-10 rounded-full" />
+          </div>
+          <SkeletonBlock className="size-5 rounded-full" />
+        </div>
+        <SkeletonBlock className="mt-2 h-5 w-36" />
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+          <div className="flex flex-col gap-2">
+            <SkeletonBlock className="h-3 w-12" />
+            <SkeletonBlock className="h-7 w-24 rounded-full" />
+          </div>
+          <SkeletonBlock className="h-9 w-14" />
+          <div className="flex flex-col items-end gap-2">
+            <SkeletonBlock className="h-3 w-12" />
+            <SkeletonBlock className="h-7 w-24 rounded-full" />
+          </div>
+        </div>
+      </Card>
+    ))}
+  </div>
+);
 
 const clearLegacyCachedMatches = () => {
   for (const key of LEGACY_CACHED_MATCH_KEYS) {
@@ -559,7 +592,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         onClose: closeMatchDetail,
       });
       setSelectedMatchId(match.id);
-      setSelectedMatch(null);
+      setSelectedMatch(match);
       window.requestAnimationFrame(() => scrollToTop("auto"));
       void loadMatchDetail(match.id);
     },
@@ -597,31 +630,31 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
   const hasMoreItems = isOnline && feedItems.length < total;
 
-  if (selectedMatchId && (isLoadingSelectedMatch || selectedMatchError)) {
+  if (selectedMatchId && selectedMatchError) {
     return (
       <div className="min-h-full">
         <DetailPageHeader title="Match Detail" tabKey="match" />
         <div className="p-2">
-          {isLoadingSelectedMatch ? (
-            <TabPanelStatus ariaLabel="매치 상세 로딩 중" isLoading />
-          ) : (
-            <div className="flex flex-col gap-3">
-              <TabPanelStatus
-                message={selectedMatchError ?? undefined}
-                tone="error"
-              />
-              <Button
-                type="button"
-                className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-                onPress={() => void loadMatchDetail(selectedMatchId)}
-              >
-                다시 시도
-              </Button>
-            </div>
-          )}
+          <div className="flex flex-col gap-3">
+            <TabPanelStatus
+              message={selectedMatchError ?? undefined}
+              tone="error"
+            />
+            <Button
+              type="button"
+              className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+              onPress={() => void loadMatchDetail(selectedMatchId)}
+            >
+              다시 시도
+            </Button>
+          </div>
         </div>
       </div>
     );
+  }
+
+  if (selectedMatchId && isLoadingSelectedMatch && !selectedMatch) {
+    return <MatchDetailSkeleton />;
   }
 
   if (selectedMatch) {
@@ -645,6 +678,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           pendingMatchAction?.matchId === selectedMatch.id &&
           pendingMatchAction.type === "cancel-approval"
         }
+        isLoading={isLoadingSelectedMatch}
       />
     );
   }
@@ -700,7 +734,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           ) : null}
 
           {isLoading ? (
-            <TabPanelStatus ariaLabel="매치 목록 로딩 중" isLoading />
+            <MatchFeedSkeleton />
           ) : error ? (
             <TabPanelStatus message={error} tone="error" />
           ) : feedItems.length === 0 ? (

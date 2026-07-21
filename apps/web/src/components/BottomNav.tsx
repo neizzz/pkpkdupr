@@ -366,7 +366,9 @@ const BottomNav: React.FC = () => {
     [selectTab],
   );
 
-  const handleActiveTabClick = useCallback(
+  // Capture the pre-selection tab before HeroUI handles the press so moving to
+  // a tab cannot be mistaken for a re-tap.
+  const handleActiveTabPointerDown = useCallback(
     (tabKey: TabKey) => {
       if (selectedTabRef.current !== tabKey) return;
 
@@ -1021,7 +1023,9 @@ const BottomNav: React.FC = () => {
             >
               <Tabs.Tab
                 id="match"
-                onClick={() => handleActiveTabClick("match")}
+                onPointerDownCapture={() =>
+                  handleActiveTabPointerDown("match")
+                }
                 className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
@@ -1032,7 +1036,9 @@ const BottomNav: React.FC = () => {
               </Tabs.Tab>
               <Tabs.Tab
                 id="members"
-                onClick={() => handleActiveTabClick("members")}
+                onPointerDownCapture={() =>
+                  handleActiveTabPointerDown("members")
+                }
                 className="min-h-[2.8rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
@@ -1043,7 +1049,7 @@ const BottomNav: React.FC = () => {
               </Tabs.Tab>
               <Tabs.Tab
                 id="me"
-                onClick={() => handleActiveTabClick("me")}
+                onPointerDownCapture={() => handleActiveTabPointerDown("me")}
                 className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-0.5 py-1">
