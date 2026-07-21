@@ -1013,11 +1013,7 @@ const BottomNav: React.FC = () => {
         onSelectionChange={handleSelectionChange}
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
-        <div
-          className={`fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-2 ${
-            isGlobalMenuVisible ? "z-[60]" : "z-20"
-          }`}
-        >
+        <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-2">
           <Tabs.ListContainer className="mr-[4.35rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
@@ -1058,75 +1054,6 @@ const BottomNav: React.FC = () => {
               </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
-          <div className="pointer-events-auto absolute bottom-3 right-3">
-            <Dropdown
-              isOpen={isGlobalMenuVisible}
-              onOpenChange={handleGlobalMenuOpenChange}
-            >
-              <Button
-                isIconOnly
-                aria-label="Global plus menu"
-                className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-lg transition-colors ${
-                  isGlobalMenuVisible
-                    ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
-                    : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
-                }`}
-              >
-                <IoAdd
-                  className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
-                    isGlobalMenuVisible ? "rotate-45" : "rotate-0"
-                  }`}
-                  style={{ width: "28px", height: "28px" }}
-                />
-              </Button>
-              <Dropdown.Popover
-                className="relative z-[70] min-w-[180px] overflow-hidden border border-border bg-white"
-                offset={12}
-                placement="top end"
-              >
-                <Dropdown.Menu
-                  onAction={handleGlobalAction}
-                  className="bg-transparent"
-                >
-                  <Dropdown.Item
-                    id="qr"
-                    textValue="QR code"
-                    isDisabled={!isOnline}
-                  >
-                    <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
-                    <Label>QR 코드</Label>
-                  </Dropdown.Item>
-                  <Dropdown.Item
-                    id="create-match"
-                    textValue="Create match"
-                    isDisabled={!isOnline}
-                  >
-                    <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
-                    <Label>매치 생성</Label>
-                  </Dropdown.Item>
-                  <Dropdown.Item id="settings" textValue="Settings">
-                    <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
-                    <Label>설정</Label>
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-                <Separator className="my-1" />
-                <div className="px-1 pb-1">
-                  <HoldToConfirmButton
-                    holdDurationMs={1000}
-                    ariaLabel="길게 눌러 로그아웃"
-                    onComplete={handleLogout}
-                    className="rounded-lg text-[#f8626c] hover:bg-[#f8626c]/6"
-                    progressClassName="bg-[#f8626c]/18"
-                  >
-                    <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
-                    <span className="truncate text-sm font-medium text-[#f8626c]">
-                      길게 눌러 로그아웃
-                    </span>
-                  </HoldToConfirmButton>
-                </div>
-              </Dropdown.Popover>
-            </Dropdown>
-          </div>
         </div>
 
         <div
@@ -1236,6 +1163,82 @@ const BottomNav: React.FC = () => {
           <AppSettingsSheetBody />
         </BottomSheet>
       </Tabs>
+      {typeof document !== "undefined"
+        ? createPortal(
+            <div className="pointer-events-none fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset)+0.75rem)] left-1/2 z-[60] flex app-shell-width -translate-x-1/2 justify-end px-3">
+              <div className="pointer-events-auto">
+                <Dropdown
+                  isOpen={isGlobalMenuVisible}
+                  onOpenChange={handleGlobalMenuOpenChange}
+                >
+                  <Button
+                    isIconOnly
+                    aria-label="Global plus menu"
+                    className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-lg transition-colors ${
+                      isGlobalMenuVisible
+                        ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
+                        : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
+                    }`}
+                  >
+                    <IoAdd
+                      className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
+                        isGlobalMenuVisible ? "rotate-45" : "rotate-0"
+                      }`}
+                      style={{ width: "28px", height: "28px" }}
+                    />
+                  </Button>
+                  <Dropdown.Popover
+                    className="relative z-[70] min-w-[180px] overflow-hidden border border-border bg-white"
+                    offset={12}
+                    placement="top end"
+                  >
+                    <Dropdown.Menu
+                      onAction={handleGlobalAction}
+                      className="bg-transparent"
+                    >
+                      <Dropdown.Item
+                        id="qr"
+                        textValue="QR code"
+                        isDisabled={!isOnline}
+                      >
+                        <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
+                        <Label>QR 코드</Label>
+                      </Dropdown.Item>
+                      <Dropdown.Item
+                        id="create-match"
+                        textValue="Create match"
+                        isDisabled={!isOnline}
+                      >
+                        <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
+                        <Label>매치 생성</Label>
+                      </Dropdown.Item>
+                      <Dropdown.Item id="settings" textValue="Settings">
+                        <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
+                        <Label>설정</Label>
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                    <Separator className="my-1" />
+                    <div className="px-1 pb-1">
+                      <HoldToConfirmButton
+                        holdDurationMs={1000}
+                        ariaLabel="길게 눌러 로그아웃"
+                        onComplete={handleLogout}
+                        className="rounded-lg text-[#f8626c] hover:bg-[#f8626c]/6"
+                        progressClassName="bg-[#f8626c]/18"
+                      >
+                        <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
+                        <span className="truncate text-sm font-medium text-[#f8626c]">
+                          길게 눌러 로그아웃
+                        </span>
+                      </HoldToConfirmButton>
+                    </div>
+                  </Dropdown.Popover>
+                </Dropdown>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {isGlobalMenuVisible && typeof document !== "undefined"
         ? createPortal(
             <button
