@@ -81,9 +81,9 @@ const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
-  hour: "2-digit",
+  hour: "numeric",
   minute: "2-digit",
-  hourCycle: "h23",
+  hourCycle: "h12",
 });
 
 const formatMatchDateTime = (value: string | Date) => {
@@ -91,7 +91,7 @@ const formatMatchDateTime = (value: string | Date) => {
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return {
     date: `${get("year")}.${get("month")}.${get("day")}`,
-    time: `${get("hour")}:${get("minute")}`,
+    time: `${get("dayPeriod")} ${get("hour")}:${get("minute")}`,
   };
 };
 
