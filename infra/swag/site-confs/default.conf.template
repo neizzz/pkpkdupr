@@ -91,6 +91,15 @@ server {
         include /config/nginx/proxy.conf;
     }
 
+    # Uptime Kuma는 서브 경로를 지원하지 않고 정적 자산과 Socket.IO를
+    # 루트 절대 경로(/assets, /socket.io)로 요청합니다. /uptime/에서
+    # 전달한 화면이 실제로 로드되도록, 다른 명시적 관리자 경로를 제외한
+    # 루트 요청도 같은 upstream으로 전달합니다.
+    location / {
+        proxy_pass http://uptime-kuma:3001;
+        include /config/nginx/proxy.conf;
+    }
+
     location /db/ {
         proxy_pass http://sqlite-web:8080;
         include /config/nginx/proxy.conf;

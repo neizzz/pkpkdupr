@@ -102,6 +102,45 @@ const verifyPage = async (
   }
 };
 
+const verifyUptimeKuma = async (response) => {
+  const body = await readText(response);
+  const normalizedBody = body.toLowerCase();
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} 응답`);
+  }
+
+  if (
+    normalizedBody.includes("404 not found") ||
+    normalizedBody.includes("notfound")
+  ) {
+    throw new Error(
+      `페이지 본문에 오류 마커가 포함되었습니다: ${normalizedBody.slice(0, 160)}`,
+    );
+  }
+
+  if (!normalizedBody.includes("uptime kuma")) {
+    throw new Error("기대 텍스트를 찾지 못했습니다: uptime kuma");
+  }
+
+  // Uptime Kuma는 번들 자산을 /assets/*로 요청한다. HTML만 200이고
+  // 자산이 404인 서브 경로 프록시 오배치를 놓치지 않는다.
+  const scriptSource = body.match(
+    /<script[^>]+src=["']([^"']*\/assets\/[^"']+\.js)["']/i,
+  )?.[1];
+  if (!scriptSource) {
+    throw new Error("Uptime Kuma JavaScript 번들 경로를 찾지 못했습니다.");
+  }
+
+  const assetUrl = new URL(scriptSource, response.url).toString();
+  const assetResponse = await fetchWithTimeout(assetUrl, { method: "GET" });
+  if (!assetResponse.ok) {
+    throw new Error(
+      `Uptime Kuma JavaScript 번들(${assetUrl})이 HTTP ${assetResponse.status}를 반환했습니다.`,
+    );
+  }
+};
+
 const checks = [
   {
     name: "API health",
@@ -147,7 +186,7 @@ const checks = [
     name: "Uptime Kuma",
     target: "admin",
     path: "/uptime/",
-    verify: async (response) => verifyPage(response, { expectedText: "uptime kuma" }),
+    verify: verifyUptimeKuma,
   },
   {
     name: "SQLite Web",
