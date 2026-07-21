@@ -13,6 +13,7 @@ import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import SkeletonBlock from "@/components/SkeletonBlock";
+import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { formatRating } from "@/utils/dupr";
 
 interface MatchDetailProps {
@@ -216,6 +217,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 }) => {
   const [scoreRows, setScoreRows] = useState(() => [createEmptyScoreRow()]);
   const [resultError, setResultError] = useState<string | null>(null);
+  const isSectionsLoading = useMinimumLoading(isLoading);
   const [isResultFormOpen, setIsResultFormOpen] = useState(false);
   const isMyMatch = match.teams.some((team) =>
     team.players.some((teamPlayer) => teamPlayer.id === currentPlayerId),
@@ -380,12 +382,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           />
 
           <section>
-            <p
-              className={`text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
-            >
-              ID
-            </p>
-            <div className="mt-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <p
+                className={`shrink-0 text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+              >
+                ID
+              </p>
               <CopyableId
                 label="Match ID"
                 value={match.id}
@@ -394,10 +396,10 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             </div>
           </section>
 
-          {isLoading ? <MatchDetailSectionsSkeleton /> : null}
+          {isSectionsLoading ? <MatchDetailSectionsSkeleton /> : null}
           <div
             className={
-              isLoading
+              isSectionsLoading
                 ? "hidden"
                 : "flex flex-col gap-3 [&_section>p]:text-sm"
             }

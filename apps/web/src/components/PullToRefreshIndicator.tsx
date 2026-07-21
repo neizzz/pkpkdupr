@@ -25,8 +25,8 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
   const isArmed = status === "armed";
   const translateY =
     status === "refreshing" || status === "error"
-      ? 60
-      : -54 + progress * 114;
+      ? 90
+      : -54 + progress * 144;
   return (
     <div
       aria-hidden={!isVisible}

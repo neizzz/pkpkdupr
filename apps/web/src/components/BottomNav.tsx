@@ -1019,7 +1019,7 @@ const BottomNav: React.FC = () => {
           <Tabs.ListContainer className="mr-[4.35rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-3 gap-1 rounded-full *:min-w-0"
+              className="grid grid-cols-3 gap-1 rounded-full shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
               <Tabs.Tab
                 id="match"
@@ -1171,7 +1171,11 @@ const BottomNav: React.FC = () => {
       </Tabs>
       {typeof document !== "undefined"
         ? createPortal(
-            <div className="pointer-events-none fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset)+0.75rem)] left-1/2 z-[60] flex app-shell-width -translate-x-1/2 justify-end px-3">
+            <div
+              className={`pointer-events-none fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset)+0.75rem)] left-1/2 flex app-shell-width -translate-x-1/2 justify-end px-3 ${
+                isGlobalMenuVisible ? "z-[60]" : "z-40"
+              }`}
+            >
               <div className="pointer-events-auto">
                 <Dropdown
                   isOpen={isGlobalMenuVisible}
@@ -1180,7 +1184,7 @@ const BottomNav: React.FC = () => {
                   <Button
                     isIconOnly
                     aria-label="Global plus menu"
-                    className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-lg transition-colors ${
+                    className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors ${
                       isGlobalMenuVisible
                         ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
                         : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"

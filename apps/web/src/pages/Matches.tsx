@@ -15,6 +15,7 @@ import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
+import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
@@ -162,6 +163,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [selectedMatchError, setSelectedMatchError] = useState<string | null>(
     null,
   );
+  const isMatchFeedLoading = useMinimumLoading(isLoading);
+  const isSelectedMatchLoading = useMinimumLoading(isLoadingSelectedMatch);
   const latestRequestIdRef = useRef(0);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
@@ -630,7 +633,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
   const hasMoreItems = isOnline && feedItems.length < total;
 
-  if (selectedMatchId && selectedMatchError) {
+  if (selectedMatchId && selectedMatchError && !isSelectedMatchLoading) {
     return (
       <div className="min-h-full">
         <DetailPageHeader title="Match Detail" tabKey="match" />
@@ -653,7 +656,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     );
   }
 
-  if (selectedMatchId && isLoadingSelectedMatch && !selectedMatch) {
+  if (selectedMatchId && isSelectedMatchLoading && !selectedMatch) {
     return <MatchDetailSkeleton />;
   }
 
@@ -678,7 +681,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           pendingMatchAction?.matchId === selectedMatch.id &&
           pendingMatchAction.type === "cancel-approval"
         }
-        isLoading={isLoadingSelectedMatch}
+        isLoading={isSelectedMatchLoading}
       />
     );
   }
@@ -733,7 +736,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             </p>
           ) : null}
 
-          {isLoading ? (
+          {isMatchFeedLoading ? (
             <MatchFeedSkeleton />
           ) : error ? (
             <TabPanelStatus message={error} tone="error" />

@@ -9,6 +9,7 @@ import Match, {
 import SessionCard from "@/components/SessionCard";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelStatus from "@/components/TabPanelStatus";
+import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 
 interface SessionDetailProps {
   session: MatchSessionSummaryInfo;
@@ -58,6 +59,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 }) => {
   const sessionId = `${session.name.trim()} · ${new Date(session.date).toISOString()}`;
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
+  const isMatchesLoading = useMinimumLoading(isLoading);
   const displayedMatches = useMemo(
     () =>
       isMyMatchOnly && currentPlayerId
@@ -82,10 +84,10 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
           />
 
           <section>
-            <p className="text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
-              ID
-            </p>
-            <div className="mt-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <p className="shrink-0 text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
+                ID
+              </p>
               <CopyableId
                 label="Session ID"
                 value={sessionId}
@@ -125,8 +127,8 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
               </Switch.Content>
             </Switch>
           </div>
-          <div className="mt-3">
-            {isLoading ? (
+          <div>
+            {isMatchesLoading ? (
               <SessionMatchListSkeleton />
             ) : error ? (
               <div className="flex flex-col gap-3">

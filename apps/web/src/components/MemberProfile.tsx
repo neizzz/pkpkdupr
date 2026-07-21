@@ -9,6 +9,7 @@ import RatingDeltaChip from "@/components/RatingDeltaChip";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
+import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { resizeAvatarImage } from "@/utils/avatar";
 import {
@@ -86,6 +87,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const { uploadAvatar, refreshMe } = useAuth();
   const isOnline = useOnlineStatus();
+  const isProfileStatsLoading = useMinimumLoading(isStatsLoading);
 
   const duprItems = (["doubles", "singles"] as const).map((type) => {
     const stats = matchStats?.[type];
@@ -226,7 +228,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
           </div>
 
-          {isStatsLoading ? (
+          {isProfileStatsLoading ? (
             <ProfileStatsSkeleton />
           ) : expandedItem ? (
             <div className="flex flex-col gap-3">

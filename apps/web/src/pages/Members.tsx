@@ -15,6 +15,7 @@ import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
+import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
@@ -122,6 +123,7 @@ const Members: React.FC = () => {
   );
   const [isSelectedMemberStatsLoading, setIsSelectedMemberStatsLoading] =
     useState(false);
+  const isMemberListLoading = useMinimumLoading(isLoading);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
 
@@ -357,7 +359,7 @@ const Members: React.FC = () => {
           </div>
 
           <div className="flex flex-1 flex-col">
-            {isLoading ? (
+            {isMemberListLoading ? (
               <MemberListSkeleton />
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
