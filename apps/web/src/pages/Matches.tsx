@@ -7,6 +7,7 @@ import Match, {
   type MatchSessionSummaryInfo,
 } from "@/components/Match";
 import MatchDetail from "@/components/MatchDetail";
+import DetailPageHeader from "@/components/DetailPageHeader";
 import SessionCard from "@/components/SessionCard";
 import SessionDetail from "@/components/SessionDetail";
 import TabPanelHeader from "@/components/TabPanelHeader";
@@ -124,6 +125,10 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
+  const [isLoadingSelectedMatch, setIsLoadingSelectedMatch] = useState(false);
+  const [selectedMatchError, setSelectedMatchError] = useState<string | null>(
+    null,
+  );
   const latestRequestIdRef = useRef(0);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
@@ -277,6 +282,24 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       );
     },
     [token],
+  );
+
+  const loadMatchDetail = useCallback(
+    async (matchId: string) => {
+      setIsLoadingSelectedMatch(true);
+      setSelectedMatchError(null);
+
+      try {
+        await loadSelectedMatch(matchId);
+      } catch (err) {
+        setSelectedMatchError(
+          err instanceof Error ? err.message : "매치를 불러오지 못했습니다.",
+        );
+      } finally {
+        setIsLoadingSelectedMatch(false);
+      }
+    },
+    [loadSelectedMatch],
   );
 
   const loadSessionMatches = useCallback(
@@ -515,6 +538,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const closeMatchDetail = useCallback(() => {
     setSelectedMatchId(null);
     setSelectedMatch(null);
+    setSelectedMatchError(null);
+    setIsLoadingSelectedMatch(false);
     restoreScrollTop("match");
   }, [restoreScrollTop]);
 
@@ -534,13 +559,13 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         onClose: closeMatchDetail,
       });
       setSelectedMatchId(match.id);
-      setSelectedMatch(match);
+      setSelectedMatch(null);
       window.requestAnimationFrame(() => scrollToTop("auto"));
-      void loadSelectedMatch(match.id).catch(() => {});
+      void loadMatchDetail(match.id);
     },
     [
       closeMatchDetail,
-      loadSelectedMatch,
+      loadMatchDetail,
       pushDepth,
       saveScrollPosition,
       scrollToTop,
@@ -571,6 +596,33 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   );
 
   const hasMoreItems = isOnline && feedItems.length < total;
+
+  if (selectedMatchId && (isLoadingSelectedMatch || selectedMatchError)) {
+    return (
+      <div className="min-h-full">
+        <DetailPageHeader title="Match Detail" tabKey="match" />
+        <div className="p-2">
+          {isLoadingSelectedMatch ? (
+            <TabPanelStatus ariaLabel="매치 상세 로딩 중" isLoading />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <TabPanelStatus
+                message={selectedMatchError ?? undefined}
+                tone="error"
+              />
+              <Button
+                type="button"
+                className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                onPress={() => void loadMatchDetail(selectedMatchId)}
+              >
+                다시 시도
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   if (selectedMatch) {
     return (

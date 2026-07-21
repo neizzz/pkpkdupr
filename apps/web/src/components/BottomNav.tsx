@@ -6,7 +6,15 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { Button, Dropdown, Label, Separator, Tabs } from "@heroui/react";
+import {
+  Alert,
+  Button,
+  CloseButton,
+  Dropdown,
+  Label,
+  Separator,
+  Tabs,
+} from "@heroui/react";
 import {
   IoAdd,
   IoAddCircleOutline,
@@ -62,7 +70,10 @@ const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
 });
 
 const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
-const PULL_TO_REFRESH_THRESHOLD = 72;
+const PULL_TO_REFRESH_THRESHOLD = 108;
+const PULL_TO_REFRESH_BASE_RESISTANCE = 0.55;
+const PULL_TO_REFRESH_MIN_RESISTANCE = 0.4;
+const PULL_TO_REFRESH_SLOW_REQUEST_MS = 8_000;
 const PULL_GESTURE_DIRECTION_THRESHOLD = 8;
 
 interface TabDepthHistoryState {
@@ -105,6 +116,7 @@ const BottomNav: React.FC = () => {
   const [pullDistance, setPullDistance] = useState(0);
   const [pullToRefreshStatus, setPullToRefreshStatus] =
     useState<PullToRefreshStatus>("idle");
+  const [isPullRefreshSlow, setIsPullRefreshSlow] = useState(false);
   const isCreateMatchQrScannerOpenRef = useRef(false);
   const [qrToken, setQrToken] = useState<PlayerQrTokenResponse | null>(null);
   const [isQrLoading, setIsQrLoading] = useState(false);
@@ -142,7 +154,9 @@ const BottomNav: React.FC = () => {
     "undecided",
   );
   const isPullRefreshingRef = useRef(false);
+  const pullRefreshRequestIdRef = useRef(0);
   const pullStatusTimeoutRef = useRef<number | null>(null);
+  const pullSlowRequestTimeoutRef = useRef<number | null>(null);
 
   const depthCallbackKey = (tabKey: TabKey, depthId: string) =>
     `${tabKey}:${depthId}`;
@@ -725,10 +739,36 @@ const BottomNav: React.FC = () => {
     [resetPullToRefresh],
   );
 
+  const clearPullRefreshSlowWarning = useCallback(() => {
+    if (pullSlowRequestTimeoutRef.current != null) {
+      window.clearTimeout(pullSlowRequestTimeoutRef.current);
+      pullSlowRequestTimeoutRef.current = null;
+    }
+    setIsPullRefreshSlow(false);
+  }, []);
+
+  const cancelPullToRefresh = useCallback(() => {
+    pullRefreshRequestIdRef.current += 1;
+    if (pullStatusTimeoutRef.current != null) {
+      window.clearTimeout(pullStatusTimeoutRef.current);
+      pullStatusTimeoutRef.current = null;
+    }
+    clearPullRefreshSlowWarning();
+    isPullRefreshingRef.current = false;
+    resetPullToRefresh();
+  }, [clearPullRefreshSlowWarning, resetPullToRefresh]);
+
+  useEffect(() => {
+    cancelPullToRefresh();
+  }, [cancelPullToRefresh, selectedTab]);
+
   useEffect(
     () => () => {
       if (pullStatusTimeoutRef.current != null) {
         window.clearTimeout(pullStatusTimeoutRef.current);
+      }
+      if (pullSlowRequestTimeoutRef.current != null) {
+        window.clearTimeout(pullSlowRequestTimeoutRef.current);
       }
     },
     [],
@@ -821,8 +861,20 @@ const BottomNav: React.FC = () => {
         lastY: touch.clientY,
       };
 
+      const pullProgress = Math.min(
+        pullDistanceRef.current / PULL_TO_REFRESH_THRESHOLD,
+        1,
+      );
+      const downwardResistance =
+        PULL_TO_REFRESH_BASE_RESISTANCE -
+        (PULL_TO_REFRESH_BASE_RESISTANCE - PULL_TO_REFRESH_MIN_RESISTANCE) *
+          pullProgress;
+      const adjustedDeltaY =
+        deltaY > 0
+          ? deltaY * downwardResistance
+          : deltaY * PULL_TO_REFRESH_BASE_RESISTANCE;
       const distance = Math.min(
-        Math.max(0, pullDistanceRef.current + deltaY * 0.55),
+        Math.max(0, pullDistanceRef.current + adjustedDeltaY),
         PULL_TO_REFRESH_THRESHOLD * 1.25,
       );
       pullDistanceRef.current = distance;
@@ -881,16 +933,32 @@ const BottomNav: React.FC = () => {
     pullDistanceRef.current = 0;
     setPullDistance(0);
     isPullRefreshingRef.current = true;
+    const requestId = pullRefreshRequestIdRef.current + 1;
+    pullRefreshRequestIdRef.current = requestId;
+    clearPullRefreshSlowWarning();
+    pullSlowRequestTimeoutRef.current = window.setTimeout(() => {
+      if (
+        pullRefreshRequestIdRef.current === requestId &&
+        isPullRefreshingRef.current
+      ) {
+        setIsPullRefreshSlow(true);
+      }
+    }, PULL_TO_REFRESH_SLOW_REQUEST_MS);
     setPullToRefreshStatus("refreshing");
 
     try {
       await refreshHandler();
+      if (pullRefreshRequestIdRef.current !== requestId) return;
+      clearPullRefreshSlowWarning();
       schedulePullToRefreshReset("refreshing", 350);
     } catch {
+      if (pullRefreshRequestIdRef.current !== requestId) return;
+      clearPullRefreshSlowWarning();
       schedulePullToRefreshReset("error", 1600);
     }
   }, [
     hasBlockingLayer,
+    clearPullRefreshSlowWarning,
     resetPullToRefresh,
     schedulePullToRefreshReset,
     selectedTab,
@@ -1073,6 +1141,29 @@ const BottomNav: React.FC = () => {
             status={pullToRefreshStatus}
             threshold={PULL_TO_REFRESH_THRESHOLD}
           />
+          {isPullRefreshSlow ? (
+            <div className="absolute inset-x-0 top-14 z-30 px-3">
+              <Alert
+                status="warning"
+                className="items-center rounded-2xl border border-amber-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
+              >
+                <Alert.Indicator className="shrink-0 self-center" />
+                <Alert.Content className="min-w-0 gap-0 self-center">
+                  <Alert.Title className="text-sm font-bold text-pkpk-sub-font">
+                    응답이 지연되고 있어요.
+                  </Alert.Title>
+                  <Alert.Description className="text-xs font-semibold text-[#888]">
+                    네트워크 연결 상태를 확인해주세요.
+                  </Alert.Description>
+                </Alert.Content>
+                <CloseButton
+                  className="shrink-0 self-center"
+                  aria-label="지연 안내 닫기"
+                  onClick={() => setIsPullRefreshSlow(false)}
+                />
+              </Alert>
+            </div>
+          ) : null}
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}
