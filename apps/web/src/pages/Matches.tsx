@@ -363,12 +363,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           setIsLoadingSession(true);
           setSessionError(null);
         }
-        const searchParams = new URLSearchParams({
-          name: session.name,
-          date: session.date,
-        });
         const res = await fetch(
-          buildApiUrl(`/api/match-sessions/matches?${searchParams.toString()}`),
+          buildApiUrl(`/api/match-sessions/${session.id}/matches`),
           { headers: { Authorization: `Bearer ${token}` } },
         );
         if (!res.ok) {
@@ -612,7 +608,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     (session: MatchSessionSummaryInfo) => {
       saveScrollPosition("match");
       pushDepth("match", {
-        id: `session-detail:${session.name}\u0000${session.date}`,
+        id: `session-detail:${session.id}`,
         kind: "session-detail",
         onClose: closeSessionDetail,
       });

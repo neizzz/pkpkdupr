@@ -60,6 +60,7 @@ export const matches = sqliteTable("matches", {
     .default("player_created"),
   creatorPlayerId: text("creator_player_id").notNull(),
   name: text("name"),
+  sessionId: text("session_id"),
   sessionName: text("session_name"),
   sessionDate: integer("session_date", { mode: "timestamp" }),
   status: text("status").notNull(),
@@ -68,6 +69,14 @@ export const matches = sqliteTable("matches", {
   completedAt: integer("completed_at", { mode: "timestamp" }),
   resultSubmittedByPlayerId: text("result_submitted_by_player_id"),
   resultSubmittedAt: integer("result_submitted_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const matchSessions = sqliteTable("match_sessions", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  date: integer("date", { mode: "timestamp" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

@@ -108,6 +108,7 @@ export interface MatchResultApproval {
 }
 
 export interface Session {
+  id: string;
   name?: string;
   date: Date;
 }
@@ -119,6 +120,7 @@ export interface MatchSessionParticipant {
 }
 
 export interface MatchSessionSummary {
+  id: string;
   name: string;
   date: Date;
   matchCount: number;

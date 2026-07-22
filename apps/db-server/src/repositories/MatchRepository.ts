@@ -26,8 +26,10 @@ import {
   matchResultApprovals,
   matches,
   matchScores,
+  matchSessions,
   players,
 } from "../db/schema";
+import { generateEntityId, isEntityId } from "@pkpkdupr/shared/entityId";
 
 type StoredMatch = typeof matches.$inferSelect;
 type StoredMatchParticipant = typeof matchParticipants.$inferSelect;
@@ -290,27 +292,29 @@ export class MatchRepository {
     };
   }
 
-  async findBySession(name: string, date: Date): Promise<Match[]> {
-    const normalizedName = name.trim();
-    const dateValue = date.getTime();
-    if (!normalizedName || Number.isNaN(dateValue)) {
+  async findBySession(sessionId: string): Promise<Match[]> {
+    if (!isEntityId(sessionId, "session")) {
       return [];
     }
 
     const allMatches = await this.loadAllMatches();
-    return allMatches.filter(
-      (match) =>
-        match.session?.name?.trim() === normalizedName &&
-        match.session.date.getTime() === dateValue,
-    );
+    return allMatches.filter((match) => match.session?.id === sessionId);
   }
 
   async create(data: CreateMatchInput): Promise<Match> {
     const now = new Date();
 
+    if (!isEntityId(data.id, "match")) {
+      throw new Error("유효한 매치 ID가 필요합니다.");
+    }
+
     if ((data.scores?.length ?? 0) > 0) {
       validateMatchScoresForMode(data.mode, data.scores ?? []);
     }
+
+    const sessionId = data.session
+      ? await this.ensureSession(data.session)
+      : null;
 
     await this.db.insert(matches).values({
       id: data.id,
@@ -319,6 +323,7 @@ export class MatchRepository {
       source: data.source ?? "player_created",
       creatorPlayerId: data.creatorPlayerId,
       name: data.name?.trim() || null,
+      sessionId,
       sessionName: data.session?.name?.trim() || null,
       sessionDate: toDateOrNull(data.session?.date),
       status: data.status,
@@ -654,12 +659,25 @@ export class MatchRepository {
       updatePayload.name = data.name?.trim() || null;
     }
 
-    if ("sessionName" in data) {
-      updatePayload.sessionName = data.sessionName?.trim() || null;
-    }
+    if ("sessionName" in data || "sessionDate" in data) {
+      const current = await this.findById(id);
+      if (!current) return undefined;
+      const nextName =
+        "sessionName" in data
+          ? data.sessionName?.trim() || undefined
+          : current.session?.name;
+      const nextDate =
+        "sessionDate" in data
+          ? toDateOrNull(data.sessionDate) ?? undefined
+          : current.session?.date;
+      const sessionId =
+        nextName && nextDate
+          ? await this.getOrCreateSession(nextName, nextDate)
+          : null;
 
-    if ("sessionDate" in data) {
-      updatePayload.sessionDate = toDateOrNull(data.sessionDate);
+      updatePayload.sessionId = sessionId;
+      updatePayload.sessionName = nextName ?? null;
+      updatePayload.sessionDate = nextDate ?? null;
     }
 
     await this.db.update(matches).set(updatePayload).where(eq(matches.id, id));
@@ -667,7 +685,7 @@ export class MatchRepository {
   }
 
   private async hydrateMatch(match: StoredMatch): Promise<Match> {
-    const [participants, scores, approvals] = await Promise.all([
+    const [participants, scores, approvals, session] = await Promise.all([
       this.db
         .select()
         .from(matchParticipants)
@@ -683,6 +701,13 @@ export class MatchRepository {
         .from(matchResultApprovals)
         .where(eq(matchResultApprovals.matchId, match.id))
         .all(),
+      match.sessionId
+        ? this.db
+            .select()
+            .from(matchSessions)
+            .where(eq(matchSessions.id, match.sessionId))
+            .get()
+        : Promise.resolve(undefined),
     ]);
     const playerRecords = await Promise.all(
       participants.map((participant: StoredMatchParticipant) =>
@@ -729,10 +754,11 @@ export class MatchRepository {
       creatorPlayerId: match.creatorPlayerId,
       name: match.name?.trim() || undefined,
       sessionName: match.sessionName?.trim() || undefined,
-      session: match.sessionDate
+      session: session
         ? {
-            name: match.sessionName?.trim() || undefined,
-            date: toDate(match.sessionDate),
+            id: session.id,
+            name: session.name,
+            date: toDate(session.date),
           }
         : undefined,
       status: match.status as Match["status"],
@@ -763,11 +789,7 @@ export class MatchRepository {
   }
 
   private getSessionKey(match: Match): string | null {
-    const name = match.session?.name?.trim();
-    if (!name || !match.session) {
-      return null;
-    }
-    return `${name}\u0000${match.session.date.toISOString()}`;
+    return match.session?.id ?? null;
   }
 
   private isPlayerInMatch(match: Match, playerId: string) {
@@ -791,6 +813,7 @@ export class MatchRepository {
       const existing = summaries.get(key);
       const summary =
         existing ?? {
+          id: match.session.id,
           name: match.session.name.trim(),
           date: match.session.date,
           matchCount: 0,
@@ -843,6 +866,95 @@ export class MatchRepository {
         });
       }
     }
+  }
+
+  private async ensureSession(session: Session): Promise<string> {
+    if (!isEntityId(session.id, "session")) {
+      throw new Error("유효한 세션 ID가 필요합니다.");
+    }
+    const name = session.name?.trim();
+    if (!name || Number.isNaN(session.date.getTime())) {
+      throw new Error("유효한 세션 정보가 필요합니다.");
+    }
+
+    const existingByMetadata = await this.db
+      .select()
+      .from(matchSessions)
+      .where(and(eq(matchSessions.name, name), eq(matchSessions.date, session.date)))
+      .get();
+    if (existingByMetadata) return existingByMetadata.id;
+
+    const existingById = await this.db
+      .select()
+      .from(matchSessions)
+      .where(eq(matchSessions.id, session.id))
+      .get();
+    if (existingById) return existingById.id;
+
+    let candidateId = session.id;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      try {
+        const now = new Date();
+        await this.db.insert(matchSessions).values({
+          id: candidateId,
+          name,
+          date: session.date,
+          createdAt: now,
+          updatedAt: now,
+        });
+        return candidateId;
+      } catch (error) {
+        const concurrentSession = await this.db
+          .select()
+          .from(matchSessions)
+          .where(
+            and(
+              eq(matchSessions.name, name),
+              eq(matchSessions.date, session.date),
+            ),
+          )
+          .get();
+        if (concurrentSession) return concurrentSession.id;
+        if (attempt === 7) throw error;
+        candidateId = generateEntityId("session");
+      }
+    }
+
+    throw new Error("세션 ID 생성에 실패했습니다.");
+  }
+
+  private async getOrCreateSession(name: string, date: Date): Promise<string> {
+    const normalizedName = name.trim();
+    const existing = await this.db
+      .select()
+      .from(matchSessions)
+      .where(
+        and(
+          eq(matchSessions.name, normalizedName),
+          eq(matchSessions.date, date),
+        ),
+      )
+      .get();
+    if (existing) return existing.id;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const id = generateEntityId("session");
+      try {
+        const now = new Date();
+        await this.db.insert(matchSessions).values({
+          id,
+          name: normalizedName,
+          date,
+          createdAt: now,
+          updatedAt: now,
+        });
+        return id;
+      } catch (error) {
+        if (attempt === 7) throw error;
+      }
+    }
+
+    throw new Error("세션 ID 생성에 실패했습니다.");
   }
 
   private async replaceScores(matchId: string, scores: MatchScore[]) {

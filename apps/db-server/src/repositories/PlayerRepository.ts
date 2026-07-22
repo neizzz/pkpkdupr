@@ -8,6 +8,7 @@ import {
   type StoredPlayerDupr,
 } from "@pkpkdupr/shared/player";
 import { desc, eq } from "drizzle-orm";
+import { isEntityId } from "@pkpkdupr/shared/entityId";
 import { players } from "../db/schema";
 
 export interface StoredPlayerRecord extends Player {
@@ -49,6 +50,9 @@ export class PlayerRepository {
   }
 
   async create(data: CreateStoredPlayerInput): Promise<StoredPlayerRecord> {
+    if (!isEntityId(data.id, "player")) {
+      throw new Error("유효한 플레이어 ID가 필요합니다.");
+    }
     const { duprState, ...storedData } = data;
     const duprRating = duprState
       ? serializeStoredPlayerDupr(duprState)

@@ -7,6 +7,7 @@ import type {
   Session,
 } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
+import { generateEntityId } from "@pkpkdupr/shared/entityId";
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
@@ -30,6 +31,7 @@ const hydrateSession = (record: any): Session | undefined => {
   }
 
   return {
+    id: record.session.id,
     name:
       typeof record.session.name === "string" && record.session.name.trim()
         ? record.session.name.trim()
@@ -95,6 +97,7 @@ const hydrateMatch = (record: any): Match => ({
 });
 
 const hydrateSessionSummary = (record: any): MatchSessionSummary => ({
+  id: record.id,
   name: record.name,
   date: new Date(record.date),
   matchCount: record.matchCount,
@@ -182,19 +185,33 @@ export class MatchRepository {
   async create(
     match: Omit<Match, "id" | "createdAt" | "updatedAt"> & { id?: string },
   ): Promise<Match> {
-    const id = match.id ?? `match-${Date.now()}`;
-    const created = await this.dbRequest<any>("/internal/matches", {
-      method: "POST",
-      body: JSON.stringify({
-        id,
-        ...match,
-        resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
-        resultSubmittedAt: match.resultSubmittedAt ?? null,
-        approvals: match.approvals ?? [],
-      }),
-    });
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const id = match.id ?? generateEntityId("match");
+      try {
+        const created = await this.dbRequest<any>("/internal/matches", {
+          method: "POST",
+          body: JSON.stringify({
+            id,
+            ...match,
+            resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
+            resultSubmittedAt: match.resultSubmittedAt ?? null,
+            approvals: match.approvals ?? [],
+          }),
+        });
+        return hydrateMatch(created);
+      } catch (error) {
+        if (
+          match.id ||
+          attempt === 7 ||
+          !(error instanceof DbRequestError) ||
+          error.status !== 409
+        ) {
+          throw error;
+        }
+      }
+    }
 
-    return hydrateMatch(created);
+    throw new Error("매치 ID 생성에 실패했습니다.");
   }
 
   async submitResult(
@@ -321,13 +338,9 @@ export class MatchRepository {
     };
   }
 
-  async findBySession(name: string, date: Date): Promise<Match[]> {
-    const params = new URLSearchParams({
-      name,
-      date: date.toISOString(),
-    });
+  async findBySession(sessionId: string): Promise<Match[]> {
     const records = await this.dbRequest<any[]>(
-      `/internal/match-sessions/matches?${params.toString()}`,
+      `/internal/match-sessions/${encodeURIComponent(sessionId)}/matches`,
     );
     return records.map(hydrateMatch);
   }

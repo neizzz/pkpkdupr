@@ -30,6 +30,7 @@ export type MatchInfo = Omit<
   completedAt: string | null;
   resultSubmittedAt: string | null;
   session?: {
+    id: string;
     name?: string;
     date: string;
   };

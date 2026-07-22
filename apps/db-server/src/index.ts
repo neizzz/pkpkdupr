@@ -1,6 +1,11 @@
 import express from "express";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
 import {
+  generateEntityId,
+  isEntityId,
+  type EntityIdKind,
+} from "@pkpkdupr/shared/entityId";
+import {
   normalizeStoredPlayerDupr,
   shouldStorePlayerDuprAsNull,
 } from "@pkpkdupr/shared/player";
@@ -83,6 +88,161 @@ const getTableInfo = async (tableName: string) => {
 const hasColumn = async (tableName: string, columnName: string) => {
   const rows = await getTableInfo(tableName);
   return rows.some((row) => String(row.name) === columnName);
+};
+
+const createIdMapping = (
+  ids: string[],
+  kind: EntityIdKind,
+): Map<string, string> => {
+  const occupied = new Set(ids);
+  const mapping = new Map<string, string>();
+
+  for (const id of ids) {
+    if (isEntityId(id, kind)) continue;
+
+    let nextId = generateEntityId(kind);
+    while (occupied.has(nextId)) {
+      nextId = generateEntityId(kind);
+    }
+    occupied.add(nextId);
+    mapping.set(id, nextId);
+  }
+
+  return mapping;
+};
+
+const executeIdReferenceUpdates = async (
+  mapping: Map<string, string>,
+  columns: Array<{ table: string; column: string }>,
+) => {
+  for (const [previousId, nextId] of mapping) {
+    for (const { table, column } of columns) {
+      await client.execute({
+        sql: `UPDATE ${table} SET ${column} = ? WHERE ${column} = ?`,
+        args: [nextId, previousId],
+      });
+    }
+  }
+};
+
+const migrateEntityIds = async () => {
+  const playerRows = await client.execute("SELECT id FROM players");
+  const matchRows = await client.execute("SELECT id FROM matches");
+  const playerIds = playerRows.rows.map((row) => String(row.id));
+  const matchIds = matchRows.rows.map((row) => String(row.id));
+  const playerIdMapping = createIdMapping(playerIds, "player");
+  const matchIdMapping = createIdMapping(matchIds, "match");
+
+  await client.execute("BEGIN IMMEDIATE");
+  try {
+    await executeIdReferenceUpdates(playerIdMapping, [
+      { table: "player_creation_logs", column: "player_id" },
+      { table: "player_creation_logs", column: "created_by_player_id" },
+      { table: "player_status_change_logs", column: "player_id" },
+      { table: "player_status_change_logs", column: "changed_by_player_id" },
+      { table: "player_rating_change_logs", column: "player_id" },
+      { table: "official_dupr_adjustment_logs", column: "player_id" },
+      { table: "official_dupr_adjustment_logs", column: "changed_by_player_id" },
+      { table: "match_participants", column: "player_id" },
+      { table: "match_result_approvals", column: "player_id" },
+      { table: "matches", column: "creator_player_id" },
+      { table: "matches", column: "result_submitted_by_player_id" },
+    ]);
+
+    await executeIdReferenceUpdates(matchIdMapping, [
+      { table: "match_scores", column: "match_id" },
+      { table: "match_participants", column: "match_id" },
+      { table: "match_result_approvals", column: "match_id" },
+    ]);
+
+    for (const [previousId, nextId] of matchIdMapping) {
+      await client.execute({
+        sql: "UPDATE player_rating_change_logs SET source_log_id = REPLACE(source_log_id, ?, ?)",
+        args: [previousId, nextId],
+      });
+    }
+
+    await executeIdReferenceUpdates(playerIdMapping, [
+      { table: "players", column: "id" },
+    ]);
+    await executeIdReferenceUpdates(matchIdMapping, [
+      { table: "matches", column: "id" },
+    ]);
+
+    await client.execute(
+      "UPDATE match_participants SET id = match_id || '-team-' || team_index || '-' || player_id",
+    );
+    await client.execute(
+      "UPDATE match_result_approvals SET id = match_id || '-approval-' || player_id",
+    );
+    await client.execute(
+      "UPDATE match_scores SET id = match_id || '-score-' || rowid",
+    );
+
+    const sessionRows = await client.execute(`
+      SELECT DISTINCT trim(session_name) AS name, session_date AS date
+      FROM matches
+      WHERE session_id IS NULL
+        AND trim(COALESCE(session_name, '')) <> ''
+        AND session_date IS NOT NULL
+    `);
+    const existingSessionRows = await client.execute(
+      "SELECT id FROM match_sessions",
+    );
+    const occupiedSessionIds = new Set(
+      existingSessionRows.rows.map((row) => String(row.id)),
+    );
+
+    for (const row of sessionRows.rows) {
+      const name = String(row.name);
+      const date = Number(row.date);
+      const existing = await client.execute({
+        sql: "SELECT id FROM match_sessions WHERE name = ? AND date = ?",
+        args: [name, date],
+      });
+      const sessionId = existing.rows[0]?.id
+        ? String(existing.rows[0].id)
+        : (() => {
+            let id = generateEntityId("session");
+            while (occupiedSessionIds.has(id)) id = generateEntityId("session");
+            occupiedSessionIds.add(id);
+            return id;
+          })();
+
+      if (!existing.rows[0]) {
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        await client.execute({
+          sql: "INSERT INTO match_sessions (id, name, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+          args: [sessionId, name, date, nowSeconds, nowSeconds],
+        });
+      }
+      await client.execute({
+        sql: "UPDATE matches SET session_id = ? WHERE session_id IS NULL AND trim(session_name) = ? AND session_date = ?",
+        args: [sessionId, name, date],
+      });
+    }
+
+    const invalidPlayerIds = await client.execute(
+      "SELECT COUNT(*) AS count FROM players WHERE length(id) != 8 OR substr(id, 1, 1) != 'P' OR id GLOB '*[^a-z0-9P]*'",
+    );
+    const invalidMatchIds = await client.execute(
+      "SELECT COUNT(*) AS count FROM matches WHERE length(id) != 8 OR substr(id, 1, 1) != 'M' OR id GLOB '*[^a-z0-9M]*'",
+    );
+    const invalidSessionIds = await client.execute(
+      "SELECT COUNT(*) AS count FROM match_sessions WHERE length(id) != 8 OR substr(id, 1, 1) != 'S' OR id GLOB '*[^a-z0-9S]*'",
+    );
+    const invalidCount = [invalidPlayerIds, invalidMatchIds, invalidSessionIds]
+      .map((result) => Number(result.rows[0]?.count ?? 0))
+      .reduce((sum, count) => sum + count, 0);
+    if (invalidCount > 0) {
+      throw new Error("엔터티 ID 마이그레이션 검증에 실패했습니다.");
+    }
+
+    await client.execute("COMMIT");
+  } catch (error) {
+    await client.execute("ROLLBACK").catch(() => {});
+    throw error;
+  }
 };
 
 const ensurePlayersDuprRatingNullable = async () => {
@@ -235,6 +395,7 @@ const initSchema = async () => {
       source TEXT NOT NULL DEFAULT 'player_created',
       creator_player_id TEXT NOT NULL DEFAULT '',
       name TEXT,
+      session_id TEXT,
       session_name TEXT,
       session_date INTEGER,
       status TEXT NOT NULL,
@@ -258,6 +419,7 @@ const initSchema = async () => {
     `ALTER TABLE matches ADD COLUMN creator_player_id TEXT NOT NULL DEFAULT ''`,
   );
   await safeExec(`ALTER TABLE matches ADD COLUMN name TEXT`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN session_id TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN session_name TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN session_date INTEGER`);
   await safeExec(
@@ -434,6 +596,20 @@ const initSchema = async () => {
   `);
 
   await client.execute(`
+    CREATE TABLE IF NOT EXISTS match_sessions (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      date INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(name, date)
+    )
+  `);
+  await client.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS match_sessions_name_date_unique ON match_sessions(name, date)",
+  );
+
+  await client.execute(`
     CREATE TABLE IF NOT EXISTS official_dupr_adjustment_logs (
       id TEXT PRIMARY KEY,
       player_id TEXT NOT NULL,
@@ -448,6 +624,8 @@ const initSchema = async () => {
       created_at INTEGER NOT NULL
     )
   `);
+
+  await migrateEntityIds();
 
   const storedPlayers = await playerRepository.findAll();
   for (const player of storedPlayers) {
@@ -638,19 +816,16 @@ app.get("/internal/match-feed", async (req, res) => {
   }
 });
 
-app.get("/internal/match-sessions/matches", async (req, res) => {
+app.get("/internal/match-sessions/:sessionId/matches", async (req, res) => {
   try {
-    const name =
-      typeof req.query.name === "string" ? req.query.name.trim() : "";
-    const date =
-      typeof req.query.date === "string" ? new Date(req.query.date) : null;
-    if (!name || !date || Number.isNaN(date.getTime())) {
+    const sessionId = req.params.sessionId;
+    if (!isEntityId(sessionId, "session")) {
       return res
         .status(400)
-        .json({ error: "유효한 세션명과 세션 날짜가 필요합니다." });
+        .json({ error: "유효한 세션 ID가 필요합니다." });
     }
 
-    res.json(await matchRepository.findBySession(name, date));
+    res.json(await matchRepository.findBySession(sessionId));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -673,7 +848,11 @@ app.post("/internal/matches", async (req, res) => {
     const match = await matchRepository.create(req.body as CreateMatchInput);
     res.json(match);
   } catch (error) {
-    res.status(500).json({ error: (error as Error).message });
+    const message = (error as Error).message;
+    if (message.includes("UNIQUE") || message.includes("unique")) {
+      return res.status(409).json({ error: message });
+    }
+    res.status(500).json({ error: message });
   }
 });
 

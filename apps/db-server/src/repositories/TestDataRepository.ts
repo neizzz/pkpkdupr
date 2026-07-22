@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import {
   matchParticipants,
   matchResultApprovals,
+  matchSessions,
   matches,
   matchScores,
   playerCreationLogs,
@@ -22,6 +23,30 @@ const createDupr = (seed: number): PlayerDupr => ({
   singles: seed - 0.013,
   doubles: seed + 0.004,
 });
+
+const devPlayerIdByLegacyId: Record<string, string> = {
+  "dev-player-alice": "Pdev0001",
+  "dev-player-bob": "Pdev0002",
+  "dev-player-cara": "Pdev0003",
+  "dev-player-dana": "Pdev0004",
+  "dev-player-ella": "Pdev0005",
+  "dev-player-finn": "Pdev0006",
+  "dev-player-gabe": "Pdev0007",
+  "dev-player-hugo": "Pdev0008",
+  "dev-player-chris": "Pdev0009",
+};
+
+const devMatchIdByLegacyId: Record<string, string> = {
+  "dev-match-open-play-001": "Mdev0001",
+  "dev-match-ladder-002": "Mdev0002",
+  "dev-session-open-play-001": "Mdev0003",
+  "dev-session-open-play-002": "Mdev0004",
+  "dev-session-open-play-003": "Mdev0005",
+};
+
+const toDevPlayerId = (id: string) => devPlayerIdByLegacyId[id] ?? id;
+const toDevMatchId = (id: string) => devMatchIdByLegacyId[id] ?? id;
+const DEV_OPEN_PLAY_SESSION_ID = "Sdev0001";
 
 const mockPlayers: CreateStoredPlayerInput[] = [
   {
@@ -142,7 +167,7 @@ const mockStatusLogs: CreatePlayerStatusChangeLogInput[] = [
     playerId: "dev-player-chris",
     previousStatus: "active",
     nextStatus: "inactive",
-    changedByPlayerId: "dev-seed-system",
+    changedByPlayerId: "dev-player-alice",
     changedByUsername: "dev-seed",
     changedAt: new Date("2026-06-04T08:45:00+09:00"),
   },
@@ -182,6 +207,7 @@ const mockMatches = [
     type: "mixed-doubles",
     source: "admin_created_result",
     creatorPlayerId: "dev-player-alice",
+    sessionId: DEV_OPEN_PLAY_SESSION_ID,
     sessionName: "일요일 오픈 플레이",
     sessionDate: new Date("2026-07-19T09:00:00+09:00"),
     status: "completed",
@@ -198,6 +224,7 @@ const mockMatches = [
     type: "mixed-doubles",
     source: "admin_created_result",
     creatorPlayerId: "dev-player-bob",
+    sessionId: DEV_OPEN_PLAY_SESSION_ID,
     sessionName: "일요일 오픈 플레이",
     sessionDate: new Date("2026-07-19T09:00:00+09:00"),
     status: "completed",
@@ -214,6 +241,7 @@ const mockMatches = [
     type: "mixed-doubles",
     source: "admin_created_result",
     creatorPlayerId: "dev-player-alice",
+    sessionId: DEV_OPEN_PLAY_SESSION_ID,
     sessionName: "일요일 오픈 플레이",
     sessionDate: new Date("2026-07-19T09:00:00+09:00"),
     status: "completed",
@@ -403,32 +431,86 @@ export class TestDataRepository {
         player.username,
       );
       if (!existing) {
-        await this.playerRepository.create(player);
+        await this.playerRepository.create({
+          ...player,
+          id: toDevPlayerId(player.id),
+        });
       }
     }
 
     for (const log of mockCreationLogs) {
-      await this.createCreationLogIfMissing(log);
+      await this.createCreationLogIfMissing({
+        ...log,
+        playerId: toDevPlayerId(log.playerId),
+        createdByPlayerId: log.createdByPlayerId
+          ? toDevPlayerId(log.createdByPlayerId)
+          : null,
+      });
     }
 
     for (const log of mockStatusLogs) {
-      await this.createStatusLogIfMissing(log);
+      await this.createStatusLogIfMissing({
+        ...log,
+        playerId: toDevPlayerId(log.playerId),
+        changedByPlayerId: toDevPlayerId(log.changedByPlayerId),
+      });
     }
 
+    await this.createSessionIfMissing({
+      id: DEV_OPEN_PLAY_SESSION_ID,
+      name: "일요일 오픈 플레이",
+      date: new Date("2026-07-19T09:00:00+09:00"),
+      createdAt: new Date("2026-07-19T08:40:00+09:00"),
+      updatedAt: new Date("2026-07-19T08:40:00+09:00"),
+    });
+
     for (const match of mockMatches) {
-      await this.createMatchIfMissing(match);
+      await this.createMatchIfMissing(
+        {
+          ...match,
+          id: toDevMatchId(match.id),
+          creatorPlayerId: toDevPlayerId(match.creatorPlayerId),
+          resultSubmittedByPlayerId: match.resultSubmittedByPlayerId
+            ? toDevPlayerId(match.resultSubmittedByPlayerId)
+            : null,
+        } as (typeof mockMatches)[number],
+      );
     }
 
     for (const score of mockMatchScores) {
-      await this.createMatchScoreIfMissing(score);
+      await this.createMatchScoreIfMissing({
+        ...score,
+        matchId: toDevMatchId(score.matchId),
+      });
     }
 
     for (const participant of mockMatchParticipants) {
-      await this.createMatchParticipantIfMissing(participant);
+      await this.createMatchParticipantIfMissing({
+        ...participant,
+        matchId: toDevMatchId(participant.matchId),
+        playerId: toDevPlayerId(participant.playerId),
+      });
     }
 
     for (const approval of mockMatchResultApprovals) {
-      await this.createMatchResultApprovalIfMissing(approval);
+      await this.createMatchResultApprovalIfMissing({
+        ...approval,
+        matchId: toDevMatchId(approval.matchId),
+        playerId: toDevPlayerId(approval.playerId),
+      });
+    }
+  }
+
+  private async createSessionIfMissing(
+    data: typeof matchSessions.$inferInsert,
+  ) {
+    const existing = await this.db
+      .select()
+      .from(matchSessions)
+      .where(eq(matchSessions.id, data.id))
+      .get();
+    if (!existing) {
+      await this.db.insert(matchSessions).values(data);
     }
   }
 

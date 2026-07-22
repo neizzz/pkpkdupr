@@ -57,7 +57,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   onRetry,
   onPressMatch,
 }) => {
-  const sessionId = `${session.name.trim()} · ${new Date(session.date).toISOString()}`;
+  const sessionId = session.id;
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
   const isMatchesLoading = useMinimumLoading(isLoading);
   const displayedMatches = useMemo(

@@ -33,7 +33,8 @@ import type {
   VerifyPlayerQrTokenResponse,
 } from "@pkpkdupr/shared/qr";
 import bcrypt from "bcryptjs";
-import { createHmac } from "crypto";
+import { createHmac, randomUUID } from "crypto";
+import { generateEntityId } from "@pkpkdupr/shared/entityId";
 import {
   ACCESS_TOKEN_EXPIRES_IN,
   createAccessToken,
@@ -92,7 +93,7 @@ export interface UserCredentials {
 }
 
 const buildId = (prefix: string) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  `${prefix}-${randomUUID()}`;
 
 const createPasswordFingerprint = (passwordHash: string) =>
   createHmac("sha256", JWT_SECRET).update(passwordHash).digest("hex");
@@ -101,7 +102,7 @@ const createPlayer = (input: Pick<Player, "username" | "gender">): Player => {
   const now = new Date();
 
   return {
-    id: buildId("player"),
+    id: generateEntityId("player"),
     username: input.username,
     duprRating: null,
     gender: input.gender,
@@ -697,16 +698,26 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const isAdmin = username === API_ADMIN_USERNAME;
-    const player = createPlayer({ username, gender });
-
-    const created = await this.dbRequest<any>("/internal/players", {
-      method: "POST",
-      body: JSON.stringify({
-        ...player,
-        passwordHash: hashedPassword,
-        isFirstLogin: true,
-      }),
-    });
+    let created: any;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const player = createPlayer({ username, gender });
+      try {
+        created = await this.dbRequest<any>("/internal/players", {
+          method: "POST",
+          body: JSON.stringify({
+            ...player,
+            passwordHash: hashedPassword,
+            isFirstLogin: true,
+          }),
+        });
+        break;
+      } catch (error) {
+        if (attempt === 7) throw error;
+      }
+    }
+    if (!created) {
+      throw new Error("플레이어 ID 생성에 실패했습니다.");
+    }
 
     const hydratedPlayer = hydratePlayer(created);
     await this.insertCreationLog({

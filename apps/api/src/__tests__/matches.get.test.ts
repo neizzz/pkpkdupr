@@ -174,12 +174,13 @@ describe("GET /api/match-feed", () => {
     const sessionMatch: Match = {
       ...match,
       id: "match-session-001",
-      session: { name: "토요 오전 세션", date: now },
+      session: { id: "Ssessn01", name: "토요 오전 세션", date: now },
     };
     const feedItems: MatchFeedItem[] = [
       {
         kind: "session",
         session: {
+          id: "Ssessn01",
           name: "토요 오전 세션",
           date: now,
           matchCount: 2,
@@ -230,7 +231,7 @@ describe("GET /api/match-feed", () => {
   });
 });
 
-describe("GET /api/match-sessions/matches", () => {
+describe("GET /api/match-sessions/:sessionId/matches", () => {
   beforeEach(() => {
     vi.spyOn(
       AuthService.prototype,
@@ -245,21 +246,19 @@ describe("GET /api/match-sessions/matches", () => {
 
   it("선택한 세션의 전체 경기를 반환한다", async () => {
     const sessionMatches: Match[] = [
-      { ...match, id: "match-session-001", session: { name: "토요 세션", date: now } },
-      { ...match, id: "match-session-002", session: { name: "토요 세션", date: now } },
+      { ...match, id: "match-session-001", session: { id: "Ssessn02", name: "토요 세션", date: now } },
+      { ...match, id: "match-session-002", session: { id: "Ssessn02", name: "토요 세션", date: now } },
     ];
     const findBySession = vi
       .spyOn(MatchRepository.prototype, "findBySession")
       .mockResolvedValue(sessionMatches);
 
     const response = await request(app)
-      .get(
-        `/api/match-sessions/matches?name=${encodeURIComponent("토요 세션")}&date=${encodeURIComponent(now.toISOString())}`,
-      )
+      .get("/api/match-sessions/Ssessn02/matches")
       .set("Authorization", "Bearer test-token");
 
     expect(response.status).toBe(200);
-    expect(findBySession).toHaveBeenCalledWith("토요 세션", now);
+    expect(findBySession).toHaveBeenCalledWith("Ssessn02");
     expect(response.body.map((item: { id: string }) => item.id)).toEqual([
       "match-session-001",
       "match-session-002",
@@ -268,12 +267,12 @@ describe("GET /api/match-sessions/matches", () => {
 
   it("세션 식별자가 없거나 유효하지 않으면 400을 반환한다", async () => {
     const response = await request(app)
-      .get("/api/match-sessions/matches?name=토요%20세션")
+      .get("/api/match-sessions/invalid/matches")
       .set("Authorization", "Bearer test-token");
 
     expect(response.status).toBe(400);
     expect(response.body).toEqual({
-      error: "유효한 세션명과 세션 날짜가 필요합니다.",
+      error: "유효한 세션 ID가 필요합니다.",
     });
   });
 });

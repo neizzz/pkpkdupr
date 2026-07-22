@@ -18,6 +18,7 @@ import {
   type MatchType,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
+import { generateEntityId, isEntityId } from "@pkpkdupr/shared/entityId";
 import type {
   MemberListPlayer,
   Player,
@@ -173,7 +174,7 @@ const normalizeMatchSession = (
     throw new Error("유효한 세션 날짜가 필요합니다.");
   }
 
-  return { name, date };
+  return { id: generateEntityId("session"), name, date };
 };
 
 const normalizeOptionalDateString = (value: unknown) => {
@@ -649,20 +650,19 @@ app.get("/api/match-feed", async (req, res) => {
   }
 });
 
-app.get("/api/match-sessions/matches", async (req, res) => {
+app.get("/api/match-sessions/:sessionId/matches", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
     if (!decoded) {
       return;
     }
 
-    const name = typeof req.query.name === "string" ? req.query.name.trim() : "";
-    const date = typeof req.query.date === "string" ? new Date(req.query.date) : null;
-    if (!name || !date || Number.isNaN(date.getTime())) {
-      return res.status(400).json({ error: "유효한 세션명과 세션 날짜가 필요합니다." });
+    const sessionId = req.params.sessionId;
+    if (!isEntityId(sessionId, "session")) {
+      return res.status(400).json({ error: "유효한 세션 ID가 필요합니다." });
     }
 
-    res.json(await matchRepository.findBySession(name, date));
+    res.json(await matchRepository.findBySession(sessionId));
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -834,7 +834,6 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       validateMatchScoresForMode(resolvedMode, normalizedScores);
 
       return {
-        id: `admin-match-${Date.now()}-${index}-${randomUUID()}`,
         name: normalizeOptionalName(name),
         session: commonSession,
         type,
