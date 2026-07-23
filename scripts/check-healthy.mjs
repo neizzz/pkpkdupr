@@ -185,7 +185,9 @@ const checks = [
   {
     name: "Uptime Kuma",
     target: "admin",
-    path: "/uptime/",
+    // Uptime Kuma는 서브 경로를 지원하지 않아 관리자 스택 루트에서
+    // 제공한다. /uptime/은 이전 링크 호환용 리다이렉트만 유지한다.
+    path: "/",
     verify: verifyUptimeKuma,
   },
   {

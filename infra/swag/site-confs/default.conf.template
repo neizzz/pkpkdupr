@@ -66,13 +66,7 @@ server {
     }
 
     location = /uptime {
-        return 301 /uptime/;
-    }
-
-    # Uptime Kuma가 초기 설정 화면을 루트 상대 경로로 열어도
-    # 공개 prefix(/uptime)를 유지하도록 보정합니다.
-    location = /setup-database {
-        return 301 /uptime/setup-database$is_args$args;
+        return 302 /;
     }
 
     location = /db {
@@ -84,17 +78,17 @@ server {
         include /config/nginx/proxy.conf;
     }
 
-    location /uptime/ {
-        rewrite ^/uptime/(.*)$ /$1 break;
-        proxy_pass http://uptime-kuma:3001;
-        proxy_set_header X-Forwarded-Prefix /uptime;
-        include /config/nginx/proxy.conf;
+    # Uptime Kuma는 서브 경로를 지원하지 않습니다. /uptime/로 들어온
+    # 기존 링크는 Kuma가 라우팅할 수 있는 관리자 스택 루트로 보냅니다.
+    # 특히 초기 설정의 /setup-database 라우트가 /uptime/setup-database로
+    # 바뀌면 프론트엔드 라우터가 404 화면을 렌더링합니다.
+    location ^~ /uptime/ {
+        rewrite ^/uptime/(.*)$ /$1 permanent;
     }
 
-    # Uptime Kuma는 서브 경로를 지원하지 않고 정적 자산과 Socket.IO를
-    # 루트 절대 경로(/assets, /socket.io)로 요청합니다. /uptime/에서
-    # 전달한 화면이 실제로 로드되도록, 다른 명시적 관리자 경로를 제외한
-    # 루트 요청도 같은 upstream으로 전달합니다.
+    # Uptime Kuma는 정적 자산과 Socket.IO를 루트 절대 경로(/assets,
+    # /socket.io)로 요청하므로, 명시적 관리자 경로를 제외한 루트 요청은
+    # 모두 같은 upstream으로 전달합니다.
     location / {
         proxy_pass http://uptime-kuma:3001;
         include /config/nginx/proxy.conf;
