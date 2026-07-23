@@ -541,6 +541,15 @@ const BottomNav: React.FC = () => {
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       const historyDepth = currentHistoryDepthRef.current;
+      // Set the destination before running an entry's close callback. A close
+      // callback can immediately open another layer (for example, replacing
+      // the global menu with a bottom sheet), which pushes a new history state.
+      // Updating this ref afterwards would overwrite that new state with the
+      // old destination and make the next OS back close the covered depth.
+      currentHistoryDepthRef.current = isTabDepthHistoryState(event.state)
+        ? event.state
+        : null;
+
       if (historyDepth) {
         removeDepthEntry(historyDepth.tabKey, historyDepth.depthId);
       } else {
@@ -552,10 +561,6 @@ const BottomNav: React.FC = () => {
           removeDepthEntry(activeTab, topEntry.id);
         }
       }
-
-      currentHistoryDepthRef.current = isTabDepthHistoryState(event.state)
-        ? event.state
-        : null;
     };
 
     window.addEventListener("popstate", handlePopState);
