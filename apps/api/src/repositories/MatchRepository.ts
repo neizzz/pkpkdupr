@@ -37,6 +37,10 @@ const hydrateSession = (record: any): Session | undefined => {
         ? record.session.name.trim()
         : undefined,
     date: new Date(record.session.date),
+    location:
+      typeof record.session.location === "string" && record.session.location.trim()
+        ? record.session.location.trim()
+        : "Court TBD",
   };
 };
 
@@ -100,6 +104,10 @@ const hydrateSessionSummary = (record: any): MatchSessionSummary => ({
   id: record.id,
   name: record.name,
   date: new Date(record.date),
+  location:
+    typeof record.location === "string" && record.location.trim()
+      ? record.location.trim()
+      : "Court TBD",
   matchCount: record.matchCount,
   participants: (record.participants ?? []).map((participant: any) => ({
     id: participant.id,
@@ -351,6 +359,7 @@ export class MatchRepository {
       name?: string | null;
       sessionName?: string | null;
       sessionDate?: string | null;
+      sessionLocation?: string | null;
     },
   ): Promise<Match> {
     const updated = await this.dbRequest<any>(

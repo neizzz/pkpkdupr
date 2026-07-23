@@ -77,6 +77,7 @@ export const matchSessions = sqliteTable("match_sessions", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   date: integer("date", { mode: "timestamp" }).notNull(),
+  location: text("location").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

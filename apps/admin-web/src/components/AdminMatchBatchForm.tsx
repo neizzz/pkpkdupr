@@ -13,6 +13,8 @@ import {
   singlesMatchTypeValues,
 } from "@pkpkdupr/shared/match";
 import type { Player } from "@pkpkdupr/shared/player";
+import { rememberRecentInputValue } from "@pkpkdupr/shared/recentInputHistory";
+import RecentValueComboBox from "./RecentValueComboBox";
 
 export interface AdminBatchMatchRequest {
   name?: string;
@@ -29,6 +31,7 @@ export interface AdminBatchMatchRequest {
 export interface AdminBatchMatchSessionRequest {
   name?: string;
   date?: string;
+  location?: string;
 }
 
 export interface AdminBatchMatchSubmitPayload {
@@ -85,6 +88,12 @@ type ImportedPreview = {
 };
 
 const IMPORT_DEFAULT_LOCATION = "Imported Sheet Match";
+const recentInputFieldKeys = {
+  matchName: "admin.match.name",
+  matchLocation: "admin.match.location",
+  sessionName: "admin.session.name",
+  sessionLocation: "admin.session.location",
+} as const;
 const REQUIRED_IMPORT_HEADERS = [
   "경기번호",
   "날짜",
@@ -415,6 +424,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   const [pastedText, setPastedText] = useState("");
   const [sessionName, setSessionName] = useState("");
   const [sessionDate, setSessionDate] = useState("");
+  const [sessionLocation, setSessionLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -422,6 +432,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     setPastedText("");
     setSessionName("");
     setSessionDate("");
+    setSessionLocation("");
     setError(null);
     setMode("manual");
   }, [resetKey]);
@@ -445,6 +456,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   );
   const normalizedSessionName = normalizeOptionalText(sessionName);
   const normalizedSessionDate = normalizeOptionalText(sessionDate);
+  const normalizedSessionLocation = normalizeOptionalText(sessionLocation);
 
   const updateDraft = (
     draftId: string,
@@ -458,7 +470,11 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   };
 
   const buildSessionPayload = () => {
-    if (!normalizedSessionName && !normalizedSessionDate) {
+    if (
+      !normalizedSessionName &&
+      !normalizedSessionDate &&
+      !normalizedSessionLocation
+    ) {
       return undefined;
     }
 
@@ -470,6 +486,10 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       throw new Error("세션 날짜를 입력해주세요.");
     }
 
+    if (!normalizedSessionLocation) {
+      throw new Error("세션 장소를 입력해주세요.");
+    }
+
     const sessionDateValue = new Date(normalizedSessionDate);
     if (Number.isNaN(sessionDateValue.getTime())) {
       throw new Error("세션 날짜를 확인해주세요.");
@@ -478,6 +498,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     return {
       name: normalizedSessionName,
       date: sessionDateValue.toISOString(),
+      location: normalizedSessionLocation,
     };
   };
 
@@ -637,6 +658,26 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
       });
 
       await onSubmit({ session, matches: payload });
+      if (session) {
+        rememberRecentInputValue(
+          recentInputFieldKeys.sessionName,
+          session.name ?? "",
+        );
+        rememberRecentInputValue(
+          recentInputFieldKeys.sessionLocation,
+          session.location ?? "",
+        );
+      }
+      payload.forEach((match) => {
+        rememberRecentInputValue(
+          recentInputFieldKeys.matchName,
+          match.name ?? "",
+        );
+        rememberRecentInputValue(
+          recentInputFieldKeys.matchLocation,
+          match.location,
+        );
+      });
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -672,6 +713,16 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
     try {
       const session = buildSessionPayload();
       await onSubmit({ session, matches: importedPreview.validMatches });
+      if (session) {
+        rememberRecentInputValue(
+          recentInputFieldKeys.sessionName,
+          session.name ?? "",
+        );
+        rememberRecentInputValue(
+          recentInputFieldKeys.sessionLocation,
+          session.location ?? "",
+        );
+      }
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -746,20 +797,21 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             수동 입력과 시트 붙여넣기 결과에 동일하게 적용됩니다.
           </p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
               세션 이름
             </label>
-            <input
-              type="text"
+            <RecentValueComboBox
+              fieldKey={recentInputFieldKeys.sessionName}
               value={sessionName}
-              onChange={(event) => {
-                setSessionName(event.target.value);
+              onChange={(nextValue) => {
+                setSessionName(nextValue);
                 setError(null);
               }}
-              placeholder="선택 입력"
-              className="w-full rounded-lg border bg-white px-4 py-2"
+              placeholder="세션 이름 입력"
+              className="w-full"
+              inputClassName="w-full rounded-lg border bg-white px-4 py-2"
             />
           </div>
           <div>
@@ -774,6 +826,22 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                 setError(null);
               }}
               className="w-full rounded-lg border bg-white px-4 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              세션 장소
+            </label>
+            <RecentValueComboBox
+              fieldKey={recentInputFieldKeys.sessionLocation}
+              value={sessionLocation}
+              onChange={(nextValue) => {
+                setSessionLocation(nextValue);
+                setError(null);
+              }}
+              placeholder="세션 장소 입력"
+              className="w-full"
+              inputClassName="w-full rounded-lg border bg-white px-4 py-2"
             />
           </div>
         </div>
@@ -833,17 +901,18 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       매치 이름
                     </label>
-                    <input
-                      type="text"
+                    <RecentValueComboBox
+                      fieldKey={recentInputFieldKeys.matchName}
                       value={draft.name}
-                      onChange={(event) =>
+                      onChange={(nextValue) =>
                         updateDraft(draft.id, (currentDraft) => ({
                           ...currentDraft,
-                          name: event.target.value,
+                          name: nextValue,
                         }))
                       }
                       placeholder="선택 입력"
-                      className="w-full rounded-lg border bg-white px-4 py-2"
+                      className="w-full"
+                      inputClassName="w-full rounded-lg border bg-white px-4 py-2"
                     />
                   </div>
                   <div>
@@ -894,17 +963,18 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       장소
                     </label>
-                    <input
-                      type="text"
+                    <RecentValueComboBox
+                      fieldKey={recentInputFieldKeys.matchLocation}
                       value={draft.location}
-                      onChange={(event) =>
+                      onChange={(nextValue) =>
                         updateDraft(draft.id, (currentDraft) => ({
                           ...currentDraft,
-                          location: event.target.value,
+                          location: nextValue,
                         }))
                       }
                       placeholder="Court TBD"
-                      className="w-full rounded-lg border bg-white px-4 py-2"
+                      className="w-full"
+                      inputClassName="w-full rounded-lg border bg-white px-4 py-2"
                     />
                   </div>
                   <div>

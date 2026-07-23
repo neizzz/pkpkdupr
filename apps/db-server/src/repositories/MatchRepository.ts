@@ -79,6 +79,7 @@ export interface UpdateMatchMetadataInput {
   name?: string | null;
   sessionName?: string | null;
   sessionDate?: Date | null;
+  sessionLocation?: string | null;
 }
 
 export interface MatchParticipantDuprSnapshot {
@@ -659,7 +660,11 @@ export class MatchRepository {
       updatePayload.name = data.name?.trim() || null;
     }
 
-    if ("sessionName" in data || "sessionDate" in data) {
+    if (
+      "sessionName" in data ||
+      "sessionDate" in data ||
+      "sessionLocation" in data
+    ) {
       const current = await this.findById(id);
       if (!current) return undefined;
       const nextName =
@@ -670,9 +675,19 @@ export class MatchRepository {
         "sessionDate" in data
           ? toDateOrNull(data.sessionDate) ?? undefined
           : current.session?.date;
+      const nextLocation =
+        "sessionLocation" in data
+          ? data.sessionLocation?.trim() || undefined
+          : current.session?.location;
+      if (
+        (nextName || nextDate || nextLocation) &&
+        (!nextName || !nextDate || !nextLocation)
+      ) {
+        throw new Error("세션명, 세션 날짜, 세션 장소가 모두 필요합니다.");
+      }
       const sessionId =
-        nextName && nextDate
-          ? await this.getOrCreateSession(nextName, nextDate)
+        nextName && nextDate && nextLocation
+          ? await this.getOrCreateSession(nextName, nextDate, nextLocation)
           : null;
 
       updatePayload.sessionId = sessionId;
@@ -759,6 +774,7 @@ export class MatchRepository {
             id: session.id,
             name: session.name,
             date: toDate(session.date),
+            location: session.location,
           }
         : undefined,
       status: match.status as Match["status"],
@@ -816,6 +832,7 @@ export class MatchRepository {
           id: match.session.id,
           name: match.session.name.trim(),
           date: match.session.date,
+          location: match.session.location,
           matchCount: 0,
           participants: [],
           latestCreatedAt: match.createdAt,
@@ -873,7 +890,8 @@ export class MatchRepository {
       throw new Error("유효한 세션 ID가 필요합니다.");
     }
     const name = session.name?.trim();
-    if (!name || Number.isNaN(session.date.getTime())) {
+    const location = session.location?.trim();
+    if (!name || !location || Number.isNaN(session.date.getTime())) {
       throw new Error("유효한 세션 정보가 필요합니다.");
     }
 
@@ -882,14 +900,30 @@ export class MatchRepository {
       .from(matchSessions)
       .where(and(eq(matchSessions.name, name), eq(matchSessions.date, session.date)))
       .get();
-    if (existingByMetadata) return existingByMetadata.id;
+    if (existingByMetadata) {
+      if (existingByMetadata.location !== location) {
+        await this.db
+          .update(matchSessions)
+          .set({ location, updatedAt: new Date() })
+          .where(eq(matchSessions.id, existingByMetadata.id));
+      }
+      return existingByMetadata.id;
+    }
 
     const existingById = await this.db
       .select()
       .from(matchSessions)
       .where(eq(matchSessions.id, session.id))
       .get();
-    if (existingById) return existingById.id;
+    if (existingById) {
+      if (existingById.location !== location) {
+        await this.db
+          .update(matchSessions)
+          .set({ location, updatedAt: new Date() })
+          .where(eq(matchSessions.id, existingById.id));
+      }
+      return existingById.id;
+    }
 
     let candidateId = session.id;
     for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -899,6 +933,7 @@ export class MatchRepository {
           id: candidateId,
           name,
           date: session.date,
+          location,
           createdAt: now,
           updatedAt: now,
         });
@@ -923,7 +958,11 @@ export class MatchRepository {
     throw new Error("세션 ID 생성에 실패했습니다.");
   }
 
-  private async getOrCreateSession(name: string, date: Date): Promise<string> {
+  private async getOrCreateSession(
+    name: string,
+    date: Date,
+    location: string,
+  ): Promise<string> {
     const normalizedName = name.trim();
     const existing = await this.db
       .select()
@@ -935,7 +974,15 @@ export class MatchRepository {
         ),
       )
       .get();
-    if (existing) return existing.id;
+    if (existing) {
+      if (existing.location !== location) {
+        await this.db
+          .update(matchSessions)
+          .set({ location, updatedAt: new Date() })
+          .where(eq(matchSessions.id, existing.id));
+      }
+      return existing.id;
+    }
 
     for (let attempt = 0; attempt < 8; attempt += 1) {
       const id = generateEntityId("session");
@@ -945,6 +992,7 @@ export class MatchRepository {
           id,
           name: normalizedName,
           date,
+          location,
           createdAt: now,
           updatedAt: now,
         });

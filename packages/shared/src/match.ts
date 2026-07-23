@@ -111,6 +111,7 @@ export interface Session {
   id: string;
   name?: string;
   date: Date;
+  location: string;
 }
 
 export interface MatchSessionParticipant {
@@ -123,6 +124,7 @@ export interface MatchSessionSummary {
   id: string;
   name: string;
   date: Date;
+  location: string;
   matchCount: number;
   participants: MatchSessionParticipant[];
   latestCreatedAt: Date;
@@ -221,7 +223,7 @@ export interface Match {
   resultSubmittedByPlayerId: string | null;
   resultSubmittedAt: Date | null;
   approvals: MatchResultApproval[];
-  location?: string;
+  location: string;
   matchStartsAt: Date;
   createdAt: Date;
   completedAt: Date | null;

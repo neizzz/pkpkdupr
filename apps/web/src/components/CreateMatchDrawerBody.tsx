@@ -5,9 +5,10 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button, Drawer, Separator } from "@heroui/react";
+import { Button, Drawer } from "@heroui/react";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type { MatchMode } from "@pkpkdupr/shared/match";
+import { rememberRecentInputValue } from "@pkpkdupr/shared/recentInputHistory";
 import {
   computeMatchStartsAt,
   DEFAULT_MATCH_MODE,
@@ -18,6 +19,7 @@ import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
 import CreateMatchTeamGrid from "./CreateMatchTeamGrid";
 import HoldToConfirmButton from "./HoldToConfirmButton";
+import RecentValueComboBox from "./RecentValueComboBox";
 import {
   areSameMatchMembers,
   areSameMatchTeams,
@@ -61,6 +63,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const [createMatchError, setCreateMatchError] = useState<string | null>(null);
   const [matchNameMode, setMatchNameMode] = useState<"auto" | "manual">("auto");
   const [matchName, setMatchName] = useState("");
+  const [location, setLocation] = useState("");
   const [selectedMatchMode, setSelectedMatchMode] =
     useState<MatchMode>(DEFAULT_MATCH_MODE);
   const matchStartsAt = useMemo(() => computeMatchStartsAt(), []);
@@ -75,13 +78,15 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     [selectedMatchMembers],
   );
   const trimmedMatchName = matchName.trim();
+  const trimmedLocation = location.trim();
   const isManualMatchNameEmpty =
     matchNameMode === "manual" && !trimmedMatchName;
   const canCreateMatch =
     isOnline &&
     !!selectedMatchType &&
     areTeamsValid(teams, selectedMatchType) &&
-    !isManualMatchNameEmpty;
+    !isManualMatchNameEmpty &&
+    !!trimmedLocation;
   const canAddMatchMember =
     isOnline && !!token && selectedMatchMembers.length < 4;
   const previewTeams = useMemo(
@@ -265,7 +270,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             name: `Team ${teamIndex === 0 ? "A" : "B"}`,
             playerIds: team.map((member) => member.id),
           })),
-          location: "Court TBD",
+          location: trimmedLocation,
           matchStartsAt: matchStartsAt.toISOString(),
         }),
       });
@@ -274,6 +279,11 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || "매치를 생성하지 못했어요.");
       }
+
+      if (matchNameMode === "manual") {
+        rememberRecentInputValue("web.match.name", trimmedMatchName);
+      }
+      rememberRecentInputValue("web.match.location", trimmedLocation);
 
       await onCreateMatch();
     } catch (err) {
@@ -300,10 +310,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   return (
     <>
-      <h2 className="bs-text-head px-5 pt-4 text-center text-pkpk-main-font">
-        매치 생성
-      </h2>
-      <Drawer.Body className="flex flex-col gap-5 px-5 pb-4">
+      <Drawer.Body className="flex flex-col gap-3 px-3 pb-4">
+        <h2 className="bs-text-head sticky top-0 z-10 -mx-3 shrink-0 bg-white px-3 pt-3 pb-0 text-center text-pkpk-main-font">
+          매치 생성
+        </h2>
         {isQrScannerOpen ? (
           <CreateMatchQrScannerPanel
             teamGrid={
@@ -329,8 +339,8 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           />
         ) : (
           <>
-            <section className="flex flex-col gap-2">
-              <div className="relative mt-4 flex items-start justify-between gap-3">
+            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
+              <div className="relative flex items-start justify-between gap-3">
                 <div>
                   <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
                 </div>
@@ -369,12 +379,14 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               )}
             </section>
 
-            <CreateMatchModeSelector
-              selectedMatchMode={selectedMatchMode}
-              onChange={setSelectedMatchMode}
-            />
+            <div className="rounded-3xl bg-slate-50/80 p-4">
+              <CreateMatchModeSelector
+                selectedMatchMode={selectedMatchMode}
+                onChange={setSelectedMatchMode}
+              />
+            </div>
 
-            <section className="flex flex-col gap-2">
+            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
               <p className="bs-text-title text-pkpk-sub-font">
                 매치 시작(자동)
               </p>
@@ -387,7 +399,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               </p>
             </section>
 
-            <section className="flex flex-col gap-2">
+            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
               <p className="bs-text-title text-pkpk-sub-font">매치 이름</p>
               <div
                 role="radiogroup"
@@ -443,29 +455,49 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                       />
                     </span>
                   </label>
-                  <input
-                    type="text"
+                  <RecentValueComboBox
+                    fieldKey="web.match.name"
                     value={matchName}
                     onFocus={() => setMatchNameMode("manual")}
-                    onChange={(event) => {
-                      setMatchName(event.target.value);
+                    onChange={(nextValue) => {
+                      setMatchName(nextValue);
                       setCreateMatchError(null);
                     }}
                     placeholder="매치 이름 입력"
-                    className="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-2 text-base text-pkpk-sub-font outline-none"
+                    className="min-w-0 flex-1"
+                    inputClassName="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-2 text-base text-pkpk-sub-font outline-none"
                   />
                 </div>
               </div>
+            </section>
+
+            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
+              <label
+                htmlFor="create-match-location"
+                className="bs-text-title text-pkpk-sub-font"
+              >
+                장소
+              </label>
+              <RecentValueComboBox
+                id="create-match-location"
+                fieldKey="web.match.location"
+                value={location}
+                onChange={(nextValue) => {
+                  setLocation(nextValue);
+                  setCreateMatchError(null);
+                }}
+                required
+                placeholder="장소 입력"
+                className="w-full"
+                inputClassName="app-mobile-input w-full rounded-2xl border border-border bg-white px-4 py-2 text-base text-pkpk-sub-font outline-none"
+              />
             </section>
           </>
         )}
       </Drawer.Body>
       {!isQrScannerOpen ? (
         <>
-          <div className="px-5">
-            <Separator />
-          </div>
-          <Drawer.Footer className="flex flex-col gap-2 px-5 pt-3">
+          <Drawer.Footer className="flex flex-col gap-2 px-5 pt-2">
             {createMatchError ? (
               <p className="bs-text-body text-error">{createMatchError}</p>
             ) : null}

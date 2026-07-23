@@ -119,6 +119,7 @@ type MatchTeamRequest = { name?: string; playerIds?: string[] };
 type MatchSessionRequest = {
   name?: string;
   date?: string;
+  location?: string;
 };
 
 type AdminBatchMatchRequest = {
@@ -142,6 +143,7 @@ type AdminMatchMetadataUpdateRequest = {
   name?: unknown;
   sessionName?: unknown;
   sessionDate?: unknown;
+  sessionLocation?: unknown;
 };
 
 const normalizeOptionalName = (value: unknown) =>
@@ -156,8 +158,9 @@ const normalizeMatchSession = (
 
   const name = normalizeOptionalName(session.name);
   const dateValue = typeof session.date === "string" ? session.date : undefined;
+  const location = normalizeOptionalName(session.location);
 
-  if (!name && !dateValue) {
+  if (!name && !dateValue && !location) {
     return undefined;
   }
 
@@ -169,12 +172,16 @@ const normalizeMatchSession = (
     throw new Error("세션 날짜를 입력해주세요.");
   }
 
+  if (!location) {
+    throw new Error("세션 장소를 입력해주세요.");
+  }
+
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) {
     throw new Error("유효한 세션 날짜가 필요합니다.");
   }
 
-  return { id: generateEntityId("session"), name, date };
+  return { id: generateEntityId("session"), name, date, location };
 };
 
 const normalizeOptionalDateString = (value: unknown) => {
@@ -688,6 +695,11 @@ app.post("/api/matches", async (req, res) => {
       return res.status(400).json({ error: "두 팀 구성이 필요합니다." });
     }
 
+    const normalizedLocation = normalizeOptionalName(location);
+    if (!normalizedLocation) {
+      return res.status(400).json({ error: "장소를 입력해주세요." });
+    }
+
     const creator = await authService.getPlayerById(decoded.playerId);
     if (
       !creator ||
@@ -747,7 +759,7 @@ app.post("/api/matches", async (req, res) => {
       resultSubmittedByPlayerId: null,
       resultSubmittedAt: null,
       approvals: [],
-      location: location?.trim() || "Court TBD",
+      location: normalizedLocation,
       matchStartsAt: matchStartsAtDate,
       completedAt: null,
     });
@@ -805,6 +817,11 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
         throw new Error(`${label}: 두 팀 구성이 필요합니다.`);
       }
 
+      const normalizedLocation = normalizeOptionalName(location);
+      if (!normalizedLocation) {
+        throw new Error(`${label}: 장소를 입력해주세요.`);
+      }
+
       const flatPlayerIds = normalizeRequestedTeamPlayerIds(teams);
       if (flatPlayerIds.length === 0) {
         throw new Error(`${label}: 참가자를 선택해주세요.`);
@@ -846,7 +863,7 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
         resultSubmittedByPlayerId: createdBy.id,
         resultSubmittedAt: matchStartsAtDate,
         approvals: [],
-        location: location?.trim() || "Court TBD",
+        location: normalizedLocation,
         matchStartsAt: matchStartsAtDate,
         completedAt: matchStartsAtDate,
       };
@@ -904,8 +921,12 @@ app.patch(
         body,
         "sessionDate",
       );
+      const hasSessionLocation = Object.prototype.hasOwnProperty.call(
+        body,
+        "sessionLocation",
+      );
 
-      if (!hasName && !hasSessionName && !hasSessionDate) {
+      if (!hasName && !hasSessionName && !hasSessionDate && !hasSessionLocation) {
         return res.status(400).json({ error: "수정할 필드가 없습니다." });
       }
 
@@ -914,6 +935,9 @@ app.patch(
         : undefined;
       const normalizedSessionDate = hasSessionDate
         ? normalizeOptionalDateString(body.sessionDate)
+        : undefined;
+      const normalizedSessionLocation = hasSessionLocation
+        ? normalizeOptionalName(body.sessionLocation)
         : undefined;
 
       validateSessionMetadataUpdate({
@@ -930,6 +954,9 @@ app.patch(
           : {}),
         ...(hasSessionDate
           ? { sessionDate: normalizedSessionDate ?? null }
+          : {}),
+        ...(hasSessionLocation
+          ? { sessionLocation: normalizedSessionLocation ?? null }
           : {}),
       });
 
