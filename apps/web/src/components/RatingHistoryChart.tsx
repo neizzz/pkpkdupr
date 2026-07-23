@@ -199,7 +199,11 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
 
     return [
       ...history,
-      { rating: latestPoint.rating, createdAt: new Date().toISOString() },
+      {
+        rating: latestPoint.rating,
+        createdAt: new Date().toISOString(),
+        source: "current" as const,
+      },
     ];
   }, [history]);
   const values = useMemo(
@@ -214,16 +218,39 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
     [historyWithToday],
   );
   const valueOffset = historyWithToday.length === 1 ? 1 : 0;
-  const labeledPointIndexes = useMemo(
-    () =>
-      new Set(
+  const dateLabelIndexes = useMemo(
+    () => {
+      const indexes = new Set(
         [...getLabeledPointIndexes(values)].map((index) => index + valueOffset),
-      ),
-    [valueOffset, values],
+      );
+      displayHistory.forEach((point, index) => {
+        if (point?.source === "official-adjustment") {
+          indexes.add(index);
+        }
+      });
+      return indexes;
+    },
+    [displayHistory, valueOffset, values],
   );
+  const ratingLabelIndexes = useMemo(() => {
+    const indexes = new Set(dateLabelIndexes);
+    const currentIndex = displayHistory.length - 1;
+    const currentPoint = displayHistory[currentIndex];
+    const previousPoint = displayHistory[currentIndex - 1];
+
+    // 마지막 점이 실제 경기 변화가 아닌 오늘 연장선이면 날짜만 보여준다.
+    if (
+      currentPoint?.source === "current" &&
+      previousPoint?.rating === currentPoint.rating
+    ) {
+      indexes.delete(currentIndex);
+    }
+
+    return indexes;
+  }, [dateLabelIndexes, displayHistory]);
   const chartDecorationPlugin = useMemo(
-    () => createChartDecorationPlugin(labeledPointIndexes),
-    [labeledPointIndexes],
+    () => createChartDecorationPlugin(dateLabelIndexes),
+    [dateLabelIndexes],
   );
   const labels = useMemo(
     () => displayHistory.map((point) => point?.createdAt ?? ""),
@@ -244,18 +271,25 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
           backgroundColor: createAreaGradient,
           borderWidth: 2,
           fill: true,
-          pointBackgroundColor: accentColor,
+          pointBackgroundColor: (context) =>
+            displayHistory[context.dataIndex]?.source === "official-adjustment"
+              ? "#ffffff"
+              : accentColor,
           pointBorderColor: accentColor,
           pointBorderWidth: 2,
+          pointStyle: (context) =>
+            displayHistory[context.dataIndex]?.source === "official-adjustment"
+              ? "rectRot"
+              : "circle",
           pointHoverRadius: (context) =>
-            labeledPointIndexes.has(context.dataIndex) ? 5 : 0,
+            dateLabelIndexes.has(context.dataIndex) ? 5 : 0,
           pointRadius: (context) =>
-            labeledPointIndexes.has(context.dataIndex) ? 3 : 0,
+            dateLabelIndexes.has(context.dataIndex) ? 3 : 0,
           tension: 0.28,
         },
       ],
     }),
-    [chartValues, labels],
+    [chartValues, dateLabelIndexes, displayHistory, labels],
   );
 
   const options = useMemo<ChartOptions<"line">>(
@@ -274,7 +308,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
           clip: false,
           color: accentColor,
           display: (context: Context) =>
-            labeledPointIndexes.has(context.dataIndex),
+            ratingLabelIndexes.has(context.dataIndex),
           font: { size: 11, weight: 700 },
           formatter: (_value: unknown, context: Context) => {
             const point = displayHistory[context.dataIndex];
@@ -306,9 +340,10 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
             padding: 8,
             callback: (_value, index) => {
               const point = displayHistory[index];
-              return labeledPointIndexes.has(index) && point
-                ? formatDate(point.createdAt)
-                : "";
+              if (!dateLabelIndexes.has(index) || !point) return "";
+              return point.source === "official-adjustment"
+                ? "공식 레이팅 반영"
+                : formatDate(point.createdAt);
             },
           },
         },
@@ -318,7 +353,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
         },
       },
     }),
-    [displayHistory, labeledPointIndexes],
+    [dateLabelIndexes, displayHistory, ratingLabelIndexes],
   );
 
   if (history.length === 0) {

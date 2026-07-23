@@ -725,6 +725,40 @@ export class AuthService {
     return hydratePlayerRatingChangeLog(log);
   }
 
+  /**
+   * 경기별 변경 로그는 감사 이력이 아니라 현재 전체 재생 결과를 화면에
+   * 전달하기 위한 materialized view다. 따라서 재계산 시 기존 값을 남기지
+   * 않고 하나의 트랜잭션으로 교체해 경기·그래프가 같은 계산 결과를 보게 한다.
+   */
+  private async replaceMatchCompletedRatingChangeLogs(
+    perMatchChanges: DuprRecalculationResult["perMatchChanges"],
+  ): Promise<PlayerRatingChangeLog[]> {
+    const logs = perMatchChanges.flatMap((change) => {
+      const sourceLogId = `match-completed-${change.matchId}-${change.completedAt.getTime()}`;
+      return change.players
+        .filter((playerChange) => hasDuprChange(playerChange.delta))
+        .map(
+          (playerChange): PlayerRatingChangeLog => ({
+            id: buildId("player-rating-change-log"),
+            playerId: playerChange.playerId,
+            source: "match_completed",
+            sourceLogId,
+            previousRating: playerChange.previousRating,
+            nextRating: playerChange.nextRating,
+            delta: playerChange.delta,
+            createdAt: change.completedAt,
+          }),
+        );
+    });
+
+    await this.dbRequest("/internal/player-rating-change-logs/match-completed", {
+      method: "PUT",
+      body: JSON.stringify(logs),
+    });
+
+    return logs;
+  }
+
   async register({
     username,
     password,
@@ -1728,6 +1762,9 @@ export class AuthService {
     await this.fillMissingMatchParticipantDuprSnapshots(
       recalculation.matchParticipantDuprSnapshots,
     );
+    await this.replaceMatchCompletedRatingChangeLogs(
+      recalculation.perMatchChanges,
+    );
 
     const createdAt = new Date();
     const ratingChangeLogs = await Promise.all(
@@ -1792,26 +1829,11 @@ export class AuthService {
           )
         : [];
 
-    const perMatchLogs: PlayerRatingChangeLog[] = [];
-    if (options.perMatchLogs) {
-      for (const change of recalculation.perMatchChanges) {
-        const sourceLogId = `match-completed-${change.matchId}-${change.completedAt.getTime()}`;
-        for (const playerChange of change.players) {
-          if (!hasDuprChange(playerChange.delta)) continue;
-
-          const log = await this.insertPlayerRatingChangeLog({
-            playerId: playerChange.playerId,
-            source: "match_completed",
-            sourceLogId,
-            previousRating: playerChange.previousRating,
-            nextRating: playerChange.nextRating,
-            delta: playerChange.delta,
-            createdAt: change.completedAt,
-          });
-          perMatchLogs.push(log);
-        }
-      }
-    }
+    const perMatchLogs = options.perMatchLogs
+      ? await this.replaceMatchCompletedRatingChangeLogs(
+          recalculation.perMatchChanges,
+        )
+      : [];
 
     return {
       ratingChangeLogs,
@@ -1827,24 +1849,7 @@ export class AuthService {
     ratingChangeLogs: PlayerRatingChangeLog[];
     changedPlayerCount: number;
   }> {
-    const winnerTeamIndex = buildWinnerTeamIndex(match);
-    if (winnerTeamIndex == null || !match.completedAt) {
-      return { ratingChangeLogs: [], changedPlayerCount: 0 };
-    }
-
-    const allPlayers = (await this.dbRequest<any[]>("/internal/players")).map(
-      hydratePlayer,
-    );
-    const participantPlayerIds = match.teams.flatMap((team) =>
-      team.players.map((p) => p.id),
-    );
-    const participantsByPlayerId = new Map(
-      allPlayers
-        .filter((p) => participantPlayerIds.includes(p.id))
-        .map((p) => [p.id, p]),
-    );
-
-    if (participantPlayerIds.length < 2) {
+    if (buildWinnerTeamIndex(match) == null || !match.completedAt) {
       return { ratingChangeLogs: [], changedPlayerCount: 0 };
     }
 
@@ -1852,116 +1857,34 @@ export class AuthService {
       matches: any[];
       total: number;
     }>("/internal/matches?page=0&limit=10000");
-    const previousCompletedMatches = allMatches
-      .filter(
-        (m: any) =>
-          m.status === "completed" &&
-          m.id !== match.id &&
-          m.completedAt &&
-          new Date(m.completedAt).getTime() <=
-            new Date(match.completedAt!).getTime(),
-      )
-      .sort(
-        (a: any, b: any) =>
-          new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
-      );
-
-    const lastPlayedAtMsByPlayerId = new Map<string, number>();
-    for (const prevMatch of previousCompletedMatches) {
-      const prevParticipantIds = prevMatch.teams.flatMap((t: any) =>
-        t.players.map((p: any) => p.id),
-      );
-      for (const pid of prevParticipantIds) {
-        if (!lastPlayedAtMsByPlayerId.has(pid)) {
-          lastPlayedAtMsByPlayerId.set(
-            pid,
-            new Date(prevMatch.completedAt).getTime(),
-          );
-        }
-      }
-      if (lastPlayedAtMsByPlayerId.size >= participantPlayerIds.length) {
-        break;
-      }
-    }
-
-    const completedAtMs = new Date(match.completedAt).getTime();
-
-    const ratingInputs = participantPlayerIds
-      .map((playerId) => {
-        const player = participantsByPlayerId.get(playerId);
-        if (!player) return null;
-        return {
-          playerId,
-          teamIndex: match.teams.findIndex((team) =>
-            team.players.some((p) => p.id === playerId),
-          ) as 0 | 1,
-          state: player.duprState,
-        };
-      })
-      .filter((input): input is NonNullable<typeof input> => Boolean(input));
-
-    const inactiveElapsedMsByPlayerId: Record<string, number> = {};
-    for (const input of ratingInputs) {
-      const lastPlayedAtMs = lastPlayedAtMsByPlayerId.get(input.playerId);
-      inactiveElapsedMsByPlayerId[input.playerId] =
-        lastPlayedAtMs == null
-          ? 0
-          : Math.max(0, completedAtMs - lastPlayedAtMs);
-    }
-
-    const replayResult = this.ratingService.replayMatch({
-      type: match.type,
-      winnerTeamIndex,
-      participants: ratingInputs,
-      scores: match.scores,
-      inactiveElapsedMsByPlayerId,
-    });
-
-    const previousStates = new Map(
-      ratingInputs.map((input) => [input.playerId, input.state]),
+    const recalculation = await this.recalculateDuprRatings(
+      allMatches
+        .filter(
+          (candidate: any) =>
+            candidate.status === "completed" && candidate.completedAt,
+        )
+        .map(
+          (candidate: any) =>
+            ({
+              ...candidate,
+              matchStartsAt: new Date(candidate.matchStartsAt),
+              completedAt: new Date(candidate.completedAt),
+              createdAt: new Date(candidate.createdAt),
+              updatedAt: new Date(candidate.updatedAt),
+              resultSubmittedAt: candidate.resultSubmittedAt
+                ? new Date(candidate.resultSubmittedAt)
+                : null,
+            }) as Match,
+        ),
+      { perMatchLogs: true },
     );
-
-    for (const [playerId, nextState] of Object.entries(replayResult)) {
-      await this.updateStoredPlayerDuprState(playerId, nextState);
-    }
-
-    const snapshots: MatchParticipantDuprSnapshot[] = ratingInputs.map(
-      (input) => ({
-        matchId: match.id,
-        playerId: input.playerId,
-        duprRating: toPublicPlayerDupr(previousStates.get(input.playerId)!),
-      }),
-    );
-    await this.fillMissingMatchParticipantDuprSnapshots(snapshots);
-
-    const createdAt = new Date();
-    const sourceLogId = `match-completed-${match.id}-${Date.now()}`;
-    const ratingChangeLogs: PlayerRatingChangeLog[] = [];
-
-    for (const [playerId, nextState] of Object.entries(replayResult)) {
-      const previousState = previousStates.get(playerId);
-      if (!previousState) continue;
-      const delta = buildDuprDelta(nextState.rating, previousState.rating);
-      if (!hasDuprChange(delta)) continue;
-
-      const player = participantsByPlayerId.get(playerId);
-      if (!player) continue;
-
-      const log = await this.insertPlayerRatingChangeLog({
-        playerId,
-        source: "match_completed",
-        sourceLogId,
-        previousRating: previousState.rating,
-        nextRating: nextState.rating,
-        delta,
-        createdAt,
-      });
-      ratingChangeLogs.push(log);
-    }
+    const matchPrefix = `match-completed-${match.id}-`;
 
     return {
-      ratingChangeLogs,
-      changedPlayerCount: Object.keys(replayResult).length,
+      ratingChangeLogs: recalculation.perMatchLogs.filter((log) =>
+        log.sourceLogId.startsWith(matchPrefix),
+      ),
+      changedPlayerCount: recalculation.changedPlayerCount,
     };
   }
 

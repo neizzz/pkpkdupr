@@ -2,6 +2,7 @@ import type { Match } from "@pkpkdupr/shared/match";
 import type {
   OfficialDuprAdjustmentLog,
   Player,
+  PlayerRatingChangeLog,
   StoredPlayerDupr,
 } from "@pkpkdupr/shared/player";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +33,7 @@ const playerById = new Map(players.map((player) => [player.id, player]));
 let storedOfficialLogs: OfficialDuprAdjustmentLog[];
 let storedPlayerById: Map<string, Record<string, unknown>>;
 let persistedDuprStateByPlayerId: Map<string, StoredPlayerDupr>;
+let replacedMatchCompletedLogs: PlayerRatingChangeLog[];
 
 const buildMatch = (completedAt: Date): Match => ({
   id: `match-${completedAt.getTime()}`,
@@ -81,6 +83,7 @@ describe("official DUPR recency propagation", () => {
       players.map((player) => [player.id, { ...player }]),
     );
     persistedDuprStateByPlayerId = new Map();
+    replacedMatchCompletedLogs = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -117,6 +120,13 @@ describe("official DUPR recency propagation", () => {
           init?.method === "POST"
         ) {
           return jsonResponse(JSON.parse(String(init.body)));
+        }
+        if (
+          path === "/internal/player-rating-change-logs/match-completed" &&
+          init?.method === "PUT"
+        ) {
+          replacedMatchCompletedLogs = JSON.parse(String(init.body));
+          return jsonResponse(replacedMatchCompletedLogs);
         }
         if (
           path.endsWith("/dupr-state") &&
@@ -325,5 +335,25 @@ describe("official DUPR recency propagation", () => {
         },
       },
     });
+    expect(replacedMatchCompletedLogs).toHaveLength(4);
+  });
+
+  it("전체 재계산은 기존 경기별 로그를 누적하지 않고 한 번에 교체한다", async () => {
+    const service = new AuthService();
+    const completedMatches = [buildMatch(new Date(NOW.getTime() - DAY_MS))];
+
+    const first = await service.recalculateDuprRatings(completedMatches, {
+      perMatchLogs: true,
+    });
+    const firstIds = first.perMatchLogs.map((log) => log.id);
+
+    const second = await service.recalculateDuprRatings(completedMatches, {
+      perMatchLogs: true,
+    });
+
+    expect(first.perMatchLogs).toHaveLength(4);
+    expect(second.perMatchLogs).toHaveLength(4);
+    expect(replacedMatchCompletedLogs).toHaveLength(4);
+    expect(replacedMatchCompletedLogs.map((log) => log.id)).not.toEqual(firstIds);
   });
 });

@@ -45,6 +45,38 @@ export class PlayerRatingChangeLogRepository {
     return hydrateLog(created);
   }
 
+  /**
+   * 경기 완료 로그는 현재 레이팅 알고리즘을 완료 경기 전체에 재생한 결과다.
+   * 재계산마다 누적하면 서로 다른 알고리즘/시점의 로그가 섞여 UI가 잘못된
+   * 변동값을 표시할 수 있으므로, 한 번에 교체한다.
+   */
+  async replaceMatchCompleted(
+    logs: CreatePlayerRatingChangeLogInput[],
+  ): Promise<PlayerRatingChangeLog[]> {
+    await this.db.transaction(async (tx: any) => {
+      await tx
+        .delete(playerRatingChangeLogs)
+        .where(eq(playerRatingChangeLogs.source, "match_completed"));
+
+      if (logs.length > 0) {
+        await tx.insert(playerRatingChangeLogs).values(
+          logs.map((log) => ({
+            id: log.id,
+            playerId: log.playerId,
+            source: log.source,
+            sourceLogId: log.sourceLogId,
+            previousRatingJson: JSON.stringify(log.previousRating),
+            nextRatingJson: JSON.stringify(log.nextRating),
+            deltaJson: JSON.stringify(log.delta),
+            createdAt: new Date(log.createdAt),
+          })),
+        );
+      }
+    });
+
+    return logs;
+  }
+
   async findAll(): Promise<PlayerRatingChangeLog[]> {
     const rows = await this.db
       .select()

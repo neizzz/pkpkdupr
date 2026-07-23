@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { IoSettingsOutline } from "react-icons/io5";
 import BottomSheet from "@/components/BottomSheet";
-import type { MatchInfo } from "@/components/Match";
+import type { MatchListResponse } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
 import TabPanelHeader from "@/components/TabPanelHeader";
@@ -72,15 +72,18 @@ const Me: React.FC = () => {
           throw new Error("매치 목록을 불러오지 못했습니다.");
         }
 
-        const data = (await res.json()) as {
-          matches: MatchInfo[];
-          total: number;
-        };
+        const data = (await res.json()) as MatchListResponse;
 
         if (!signal.aborted) {
           setMatchStats(buildMatchStats(data.matches, playerId));
           setRatingDelta(buildRatingDelta(data.matches, playerId));
-          setRatingHistory(buildRatingHistory(data.matches, playerId));
+          setRatingHistory(
+            buildRatingHistory(
+              data.matches,
+              playerId,
+              data.ratingAdjustmentLogs,
+            ),
+          );
           lastSuccessfulLoadAtRef.current = Date.now();
         }
       } catch {

@@ -53,6 +53,13 @@ export type MatchFeedItemInfo =
   | { kind: "match"; match: MatchInfo }
   | { kind: "session"; session: MatchSessionSummaryInfo };
 
+export interface MatchListResponse {
+  matches: MatchInfo[];
+  total: number;
+  /** 경기와 별도로 기록되는 공식 레이팅 반영 이벤트(그래프 전용). */
+  ratingAdjustmentLogs?: PlayerRatingChangeLog[];
+}
+
 interface MatchProps {
   match: MatchInfo;
   currentPlayerId?: string;

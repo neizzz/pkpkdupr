@@ -69,6 +69,29 @@ describe("ScorePerformanceRatingService", () => {
     expect(result.d.rating.doubles).toBeGreaterThan(6.15);
   });
 
+  it("M6nix34e 조건에서는 기대보다 근소한 B팀이 모두 하락한다", () => {
+    const service = new ScorePerformanceRatingService();
+    const result = service.replayMatch({
+      type: "unrestricted-doubles",
+      winnerTeamIndex: 1,
+      scores: [
+        { scoreA: 4, scoreB: 11 },
+        { scoreA: 10, scoreB: 12 },
+      ],
+      participants: [
+        { playerId: "neiz", teamIndex: 0, state: createState(3.275, 50) },
+        { playerId: "colin", teamIndex: 0, state: createState(2.825, 50) },
+        { playerId: "cloud", teamIndex: 1, state: createState(3.521, 50) },
+        { playerId: "scarlett", teamIndex: 1, state: createState(3.245, 50) },
+      ],
+    });
+
+    expect(result.neiz.rating.doubles).toBeGreaterThan(3.275);
+    expect(result.colin.rating.doubles).toBeGreaterThan(2.825);
+    expect(result.cloud.rating.doubles).toBeLessThan(3.521);
+    expect(result.scarlett.rating.doubles).toBeLessThan(3.245);
+  });
+
   it("점수가 없는 과거 경기는 기존 승패 방식으로 계산한다", () => {
     const service = new ScorePerformanceRatingService();
     const result = service.replayMatch({

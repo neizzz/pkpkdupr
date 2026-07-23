@@ -40,6 +40,7 @@ export type MemberProfileRatingDelta = Record<
 export interface MemberProfileRatingHistoryPoint {
   rating: number;
   createdAt: string;
+  source: "match" | "official-adjustment" | "current";
 }
 
 export type MemberProfileRatingHistory = Record<

@@ -227,6 +227,16 @@ describe("GET /api/matches", () => {
       delta: { singles: 0.1, doubles: 0 },
       createdAt: now,
     };
+    const adjustmentLog: PlayerRatingChangeLog = {
+      id: "adjustment-001",
+      playerId: player.id,
+      source: "official_adjustment_recalculation",
+      sourceLogId: "official-adjustment-001",
+      previousRating: { singles: 3.1, doubles: 3.0 },
+      nextRating: { singles: 3.2, doubles: 3.0 },
+      delta: { singles: 0.1, doubles: 0 },
+      createdAt: now,
+    };
 
     vi.spyOn(MatchRepository.prototype, "findByPlayerId").mockResolvedValue({
       matches: [match],
@@ -235,7 +245,7 @@ describe("GET /api/matches", () => {
     vi.spyOn(
       MatchRepository.prototype,
       "getPlayerRatingChangeLogs",
-    ).mockResolvedValue([ratingChangeLog]);
+    ).mockResolvedValue([ratingChangeLog, adjustmentLog]);
 
     const response = await request(app)
       .get(`/api/matches?playerId=${player.id}`)
@@ -245,6 +255,9 @@ describe("GET /api/matches", () => {
     expect(response.body.matches).toHaveLength(1);
     expect(response.body.matches[0].ratingChanges).toHaveLength(1);
     expect(response.body.matches[0].ratingChanges[0].id).toBe("log-001");
+    expect(response.body.ratingAdjustmentLogs).toEqual([
+      expect.objectContaining({ id: "adjustment-001" }),
+    ]);
   });
 
   it("playerId 없이 요청하면 ratingChanges를 포함하지 않는다", async () => {

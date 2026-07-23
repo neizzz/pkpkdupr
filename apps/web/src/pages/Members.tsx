@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { IoChevronForward } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
-import type { MatchInfo } from "@/components/Match";
+import type { MatchListResponse } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader from "@/components/TabPanelHeader";
@@ -232,13 +232,16 @@ const Members: React.FC = () => {
           throw new Error("매치 목록을 불러오지 못했습니다.");
         }
 
-        const data = (await res.json()) as {
-          matches: MatchInfo[];
-          total: number;
-        };
+        const data = (await res.json()) as MatchListResponse;
         setSelectedMemberMatchStats(buildMatchStats(data.matches, memberId));
         setSelectedMemberRatingDelta(buildRatingDelta(data.matches, memberId));
-        setSelectedMemberRatingHistory(buildRatingHistory(data.matches, memberId));
+        setSelectedMemberRatingHistory(
+          buildRatingHistory(
+            data.matches,
+            memberId,
+            data.ratingAdjustmentLogs,
+          ),
+        );
       } catch (err) {
         if (!preserveVisibleData) {
           setSelectedMemberMatchStats(createEmptyMatchStats());

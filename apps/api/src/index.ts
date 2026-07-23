@@ -694,6 +694,12 @@ app.get("/api/matches", async (req, res) => {
         ...match,
         ratingChanges: logsByMatch.get(match.id) ?? [],
       }));
+
+      const ratingAdjustmentLogs = ratingChangeLogs.filter(
+        (log) => log.source === "official_adjustment_recalculation",
+      );
+
+      return res.json({ ...result, ratingAdjustmentLogs });
     }
 
     res.json(result);
@@ -1115,6 +1121,7 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       {
         source: "manual_recalculation",
         sourceLogId: `admin-match-batch-${Date.now()}-${randomUUID()}`,
+        perMatchLogs: true,
       },
     );
 
@@ -1275,6 +1282,7 @@ app.post(
         {
           source: "manual_recalculation",
           sourceLogId: `admin-match-result-${match.id}-${Date.now()}-${randomUUID()}`,
+          perMatchLogs: true,
         },
       );
 
@@ -1314,6 +1322,7 @@ app.delete(
         {
           source: "manual_recalculation",
           sourceLogId: `admin-match-delete-${req.params.matchId}-${Date.now()}-${randomUUID()}`,
+          perMatchLogs: true,
         },
       );
 

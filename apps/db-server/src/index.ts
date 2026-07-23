@@ -1181,6 +1181,23 @@ app.post("/internal/player-rating-change-logs", async (req, res) => {
   }
 });
 
+app.put("/internal/player-rating-change-logs/match-completed", async (req, res) => {
+  try {
+    const logs = Array.isArray(req.body) ? req.body : null;
+    if (!logs) {
+      return res.status(400).json({ error: "경기 완료 로그 목록이 필요합니다." });
+    }
+
+    res.json(
+      await playerRatingChangeLogRepository.replaceMatchCompleted(
+        logs as CreatePlayerRatingChangeLogInput[],
+      ),
+    );
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.get("/internal/official-dupr-adjustment-logs", async (_req, res) => {
   try {
     res.json(await officialDuprAdjustmentLogRepository.findAll());
