@@ -323,7 +323,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
 
   if (history.length === 0) {
     return (
-      <div className="mt-5 flex h-32 items-center justify-center px-4 text-center text-sm font-medium text-pkpk-secondary-font/70">
+      <div className="mt-2 flex h-36 items-center justify-center px-4 text-center text-sm font-medium text-pkpk-secondary-font/70">
         평점 이력이 없습니다.
       </div>
     );

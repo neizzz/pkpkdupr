@@ -85,7 +85,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 
           <section>
             <div className="flex min-w-0 items-center gap-3">
-              <p className="shrink-0 text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
+              <p className="shrink-0 pl-2 text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
                 ID
               </p>
               <CopyableId
@@ -98,7 +98,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 
         <section>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
+            <p className="pl-2 text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
               Matches
             </p>
             <Switch

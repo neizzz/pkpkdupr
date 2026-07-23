@@ -142,11 +142,11 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     </span>
     <section>
       <p
-        className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+        className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
       >
         Score
       </p>
-      <div className="mt-3 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 p-3 shadow-sm">
+      <div className="mt-1.5 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 p-3 shadow-sm">
         <SkeletonBlock className="h-4 w-full" />
         <div className="mt-3 flex flex-col gap-2">
           {Array.from({ length: 2 }, (_, index) => (
@@ -164,11 +164,11 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 
     <section>
       <p
-        className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+        className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
       >
         Rating Change
       </p>
-      <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+      <Card className="mt-1.5 rounded-3xl bg-white/95 p-3 shadow-sm">
         <div className="flex flex-col gap-3">
           {Array.from({ length: 3 }, (_, index) => (
             <div key={index} className="flex items-center justify-between gap-3">
@@ -183,13 +183,13 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <section>
       <div className="flex items-center justify-between gap-3">
         <p
-          className={`!text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+          className={`!text-sm pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
         >
           Approval
         </p>
         <SkeletonBlock className="h-3 w-12" />
       </div>
-      <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+      <Card className="mt-1.5 rounded-3xl bg-white/95 p-3 shadow-sm">
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }, (_, index) => (
             <div key={index} className="flex items-center justify-between gap-3">
@@ -385,7 +385,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           <section>
             <div className="flex min-w-0 items-center gap-3">
               <p
-                className={`shrink-0 text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+                className={`shrink-0 pl-2 text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
               >
                 ID
               </p>
@@ -407,11 +407,11 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           >
             <section>
             <p
-              className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+              className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
             >
               Score
             </p>
-            <div className="mt-3 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 shadow-sm">
+            <div className="mt-1.5 overflow-hidden rounded-2xl border border-pkpk-primary-bg/20 bg-pkpk-primary-bg/5 shadow-sm">
               <table className="w-full table-fixed border-collapse text-sm text-pkpk-sub-font">
                 <colgroup>
                   <col className="w-[40%]" />
@@ -583,11 +583,11 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
             <section>
             <p
-              className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+              className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
             >
               Rating Change
             </p>
-            <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+            <Card className="mt-1.5 rounded-3xl bg-white/95 p-3 shadow-sm">
               {hasRatingChanges ? (
                 (() => {
                   const entries = match.teams
@@ -643,7 +643,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <section>
             <div className="flex items-center justify-between gap-3">
               <p
-                className={`!text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+                className={`!text-sm pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
               >
                 Approval
               </p>
@@ -652,7 +652,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 {match.teams.flatMap((team) => team.players).length}
               </span>
             </div>
-            <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
+            <Card className="mt-1.5 rounded-3xl bg-white/95 p-3 shadow-sm">
               {match.teams
                 .flatMap((team) => team.players)
                 .map((player, index, players) => {

@@ -210,11 +210,15 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
           </div>
 
           <div className="rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
-            <h3 className="text-[1.625rem] font-bold text-pkpk-secondary-font">
+            <h3
+              className={`text-[1.625rem] font-bold text-pkpk-secondary-font ${
+                showDetailHeader ? "pl-2" : ""
+              }`}
+            >
               Rating
             </h3>
 
-            <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="mt-1.5 grid grid-cols-2 gap-3">
               {duprItems.map((item) => {
                 const Icon = item.icon;
                 return (
