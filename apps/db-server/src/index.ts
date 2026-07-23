@@ -162,6 +162,39 @@ const migrateEntityIds = async () => {
       });
     }
 
+    await client.execute(`
+      DELETE FROM match_participants
+      WHERE rowid IN (
+        SELECT rowid
+        FROM (
+          SELECT
+            rowid,
+            ROW_NUMBER() OVER (
+              PARTITION BY match_id, team_index, player_id
+              ORDER BY CASE WHEN dupr_rating_json IS NULL THEN 1 ELSE 0 END, rowid
+            ) AS duplicate_rank
+          FROM match_participants
+        )
+        WHERE duplicate_rank > 1
+      )
+    `);
+    await client.execute(`
+      DELETE FROM match_result_approvals
+      WHERE rowid IN (
+        SELECT rowid
+        FROM (
+          SELECT
+            rowid,
+            ROW_NUMBER() OVER (
+              PARTITION BY match_id, player_id
+              ORDER BY approved_at DESC, rowid
+            ) AS duplicate_rank
+          FROM match_result_approvals
+        )
+        WHERE duplicate_rank > 1
+      )
+    `);
+
     await executeIdReferenceUpdates(playerIdMapping, [
       { table: "players", column: "id" },
     ]);
@@ -180,11 +213,15 @@ const migrateEntityIds = async () => {
     );
 
     const sessionRows = await client.execute(`
-      SELECT DISTINCT trim(session_name) AS name, session_date AS date
+      SELECT
+        trim(session_name) AS name,
+        session_date AS date,
+        MIN(COALESCE(NULLIF(trim(location), ''), 'Court TBD')) AS location
       FROM matches
       WHERE session_id IS NULL
         AND trim(COALESCE(session_name, '')) <> ''
         AND session_date IS NOT NULL
+      GROUP BY trim(session_name), session_date
     `);
     const existingSessionRows = await client.execute(
       "SELECT id FROM match_sessions",
@@ -196,6 +233,7 @@ const migrateEntityIds = async () => {
     for (const row of sessionRows.rows) {
       const name = String(row.name);
       const date = Number(row.date);
+      const location = String(row.location);
       const existing = await client.execute({
         sql: "SELECT id FROM match_sessions WHERE name = ? AND date = ?",
         args: [name, date],
@@ -212,8 +250,8 @@ const migrateEntityIds = async () => {
       if (!existing.rows[0]) {
         const nowSeconds = Math.floor(Date.now() / 1000);
         await client.execute({
-          sql: "INSERT INTO match_sessions (id, name, date, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-          args: [sessionId, name, date, nowSeconds, nowSeconds],
+          sql: "INSERT INTO match_sessions (id, name, date, location, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+          args: [sessionId, name, date, location, nowSeconds, nowSeconds],
         });
       }
       await client.execute({
@@ -600,11 +638,15 @@ const initSchema = async () => {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       date INTEGER NOT NULL,
+      location TEXT NOT NULL DEFAULT 'Court TBD',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       UNIQUE(name, date)
     )
   `);
+  await safeExec(
+    `ALTER TABLE match_sessions ADD COLUMN location TEXT NOT NULL DEFAULT 'Court TBD'`,
+  );
   await client.execute(
     "CREATE UNIQUE INDEX IF NOT EXISTS match_sessions_name_date_unique ON match_sessions(name, date)",
   );
