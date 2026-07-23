@@ -50,7 +50,12 @@ import {
   verifyDevPlayerQrPayload,
   verifyPlayerQrPayload,
 } from "./playerQrToken";
-import { getDuprCategoryForMatchType, RatingService } from "./RatingService";
+import {
+  getDuprCategoryForMatchType,
+  RatingService,
+  type RatingServiceContract,
+} from "./RatingService";
+import { ScorePerformanceRatingService } from "./ScorePerformanceRatingService";
 import type { Match } from "@pkpkdupr/shared/match";
 
 const SALT_ROUNDS = 10;
@@ -392,6 +397,39 @@ interface RecalculateDuprRatingsOptions {
   perMatchLogs?: boolean;
 }
 
+interface OfficialDuprRatingAnchor {
+  playerId: string;
+  category: keyof PlayerDupr;
+  rating: number;
+  confidence: number;
+  createdAtMs: number;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const OFFICIAL_DUPR_RECENCY_HALF_LIFE_MS = 30 * DAY_MS;
+
+export const getOfficialDuprRecencyWeight = (
+  matchCompletedAt: string | Date | number,
+  officialAppliedAt: string | Date | number,
+): number => {
+  const matchCompletedAtMs = new Date(matchCompletedAt).getTime();
+  const officialAppliedAtMs = new Date(officialAppliedAt).getTime();
+
+  if (
+    !Number.isFinite(matchCompletedAtMs) ||
+    !Number.isFinite(officialAppliedAtMs) ||
+    matchCompletedAtMs >= officialAppliedAtMs
+  ) {
+    return 1;
+  }
+
+  return Math.pow(
+    2,
+    -(officialAppliedAtMs - matchCompletedAtMs) /
+      OFFICIAL_DUPR_RECENCY_HALF_LIFE_MS,
+  );
+};
+
 const duprPatchEntries = (["singles", "doubles"] as const).map((category) => ({
   category,
   getRating: (ratings?: OfficialDuprRatingPatch) => ratings?.[category],
@@ -473,7 +511,10 @@ const hasStoredDuprStateChange = (
   hasDuprMetricChange(nextState.metrics, previousState.metrics);
 
 export class AuthService {
-  private ratingService = new RatingService();
+  constructor(
+    private readonly ratingService: RatingServiceContract =
+      new ScorePerformanceRatingService(),
+  ) {}
 
   private shouldRequirePasswordChange(
     stored: Pick<StoredPlayerRecord, "username" | "isFirstLogin">,
@@ -857,6 +898,22 @@ export class AuthService {
     });
   }
 
+  async verifyAdminPassword(
+    playerId: string,
+    password: string | undefined,
+  ): Promise<boolean> {
+    if (!password) {
+      return false;
+    }
+
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored || stored.username !== API_ADMIN_USERNAME) {
+      return false;
+    }
+
+    return await bcrypt.compare(password, stored.passwordHash);
+  }
+
   async resetPlayerPassword(
     playerId: string,
     newPassword: string,
@@ -1138,6 +1195,7 @@ export class AuthService {
   private async calculateDuprRecalculation(
     completedMatches: Match[],
     additionalLogs: OfficialDuprAdjustmentLog[] = [],
+    ratingService: RatingServiceContract = this.ratingService,
   ): Promise<DuprRecalculationResult> {
     const players = (await this.dbRequest<any[]>("/internal/players")).map(
       hydratePlayer,
@@ -1157,6 +1215,10 @@ export class AuthService {
       ]),
     );
     const correctionWeightByPlayerId: Record<string, number> = {};
+    const officialAnchorByPlayerCategory = new Map<
+      string,
+      OfficialDuprRatingAnchor
+    >();
 
     for (const log of logs) {
       const state = stateByPlayerId.get(log.playerId);
@@ -1181,10 +1243,20 @@ export class AuthService {
           confidence: normalizeConfidenceValue(confidenceValue),
           accuracy: 100,
         });
+        officialAnchorByPlayerCategory.set(
+          `${log.playerId}:${entry.category}`,
+          {
+            playerId: log.playerId,
+            category: entry.category,
+            rating: normalizeDuprRatingValue(ratingValue),
+            confidence: normalizeConfidenceValue(confidenceValue),
+            createdAtMs: new Date(log.createdAt).getTime(),
+          },
+        );
         const preUpdateAccuracy = entry.getAccuracy(log.preUpdateAccuracy);
         correctionWeightByPlayerId[log.playerId] = Math.max(
           correctionWeightByPlayerId[log.playerId] ?? 0,
-          this.ratingService.getCorrectionWeight(
+          ratingService.getCorrectionWeight(
             preUpdateAccuracy == null ? null : Number(preUpdateAccuracy),
           ),
         );
@@ -1200,6 +1272,7 @@ export class AuthService {
     const lastPlayedAtMsByCategoryKey = new Map<string, number>();
     const matchParticipantDuprSnapshots: MatchParticipantDuprSnapshot[] = [];
     const perMatchChanges: DuprRecalculationResult["perMatchChanges"] = [];
+    const fixedOfficialAnchorKeys = new Set<string>();
     const replayMatches = completedMatches
       .filter((match) => match.status === "completed" && match.completedAt)
       .sort(
@@ -1215,6 +1288,43 @@ export class AuthService {
       }
       const category = getDuprCategoryForMatchType(match.type);
       const completedAtMs = new Date(match.completedAt!).getTime();
+
+      for (const [anchorKey, anchor] of officialAnchorByPlayerCategory) {
+        if (
+          anchor.category !== category ||
+          fixedOfficialAnchorKeys.has(anchorKey) ||
+          completedAtMs <= anchor.createdAtMs
+        ) {
+          continue;
+        }
+
+        const state = stateByPlayerId.get(anchor.playerId);
+        if (!state) {
+          fixedOfficialAnchorKeys.add(anchorKey);
+          continue;
+        }
+        const currentMetric = getDuprMetricByCategory(
+          state.metrics,
+          anchor.category,
+        );
+        stateByPlayerId.set(anchor.playerId, {
+          rating: setDuprRatingByCategory(
+            state.rating,
+            anchor.category,
+            anchor.rating,
+          ),
+          metrics: setDuprMetricByCategory(
+            state.metrics,
+            anchor.category,
+            {
+              ...currentMetric,
+              confidence: anchor.confidence,
+              accuracy: 100,
+            },
+          ),
+        });
+        fixedOfficialAnchorKeys.add(anchorKey);
+      }
 
       const participants = match.teams.flatMap((team, teamIndex) =>
         team.players
@@ -1267,7 +1377,33 @@ export class AuthService {
         );
       });
 
-      const replayResult = this.ratingService.replayMatch(
+      const participantPlayerIds = new Set(
+        participants.map((participant) => participant.playerId),
+      );
+      const matchRecencyWeight = Math.max(
+        0,
+        ...[...officialAnchorByPlayerCategory.values()]
+          .filter(
+            (anchor) =>
+              anchor.category === category &&
+              participantPlayerIds.has(anchor.playerId) &&
+              completedAtMs <= anchor.createdAtMs,
+          )
+          .map((anchor) =>
+            getOfficialDuprRecencyWeight(
+              completedAtMs,
+              anchor.createdAtMs,
+            ),
+          ),
+      );
+      const effectiveCorrectionWeightByPlayerId = Object.fromEntries(
+        participants.map((participant) => [
+          participant.playerId,
+          (correctionWeightByPlayerId[participant.playerId] ?? 1) *
+            (matchRecencyWeight || 1),
+        ]),
+      );
+      const replayResult = ratingService.replayMatch(
         {
           type: match.type,
           winnerTeamIndex,
@@ -1275,7 +1411,7 @@ export class AuthService {
           scores: match.scores,
           inactiveElapsedMsByPlayerId,
         },
-        correctionWeightByPlayerId,
+        effectiveCorrectionWeightByPlayerId,
       );
 
       const matchPlayerChanges: Array<{
@@ -1314,12 +1450,126 @@ export class AuthService {
       });
     }
 
+    for (const [anchorKey, anchor] of officialAnchorByPlayerCategory) {
+      if (fixedOfficialAnchorKeys.has(anchorKey)) {
+        continue;
+      }
+
+      const state = stateByPlayerId.get(anchor.playerId);
+      if (!state) {
+        continue;
+      }
+      const currentMetric = getDuprMetricByCategory(
+        state.metrics,
+        anchor.category,
+      );
+      stateByPlayerId.set(anchor.playerId, {
+        rating: setDuprRatingByCategory(
+          state.rating,
+          anchor.category,
+          anchor.rating,
+        ),
+        metrics: setDuprMetricByCategory(
+          state.metrics,
+          anchor.category,
+          {
+            ...currentMetric,
+            confidence: anchor.confidence,
+            accuracy: 100,
+          },
+        ),
+      });
+    }
+
     return {
       players,
       stateByPlayerId,
       relatedMatchCountByPlayerId,
       matchParticipantDuprSnapshots,
       perMatchChanges,
+    };
+  }
+
+  async compareRatingMethods(completedMatches: Match[]): Promise<{
+    completedMatchCount: number;
+    players: Array<{
+      playerId: string;
+      username: string;
+      currentRating: PublicPlayerDupr | null;
+      legacyRating: PublicPlayerDupr | null;
+      scorePerformanceRating: PublicPlayerDupr | null;
+      difference: PublicPlayerDupr;
+      relatedMatchCount: number;
+    }>;
+  }> {
+    const [legacy, scorePerformance] = await Promise.all([
+      this.calculateDuprRecalculation(
+        completedMatches,
+        [],
+        new RatingService(),
+      ),
+      this.calculateDuprRecalculation(
+        completedMatches,
+        [],
+        new ScorePerformanceRatingService(),
+      ),
+    ]);
+
+    return {
+      completedMatchCount: completedMatches.length,
+      players: scorePerformance.players
+        .map((player) => {
+          const legacyState = legacy.stateByPlayerId.get(player.id);
+          const scorePerformanceState =
+            scorePerformance.stateByPlayerId.get(player.id);
+          if (!legacyState || !scorePerformanceState) {
+            return null;
+          }
+          const currentRating = toPublicPlayerDupr(player.duprState);
+          const legacyRating = toPublicPlayerDupr(legacyState);
+          const scorePerformanceRating =
+            toPublicPlayerDupr(scorePerformanceState);
+
+          return {
+            playerId: player.id,
+            username: player.username,
+            currentRating,
+            legacyRating,
+            scorePerformanceRating,
+            difference: {
+              singles:
+                legacyRating?.singles != null &&
+                scorePerformanceRating?.singles != null
+                  ? roundDuprRating(
+                      scorePerformanceRating.singles - legacyRating.singles,
+                    )
+                  : null,
+              doubles:
+                legacyRating?.doubles != null &&
+                scorePerformanceRating?.doubles != null
+                  ? roundDuprRating(
+                      scorePerformanceRating.doubles - legacyRating.doubles,
+                    )
+                  : null,
+            },
+            relatedMatchCount:
+              scorePerformance.relatedMatchCountByPlayerId.get(player.id) ?? 0,
+          };
+        })
+        .filter(
+          (
+            comparison,
+          ): comparison is {
+            playerId: string;
+            username: string;
+            currentRating: PublicPlayerDupr | null;
+            legacyRating: PublicPlayerDupr | null;
+            scorePerformanceRating: PublicPlayerDupr | null;
+            difference: PublicPlayerDupr;
+            relatedMatchCount: number;
+          } => Boolean(comparison),
+        )
+        .sort((a, b) => a.username.localeCompare(b.username)),
     };
   }
 

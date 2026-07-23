@@ -31,6 +31,14 @@ import { useNavigate } from "react-router-dom";
 import AdminMatchBatchForm, {
   type AdminBatchMatchSubmitPayload,
 } from "../components/AdminMatchBatchForm";
+import AdminSessionManager from "../components/AdminSessionManager";
+import AdminSidebar, {
+  adminSectionInfo,
+  type AdminSection,
+} from "../components/AdminSidebar";
+import RatingComparisonPanel, {
+  type RatingMethodComparison,
+} from "../components/RatingComparisonPanel";
 import RecentValueComboBox from "../components/RecentValueComboBox";
 
 type PlayerInfo = Pick<
@@ -238,8 +246,17 @@ const normalizeDraftValue = (value: string) => value.trim();
 const AdminDashboard: React.FC = () => {
   const { player, isAdmin, logout, token } = useAuth();
   const navigate = useNavigate();
+  const [activeSection, setActiveSection] =
+    useState<AdminSection>("members");
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [matches, setMatches] = useState<MatchInfo[]>([]);
+  const [ratingComparison, setRatingComparison] =
+    useState<RatingMethodComparison | null>(null);
+  const [isLoadingRatingComparison, setIsLoadingRatingComparison] =
+    useState(false);
+  const [ratingComparisonError, setRatingComparisonError] = useState<
+    string | null
+  >(null);
   const [isMatchListExpanded, setIsMatchListExpanded] = useState(true);
   const [statusLogsByPlayerId, setStatusLogsByPlayerId] =
     useState<PlayerStatusLogsByPlayerId>({});
@@ -433,6 +450,29 @@ const AdminDashboard: React.FC = () => {
     syncMatchDrafts(data);
   };
 
+  const loadRatingComparison = async () => {
+    try {
+      setIsLoadingRatingComparison(true);
+      setRatingComparisonError(null);
+      const res = await fetch("/api/admin/ratings/comparison", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || "방법별 레이팅을 불러오지 못했습니다.",
+        );
+      }
+      setRatingComparison((await res.json()) as RatingMethodComparison);
+    } catch (err: unknown) {
+      setRatingComparisonError(
+        err instanceof Error ? err.message : "알 수 없는 오류",
+      );
+    } finally {
+      setIsLoadingRatingComparison(false);
+    }
+  };
+
   const loadDashboardData = async () => {
     try {
       setError(null);
@@ -452,6 +492,26 @@ const AdminDashboard: React.FC = () => {
       loadDashboardData();
     }
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (
+      token &&
+      isAdmin &&
+      activeSection === "ratings" &&
+      !ratingComparison &&
+      !ratingComparisonError &&
+      !isLoadingRatingComparison
+    ) {
+      void loadRatingComparison();
+    }
+  }, [
+    token,
+    isAdmin,
+    activeSection,
+    ratingComparison,
+    ratingComparisonError,
+    isLoadingRatingComparison,
+  ]);
 
   const handleAddPlayer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -673,8 +733,9 @@ const AdminDashboard: React.FC = () => {
         restoredMatchDuprSnapshotMatchCount: number;
       };
       await loadDashboardData();
+      await loadRatingComparison();
       setSuccess(
-        `레이팅 재계산이 완료되었습니다. 완료 매치 ${data.completedMatchCount}개 기준, ${data.changedPlayerCount}명 변동 (집계 ${data.ratingChangeLogs.length}건 + 매치별 ${data.perMatchLogCount}건 기록), 매치 DUPR 스냅샷 ${data.restoredMatchDuprSnapshotCount}건 복원 (${data.restoredMatchDuprSnapshotMatchCount}개 매치).`,
+        `레이팅 재계산이 완료되었습니다. 완료 매치 ${data.completedMatchCount}개 기준, ${data.changedPlayerCount}명 변동 (집계 ${data.ratingChangeLogs.length}건 + 매치별 ${data.perMatchLogCount}건 기록), 매치 레이팅 스냅샷 ${data.restoredMatchDuprSnapshotCount}건 복원 (${data.restoredMatchDuprSnapshotMatchCount}개 매치).`,
       );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
@@ -1179,11 +1240,11 @@ const AdminDashboard: React.FC = () => {
   const genderLabel = player?.gender === "M" ? "남" : "여";
   const nowPlaying = () => new Date().toLocaleString("ko-KR");
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-slate-50">
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-bold text-blue-600">PKELO Admin</h1>
         <div className="flex gap-4 items-center">
-          <span className="text-sm text-gray-400">v{__APP_VERSION__}</span>
+          <span className="text-sm text-gray-400">{__APP_VERSION__}</span>
           <span className="text-sm text-gray-600">
             {player?.username} ({genderLabel}) / 관리자
           </span>
@@ -1199,11 +1260,20 @@ const AdminDashboard: React.FC = () => {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[144rem] space-y-8 p-6">
-        <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
-            신규 회원 추가
-          </h2>
+      <div className="flex flex-col lg:flex-row lg:items-stretch">
+        <AdminSidebar
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+        />
+        <main className="min-w-0 flex-1 space-y-8 bg-white p-4 lg:p-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">
+              {adminSectionInfo[activeSection].label}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              {adminSectionInfo[activeSection].description}
+            </p>
+          </div>
 
           {error && (
             <div className="bg-error/10 border border-error/20 text-error px-4 py-2 rounded text-sm">
@@ -1215,6 +1285,12 @@ const AdminDashboard: React.FC = () => {
               {success}
             </div>
           )}
+
+        {activeSection === "members" ? (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-700">
+            신규 회원 추가
+          </h2>
 
           <form
             onSubmit={handleAddPlayer}
@@ -1273,15 +1349,27 @@ const AdminDashboard: React.FC = () => {
             </div>
           </form>
         </section>
+        ) : null}
 
-        <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
+        {activeSection === "ratings" ? (
+          <RatingComparisonPanel
+            comparison={ratingComparison}
+            isLoading={isLoadingRatingComparison}
+            error={ratingComparisonError}
+            onReload={() => void loadRatingComparison()}
+          />
+        ) : null}
+
+        {activeSection === "ratings" ? (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-700">
                 레이팅 재계산
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                전체 완료 매치를 기준으로 모든 회원의 DUPR을 다시 계산합니다.
+                현재 적용 중인 신규 득점률식으로 전체 완료 매치를 재생해 모든
+                회원의 저장 레이팅을 갱신합니다.
               </p>
             </div>
             <button
@@ -1294,7 +1382,9 @@ const AdminDashboard: React.FC = () => {
             </button>
           </div>
         </section>
+        ) : null}
 
+        {activeSection === "matches" ? (
         <AdminMatchBatchForm
           players={players}
           isSubmitting={isSavingAdminMatches}
@@ -1302,11 +1392,27 @@ const AdminDashboard: React.FC = () => {
           resetKey={adminMatchFormResetKey}
           onSubmit={handleAdminMatchBatchSubmit}
         />
+        ) : null}
 
-        <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
-            공식 DUPR 수동 반영
-          </h2>
+        {activeSection === "sessions" ? (
+        <AdminSessionManager
+          token={token}
+          players={players}
+          protectedAdminUsername={PROTECTED_ADMIN_USERNAME}
+        />
+        ) : null}
+
+        {activeSection === "ratings" ? (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-700">
+              공식 DUPR 수동 반영
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              최근 경기 30일 반감기 적용: 공식 DUPR 반영 시점에 가까운
+              경기일수록 파트너와 상대 선수의 레이팅에 더 크게 반영됩니다.
+            </p>
+          </div>
           <form
             onSubmit={handleOfficialDuprSubmit}
             className="grid grid-cols-4 gap-4 items-end"
@@ -1343,7 +1449,7 @@ const AdminDashboard: React.FC = () => {
                   setOfficialReason(e.target.value);
                   setOfficialPreview(null);
                 }}
-                placeholder="정식 DUPR 반영 사유"
+                placeholder="공식 DUPR 반영 사유"
                 className="w-full px-4 py-2 border rounded-lg"
               />
             </div>
@@ -1439,12 +1545,12 @@ const AdminDashboard: React.FC = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b text-left text-indigo-800">
-                        <th className="pb-2">회원</th>
-                        <th className="pb-2">Singles</th>
-                        <th className="pb-2">Doubles</th>
-                        <th className="pb-2">관련 매치</th>
+                    <thead className="bg-indigo-100">
+                      <tr className="text-left text-indigo-900">
+                        <th className="px-3 py-2">회원</th>
+                        <th className="px-3 py-2">Singles</th>
+                        <th className="px-3 py-2">Doubles</th>
+                        <th className="px-3 py-2">관련 매치</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1453,7 +1559,7 @@ const AdminDashboard: React.FC = () => {
                           key={impact.playerId}
                           className="border-b last:border-0"
                         >
-                          <td className="py-2 font-semibold text-gray-800">
+                          <td className="px-3 py-2 font-semibold text-gray-800">
                             {impact.username}
                           </td>
                           {[
@@ -1468,7 +1574,7 @@ const AdminDashboard: React.FC = () => {
                               impact.delta.doubles,
                             ],
                           ].map(([key, nextValue, deltaValue]) => (
-                            <td key={key} className="py-2">
+                            <td key={key} className="px-3 py-2">
                               <span className="font-medium text-gray-800">
                                 {formatDupr(nextValue as number)}
                               </span>
@@ -1485,7 +1591,7 @@ const AdminDashboard: React.FC = () => {
                               </span>
                             </td>
                           ))}
-                          <td className="py-2 text-gray-600">
+                          <td className="px-3 py-2 text-gray-600">
                             {impact.relatedMatchCount}
                           </td>
                         </tr>
@@ -1497,9 +1603,11 @@ const AdminDashboard: React.FC = () => {
             </div>
           ) : null}
         </section>
+        ) : null}
 
-        <section className="bg-white rounded-xl shadow-sm mt-2 p-6 space-y-4">
-          <div className="flex items-center justify-between border-b pb-2">
+        {activeSection === "matches" ? (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-700">
               매치 목록 ({matches.length})
             </h2>
@@ -1524,12 +1632,13 @@ const AdminDashboard: React.FC = () => {
                     <label className="mb-1 block text-sm font-medium text-slate-700">
                       일괄 세션명
                     </label>
-                    <input
-                      type="text"
+                    <RecentValueComboBox
+                      fieldKey={recentInputFieldKeys.sessionName}
                       value={bulkSessionName}
-                      onChange={(e) => setBulkSessionName(e.target.value)}
+                      onChange={setBulkSessionName}
                       placeholder="예: 수요일 저녁 세션"
-                      className="w-full rounded-lg border px-3 py-2"
+                      className="w-full"
+                      inputClassName="w-full rounded-lg border px-3 py-2"
                     />
                   </div>
                   <div className="flex-1">
@@ -1590,9 +1699,9 @@ const AdminDashboard: React.FC = () => {
 
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[1600px] table-auto text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-gray-500">
-                      <th className="px-4 pb-3 whitespace-nowrap">
+                  <thead className="bg-slate-100">
+                    <tr className="text-left text-slate-600">
+                      <th className="px-4 py-3 whitespace-nowrap">
                         <input
                           type="checkbox"
                           checked={
@@ -1802,9 +1911,11 @@ const AdminDashboard: React.FC = () => {
             </>
           )}
         </section>
+        ) : null}
 
-        <section className="bg-white rounded-xl shadow-sm mt-2 p-6 space-y-4">
-          <h2 className="text-lg font-semibold border-b pb-2 text-gray-700">
+        {activeSection === "members" ? (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-700">
             회원 목록 ({players.length})
           </h2>
 
@@ -1815,19 +1926,19 @@ const AdminDashboard: React.FC = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1360px] table-auto text-sm">
-                <thead>
-                  <tr className="border-b text-left text-gray-500">
-                    <th className="px-4 pb-3 whitespace-nowrap">Username</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">DUPR</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">Confidence</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">성별</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">현재 상태</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">상태 변경</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">
+                <thead className="bg-slate-100">
+                  <tr className="text-left text-slate-600">
+                    <th className="px-4 py-3 whitespace-nowrap">Username</th>
+                    <th className="px-4 py-3 whitespace-nowrap">레이팅</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Confidence</th>
+                    <th className="px-4 py-3 whitespace-nowrap">성별</th>
+                    <th className="px-4 py-3 whitespace-nowrap">현재 상태</th>
+                    <th className="px-4 py-3 whitespace-nowrap">상태 변경</th>
+                    <th className="px-4 py-3 whitespace-nowrap">
                       비밀번호 초기화
                     </th>
-                    <th className="px-4 pb-3 whitespace-nowrap">생성 로그</th>
-                    <th className="px-4 pb-3 whitespace-nowrap">상태 로그</th>
+                    <th className="px-4 py-3 whitespace-nowrap">생성 로그</th>
+                    <th className="px-4 py-3 whitespace-nowrap">상태 로그</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2054,11 +2165,13 @@ const AdminDashboard: React.FC = () => {
             </div>
           )}
         </section>
+        ) : null}
 
-        <footer className="text-center text-xs text-gray-400">
-          Last checked: {nowPlaying()}
-        </footer>
-      </main>
+          <footer className="text-center text-xs text-gray-400">
+            Last checked: {nowPlaying()}
+          </footer>
+        </main>
+      </div>
     </div>
   );
 };

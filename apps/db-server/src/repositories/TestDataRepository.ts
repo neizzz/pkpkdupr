@@ -1017,7 +1017,7 @@ export class TestDataRepository {
     const existing = await this.db
       .select()
       .from(matchScores)
-      .where(eq(matchScores.id, data.id))
+      .where(eq(matchScores.matchId, data.matchId))
       .get();
     if (existing) {
       return;

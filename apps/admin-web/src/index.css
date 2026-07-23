@@ -38,3 +38,17 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+@keyframes delete-hold-progress {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.delete-hold-progress {
+  animation: delete-hold-progress 800ms linear forwards;
+}

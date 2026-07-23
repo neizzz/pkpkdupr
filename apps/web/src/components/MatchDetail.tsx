@@ -227,6 +227,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   const hasResultScores = !!match.scores?.length;
   const canSubmitResult =
     (match.status === "created" || match.status === "pending-approval") &&
+    !match.session &&
     isCreator &&
     isOnline &&
     !!onSubmitResult;

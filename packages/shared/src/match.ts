@@ -61,6 +61,7 @@ export const getMatchTopLevelType = (
 
 export const matchSourceValues = [
   "player_created",
+  "admin_created",
   "admin_created_result",
 ] as const;
 
@@ -68,6 +69,7 @@ export type MatchSource = (typeof matchSourceValues)[number];
 
 export const matchSourceLabels: Record<MatchSource, string> = {
   player_created: "일반 생성",
+  admin_created: "관리자 예정 경기",
   admin_created_result: "관리자 입력",
 };
 
@@ -122,6 +124,17 @@ export interface Session {
   name?: string;
   date: Date;
   location: string;
+}
+
+export interface ManagedMatchSession {
+  id: string;
+  name: string;
+  date: Date;
+  location: string;
+  participantIds: string[];
+  matchCount: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface MatchSessionParticipant {

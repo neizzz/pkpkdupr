@@ -35,6 +35,21 @@ export interface MatchReplayInput {
   inactiveElapsedMsByPlayerId?: Record<string, number>;
 }
 
+/**
+ * 평점 알고리즘 구현체가 AuthService에 제공해야 하는 최소 계약입니다.
+ *
+ * 세부 계산식과 K-factor는 구현체마다 다를 수 있지만, 공식 DUPR 보정과
+ * 경기 재생 흐름은 이 인터페이스만 의존합니다.
+ */
+export interface RatingServiceContract {
+  getAccuracy(internalRating: number, officialRating: number): number;
+  getCorrectionWeight(preUpdateAccuracy: number | null): number;
+  replayMatch(
+    match: MatchReplayInput,
+    correctionWeightByPlayerId?: Record<string, number>,
+  ): Record<string, StoredPlayerDupr>;
+}
+
 const CONFIDENCE_K_FACTORS = [
   { maxExclusive: 20, kFactor: 0.064 },
   { maxExclusive: 50, kFactor: 0.048 },
@@ -153,7 +168,7 @@ export const getDuprCategoryForMatchType = (
   return "doubles";
 };
 
-export class RatingService {
+export class RatingService implements RatingServiceContract {
   getKFactor(confidence: number): number {
     const normalized = clamp(Math.round(confidence), 0, 100);
     return CONFIDENCE_K_FACTORS.find(

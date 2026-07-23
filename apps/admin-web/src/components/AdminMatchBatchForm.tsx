@@ -733,8 +733,8 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
   };
 
   return (
-    <section className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-2">
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-gray-700">
             경기 결과 일괄 입력
@@ -792,7 +792,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="mb-3">
-          <h3 className="font-semibold text-slate-800">공통 세션 정보</h3>
+          <h3 className="font-semibold text-slate-800">
+            공통 세션 정보
+          </h3>
           <p className="text-sm text-slate-500">
             수동 입력과 시트 붙여넣기 결과에 동일하게 적용됩니다.
           </p>
@@ -1218,8 +1220,8 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
               {importedPreview.rows.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[880px] text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-slate-500">
+                    <thead className="bg-slate-100">
+                      <tr className="text-left text-slate-600">
                         <th className="pb-2 pr-3">행</th>
                         <th className="pb-2 pr-3">경기번호</th>
                         <th className="pb-2 pr-3">날짜</th>

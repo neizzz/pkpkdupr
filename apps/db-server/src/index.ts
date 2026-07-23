@@ -1,5 +1,8 @@
 import express from "express";
-import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
+import {
+  DEFAULT_MATCH_MODE,
+  type Session,
+} from "@pkpkdupr/shared/match";
 import {
   generateEntityId,
   isEntityId,
@@ -144,6 +147,7 @@ const migrateEntityIds = async () => {
       { table: "official_dupr_adjustment_logs", column: "player_id" },
       { table: "official_dupr_adjustment_logs", column: "changed_by_player_id" },
       { table: "match_participants", column: "player_id" },
+      { table: "match_session_participants", column: "player_id" },
       { table: "match_result_approvals", column: "player_id" },
       { table: "matches", column: "creator_player_id" },
       { table: "matches", column: "result_submitted_by_player_id" },
@@ -650,6 +654,35 @@ const initSchema = async () => {
   await client.execute(
     "CREATE UNIQUE INDEX IF NOT EXISTS match_sessions_name_date_unique ON match_sessions(name, date)",
   );
+  await client.execute(`
+    CREATE TABLE IF NOT EXISTS match_session_participants (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      player_id TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+  await client.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS match_session_participants_session_player_unique ON match_session_participants(session_id, player_id)",
+  );
+  await client.execute(`
+    INSERT OR IGNORE INTO match_session_participants (
+      id,
+      session_id,
+      player_id,
+      created_at
+    )
+    SELECT
+      matches.session_id || '-' || match_participants.player_id,
+      matches.session_id,
+      match_participants.player_id,
+      MIN(matches.created_at)
+    FROM matches
+    INNER JOIN match_participants
+      ON match_participants.match_id = matches.id
+    WHERE matches.session_id IS NOT NULL
+    GROUP BY matches.session_id, match_participants.player_id
+  `);
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS official_dupr_adjustment_logs (
@@ -668,6 +701,28 @@ const initSchema = async () => {
   `);
 
   await migrateEntityIds();
+
+  // 과거 개발 시드가 매번 점수 행 ID를 변경한 뒤 다시 삽입되어, 단판 결과가
+  // 여러 번 표시되는 데이터가 남아 있을 수 있다. 경기 모드별 허용 세트 수만
+  // 유지해 기존 로컬 DB도 다음 기동 시 함께 정리한다.
+  await client.execute(`
+    DELETE FROM match_scores
+    WHERE rowid IN (
+      SELECT rowid
+      FROM (
+        SELECT
+          match_scores.rowid AS rowid,
+          ROW_NUMBER() OVER (
+            PARTITION BY match_scores.match_id
+            ORDER BY match_scores.rowid
+          ) AS score_rank,
+          COALESCE(matches.mode, '${DEFAULT_MATCH_MODE}') AS match_mode
+        FROM match_scores
+        LEFT JOIN matches ON matches.id = match_scores.match_id
+      )
+      WHERE score_rank > CASE WHEN match_mode = 'best-of-3' THEN 3 ELSE 1 END
+    )
+  `);
 
   const storedPlayers = await playerRepository.findAll();
   for (const player of storedPlayers) {
@@ -858,6 +913,50 @@ app.get("/internal/match-feed", async (req, res) => {
   }
 });
 
+app.post("/internal/match-sessions", async (req, res) => {
+  try {
+    const session = await matchRepository.createSession({
+      ...(req.body as Omit<Session, "date">),
+      date: new Date(req.body?.date),
+    });
+    res.status(201).json(session);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/match-sessions", async (_req, res) => {
+  try {
+    res.json(await matchRepository.findSessions());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put(
+  "/internal/match-sessions/:sessionId/participants",
+  async (req, res) => {
+    try {
+      const playerIds = Array.isArray(req.body?.playerIds)
+        ? req.body.playerIds.filter(
+            (playerId: unknown): playerId is string =>
+              typeof playerId === "string",
+          )
+        : [];
+      const session = await matchRepository.replaceSessionParticipants(
+        req.params.sessionId,
+        playerIds,
+      );
+      if (!session) {
+        return res.status(404).json({ error: "세션을 찾을 수 없습니다." });
+      }
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  },
+);
+
 app.get("/internal/match-sessions/:sessionId/matches", async (req, res) => {
   try {
     const sessionId = req.params.sessionId;
@@ -937,6 +1036,35 @@ app.post("/internal/matches/:id/result", async (req, res) => {
   } catch (error) {
     if (error instanceof CompletedMatchResultEditError) {
       return res.status(409).json({ error: error.message });
+    }
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/matches/:id/admin-result", async (req, res) => {
+  try {
+    const match = await matchRepository.recordAdminResult(
+      req.params.id,
+      req.body.submittedByPlayerId,
+      req.body.scores,
+      req.body.completedAt ? new Date(req.body.completedAt) : new Date(),
+    );
+    res.json(match);
+  } catch (error) {
+    if (error instanceof CompletedMatchResultEditError) {
+      return res.status(409).json({ error: error.message });
+    }
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.delete("/internal/matches/:id", async (req, res) => {
+  try {
+    await matchRepository.delete(req.params.id);
+    res.status(204).end();
+  } catch (error) {
+    if ((error as Error).message === "MATCH_NOT_FOUND") {
+      return res.status(404).json({ error: "매치를 찾을 수 없습니다." });
     }
     res.status(400).json({ error: (error as Error).message });
   }

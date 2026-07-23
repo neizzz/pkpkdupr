@@ -82,6 +82,16 @@ export const matchSessions = sqliteTable("match_sessions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+export const matchSessionParticipants = sqliteTable(
+  "match_session_participants",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    playerId: text("player_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  },
+);
+
 export const matchScores = sqliteTable("match_scores", {
   id: text("id").primaryKey(),
   matchId: text("match_id").notNull(),

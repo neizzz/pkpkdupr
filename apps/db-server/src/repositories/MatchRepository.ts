@@ -6,6 +6,7 @@ import type {
   MatchScore,
   MatchSessionSummary,
   MatchStatus,
+  ManagedMatchSession,
   Session,
   MatchSource,
   MatchType,
@@ -14,6 +15,7 @@ import type {
 import {
   DEFAULT_MATCH_MODE,
   getMatchSessionStatus,
+  getMaxScoreCountForMatchMode,
   MATCH_RESULT_MAX_SCORE_COUNT,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
@@ -28,6 +30,7 @@ import {
   matchResultApprovals,
   matches,
   matchScores,
+  matchSessionParticipants,
   matchSessions,
   players,
 } from "../db/schema";
@@ -37,6 +40,7 @@ type StoredMatch = typeof matches.$inferSelect;
 type StoredMatchParticipant = typeof matchParticipants.$inferSelect;
 type StoredMatchScore = typeof matchScores.$inferSelect;
 type StoredMatchApproval = typeof matchResultApprovals.$inferSelect;
+type StoredMatchSession = typeof matchSessions.$inferSelect;
 type StoredPlayer = typeof players.$inferSelect;
 
 export const COMPLETED_MATCH_RESULT_EDIT_ERROR_MESSAGE =
@@ -172,6 +176,154 @@ export class MatchRepository {
     private client: any,
   ) {}
 
+  async createSession(session: Session): Promise<Session> {
+    const sessionId = await this.ensureSession(session);
+    const stored = await this.db
+      .select()
+      .from(matchSessions)
+      .where(eq(matchSessions.id, sessionId))
+      .get();
+
+    if (!stored) {
+      throw new Error("세션 생성에 실패했습니다.");
+    }
+
+    return {
+      id: stored.id,
+      name: stored.name,
+      date: toDate(stored.date),
+      location: stored.location,
+    };
+  }
+
+  private async toManagedSession(
+    stored: StoredMatchSession,
+  ): Promise<ManagedMatchSession> {
+    const [participantRecords, sessionMatches] = await Promise.all([
+      this.db
+        .select()
+        .from(matchSessionParticipants)
+        .where(eq(matchSessionParticipants.sessionId, stored.id))
+        .all(),
+      this.db
+        .select()
+        .from(matches)
+        .where(eq(matches.sessionId, stored.id))
+        .all(),
+    ]);
+
+    return {
+      id: stored.id,
+      name: stored.name,
+      date: toDate(stored.date),
+      location: stored.location,
+      participantIds: participantRecords.map(
+        (participant: typeof matchSessionParticipants.$inferSelect) =>
+          participant.playerId,
+      ),
+      matchCount: sessionMatches.length,
+      createdAt: toDate(stored.createdAt),
+      updatedAt: toDate(stored.updatedAt),
+    };
+  }
+
+  async findSessions(): Promise<ManagedMatchSession[]> {
+    const storedSessions = await this.db
+      .select()
+      .from(matchSessions)
+      .orderBy(desc(matchSessions.date))
+      .all();
+    return await Promise.all(
+      storedSessions.map((session: StoredMatchSession) =>
+        this.toManagedSession(session),
+      ),
+    );
+  }
+
+  async findSessionById(
+    sessionId: string,
+  ): Promise<ManagedMatchSession | undefined> {
+    if (!isEntityId(sessionId, "session")) {
+      return undefined;
+    }
+    const stored = await this.db
+      .select()
+      .from(matchSessions)
+      .where(eq(matchSessions.id, sessionId))
+      .get();
+    return stored ? await this.toManagedSession(stored) : undefined;
+  }
+
+  async replaceSessionParticipants(
+    sessionId: string,
+    playerIds: string[],
+  ): Promise<ManagedMatchSession | undefined> {
+    const session = await this.findSessionById(sessionId);
+    if (!session) {
+      return undefined;
+    }
+
+    const uniquePlayerIds = [...new Set(playerIds)];
+    const playerRecords = await Promise.all(
+      uniquePlayerIds.map((playerId) =>
+        this.db
+          .select()
+          .from(players)
+          .where(eq(players.id, playerId))
+          .get(),
+      ),
+    );
+    if (
+      playerRecords.some(
+        (player: StoredPlayer | undefined) =>
+          !player || player.status !== "active",
+      )
+    ) {
+      throw new Error("유효한 활성 참여자만 등록할 수 있습니다.");
+    }
+
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+    const now = new Date();
+    try {
+      await transaction.execute({
+        sql: "DELETE FROM match_session_participants WHERE session_id = ?",
+        args: [sessionId],
+      });
+      for (const playerId of uniquePlayerIds) {
+        await transaction.execute({
+          sql: `
+            INSERT INTO match_session_participants (
+              id,
+              session_id,
+              player_id,
+              created_at
+            )
+            VALUES (?, ?, ?, ?)
+          `,
+          args: [
+            `${sessionId}-${playerId}`,
+            sessionId,
+            playerId,
+            toUnixTimestampSeconds(now),
+          ],
+        });
+      }
+      await transaction.execute({
+        sql: "UPDATE match_sessions SET updated_at = ? WHERE id = ?",
+        args: [toUnixTimestampSeconds(now), sessionId],
+      });
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
+
+    return await this.findSessionById(sessionId);
+  }
+
   async findById(id: string): Promise<Match | undefined> {
     const match = await this.db
       .select()
@@ -248,6 +400,17 @@ export class MatchRepository {
   ): Promise<{ items: MatchFeedItem[]; total: number }> {
     const allMatches = await this.loadAllMatches();
     const sessionSummaries = this.buildSessionSummaries(allMatches);
+    const registeredParticipants = await this.db
+      .select()
+      .from(matchSessionParticipants)
+      .all();
+    const registeredPlayerRecords = await this.db.select().from(players).all();
+    const registeredPlayerById = new Map<string, Player>(
+      registeredPlayerRecords.map((player: StoredPlayer) => [
+        player.id,
+        toPublicPlayer(player),
+      ]),
+    );
     const sessionParticipantIds = new Map<string, Set<string>>();
     for (const match of allMatches) {
       const sessionKey = this.getSessionKey(match);
@@ -260,6 +423,34 @@ export class MatchRepository {
         }
       }
       sessionParticipantIds.set(sessionKey, participantIds);
+    }
+    for (const registration of registeredParticipants) {
+      const participantIds =
+        sessionParticipantIds.get(registration.sessionId) ?? new Set<string>();
+      participantIds.add(registration.playerId);
+      sessionParticipantIds.set(registration.sessionId, participantIds);
+
+      const summary = sessionSummaries.get(registration.sessionId);
+      const player = registeredPlayerById.get(registration.playerId);
+      if (
+        summary &&
+        player &&
+        !summary.participants.some(
+          (participant) => participant.id === registration.playerId,
+        )
+      ) {
+        summary.participants.push({
+          id: player.id,
+          username: player.username,
+          avatarUrl: player.avatarUrl,
+        });
+      }
+    }
+    for (const summary of sessionSummaries.values()) {
+      summary.participants.sort(
+        (left, right) =>
+          Number(Boolean(right.avatarUrl)) - Number(Boolean(left.avatarUrl)),
+      );
     }
     const seenSessionKeys = new Set<string>();
     const feedItems: MatchFeedItem[] = [];
@@ -513,6 +704,134 @@ export class MatchRepository {
       throw new Error("매치 결과 저장에 실패했습니다.");
     }
     return updated;
+  }
+
+  async recordAdminResult(
+    matchId: string,
+    submittedByPlayerId: string,
+    scores: MatchScore[],
+    completedAt: Date = new Date(),
+  ): Promise<Match> {
+    const existing = await this.findById(matchId);
+    if (!existing) {
+      throw new Error("매치를 찾을 수 없습니다.");
+    }
+
+    if (existing.status === "completed") {
+      throw new CompletedMatchResultEditError();
+    }
+
+    if (
+      existing.status !== "created" &&
+      existing.status !== "pending-approval"
+    ) {
+      throw new Error("결과를 입력할 수 없는 매치 상태입니다.");
+    }
+
+    validateMatchScoresForMode(existing.mode, scores);
+
+    const scoreColumns = await this.getMatchScoreColumns();
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+
+    try {
+      const completedAtSeconds = toUnixTimestampSeconds(completedAt);
+      const updateResult = await transaction.execute({
+        sql: `
+          UPDATE matches
+          SET
+            status = ?,
+            result_submitted_by_player_id = ?,
+            result_submitted_at = ?,
+            completed_at = ?,
+            updated_at = ?
+          WHERE id = ?
+            AND status IN ('created', 'pending-approval')
+        `,
+        args: [
+          "completed",
+          submittedByPlayerId,
+          completedAtSeconds,
+          completedAtSeconds,
+          completedAtSeconds,
+          matchId,
+        ],
+      });
+      if (!updateResult.rowsAffected) {
+        throw new Error("RESULT_SUBMIT_STATE_CONFLICT");
+      }
+
+      await this.replaceScoresWithExecutor(
+        matchId,
+        scores,
+        scoreColumns,
+        transaction,
+      );
+      await transaction.execute({
+        sql: `DELETE FROM match_result_approvals WHERE match_id = ?`,
+        args: [matchId],
+      });
+
+      await transaction.commit();
+      committed = true;
+    } catch (error) {
+      transaction.close();
+      const current = await this.findById(matchId);
+      if (
+        (error as Error).message === "RESULT_SUBMIT_STATE_CONFLICT" &&
+        current?.status === "completed"
+      ) {
+        throw new CompletedMatchResultEditError();
+      }
+      throw error;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
+
+    const updated = await this.findById(matchId);
+    if (!updated) {
+      throw new Error("매치 결과 저장에 실패했습니다.");
+    }
+    return updated;
+  }
+
+  async delete(matchId: string): Promise<void> {
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+
+    try {
+      await transaction.execute({
+        sql: `DELETE FROM match_scores WHERE match_id = ?`,
+        args: [matchId],
+      });
+      await transaction.execute({
+        sql: `DELETE FROM match_participants WHERE match_id = ?`,
+        args: [matchId],
+      });
+      await transaction.execute({
+        sql: `DELETE FROM match_result_approvals WHERE match_id = ?`,
+        args: [matchId],
+      });
+      const deleted = await transaction.execute({
+        sql: `DELETE FROM matches WHERE id = ?`,
+        args: [matchId],
+      });
+      if (!deleted.rowsAffected) {
+        throw new Error("MATCH_NOT_FOUND");
+      }
+
+      await transaction.commit();
+      committed = true;
+    } catch (error) {
+      transaction.close();
+      throw error;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
   }
 
   async approveResult(
@@ -781,7 +1100,14 @@ export class MatchRepository {
         : undefined,
       status: match.status as Match["status"],
       teams,
-      scores: scores.map(toMatchScore),
+      scores: scores
+        .map(toMatchScore)
+        .slice(
+          0,
+          getMaxScoreCountForMatchMode(
+            (match.mode as MatchMode | null) ?? DEFAULT_MATCH_MODE,
+          ),
+        ),
       resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
       resultSubmittedAt: toDateOrNull(match.resultSubmittedAt),
       approvals: approvals.map(toApproval),
@@ -905,14 +1231,15 @@ export class MatchRepository {
     }
     const name = session.name?.trim();
     const location = session.location?.trim();
-    if (!name || !location || Number.isNaN(session.date.getTime())) {
+    const date = toDate(session.date);
+    if (!name || !location || Number.isNaN(date.getTime())) {
       throw new Error("유효한 세션 정보가 필요합니다.");
     }
 
     const existingByMetadata = await this.db
       .select()
       .from(matchSessions)
-      .where(and(eq(matchSessions.name, name), eq(matchSessions.date, session.date)))
+      .where(and(eq(matchSessions.name, name), eq(matchSessions.date, date)))
       .get();
     if (existingByMetadata) {
       if (existingByMetadata.location !== location) {
@@ -946,7 +1273,7 @@ export class MatchRepository {
         await this.db.insert(matchSessions).values({
           id: candidateId,
           name,
-          date: session.date,
+          date,
           location,
           createdAt: now,
           updatedAt: now,
@@ -959,7 +1286,7 @@ export class MatchRepository {
           .where(
             and(
               eq(matchSessions.name, name),
-              eq(matchSessions.date, session.date),
+              eq(matchSessions.date, date),
             ),
           )
           .get();

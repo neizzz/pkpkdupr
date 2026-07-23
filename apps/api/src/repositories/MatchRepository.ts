@@ -4,6 +4,7 @@ import type {
   MatchMode,
   MatchScore,
   MatchSessionSummary,
+  ManagedMatchSession,
   Session,
 } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
@@ -43,6 +44,24 @@ const hydrateSession = (record: any): Session | undefined => {
         : "Court TBD",
   };
 };
+
+const hydrateStandaloneSession = (record: any): Session => ({
+  id: record.id,
+  name: record.name,
+  date: new Date(record.date),
+  location: record.location,
+});
+
+const hydrateManagedSession = (record: any): ManagedMatchSession => ({
+  id: record.id,
+  name: record.name,
+  date: new Date(record.date),
+  location: record.location,
+  participantIds: record.participantIds ?? [],
+  matchCount: Number(record.matchCount ?? 0),
+  createdAt: new Date(record.createdAt),
+  updatedAt: new Date(record.updatedAt),
+});
 
 const hydrateRatingChangeLog = (record: any): PlayerRatingChangeLog => ({
   id: record.id,
@@ -223,6 +242,45 @@ export class MatchRepository {
     throw new Error("매치 ID 생성에 실패했습니다.");
   }
 
+  async createSession(
+    session: Omit<Session, "id"> & { id?: string },
+  ): Promise<Session> {
+    const created = await this.dbRequest<any>("/internal/match-sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        ...session,
+        id: session.id ?? generateEntityId("session"),
+      }),
+    });
+    return hydrateStandaloneSession(created);
+  }
+
+  async findSessions(): Promise<ManagedMatchSession[]> {
+    const records = await this.dbRequest<any[]>("/internal/match-sessions");
+    return records.map(hydrateManagedSession);
+  }
+
+  async findSessionById(
+    sessionId: string,
+  ): Promise<ManagedMatchSession | undefined> {
+    const sessions = await this.findSessions();
+    return sessions.find((session) => session.id === sessionId);
+  }
+
+  async replaceSessionParticipants(
+    sessionId: string,
+    playerIds: string[],
+  ): Promise<ManagedMatchSession> {
+    const updated = await this.dbRequest<any>(
+      `/internal/match-sessions/${encodeURIComponent(sessionId)}/participants`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ playerIds }),
+      },
+    );
+    return hydrateManagedSession(updated);
+  }
+
   async submitResult(
     matchId: string,
     submittedByPlayerId: string,
@@ -242,6 +300,32 @@ export class MatchRepository {
     );
 
     return hydrateMatch(updated);
+  }
+
+  async recordAdminResult(
+    matchId: string,
+    submittedByPlayerId: string,
+    scores: MatchScore[],
+  ): Promise<Match> {
+    const updated = await this.dbRequest<any>(
+      `/internal/matches/${matchId}/admin-result`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          submittedByPlayerId,
+          scores,
+          completedAt: new Date(),
+        }),
+      },
+    );
+
+    return hydrateMatch(updated);
+  }
+
+  async delete(matchId: string): Promise<void> {
+    await this.dbRequest<void>(`/internal/matches/${matchId}`, {
+      method: "DELETE",
+    });
   }
 
   async approveResult(matchId: string, playerId: string): Promise<Match> {

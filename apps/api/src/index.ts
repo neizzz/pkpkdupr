@@ -135,6 +135,14 @@ type AdminBatchMatchRequest = {
   }>;
 };
 
+type AdminScheduledMatchRequest = {
+  name?: string;
+  type?: MatchType;
+  mode?: MatchMode;
+  teams?: [MatchTeamRequest, MatchTeamRequest];
+  matchStartsAt?: string;
+};
+
 type SubmitMatchResultRequest = {
   scores?: MatchScore[];
 };
@@ -770,6 +778,176 @@ app.post("/api/matches", async (req, res) => {
   }
 });
 
+app.post("/api/admin/match-sessions", requireAdmin, async (req, res) => {
+  try {
+    const session = normalizeMatchSession(req.body as MatchSessionRequest);
+    if (!session) {
+      return res.status(400).json({ error: "세션 정보가 필요합니다." });
+    }
+
+    res.status(201).json(await matchRepository.createSession(session));
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/api/admin/match-sessions", requireAdmin, async (_req, res) => {
+  try {
+    res.json(await matchRepository.findSessions());
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.put(
+  "/api/admin/match-sessions/:sessionId/participants",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const requestedPlayerIds = Array.isArray(req.body?.playerIds)
+        ? req.body.playerIds
+        : null;
+      if (
+        !requestedPlayerIds ||
+        requestedPlayerIds.some(
+          (playerId: unknown) => typeof playerId !== "string",
+        )
+      ) {
+        return res.status(400).json({ error: "참여자 목록이 필요합니다." });
+      }
+
+      const availablePlayerIds = new Set(
+        (await authService.getAllPlayers())
+          .filter(
+            (player) =>
+              player.status === "active" &&
+              player.username !== PROTECTED_ADMIN_USERNAME,
+          )
+          .map((player) => player.id),
+      );
+      if (
+        requestedPlayerIds.some(
+          (playerId: string) => !availablePlayerIds.has(playerId),
+        )
+      ) {
+        return res
+          .status(400)
+          .json({ error: "유효한 활성 회원만 참여자로 등록할 수 있습니다." });
+      }
+
+      res.json(
+        await matchRepository.replaceSessionParticipants(
+          req.params.sessionId,
+          requestedPlayerIds,
+        ),
+      );
+    } catch (err) {
+      const status =
+        err instanceof DbRequestError && err.status === 404 ? 404 : 400;
+      res.status(status).json({ error: (err as Error).message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/match-sessions/:sessionId/matches",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+      const session = await matchRepository.findSessionById(
+        req.params.sessionId,
+      );
+      if (!session) {
+        return res.status(404).json({ error: "세션을 찾을 수 없습니다." });
+      }
+
+      const { name, type, mode, teams, matchStartsAt } =
+        req.body as AdminScheduledMatchRequest;
+      if (!isMatchType(type)) {
+        return res
+          .status(400)
+          .json({ error: "유효한 매치 타입이 필요합니다." });
+      }
+      if (mode != null && !isMatchMode(mode)) {
+        return res.status(400).json({ error: "유효한 경기 모드가 필요합니다." });
+      }
+      if (!teams || teams.length !== 2) {
+        return res.status(400).json({ error: "두 팀 구성이 필요합니다." });
+      }
+
+      const matchStartsAtDate = new Date(matchStartsAt ?? "");
+      if (Number.isNaN(matchStartsAtDate.getTime())) {
+        return res.status(400).json({ error: "경기 예정 일시가 필요합니다." });
+      }
+
+      const registeredPlayerIds = new Set(session.participantIds);
+      const requestedPlayerIds = normalizeRequestedTeamPlayerIds(teams);
+      if (
+        requestedPlayerIds.length === 0 ||
+        requestedPlayerIds.some(
+          (playerId) => !registeredPlayerIds.has(playerId),
+        )
+      ) {
+        return res.status(400).json({
+          error: "세션에 등록된 참여자만 경기에 배정할 수 있습니다.",
+        });
+      }
+
+      const allPlayers = await authService.getAllPlayers();
+      const playersById = new Map<string, Player>(
+        allPlayers
+          .filter(
+            (player) =>
+              player.status === "active" &&
+              registeredPlayerIds.has(player.id),
+          )
+          .map((player) => [player.id, player]),
+      );
+      const matchTeams = buildMatchTeamsFromRequests(teams, playersById);
+      if (
+        !validateCreateMatchTeams(type, [
+          matchTeams[0].players,
+          matchTeams[1].players,
+        ])
+      ) {
+        return res.status(400).json({
+          error: `${matchTypeLabels[type]}에 맞는 팀 구성이 필요합니다.`,
+        });
+      }
+
+      const match = await matchRepository.create({
+        name: normalizeOptionalName(name),
+        session: {
+          id: session.id,
+          name: session.name,
+          date: session.date,
+          location: session.location,
+        },
+        type,
+        mode: mode ?? DEFAULT_MATCH_MODE,
+        source: "admin_created",
+        creatorPlayerId: decoded.playerId,
+        status: "created",
+        teams: matchTeams,
+        scores: [],
+        resultSubmittedByPlayerId: null,
+        resultSubmittedAt: null,
+        approvals: [],
+        location: session.location,
+        matchStartsAt: matchStartsAtDate,
+        completedAt: null,
+      });
+      res.status(201).json(match);
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
 app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -996,6 +1174,24 @@ app.post("/api/matches/:matchId/result", async (req, res) => {
       return;
     }
 
+    const existingMatch = await matchRepository.findById(req.params.matchId);
+    if (!existingMatch) {
+      return res.status(404).json({ error: "매치를 찾을 수 없습니다." });
+    }
+    if (existingMatch.session && !decoded.isAdmin) {
+      return res
+        .status(403)
+        .json({ error: "세션 경기 결과는 관리자만 입력할 수 있습니다." });
+    }
+    if (
+      !existingMatch.session &&
+      existingMatch.creatorPlayerId !== decoded.playerId
+    ) {
+      return res
+        .status(403)
+        .json({ error: "경기 생성자만 결과를 입력할 수 있습니다." });
+    }
+
     const { scores } = req.body as SubmitMatchResultRequest;
     const normalizedScores = normalizeMatchScores(scores);
     const match = await matchRepository.submitResult(
@@ -1012,6 +1208,82 @@ app.post("/api/matches/:matchId/result", async (req, res) => {
     res.status(400).json({ error: (err as Error).message });
   }
 });
+
+app.post(
+  "/api/admin/matches/:matchId/result",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+
+      const scores = normalizeMatchScores(
+        (req.body as SubmitMatchResultRequest).scores,
+      );
+      const match = await matchRepository.recordAdminResult(
+        req.params.matchId,
+        decoded.playerId,
+        scores,
+      );
+      const { matches } = await matchRepository.findAll(0, 10000);
+      const recalculation = await authService.recalculateDuprRatings(
+        matches.filter((candidate) => candidate.status === "completed"),
+        {
+          source: "manual_recalculation",
+          sourceLogId: `admin-match-result-${match.id}-${Date.now()}-${randomUUID()}`,
+        },
+      );
+
+      res.json({ match, ...recalculation });
+    } catch (err) {
+      if (err instanceof DbRequestError && err.status === 409) {
+        return res.status(409).json({ error: err.message });
+      }
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+app.delete(
+  "/api/admin/matches/:matchId",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) {
+        return;
+      }
+      const isValidAdminPassword = await authService.verifyAdminPassword(
+        decoded.playerId,
+        req.body?.adminPassword,
+      );
+      if (!isValidAdminPassword) {
+        return res
+          .status(400)
+          .json({ error: "admin 비밀번호가 올바르지 않습니다." });
+      }
+
+      await matchRepository.delete(req.params.matchId);
+      const { matches } = await matchRepository.findAll(0, 10000);
+      const recalculation = await authService.recalculateDuprRatings(
+        matches.filter((candidate) => candidate.status === "completed"),
+        {
+          source: "manual_recalculation",
+          sourceLogId: `admin-match-delete-${req.params.matchId}-${Date.now()}-${randomUUID()}`,
+        },
+      );
+
+      res.json({ deletedMatchId: req.params.matchId, ...recalculation });
+    } catch (err) {
+      if (err instanceof DbRequestError && err.status === 404) {
+        return res.status(404).json({ error: err.message });
+      }
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
 
 app.post("/api/matches/:matchId/approval", async (req, res) => {
   try {
@@ -1299,6 +1571,23 @@ app.post("/api/admin/ratings/recalculate", requireAdmin, async (_req, res) => {
       ...result,
       completedMatchCount: completedMatches.length,
     });
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/api/admin/ratings/comparison", requireAdmin, async (_req, res) => {
+  try {
+    const { matches } = await matchRepository.findAll(0, 10000);
+    const completedMatches = matches.filter(
+      (match) => match.status === "completed",
+    );
+
+    // 이전에 추가된 테스트 매치는 참가자 당시의 DUPR 스냅샷과 저장 레이팅이
+    // 비어 있을 수 있다. 비교값을 만들기 전에 신규 득점률식으로 한 번 재생해
+    // 누락 데이터를 보강하고, 두 방식 모두 같은 완료 매치 집합에서 계산한다.
+    await authService.recalculateDuprRatings(completedMatches);
+    res.json(await authService.compareRatingMethods(completedMatches));
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
   }
