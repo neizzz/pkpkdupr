@@ -6,6 +6,11 @@ type PlayerInfo = Pick<
   "id" | "username" | "duprRating" | "gender" | "status"
 >;
 
+type AdminSessionResponse = PlayerInfo & {
+  accessToken?: string;
+  isAdmin?: boolean;
+};
+
 interface AuthContextType {
   token: string | null;
   player: PlayerInfo | null;
@@ -31,15 +36,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
+  const logout = () => {
+    localStorage.removeItem("admin-token");
+    setToken(null);
+    setPlayer(null);
+    setIsAdmin(false);
+  };
+
   const fetchMe = async (accessToken: string) => {
     try {
       const res = await fetch("/api/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setPlayer(data);
+      if (!res.ok) return;
+
+      const data = (await res.json()) as AdminSessionResponse;
+      if (!data.id || data.isAdmin !== true) {
+        logout();
+        return;
       }
+
+      const refreshedToken = data.accessToken ?? accessToken;
+      localStorage.setItem("admin-token", refreshedToken);
+      setToken(refreshedToken);
+      setPlayer(data);
+      setIsAdmin(true);
     } catch {
       console.error("Failed to fetch user info");
     }
@@ -49,24 +70,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, rememberMe: true }),
     });
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || "로그인 실패");
     }
     const data = await res.json();
-    localStorage.setItem("admin-token", data.accessToken);
-    setToken(data.accessToken);
-    setIsAdmin(data.isAdmin === true);
-    fetchMe(data.accessToken);
-  };
-
-  const logout = () => {
-    localStorage.removeItem("admin-token");
-    setToken(null);
-    setPlayer(null);
-    setIsAdmin(false);
+    if (data.isAdmin !== true) {
+      throw new Error("관리자 권한이 필요합니다.");
+    }
+    await fetchMe(data.accessToken);
   };
 
   return (

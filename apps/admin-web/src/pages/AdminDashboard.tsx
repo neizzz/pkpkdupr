@@ -1007,37 +1007,28 @@ const AdminDashboard: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      const results = await Promise.allSettled(
-        matchesToUpdate.map(async (match) => {
-          const res = await fetch(`/api/admin/matches/${match.id}/metadata`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              sessionName: nextSessionName,
-              sessionDate: serializedSessionDate,
-              sessionLocation: nextSessionLocation,
-            }),
-          });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || "세션 일괄 반영 실패");
-          }
-
-          return (await res.json()) as MatchInfo;
+      const res = await fetch("/api/admin/matches/bulk-metadata", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          matchIds: matchesToUpdate.map((match) => match.id),
+          sessionName: nextSessionName,
+          sessionDate: serializedSessionDate,
+          sessionLocation: nextSessionLocation,
         }),
-      );
+      });
 
-      const updatedMatches = results.flatMap((result) =>
-        result.status === "fulfilled" ? [result.value] : [],
-      );
-      const failedResults = results.filter(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      );
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "세션 일괄 반영 실패");
+      }
+
+      const { matches: updatedMatches } = (await res.json()) as {
+        matches: MatchInfo[];
+      };
 
       if (updatedMatches.length > 0) {
         rememberRecentInputValue(
@@ -1085,21 +1076,6 @@ const AdminDashboard: React.FC = () => {
           });
           return next;
         });
-      }
-
-      if (failedResults.length > 0) {
-        const firstError = failedResults[0].reason;
-        setError(
-          firstError instanceof Error
-            ? firstError.message
-            : "일부 매치 세션 반영에 실패했습니다.",
-        );
-        setSuccess(
-          updatedMatches.length > 0
-            ? `선택한 ${selectedMatchIds.length}개 중 ${updatedMatches.length}개 매치에 세션을 반영했습니다.`
-            : null,
-        );
-        return;
       }
 
       setSelectedMatchIds([]);

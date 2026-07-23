@@ -154,6 +154,11 @@ type AdminMatchMetadataUpdateRequest = {
   sessionLocation?: unknown;
 };
 
+type AdminBulkMatchMetadataUpdateRequest =
+  AdminMatchMetadataUpdateRequest & {
+    matchIds?: unknown;
+  };
+
 const normalizeOptionalName = (value: unknown) =>
   typeof value === "string" && value.trim() ? value.trim() : undefined;
 
@@ -243,6 +248,54 @@ const validateSessionMetadataUpdate = ({
   if (!hasEffectiveSessionDate) {
     throw new Error("세션 날짜를 입력해주세요.");
   }
+};
+
+const parseAdminMatchMetadataUpdate = (
+  body: AdminMatchMetadataUpdateRequest,
+) => {
+  const hasName = Object.prototype.hasOwnProperty.call(body, "name");
+  const hasSessionName = Object.prototype.hasOwnProperty.call(
+    body,
+    "sessionName",
+  );
+  const hasSessionDate = Object.prototype.hasOwnProperty.call(
+    body,
+    "sessionDate",
+  );
+  const hasSessionLocation = Object.prototype.hasOwnProperty.call(
+    body,
+    "sessionLocation",
+  );
+
+  if (!hasName && !hasSessionName && !hasSessionDate && !hasSessionLocation) {
+    throw new Error("수정할 필드가 없습니다.");
+  }
+
+  const normalizedSessionName = hasSessionName
+    ? normalizeOptionalName(body.sessionName)
+    : undefined;
+  const normalizedSessionDate = hasSessionDate
+    ? normalizeOptionalDateString(body.sessionDate)
+    : undefined;
+  const normalizedSessionLocation = hasSessionLocation
+    ? normalizeOptionalName(body.sessionLocation)
+    : undefined;
+
+  validateSessionMetadataUpdate({
+    hasSessionName,
+    hasSessionDate,
+    sessionName: normalizedSessionName,
+    sessionDate: normalizedSessionDate ?? null,
+  });
+
+  return {
+    ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
+    ...(hasSessionName ? { sessionName: normalizedSessionName ?? null } : {}),
+    ...(hasSessionDate ? { sessionDate: normalizedSessionDate ?? null } : {}),
+    ...(hasSessionLocation
+      ? { sessionLocation: normalizedSessionLocation ?? null }
+      : {}),
+  };
 };
 
 const isMatchType = (value: unknown): value is MatchType =>
@@ -536,6 +589,7 @@ app.get("/api/me", async (req, res) => {
     res.json({
       ...session.player,
       isFirstLogin: session.isFirstLogin,
+      isAdmin: session.payload.isAdmin === true,
       accessToken: session.refreshedAccessToken,
     });
   } catch {
@@ -1084,59 +1138,47 @@ app.get("/api/admin/matches", requireAdmin, async (_req, res) => {
   }
 });
 
+app.patch("/api/admin/matches/bulk-metadata", requireAdmin, async (req, res) => {
+  try {
+    const body = req.body as AdminBulkMatchMetadataUpdateRequest;
+    const matchIds = Array.isArray(body.matchIds)
+      ? [...new Set(body.matchIds.filter((matchId): matchId is string =>
+          typeof matchId === "string" && matchId.trim().length > 0,
+        ))]
+      : [];
+    if (!matchIds.length) {
+      return res.status(400).json({ error: "수정할 매치를 선택해주세요." });
+    }
+
+    const update = parseAdminMatchMetadataUpdate(body);
+    const matches = [];
+    for (const matchId of matchIds) {
+      const match = await matchRepository.updateMetadata(matchId, update);
+      if (!match) {
+        return res.status(404).json({ error: `매치를 찾을 수 없습니다: ${matchId}` });
+      }
+      matches.push(match);
+    }
+
+    res.json({ matches });
+  } catch (err) {
+    if (err instanceof DbRequestError && err.status === 404) {
+      return res.status(404).json({ error: err.message });
+    }
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
 app.patch(
   "/api/admin/matches/:matchId/metadata",
   requireAdmin,
   async (req, res) => {
     try {
       const body = req.body as AdminMatchMetadataUpdateRequest;
-      const hasName = Object.prototype.hasOwnProperty.call(body, "name");
-      const hasSessionName = Object.prototype.hasOwnProperty.call(
-        body,
-        "sessionName",
+      const match = await matchRepository.updateMetadata(
+        req.params.matchId,
+        parseAdminMatchMetadataUpdate(body),
       );
-      const hasSessionDate = Object.prototype.hasOwnProperty.call(
-        body,
-        "sessionDate",
-      );
-      const hasSessionLocation = Object.prototype.hasOwnProperty.call(
-        body,
-        "sessionLocation",
-      );
-
-      if (!hasName && !hasSessionName && !hasSessionDate && !hasSessionLocation) {
-        return res.status(400).json({ error: "수정할 필드가 없습니다." });
-      }
-
-      const normalizedSessionName = hasSessionName
-        ? normalizeOptionalName(body.sessionName)
-        : undefined;
-      const normalizedSessionDate = hasSessionDate
-        ? normalizeOptionalDateString(body.sessionDate)
-        : undefined;
-      const normalizedSessionLocation = hasSessionLocation
-        ? normalizeOptionalName(body.sessionLocation)
-        : undefined;
-
-      validateSessionMetadataUpdate({
-        hasSessionName,
-        hasSessionDate,
-        sessionName: normalizedSessionName,
-        sessionDate: normalizedSessionDate ?? null,
-      });
-
-      const match = await matchRepository.updateMetadata(req.params.matchId, {
-        ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
-        ...(hasSessionName
-          ? { sessionName: normalizedSessionName ?? null }
-          : {}),
-        ...(hasSessionDate
-          ? { sessionDate: normalizedSessionDate ?? null }
-          : {}),
-        ...(hasSessionLocation
-          ? { sessionLocation: normalizedSessionLocation ?? null }
-          : {}),
-      });
 
       res.json(match);
     } catch (err) {
