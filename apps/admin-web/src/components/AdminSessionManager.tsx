@@ -734,6 +734,9 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
       const { match: savedMatch } = (await response.json()) as {
         match: SavedSessionMatchResult;
       };
+      if (savedMatch.status !== "completed") {
+        throw new Error("관리자 자동 승인을 완료하지 못했습니다.");
+      }
 
       const [, matches] = await Promise.all([
         loadSessions(selectedSessionId),
@@ -741,7 +744,7 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
       ]);
       setLoadedSessionMatches(matches);
       onMatchResultSaved?.(savedMatch);
-      setSuccess("경기 결과를 저장하고 레이팅을 재계산했습니다.");
+      setSuccess("경기 결과를 저장하고 관리자 승인 및 레이팅 재계산을 완료했습니다.");
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -1080,9 +1083,9 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                           <th className="px-4 py-3">타입</th>
                           <th className="px-4 py-3">A팀</th>
                           <th className="px-4 py-3">B팀</th>
+                          <th className="px-4 py-3">결과</th>
                           <th className="px-4 py-3">일시</th>
                           <th className="px-4 py-3">상태</th>
-                          <th className="px-4 py-3">결과</th>
                           <th className="px-4 py-3 text-right">관리</th>
                         </tr>
                       </thead>
@@ -1095,6 +1098,102 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                           const canAddScore =
                             match.mode === "best-of-3" &&
                             scoreDraft.length < MATCH_RESULT_MAX_SCORE_COUNT;
+                          const renderResultCell = () => (
+                            <td className="min-w-52 px-4 py-3">
+                              {isCompleted ? (
+                                <span className="text-sm font-medium text-slate-700">
+                                  {match.scores
+                                    ?.map(
+                                      (score) =>
+                                        `${score.scoreA}:${score.scoreB}`,
+                                    )
+                                    .join(" · ") || "-"}
+                                </span>
+                              ) : (
+                                <div className="space-y-2">
+                                  {scoreDraft.map((score, scoreIndex) => (
+                                    <div
+                                      key={`${match.id}-score-${scoreIndex}`}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        inputMode="numeric"
+                                        aria-label={`A팀 ${scoreIndex + 1}세트 점수`}
+                                        placeholder="A팀"
+                                        value={score.scoreA}
+                                        onChange={(event) =>
+                                          updateScoreDraft(
+                                            match.id,
+                                            scoreIndex,
+                                            "scoreA",
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-16 rounded border px-2 py-1.5 text-sm"
+                                      />
+                                      <span className="text-slate-400">:</span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        inputMode="numeric"
+                                        aria-label={`B팀 ${scoreIndex + 1}세트 점수`}
+                                        placeholder="B팀"
+                                        value={score.scoreB}
+                                        onChange={(event) =>
+                                          updateScoreDraft(
+                                            match.id,
+                                            scoreIndex,
+                                            "scoreB",
+                                            event.target.value,
+                                          )
+                                        }
+                                        className="w-16 rounded border px-2 py-1.5 text-sm"
+                                      />
+                                      {scoreDraft.length > 1 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removeScoreDraft(
+                                              match.id,
+                                              scoreIndex,
+                                            )
+                                          }
+                                          className="px-1 text-xs text-slate-500 hover:text-red-600"
+                                        >
+                                          삭제
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  ))}
+                                  <div className="flex flex-wrap gap-2">
+                                    {canAddScore ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => addScoreDraft(match.id)}
+                                        className="text-xs font-medium text-blue-600 hover:underline"
+                                      >
+                                        세트 추가
+                                      </button>
+                                    ) : null}
+                                    <button
+                                      type="button"
+                                      disabled={savingResultMatchId === match.id}
+                                      onClick={() =>
+                                        void handleSaveMatchResult(match)
+                                      }
+                                      className="text-xs font-semibold text-blue-600 disabled:text-slate-300"
+                                    >
+                                      {savingResultMatchId === match.id
+                                        ? "저장 및 승인 중..."
+                                        : "저장 및 승인"}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          );
 
                           return (
                             <tr key={match.id} className="even:bg-slate-50">
@@ -1105,16 +1204,17 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                                 {matchTypeLabels[match.type]} ·{" "}
                                 {matchModeLabels[match.mode]}
                               </td>
-                              {match.teams.map((team, teamIndex) => (
-                                <td
-                                  key={`${match.id}-${teamIndex}`}
-                                  className="px-4 py-3 text-slate-600"
-                                >
-                                  {team.players
-                                    .map((player) => player.username)
-                                    .join(", ")}
-                                </td>
-                              ))}
+                              <td className="px-4 py-3 text-slate-600">
+                                {match.teams[0].players
+                                  .map((player) => player.username)
+                                  .join(", ")}
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {match.teams[1].players
+                                  .map((player) => player.username)
+                                  .join(", ")}
+                              </td>
+                              {renderResultCell()}
                               <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                                 {new Date(match.matchStartsAt).toLocaleString(
                                   "ko-KR",
@@ -1126,98 +1226,6 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                                 >
                                   {matchStatusLabelMap[match.status]}
                                 </span>
-                              </td>
-                              <td className="min-w-52 px-4 py-3">
-                                {isCompleted ? (
-                                  <span className="text-sm font-medium text-slate-700">
-                                    {match.scores
-                                      ?.map(
-                                        (score) =>
-                                          `${score.scoreA}:${score.scoreB}`,
-                                      )
-                                      .join(" · ") || "-"}
-                                  </span>
-                                ) : (
-                                  <div className="space-y-2">
-                                    {scoreDraft.map((score, scoreIndex) => (
-                                      <div
-                                        key={`${match.id}-score-${scoreIndex}`}
-                                        className="flex items-center gap-1"
-                                      >
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          inputMode="numeric"
-                                          aria-label={`A팀 ${scoreIndex + 1}세트 점수`}
-                                          value={score.scoreA}
-                                          onChange={(event) =>
-                                            updateScoreDraft(
-                                              match.id,
-                                              scoreIndex,
-                                              "scoreA",
-                                              event.target.value,
-                                            )
-                                          }
-                                          className="w-16 rounded border px-2 py-1.5 text-sm"
-                                        />
-                                        <span className="text-slate-400">:</span>
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          inputMode="numeric"
-                                          aria-label={`B팀 ${scoreIndex + 1}세트 점수`}
-                                          value={score.scoreB}
-                                          onChange={(event) =>
-                                            updateScoreDraft(
-                                              match.id,
-                                              scoreIndex,
-                                              "scoreB",
-                                              event.target.value,
-                                            )
-                                          }
-                                          className="w-16 rounded border px-2 py-1.5 text-sm"
-                                        />
-                                        {scoreDraft.length > 1 ? (
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              removeScoreDraft(
-                                                match.id,
-                                                scoreIndex,
-                                              )
-                                            }
-                                            className="px-1 text-xs text-slate-500 hover:text-red-600"
-                                          >
-                                            삭제
-                                          </button>
-                                        ) : null}
-                                      </div>
-                                    ))}
-                                    <div className="flex flex-wrap gap-2">
-                                      {canAddScore ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => addScoreDraft(match.id)}
-                                          className="text-xs font-medium text-blue-600 hover:underline"
-                                        >
-                                          세트 추가
-                                        </button>
-                                      ) : null}
-                                      <button
-                                        type="button"
-                                        disabled={savingResultMatchId === match.id}
-                                        onClick={() =>
-                                          void handleSaveMatchResult(match)
-                                        }
-                                        className="text-xs font-semibold text-blue-600 disabled:text-slate-300"
-                                      >
-                                        {savingResultMatchId === match.id
-                                          ? "저장 중..."
-                                          : "결과 저장"}
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-right">
                                 <button

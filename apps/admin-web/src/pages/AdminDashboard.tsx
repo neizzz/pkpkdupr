@@ -1715,8 +1715,9 @@ const AdminDashboard: React.FC = () => {
                       <th className="px-4 py-3 whitespace-nowrap">모드</th>
                       <th className="px-4 py-3 whitespace-nowrap">상태</th>
                       <th className="px-4 py-3 whitespace-nowrap">생성 방식</th>
-                      <th className="px-4 py-3 whitespace-nowrap">참가자</th>
-                      <th className="px-4 py-3 whitespace-nowrap">스코어</th>
+                      <th className="px-4 py-3 whitespace-nowrap">A팀</th>
+                      <th className="px-4 py-3 whitespace-nowrap">B팀</th>
+                      <th className="px-4 py-3 whitespace-nowrap">결과</th>
                       <th className="px-4 py-3 whitespace-nowrap">수정</th>
                     </tr>
                   </thead>
@@ -1853,27 +1854,11 @@ const AdminDashboard: React.FC = () => {
                           <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-700">
                             {matchSourceLabels[match.source]}
                           </td>
-                          <td className="px-4 py-4 min-w-[280px] text-xs text-gray-600">
-                            <div className="space-y-1 leading-5">
-                              <div>
-                                <span className="font-medium text-gray-700">
-                                  A
-                                </span>
-                                <span className="mx-1">·</span>
-                                <span>
-                                  {getTeamLabel(match.teams[0], match.type)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="font-medium text-gray-700">
-                                  B
-                                </span>
-                                <span className="mx-1">·</span>
-                                <span>
-                                  {getTeamLabel(match.teams[1], match.type)}
-                                </span>
-                              </div>
-                            </div>
+                          <td className="px-4 py-4 min-w-[180px] text-xs text-gray-600">
+                            {getTeamLabel(match.teams[0], match.type)}
+                          </td>
+                          <td className="px-4 py-4 min-w-[180px] text-xs text-gray-600">
+                            {getTeamLabel(match.teams[1], match.type)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-xs text-gray-700">
                             {getScoreLabel(match.scores)}
