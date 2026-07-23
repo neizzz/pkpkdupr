@@ -39,6 +39,12 @@
   }
 }
 
+input,
+select,
+textarea {
+  background-color: #fff;
+}
+
 @keyframes delete-hold-progress {
   from {
     transform: scaleX(0);

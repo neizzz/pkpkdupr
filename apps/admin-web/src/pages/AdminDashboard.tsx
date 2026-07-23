@@ -788,6 +788,23 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleSessionMatchResultSaved = (updatedMatch: Pick<
+    MatchInfo,
+    "id" | "status" | "scores"
+  >) => {
+    setMatches((previousMatches) =>
+      previousMatches.map((match) =>
+        match.id === updatedMatch.id
+          ? {
+              ...match,
+              status: updatedMatch.status,
+              scores: updatedMatch.scores,
+            }
+          : match,
+      ),
+    );
+  };
+
   const handleMatchMetadataSave = async (matchId: string) => {
     const targetMatch = matches.find((match) => match.id === matchId);
     if (!targetMatch) {
@@ -846,7 +863,7 @@ const AdminDashboard: React.FC = () => {
       (nextSessionName || nextSessionDate || nextSessionLocation) &&
       !nextSessionLocation
     ) {
-      setError("세션이 있으면 세션 장소를 입력해주세요.");
+      setError("세션이 있으면 장소를 입력해주세요.");
       setSuccess(null);
       return;
     }
@@ -912,7 +929,7 @@ const AdminDashboard: React.FC = () => {
         ...prev,
         [matchId]: updatedMatch.session?.location ?? "",
       }));
-      setSuccess("매치 세션명/세션 날짜/세션 장소/매치명을 수정했습니다.");
+      setSuccess("매치 세션명/세션 날짜/장소/매치명을 수정했습니다.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {
@@ -969,7 +986,7 @@ const AdminDashboard: React.FC = () => {
       (nextSessionName || nextSessionDate || nextSessionLocation) &&
       !nextSessionLocation
     ) {
-      setError("세션을 일괄 반영하려면 세션 장소를 입력해주세요.");
+      setError("세션을 일괄 반영하려면 장소를 입력해주세요.");
       setSuccess(null);
       return;
     }
@@ -1375,6 +1392,7 @@ const AdminDashboard: React.FC = () => {
           token={token}
           players={players}
           protectedAdminUsername={PROTECTED_ADMIN_USERNAME}
+          onMatchResultSaved={handleSessionMatchResultSaved}
         />
         ) : null}
 
@@ -1630,7 +1648,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      일괄 세션 장소
+                      일괄 장소
                     </label>
                     <RecentValueComboBox
                       fieldKey={recentInputFieldKeys.sessionLocation}
@@ -1667,7 +1685,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  수정할 매치를 선택한 뒤 같은 세션명/세션 날짜/세션 장소를 한
+                  수정할 매치를 선택한 뒤 같은 세션명/세션 날짜/장소를 한
                   번에 반영할 수 있습니다. 세 값을 모두 비우고 반영하면 선택한
                   매치의 세션 정보가 제거됩니다.
                 </p>
@@ -1691,7 +1709,7 @@ const AdminDashboard: React.FC = () => {
                       <th className="px-4 py-3 whitespace-nowrap">일시</th>
                       <th className="px-4 py-3 whitespace-nowrap">세션명</th>
                       <th className="px-4 py-3 whitespace-nowrap">세션 날짜</th>
-                      <th className="px-4 py-3 whitespace-nowrap">세션 장소</th>
+                      <th className="px-4 py-3 whitespace-nowrap">장소</th>
                       <th className="px-4 py-3 whitespace-nowrap">매치명</th>
                       <th className="px-4 py-3 whitespace-nowrap">타입</th>
                       <th className="px-4 py-3 whitespace-nowrap">모드</th>
@@ -1799,7 +1817,7 @@ const AdminDashboard: React.FC = () => {
                                   [match.id]: nextValue,
                                 }))
                               }
-                              placeholder="세션 장소"
+                              placeholder="장소"
                               className="w-full"
                               inputClassName="w-full rounded-lg border px-3 py-2"
                             />

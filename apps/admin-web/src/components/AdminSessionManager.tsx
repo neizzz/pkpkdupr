@@ -39,6 +39,11 @@ type SessionMatchInfo = {
   ];
 };
 
+type SavedSessionMatchResult = Pick<
+  SessionMatchInfo,
+  "id" | "status" | "scores"
+>;
+
 type ScoreDraft = { scoreA: string; scoreB: string };
 type AutoMatchKind = "singles" | "doubles";
 
@@ -166,6 +171,7 @@ interface AdminSessionManagerProps {
   token: string;
   players: Array<Pick<Player, "id" | "username" | "gender" | "status">>;
   protectedAdminUsername?: string;
+  onMatchResultSaved?: (match: SavedSessionMatchResult) => void;
 }
 
 const recentInputFieldKeys = {
@@ -211,6 +217,7 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
   token,
   players,
   protectedAdminUsername = "admin",
+  onMatchResultSaved,
 }) => {
   const [sessions, setSessions] = useState<ManagedSessionInfo[]>([]);
   const [sessionMatches, setSessionMatches] = useState<SessionMatchInfo[]>([]);
@@ -724,12 +731,16 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "경기 결과 저장 실패");
       }
+      const { match: savedMatch } = (await response.json()) as {
+        match: SavedSessionMatchResult;
+      };
 
       const [, matches] = await Promise.all([
         loadSessions(selectedSessionId),
         loadSessionMatches(selectedSessionId),
       ]);
       setLoadedSessionMatches(matches);
+      onMatchResultSaved?.(savedMatch);
       setSuccess("경기 결과를 저장하고 레이팅을 재계산했습니다.");
     } catch (submitError) {
       setError(
