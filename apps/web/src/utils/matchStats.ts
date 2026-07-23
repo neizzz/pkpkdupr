@@ -3,6 +3,7 @@ import type { MatchInfo } from "@/components/Match";
 import type {
   MemberProfileMatchStats,
   MemberProfileRatingDelta,
+  MemberProfileRatingHistory,
 } from "@/components/MemberProfile";
 
 export const createEmptyMatchStats = (): MemberProfileMatchStats => ({
@@ -13,6 +14,11 @@ export const createEmptyMatchStats = (): MemberProfileMatchStats => ({
 export const createEmptyRatingDelta = (): MemberProfileRatingDelta => ({
   singles: { last7Days: 0, last30Days: 0 },
   doubles: { last7Days: 0, last30Days: 0 },
+});
+
+export const createEmptyRatingHistory = (): MemberProfileRatingHistory => ({
+  singles: [],
+  doubles: [],
 });
 
 const getWinningTeamIndex = (scores: MatchInfo["scores"]): 0 | 1 | null => {
@@ -136,4 +142,42 @@ export const buildRatingDelta = (
   }
 
   return delta;
+};
+
+export const buildRatingHistory = (
+  matches: MatchInfo[],
+  playerId: string,
+): MemberProfileRatingHistory => {
+  const history = createEmptyRatingHistory();
+
+  for (const match of matches) {
+    if (match.status !== "completed" || !match.ratingChanges) {
+      continue;
+    }
+
+    const change = match.ratingChanges.find((item) => item.playerId === playerId);
+    if (!change) continue;
+
+    const category = getMatchTopLevelType(match.type);
+    const rating = change.nextRating[category];
+    const createdAt = new Date(change.createdAt);
+
+    if (!Number.isFinite(rating) || Number.isNaN(createdAt.getTime())) {
+      continue;
+    }
+
+    history[category].push({
+      rating,
+      createdAt: createdAt.toISOString(),
+    });
+  }
+
+  for (const category of ["singles", "doubles"] as const) {
+    history[category].sort(
+      (left, right) =>
+        new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+    );
+  }
+
+  return history;
 };

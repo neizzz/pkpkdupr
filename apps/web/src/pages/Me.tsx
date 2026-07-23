@@ -13,8 +13,10 @@ import { isTabRefreshDue } from "@/lib/tabRefresh";
 import {
   buildMatchStats,
   buildRatingDelta,
+  buildRatingHistory,
   createEmptyMatchStats,
   createEmptyRatingDelta,
+  createEmptyRatingHistory,
 } from "@/utils/matchStats";
 
 const Me: React.FC = () => {
@@ -24,6 +26,7 @@ const Me: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
   const [ratingDelta, setRatingDelta] = useState(createEmptyRatingDelta);
+  const [ratingHistory, setRatingHistory] = useState(createEmptyRatingHistory);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
@@ -43,6 +46,7 @@ const Me: React.FC = () => {
         lastSuccessfulLoadAtRef.current = null;
         setMatchStats(createEmptyMatchStats());
         setRatingDelta(createEmptyRatingDelta());
+        setRatingHistory(createEmptyRatingHistory());
         setIsMatchStatsLoading(false);
         return;
       }
@@ -76,12 +80,14 @@ const Me: React.FC = () => {
         if (!signal.aborted) {
           setMatchStats(buildMatchStats(data.matches, playerId));
           setRatingDelta(buildRatingDelta(data.matches, playerId));
+          setRatingHistory(buildRatingHistory(data.matches, playerId));
           lastSuccessfulLoadAtRef.current = Date.now();
         }
       } catch {
         if (!signal.aborted && !preserveVisibleData) {
           setMatchStats(createEmptyMatchStats());
           setRatingDelta(createEmptyRatingDelta());
+          setRatingHistory(createEmptyRatingHistory());
         }
         if (!signal.aborted && throwOnError) {
           throw new Error("내 경기 통계를 새로고침하지 못했습니다.");
@@ -126,6 +132,7 @@ const Me: React.FC = () => {
       lastSuccessfulLoadAtRef.current = null;
       setMatchStats(createEmptyMatchStats());
       setRatingDelta(createEmptyRatingDelta());
+      setRatingHistory(createEmptyRatingHistory());
       setIsMatchStatsLoading(false);
     }
   }, [playerId, token]);
@@ -181,6 +188,7 @@ const Me: React.FC = () => {
         showDetailHeader={false}
         matchStats={matchStats}
         ratingDelta={ratingDelta}
+        ratingHistory={ratingHistory}
         isStatsLoading={isMatchStatsLoading}
         showPlayerId
       />

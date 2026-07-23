@@ -26,8 +26,10 @@ import {
 import {
   buildMatchStats,
   buildRatingDelta,
+  buildRatingHistory,
   createEmptyMatchStats,
   createEmptyRatingDelta,
+  createEmptyRatingHistory,
 } from "@/utils/matchStats";
 
 const CACHED_MEMBERS_KEY = "pkpkdupr:members";
@@ -121,6 +123,8 @@ const Members: React.FC = () => {
   const [selectedMemberRatingDelta, setSelectedMemberRatingDelta] = useState(
     createEmptyRatingDelta,
   );
+  const [selectedMemberRatingHistory, setSelectedMemberRatingHistory] =
+    useState(createEmptyRatingHistory);
   const [isSelectedMemberStatsLoading, setIsSelectedMemberStatsLoading] =
     useState(false);
   const isMemberListLoading = useMinimumLoading(isLoading);
@@ -202,6 +206,7 @@ const Members: React.FC = () => {
       if (!token) {
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
+        setSelectedMemberRatingHistory(createEmptyRatingHistory());
         setIsSelectedMemberStatsLoading(false);
         return;
       }
@@ -209,6 +214,7 @@ const Members: React.FC = () => {
       if (!preserveVisibleData) {
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
+        setSelectedMemberRatingHistory(createEmptyRatingHistory());
         setIsSelectedMemberStatsLoading(true);
       }
 
@@ -232,10 +238,12 @@ const Members: React.FC = () => {
         };
         setSelectedMemberMatchStats(buildMatchStats(data.matches, memberId));
         setSelectedMemberRatingDelta(buildRatingDelta(data.matches, memberId));
+        setSelectedMemberRatingHistory(buildRatingHistory(data.matches, memberId));
       } catch (err) {
         if (!preserveVisibleData) {
           setSelectedMemberMatchStats(createEmptyMatchStats());
           setSelectedMemberRatingDelta(createEmptyRatingDelta());
+          setSelectedMemberRatingHistory(createEmptyRatingHistory());
         }
         if (throwOnError) {
           throw err;
@@ -268,6 +276,7 @@ const Members: React.FC = () => {
     if (!token || !selectedMemberId) {
       setSelectedMemberMatchStats(createEmptyMatchStats());
       setSelectedMemberRatingDelta(createEmptyRatingDelta());
+      setSelectedMemberRatingHistory(createEmptyRatingHistory());
       setIsSelectedMemberStatsLoading(false);
       return;
     }
@@ -340,6 +349,7 @@ const Members: React.FC = () => {
         isMe={selectedMember.id === player?.id}
         matchStats={selectedMemberMatchStats}
         ratingDelta={selectedMemberRatingDelta}
+        ratingHistory={selectedMemberRatingHistory}
         isStatsLoading={isSelectedMemberStatsLoading}
       />
     );

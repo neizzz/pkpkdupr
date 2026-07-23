@@ -6,6 +6,7 @@ import Avatar from "@/components/Avatar";
 import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
+import RatingHistoryChart from "@/components/RatingHistoryChart";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
@@ -36,6 +37,16 @@ export type MemberProfileRatingDelta = Record<
   }
 >;
 
+export interface MemberProfileRatingHistoryPoint {
+  rating: number;
+  createdAt: string;
+}
+
+export type MemberProfileRatingHistory = Record<
+  MatchTopLevelType,
+  MemberProfileRatingHistoryPoint[]
+>;
+
 interface MemberProfileProps {
   player: PlayerInfo | null;
   memberName?: string;
@@ -44,6 +55,7 @@ interface MemberProfileProps {
   headerAction?: React.ReactNode;
   matchStats?: MemberProfileMatchStats;
   ratingDelta?: MemberProfileRatingDelta;
+  ratingHistory?: MemberProfileRatingHistory;
   isStatsLoading?: boolean;
   showPlayerId?: boolean;
 }
@@ -75,6 +87,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   headerAction,
   matchStats,
   ratingDelta,
+  ratingHistory,
   isStatsLoading = false,
   showPlayerId = false,
 }) => {
@@ -212,7 +225,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                     className={`rounded-xl px-4 py-4 text-left transition-colors ${
                       expandedType === item.type
                         ? "bg-white/25"
-                        : "bg-white/15 hover:bg-white/20"
+                        : "bg-white/15 opacity-80 hover:bg-white/20"
                     }`}
                   >
                     <p className="text-2xl font-bold leading-none text-pkpk-secondary-font">
@@ -226,6 +239,16 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 );
               })}
             </div>
+
+            {isProfileStatsLoading ? (
+              <SkeletonBlock className="mt-5 h-36 bg-white/15" />
+            ) : expandedItem ? (
+              <RatingHistoryChart
+                key={expandedItem.type}
+                history={ratingHistory?.[expandedItem.type] ?? []}
+                label={expandedItem.label}
+              />
+            ) : null}
           </div>
 
           {isProfileStatsLoading ? (
