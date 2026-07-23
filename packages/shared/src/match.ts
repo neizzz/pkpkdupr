@@ -90,6 +90,16 @@ export type MatchStatus =
   | "completed"
   | "cancelled";
 
+export type MatchSessionStatus = "created" | "completed";
+
+export const getMatchSessionStatus = (
+  matchStatuses: readonly MatchStatus[],
+): MatchSessionStatus =>
+  matchStatuses.length > 0 &&
+  matchStatuses.every((status) => status === "completed")
+    ? "completed"
+    : "created";
+
 export interface Team {
   id: string;
   name: string;
@@ -125,6 +135,7 @@ export interface MatchSessionSummary {
   name: string;
   date: Date;
   location: string;
+  status: MatchSessionStatus;
   matchCount: number;
   participants: MatchSessionParticipant[];
   latestCreatedAt: Date;

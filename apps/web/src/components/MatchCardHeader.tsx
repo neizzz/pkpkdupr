@@ -28,10 +28,10 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
 }) => (
   <div className="min-w-0">
     <div className="flex min-h-6 items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-sub-font">
+      <div className="flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold tabular-nums text-pkpk-sub-font">
         <IoCalendarClearOutline className="size-3.5 shrink-0 [&_*]:stroke-[40]" />
         <span className="relative top-px">{date}</span>
-        <span className="-mx-0.5 text-[0.75rem] font-bold leading-none text-pkpk-sub-font/50">
+        <span className="-mx-0.5 text-[0.75rem] font-semibold leading-none text-pkpk-sub-font/50">
           ·
         </span>
         <span className="relative top-px">{time}</span>
@@ -49,16 +49,16 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
       )}
     </div>
     {location ? (
-      <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-bold text-pkpk-sub-font/75">
+      <div className="mt-0 flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold tabular-nums text-pkpk-sub-font">
         <IoLocationOutline
           aria-hidden="true"
           className="size-3.5 shrink-0 [&_*]:stroke-[40]"
         />
-        <span className="truncate">{location}</span>
+        <span className="relative top-px truncate">{location}</span>
       </div>
     ) : null}
     {title ? (
-      <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-main-font">
+      <p className="mt-1 truncate text-[clamp(1.125rem,5vw,1.25rem)] font-semibold text-pkpk-main-font">
         {title}
       </p>
     ) : null}

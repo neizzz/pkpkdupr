@@ -183,6 +183,8 @@ describe("GET /api/match-feed", () => {
           id: "Ssessn01",
           name: "토요 오전 세션",
           date: now,
+          location: "PKELO Court A",
+          status: "completed",
           matchCount: 2,
           participants: [
             { id: player.id, username: player.username, avatarUrl: "avatar-a" },
@@ -209,6 +211,7 @@ describe("GET /api/match-feed", () => {
       kind: "session",
       session: {
         name: "토요 오전 세션",
+        status: "completed",
         matchCount: 2,
         participants: [
           { id: player.id, username: player.username },

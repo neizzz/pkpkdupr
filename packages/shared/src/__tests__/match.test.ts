@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { computeMatchStartsAt } from "../match";
+import { computeMatchStartsAt, getMatchSessionStatus } from "../match";
+
+describe("getMatchSessionStatus", () => {
+  it("모든 매치가 완료일 때만 완료 상태를 반환한다", () => {
+    expect(getMatchSessionStatus(["completed", "completed"])).toBe(
+      "completed",
+    );
+    expect(getMatchSessionStatus(["completed", "created"])).toBe("created");
+    expect(getMatchSessionStatus(["pending-approval"])).toBe("created");
+    expect(getMatchSessionStatus(["cancelled"])).toBe("created");
+  });
+});
 
 describe("computeMatchStartsAt", () => {
   it("keeps the time if already on a 30-minute boundary", () => {

@@ -108,6 +108,7 @@ const hydrateSessionSummary = (record: any): MatchSessionSummary => ({
     typeof record.location === "string" && record.location.trim()
       ? record.location.trim()
       : "Court TBD",
+  status: record.status === "completed" ? "completed" : "created",
   matchCount: record.matchCount,
   participants: (record.participants ?? []).map((participant: any) => ({
     id: participant.id,

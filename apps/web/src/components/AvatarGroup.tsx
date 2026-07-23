@@ -12,6 +12,7 @@ interface AvatarGroupProps {
   max?: number;
   size?: "xs" | "session" | "sm" | "md" | "lg";
     className?: string;
+    ringClassName?: string;
 }
 
 const spacingClassMap: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
@@ -35,6 +36,7 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
     max = 5,
     size = "md",
     className,
+    ringClassName = "ring-white",
 }) => {
     const visible = items.slice(0, max);
     const overflow = items.length - visible.length;
@@ -59,15 +61,16 @@ const AvatarGroup: React.FC<AvatarGroupProps> = ({
                         avatarUrl={item.avatarUrl}
                         name={item.name}
                         size={size}
-                        className="ring-2 ring-white"
+                        className={`ring-2 ${ringClassName}`}
                     />
                 </div>
             ))}
             {overflow > 0 && (
                 <div
                     className={[
-                        "relative flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 ring-2 ring-white",
+                        "relative flex shrink-0 items-center justify-center rounded-full bg-slate-100 font-semibold text-slate-600 ring-2",
                         counterSizeClassMap[size],
+                        ringClassName,
                     ].join(" ")}
                     style={{ zIndex: visible.length + 1 }}
                 >

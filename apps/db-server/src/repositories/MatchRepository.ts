@@ -5,6 +5,7 @@ import type {
   MatchResultApproval,
   MatchScore,
   MatchSessionSummary,
+  MatchStatus,
   Session,
   MatchSource,
   MatchType,
@@ -12,6 +13,7 @@ import type {
 } from "@pkpkdupr/shared/match";
 import {
   DEFAULT_MATCH_MODE,
+  getMatchSessionStatus,
   MATCH_RESULT_MAX_SCORE_COUNT,
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
@@ -817,7 +819,10 @@ export class MatchRepository {
   private buildSessionSummaries(matchesToGroup: Match[]) {
     const summaries = new Map<
       string,
-      MatchSessionSummary & { participantIds: Set<string> }
+      Omit<MatchSessionSummary, "status"> & {
+        participantIds: Set<string>;
+        matchStatuses: MatchStatus[];
+      }
     >();
 
     for (const match of matchesToGroup) {
@@ -837,9 +842,11 @@ export class MatchRepository {
           participants: [],
           latestCreatedAt: match.createdAt,
           participantIds: new Set<string>(),
+          matchStatuses: [],
         };
 
       summary.matchCount += 1;
+      summary.matchStatuses.push(match.status);
       if (match.createdAt > summary.latestCreatedAt) {
         summary.latestCreatedAt = match.createdAt;
       }
@@ -865,8 +872,15 @@ export class MatchRepository {
 
     return new Map(
       [...summaries.entries()].map(([key, summary]) => {
-        const { participantIds: _participantIds, ...session } = summary;
-        return [key, session];
+        const {
+          participantIds: _participantIds,
+          matchStatuses,
+          ...session
+        } = summary;
+        return [
+          key,
+          { ...session, status: getMatchSessionStatus(matchStatuses) },
+        ];
       }),
     );
   }
