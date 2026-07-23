@@ -42,15 +42,15 @@ describe("GET /api/players", () => {
     vi.restoreAllMocks();
   });
 
-  it("완료 경기의 최신 시각을 멤버별로 포함한다", async () => {
-    const lastPlayedAt = new Date("2026-07-20T10:00:00.000Z");
+  it("완료된 경기의 최신 경기 시간을 멤버별로 포함한다", async () => {
+    const lastPlayedAt = new Date("2026-07-20T08:30:00.000Z");
     vi.spyOn(AuthService.prototype, "getPublicPlayers").mockResolvedValue([
       player,
       playerWithoutCompletedMatch,
     ]);
     vi.spyOn(
       MatchRepository.prototype,
-      "getLastCompletedAtByPlayerId",
+      "getLastPlayedAtByPlayerId",
     ).mockResolvedValue({ [player.id]: lastPlayedAt });
 
     const response = await request(app)

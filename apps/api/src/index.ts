@@ -606,7 +606,7 @@ app.get("/api/players", async (req, res) => {
 
     const [players, lastPlayedAtByPlayerId] = await Promise.all([
       authService.getPublicPlayers(),
-      matchRepository.getLastCompletedAtByPlayerId(),
+      matchRepository.getLastPlayedAtByPlayerId(),
     ]);
     const memberList: MemberListPlayer[] = players.map((player) => ({
       ...player,

@@ -366,11 +366,11 @@ export class MatchRepository {
     };
   }
 
-  async findLastCompletedAtByPlayerId(): Promise<Record<string, Date>> {
+  async findLastPlayedAtByPlayerId(): Promise<Record<string, Date>> {
     const rows = await this.db
       .select({
         playerId: matchParticipants.playerId,
-        lastPlayedAt: max(matches.completedAt),
+        lastPlayedAt: max(matches.matchStartsAt),
       })
       .from(matchParticipants)
       .innerJoin(matches, eq(matchParticipants.matchId, matches.id))

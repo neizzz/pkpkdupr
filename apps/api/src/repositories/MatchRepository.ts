@@ -372,7 +372,7 @@ export class MatchRepository {
     return await this.findAll(page, limit, playerId);
   }
 
-  async getLastCompletedAtByPlayerId(): Promise<Record<string, Date>> {
+  async getLastPlayedAtByPlayerId(): Promise<Record<string, Date>> {
     const records = await this.dbRequest<Record<string, string | Date>>(
       "/internal/matches/last-played",
     );

@@ -894,7 +894,7 @@ app.get("/internal/matches", async (req, res) => {
 
 app.get("/internal/matches/last-played", async (_req, res) => {
   try {
-    res.json(await matchRepository.findLastCompletedAtByPlayerId());
+    res.json(await matchRepository.findLastPlayedAtByPlayerId());
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
