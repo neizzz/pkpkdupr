@@ -150,6 +150,7 @@ const Match: React.FC<MatchProps> = ({
         <MatchCardHeader
           date={matchDate}
           time={matchTime}
+          location={match.location}
           title={displayTitle}
           showChevron={showChevron}
           afterTime={

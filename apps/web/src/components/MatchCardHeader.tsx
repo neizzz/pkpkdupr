@@ -1,9 +1,14 @@
 import React from "react";
-import { IoCalendarClearOutline, IoChevronForward } from "react-icons/io5";
+import {
+  IoCalendarClearOutline,
+  IoChevronForward,
+  IoLocationOutline,
+} from "react-icons/io5";
 
 interface MatchCardHeaderProps {
   date: string;
   time: string;
+  location?: string;
   title?: string;
   afterTime?: React.ReactNode;
   rightContent?: React.ReactNode;
@@ -14,6 +19,7 @@ interface MatchCardHeaderProps {
 const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
   date,
   time,
+  location,
   title,
   afterTime,
   rightContent,
@@ -42,6 +48,15 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
         </div>
       )}
     </div>
+    {location ? (
+      <div className="mt-0.5 flex min-w-0 items-center gap-1 text-xs font-bold text-pkpk-sub-font/75">
+        <IoLocationOutline
+          aria-hidden="true"
+          className="size-3.5 shrink-0 [&_*]:stroke-[40]"
+        />
+        <span className="truncate">{location}</span>
+      </div>
+    ) : null}
     {title ? (
       <p className="mt-1 truncate text-[clamp(1rem,4.5vw,1.125rem)] font-semibold text-pkpk-main-font">
         {title}

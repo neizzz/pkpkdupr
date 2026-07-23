@@ -49,6 +49,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
       <MatchCardHeader
         date={date}
         time={time}
+        location={session.location}
         title={`[세션] ${session.name}`}
         rightGapClassName="gap-0"
         rightContent={
