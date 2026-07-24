@@ -24,15 +24,20 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [token, setToken] = useState<string | null>(null);
+  // Preserve a saved session during the first render.  AdminDashboard redirects
+  // when token is null, so setting this only in an effect lets a page reload
+  // (for example after a form submission) race into /login before /api/me
+  // finishes restoring the session.
+  const [token, setToken] = useState<string | null>(() =>
+    localStorage.getItem("admin-token"),
+  );
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("admin-token");
     if (storedToken) {
-      setToken(storedToken);
-      fetchMe(storedToken);
+      void fetchMe(storedToken);
     }
   }, []);
 
