@@ -193,19 +193,23 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
     return () => window.cancelAnimationFrame(frameId);
   }, []);
 
+  const graphHistory = useMemo(
+    () => history.filter((point) => point.source !== "official-adjustment"),
+    [history],
+  );
   const historyWithToday = useMemo(() => {
-    const latestPoint = history[history.length - 1];
-    if (!latestPoint || isToday(latestPoint.createdAt)) return history;
+    const latestPoint = graphHistory[graphHistory.length - 1];
+    if (!latestPoint || isToday(latestPoint.createdAt)) return graphHistory;
 
     return [
-      ...history,
+      ...graphHistory,
       {
         rating: latestPoint.rating,
         createdAt: new Date().toISOString(),
         source: "current" as const,
       },
     ];
-  }, [history]);
+  }, [graphHistory]);
   const values = useMemo(
     () => historyWithToday.map((point) => point.rating),
     [historyWithToday],
@@ -219,35 +223,12 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
   );
   const valueOffset = historyWithToday.length === 1 ? 1 : 0;
   const dateLabelIndexes = useMemo(
-    () => {
-      const indexes = new Set(
+    () =>
+      new Set(
         [...getLabeledPointIndexes(values)].map((index) => index + valueOffset),
-      );
-      displayHistory.forEach((point, index) => {
-        if (point?.source === "official-adjustment") {
-          indexes.add(index);
-        }
-      });
-      return indexes;
-    },
-    [displayHistory, valueOffset, values],
+      ),
+    [valueOffset, values],
   );
-  const ratingLabelIndexes = useMemo(() => {
-    const indexes = new Set(dateLabelIndexes);
-    const currentIndex = displayHistory.length - 1;
-    const currentPoint = displayHistory[currentIndex];
-    const previousPoint = displayHistory[currentIndex - 1];
-
-    // 마지막 점이 실제 경기 변화가 아닌 오늘 연장선이면 날짜만 보여준다.
-    if (
-      currentPoint?.source === "current" &&
-      previousPoint?.rating === currentPoint.rating
-    ) {
-      indexes.delete(currentIndex);
-    }
-
-    return indexes;
-  }, [dateLabelIndexes, displayHistory]);
   const chartDecorationPlugin = useMemo(
     () => createChartDecorationPlugin(dateLabelIndexes),
     [dateLabelIndexes],
@@ -271,16 +252,10 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
           backgroundColor: createAreaGradient,
           borderWidth: 2,
           fill: true,
-          pointBackgroundColor: (context) =>
-            displayHistory[context.dataIndex]?.source === "official-adjustment"
-              ? "#ffffff"
-              : accentColor,
+          pointBackgroundColor: accentColor,
           pointBorderColor: accentColor,
           pointBorderWidth: 2,
-          pointStyle: (context) =>
-            displayHistory[context.dataIndex]?.source === "official-adjustment"
-              ? "rectRot"
-              : "circle",
+          pointStyle: "circle",
           pointHoverRadius: (context) =>
             dateLabelIndexes.has(context.dataIndex) ? 5 : 0,
           pointRadius: (context) =>
@@ -308,7 +283,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
           clip: false,
           color: accentColor,
           display: (context: Context) =>
-            ratingLabelIndexes.has(context.dataIndex),
+            dateLabelIndexes.has(context.dataIndex),
           font: { size: 11, weight: 700 },
           formatter: (_value: unknown, context: Context) => {
             const point = displayHistory[context.dataIndex];
@@ -341,9 +316,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
             callback: (_value, index) => {
               const point = displayHistory[index];
               if (!dateLabelIndexes.has(index) || !point) return "";
-              return point.source === "official-adjustment"
-                ? "공식 레이팅 반영"
-                : formatDate(point.createdAt);
+              return formatDate(point.createdAt);
             },
           },
         },
@@ -353,10 +326,10 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
         },
       },
     }),
-    [dateLabelIndexes, displayHistory, ratingLabelIndexes],
+    [dateLabelIndexes, displayHistory],
   );
 
-  if (history.length === 0) {
+  if (graphHistory.length === 0) {
     return (
       <div className="mt-2 flex h-36 items-center justify-center px-4 text-center text-sm font-medium text-pkpk-secondary-font/70">
         평점 이력이 없습니다.

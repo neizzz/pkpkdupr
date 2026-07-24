@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { Spinner } from "@heroui/react";
 import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
 import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
 import { IoPeople, IoPerson } from "react-icons/io5";
@@ -246,7 +247,14 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
 
             {isProfileStatsLoading ? (
-              <SkeletonBlock className="mt-5 h-36 bg-white/15" />
+              <div className="mt-2 flex h-36 items-center justify-center">
+                <Spinner
+                  aria-label="평점 이력 로딩 중"
+                  className="text-pkpk-accent-bg"
+                  color="current"
+                  size="md"
+                />
+              </div>
             ) : expandedItem ? (
               <RatingHistoryChart
                 key={expandedItem.type}
