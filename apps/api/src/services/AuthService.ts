@@ -736,7 +736,6 @@ export class AuthService {
     const logs = perMatchChanges.flatMap((change) => {
       const sourceLogId = `match-completed-${change.matchId}-${change.completedAt.getTime()}`;
       return change.players
-        .filter((playerChange) => hasDuprChange(playerChange.delta))
         .map(
           (playerChange): PlayerRatingChangeLog => ({
             id: buildId("player-rating-change-log"),

@@ -356,4 +356,31 @@ describe("official DUPR recency propagation", () => {
     expect(replacedMatchCompletedLogs).toHaveLength(4);
     expect(replacedMatchCompletedLogs.map((log) => log.id)).not.toEqual(firstIds);
   });
+
+  it("레이팅이 변하지 않은 참가자도 경기별 로그로 보존한다", async () => {
+    const unchangedRatingService: RatingServiceContract = {
+      getAccuracy: () => 0,
+      getCorrectionWeight: () => 1,
+      replayMatch: (match) =>
+        Object.fromEntries(
+          match.participants.map((participant) => [
+            participant.playerId,
+            participant.state,
+          ]),
+        ),
+    };
+    const service = new AuthService(unchangedRatingService);
+
+    const recalculation = await service.recalculateDuprRatings(
+      [buildMatch(new Date(NOW.getTime() - DAY_MS))],
+      { perMatchLogs: true },
+    );
+
+    expect(recalculation.perMatchLogs).toHaveLength(4);
+    expect(replacedMatchCompletedLogs).toHaveLength(4);
+    for (const log of recalculation.perMatchLogs) {
+      expect(log.previousRating).toEqual(log.nextRating);
+      expect(log.delta).toEqual({ singles: 0, doubles: 0 });
+    }
+  });
 });

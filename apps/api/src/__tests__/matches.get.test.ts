@@ -69,11 +69,21 @@ describe("GET /api/matches/:matchId", () => {
     vi.restoreAllMocks();
   });
 
-  it("인증된 사용자에게 단건 매치를 반환한다", async () => {
+  it("인증된 사용자에게 무변동 레이팅 로그를 포함한 단건 매치를 반환한다", async () => {
+    const unchangedRatingLog: PlayerRatingChangeLog = {
+      id: "log-unchanged-001",
+      playerId: player.id,
+      source: "match_completed",
+      sourceLogId: `match-completed-${match.id}-${now.getTime()}`,
+      previousRating: { singles: 3.0, doubles: 3.0 },
+      nextRating: { singles: 3.0, doubles: 3.0 },
+      delta: { singles: 0, doubles: 0 },
+      createdAt: now,
+    };
     vi.spyOn(
       MatchRepository.prototype,
       "findByIdWithRatingChanges",
-    ).mockResolvedValue({ match, ratingChanges: [] });
+    ).mockResolvedValue({ match, ratingChanges: [unchangedRatingLog] });
 
     const response = await request(app)
       .get(`/api/matches/${match.id}`)
@@ -83,7 +93,13 @@ describe("GET /api/matches/:matchId", () => {
     expect(response.body).toMatchObject({
       id: match.id,
       type: "singles",
-      ratingChanges: [],
+      ratingChanges: [
+        expect.objectContaining({
+          previousRating: { singles: 3, doubles: 3 },
+          nextRating: { singles: 3, doubles: 3 },
+          delta: { singles: 0, doubles: 0 },
+        }),
+      ],
     });
   });
 
