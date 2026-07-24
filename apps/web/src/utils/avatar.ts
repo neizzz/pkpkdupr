@@ -1,4 +1,4 @@
-const MAX_AVATAR_SIZE = 512;
+const MAX_AVATAR_SIZE = 128;
 const AVATAR_JPEG_QUALITY = 0.85;
 
 const readImage = (src: string) =>
