@@ -25,7 +25,7 @@ const CopyableId: React.FC<CopyableIdProps> = ({
         type="button"
         aria-label={`${label} 복사`}
         onClick={handleCopy}
-        className="flex min-w-0 items-center gap-1 rounded-full bg-pkpk-primary-bg/5 px-2.5 py-1 font-medium transition-colors hover:bg-pkpk-primary-bg/10"
+        className="flex min-w-0 items-center gap-0.5 font-medium transition-opacity hover:opacity-70"
       >
         <IoCopyOutline aria-hidden="true" className="size-3.5 shrink-0" />
         <span className="truncate font-mono">{value}</span>

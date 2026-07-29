@@ -309,7 +309,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
       {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
       <div className="p-2">
         <div className="mx-auto flex w-full flex-col gap-3">
-          <div className="flex items-start justify-center gap-3 pt-5 pb-5">
+          <div className="flex items-start justify-center gap-4 pt-5 pb-5">
             <Avatar
               size="lg"
               avatarUrl={displayedPlayer?.avatarUrl}
@@ -328,8 +328,8 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               />
             ) : null}
             <div className="flex min-w-[180px] w-full max-w-[50%] flex-1 flex-col items-start gap-1">
-              <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-                <h2 className="min-w-0 truncate text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font">
+              <div className="flex min-w-0 max-w-full flex-nowrap items-baseline gap-2">
+                <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font">
                   {displayName}
                 </h2>
                 {showPlayerId && player?.id ? (
@@ -366,18 +366,24 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               Rating
             </h3>
 
-            <div className="mt-1.5 grid grid-cols-2 gap-3">
+            <div
+              role="tablist"
+              aria-label="Rating type"
+              className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-white/10"
+            >
               {duprItems.map((item) => {
                 const Icon = item.icon;
                 return (
                   <button
                     key={item.type}
                     type="button"
+                    role="tab"
+                    aria-selected={expandedType === item.type}
                     onClick={() => handleCardClick(item.type)}
-                    className={`rounded-xl px-4 py-4 text-left transition-colors ${
+                    className={`min-w-0 rounded-lg px-3 py-3 text-left transition-colors ${
                       expandedType === item.type
                         ? "bg-white/25"
-                        : "bg-white/15 opacity-80 hover:bg-white/20"
+                        : "bg-transparent opacity-80 hover:bg-white/15"
                     }`}
                   >
                     <p className="text-[clamp(1.3rem,6cqw,1.8rem)] font-bold leading-none text-pkpk-secondary-font">
@@ -393,81 +399,85 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
 
             {isProfileStatsLoading ? (
-              <div className="mt-2 flex h-36 items-center justify-center">
-                <Spinner
-                  aria-label="평점 이력 로딩 중"
-                  className="text-pkpk-accent-bg"
-                  color="current"
-                  size="md"
-                />
-              </div>
+              <>
+                <div className="mt-2 flex h-36 items-center justify-center">
+                  <Spinner
+                    aria-label="평점 이력 로딩 중"
+                    className="text-pkpk-accent-bg"
+                    color="current"
+                    size="md"
+                  />
+                </div>
+                <div className="mt-3">
+                  <ProfileStatsSkeleton />
+                </div>
+              </>
             ) : expandedItem ? (
-              <RatingHistoryChart
-                key={expandedItem.type}
-                history={ratingHistory?.[expandedItem.type] ?? []}
-                label={expandedItem.label}
-              />
+              <>
+                <RatingHistoryChart
+                  key={expandedItem.type}
+                  history={ratingHistory?.[expandedItem.type] ?? []}
+                  label={expandedItem.label}
+                />
+                <div className="mt-3 flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                        매치 승률
+                      </p>
+                      <div className="mt-1 flex items-baseline gap-1.5">
+                        <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+                          {expandedItem.matchWinRate}
+                        </p>
+                        <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
+                          {expandedItem.matchWinLoss}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                        세트 승률
+                      </p>
+                      <div className="mt-1 flex items-baseline gap-1.5">
+                        <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+                          {expandedItem.setWinRate}
+                        </p>
+                        <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
+                          {expandedItem.setWinLoss}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                        최근 7일 변동
+                      </p>
+                      <div className="mt-1">
+                        <RatingDeltaChip
+                          delta={expandedItem.delta7d}
+                          hasData={expandedItem.hasDelta7d}
+                          appearance="rating"
+                        />
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                        최근 30일 변동
+                      </p>
+                      <div className="mt-1">
+                        <RatingDeltaChip
+                          delta={expandedItem.delta30d}
+                          hasData={expandedItem.hasDelta30d}
+                          appearance="rating"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : null}
           </div>
-
-          {isProfileStatsLoading ? (
-            <ProfileStatsSkeleton />
-          ) : expandedItem ? (
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
-                    매치 승률
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-main-font">
-                      {expandedItem.matchWinRate}
-                    </p>
-                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-sub-font">
-                      {expandedItem.matchWinLoss}
-                    </p>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
-                    세트 승률
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-main-font">
-                      {expandedItem.setWinRate}
-                    </p>
-                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-sub-font">
-                      {expandedItem.setWinLoss}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
-                    최근 7일 변동
-                  </p>
-                  <div className="mt-1">
-                    <RatingDeltaChip
-                      delta={expandedItem.delta7d}
-                      hasData={expandedItem.hasDelta7d}
-                    />
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
-                    최근 30일 변동
-                  </p>
-                  <div className="mt-1">
-                    <RatingDeltaChip
-                      delta={expandedItem.delta30d}
-                      hasData={expandedItem.hasDelta30d}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
       <BottomSheet
