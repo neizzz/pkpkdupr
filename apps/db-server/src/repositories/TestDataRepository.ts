@@ -156,6 +156,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "test1",
     gender: "F",
     status: "active",
+    affiliations: [{ name: "PKELO Gangnam", isPrimary: true }],
     duprRating: createDupr(3.176),
     passwordHash: TEST_PASSWORD_HASH,
     isFirstLogin: false,
@@ -167,6 +168,10 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     username: "test2",
     gender: "M",
     status: "active",
+    affiliations: [
+      { name: "PKELO Jamsil", isPrimary: true },
+      { name: "Weekend Pickleball Club", isPrimary: false },
+    ],
     duprRating: createDupr(3.482),
     passwordHash: TEST_PASSWORD_HASH,
     isFirstLogin: false,
@@ -763,6 +768,11 @@ export class TestDataRepository {
           player.passwordHash,
           player.isFirstLogin,
         );
+        if (!existing.affiliations?.length && player.affiliations?.length) {
+          await this.playerRepository.updateProfile(existing.id, {
+            affiliations: player.affiliations,
+          });
+        }
       }
     }
 

@@ -3,6 +3,7 @@ import {
   OfficialDuprAdjustmentImpact,
   OfficialDuprAdjustmentPreview,
   Player,
+  PlayerAffiliation,
   PlayerCreationLog,
   PlayerCreationSource,
   PlayerDupr,
@@ -985,22 +986,45 @@ export class AuthService {
 
   async updatePlayerProfile(
     playerId: string,
-    input: { avatarUrl?: string | null },
+    input: {
+      avatarUrl?: string | null;
+      affiliations?: PlayerAffiliation[];
+      statusMessage?: string | null;
+      statusMessageBackgroundColor?: string | null;
+    },
   ): Promise<Player> {
     const stored = await this.getStoredPlayerById(playerId);
     if (!stored) {
       throw new Error("사용자를 찾을 수 없습니다.");
     }
 
-    const avatarUrl =
-      typeof input.avatarUrl === "string" && input.avatarUrl.trim()
-        ? input.avatarUrl.trim()
-        : null;
+    const profilePatch: Record<string, unknown> = {};
+    if (Object.prototype.hasOwnProperty.call(input, "avatarUrl")) {
+      profilePatch.avatarUrl =
+        typeof input.avatarUrl === "string" && input.avatarUrl.trim()
+          ? input.avatarUrl.trim()
+          : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(input, "affiliations")) {
+      profilePatch.affiliations = input.affiliations ?? [];
+    }
+    if (Object.prototype.hasOwnProperty.call(input, "statusMessage")) {
+      profilePatch.statusMessage = input.statusMessage ?? null;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(
+        input,
+        "statusMessageBackgroundColor",
+      )
+    ) {
+      profilePatch.statusMessageBackgroundColor =
+        input.statusMessageBackgroundColor ?? null;
+    }
 
     const updated = hydratePlayer(
       await this.dbRequest<any>(`/internal/players/${playerId}/profile`, {
         method: "PATCH",
-        body: JSON.stringify({ avatarUrl }),
+        body: JSON.stringify(profilePatch),
       }),
     );
 

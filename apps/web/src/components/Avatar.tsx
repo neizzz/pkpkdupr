@@ -1,7 +1,7 @@
 import React from "react";
 import { Avatar as HeroAvatar } from "@heroui/react";
 import { IoPerson } from "react-icons/io5";
-import { MdOutlineCreate } from "react-icons/md";
+import { MdPhotoCamera } from "react-icons/md";
 import { resolveAssetUrl } from "@/lib/api";
 
 interface AvatarProps {
@@ -88,7 +88,7 @@ const Avatar: React.FC<AvatarProps> = ({
         className={`absolute bottom-0 right-0 flex ${editBadgeSizeMap[size]} items-center justify-center rounded-full bg-white text-black shadow-sm ring-1 ring-border`}
         aria-label="프로필 이미지 변경"
       >
-        <MdOutlineCreate className="size-[60%]" />
+        <MdPhotoCamera className="size-[60%]" />
       </button>
     </div>
   );

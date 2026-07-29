@@ -12,7 +12,7 @@ const CreateMatchModeSelector: React.FC<CreateMatchModeSelectorProps> = ({
   selectedMatchMode,
   onChange,
 }) => (
-  <section className="flex flex-col gap-2">
+  <div className="flex flex-col gap-2">
     <p className="bs-text-title text-pkpk-sub-font">경기 모드</p>
     <RadioGroup
       aria-label="경기 모드"
@@ -50,7 +50,7 @@ const CreateMatchModeSelector: React.FC<CreateMatchModeSelectorProps> = ({
         </Radio>
       ))}
     </RadioGroup>
-  </section>
+  </div>
 );
 
 export default CreateMatchModeSelector;

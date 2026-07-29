@@ -18,6 +18,7 @@ import { buildApiUrl } from "@/lib/api";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
 import CreateMatchTeamGrid from "./CreateMatchTeamGrid";
+import BottomSheetSection from "./BottomSheetSection";
 import HoldToConfirmButton from "./HoldToConfirmButton";
 import RecentValueComboBox from "./RecentValueComboBox";
 import {
@@ -339,7 +340,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           />
         ) : (
           <>
-            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
+            <BottomSheetSection>
               <div className="relative flex items-start justify-between gap-3">
                 <div>
                   <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
@@ -377,16 +378,16 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   {teamGrid}
                 </>
               )}
-            </section>
+            </BottomSheetSection>
 
-            <div className="rounded-3xl bg-slate-50/80 p-4">
+            <BottomSheetSection>
               <CreateMatchModeSelector
                 selectedMatchMode={selectedMatchMode}
                 onChange={setSelectedMatchMode}
               />
-            </div>
+            </BottomSheetSection>
 
-            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
+            <BottomSheetSection>
               <p className="bs-text-title text-pkpk-sub-font">
                 매치 시작(자동)
               </p>
@@ -397,9 +398,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   hour12: true,
                 })}
               </p>
-            </section>
+            </BottomSheetSection>
 
-            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
+            <BottomSheetSection>
               <p className="bs-text-title text-pkpk-sub-font">매치 이름</p>
               <div
                 role="radiogroup"
@@ -469,9 +470,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   />
                 </div>
               </div>
-            </section>
+            </BottomSheetSection>
 
-            <section className="flex flex-col gap-2 rounded-3xl bg-slate-50/80 p-4">
+            <BottomSheetSection>
               <label
                 htmlFor="create-match-location"
                 className="bs-text-title text-pkpk-sub-font"
@@ -491,7 +492,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 className="w-full"
                 inputClassName="app-mobile-input w-full rounded-2xl border border-border bg-white px-4 py-2 text-base text-pkpk-sub-font outline-none"
               />
-            </section>
+            </BottomSheetSection>
           </>
         )}
       </Drawer.Body>

@@ -9,6 +9,7 @@ import { IoChevronForward } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
 import type { MatchListResponse } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
+import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
@@ -102,7 +103,7 @@ const readCachedMembers = (): MemberListPlayerInfo[] | null => {
 };
 
 const Members: React.FC = () => {
-  const { player, token } = useAuth();
+  const { player, token, updateProfile } = useAuth();
   const isOnline = useOnlineStatus();
   const {
     pushDepth,
@@ -309,6 +310,30 @@ const Members: React.FC = () => {
     restoreScrollTop("members");
   }, [restoreScrollTop]);
 
+  const handleMemberProfileUpdated = useCallback((updatedPlayer: PlayerInfo) => {
+    setMembers((currentMembers) =>
+      currentMembers.map((member) =>
+        member.id === updatedPlayer.id
+          ? { ...member, ...updatedPlayer }
+          : member,
+      ),
+    );
+  }, []);
+
+  const setMemberPrimaryAffiliation = async (
+    member: MemberListPlayerInfo,
+    affiliationName: string,
+  ) => {
+    if (member.id !== player?.id || !member.affiliations) return;
+    const updatedPlayer = await updateProfile({
+      affiliations: member.affiliations.map((affiliation) => ({
+        ...affiliation,
+        isPrimary: affiliation.name === affiliationName,
+      })),
+    });
+    handleMemberProfileUpdated(updatedPlayer);
+  };
+
   const openMemberProfile = (memberId: string) => {
     saveScrollPosition("members");
     pushDepth("members", {
@@ -350,6 +375,7 @@ const Members: React.FC = () => {
       <MemberProfile
         player={selectedMember}
         isMe={selectedMember.id === player?.id}
+        onProfileUpdated={handleMemberProfileUpdated}
         matchStats={selectedMemberMatchStats}
         ratingDelta={selectedMemberRatingDelta}
         ratingHistory={selectedMemberRatingHistory}
@@ -365,7 +391,7 @@ const Members: React.FC = () => {
         <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
           <div>
             {notice ? (
-              <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-pkpk-sub-font">
+              <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
                 {notice}
               </p>
             ) : null}
@@ -386,32 +412,53 @@ const Members: React.FC = () => {
                   );
 
                   return (
-                    <button
+                    <div
                       key={member.id}
-                      type="button"
-                      onClick={() => openMemberProfile(member.id)}
-                      className={`relative flex w-full min-w-0 items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-amber-50 active:bg-amber-50 ${
+                      className={`relative flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-amber-50 active:bg-amber-50 ${
                         index < sortedMembers.length - 1
-                          ? "after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-pkpk-sub-font/10"
+                          ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
                           : ""
                       }`}
                     >
-                      <Avatar
-                        size="sm"
-                        avatarUrl={member.avatarUrl}
-                        name={member.username}
+                      <button
+                        type="button"
+                        onClick={() => openMemberProfile(member.id)}
+                        className="absolute inset-0 z-0"
+                        aria-label={`${member.username ?? "멤버"} 프로필 보기`}
                       />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-lg font-semibold text-pkpk-main-font">
-                          {member.username}
-                        </p>
-                        <p className="truncate text-xs text-pkpk-detail-font">
-                          {formatLastPlayedAt(member.lastPlayedAt)}
-                        </p>
+                      <div className="relative z-10 flex min-w-0 flex-1 items-center gap-4 pointer-events-none">
+                        <Avatar
+                          size="md"
+                          avatarUrl={member.avatarUrl}
+                          name={member.username}
+                        />
+                        <div className="flex min-w-0 flex-1 flex-col gap-1 self-start pt-1">
+                          <p className="truncate text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold text-pkpk-main-font">
+                            {member.username}
+                          </p>
+                          {member.statusMessage || member.affiliations?.length ? (
+                            <div className="pointer-events-auto">
+                              <PlayerProfileMeta
+                                affiliations={member.affiliations}
+                                statusMessage={member.statusMessage}
+                                statusMessageBackgroundColor={
+                                  member.statusMessageBackgroundColor
+                                }
+                                isMe={member.id === player?.id}
+                                onSetPrimary={(name) =>
+                                  void setMemberPrimaryAffiliation(member, name)
+                                }
+                              />
+                            </div>
+                          ) : null}
+                          <p className="truncate text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+                            {formatLastPlayedAt(member.lastPlayedAt)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="ml-auto flex shrink-0 items-center gap-2">
+                      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2 pointer-events-none">
                         <span
-                          className={`text-lg font-semibold tabular-nums ${
+                          className={`text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold tabular-nums ${
                             doublesRating == null
                               ? "text-pkpk-detail-font"
                               : "text-pkpk-dupr-font"
@@ -421,7 +468,7 @@ const Members: React.FC = () => {
                         </span>
                         <IoChevronForward aria-hidden="true" className="size-5 text-pkpk-sub-font" />
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import type { PublicPlayerDupr } from "@pkpkdupr/shared/player";
+import type {
+  PlayerAffiliation,
+  PublicPlayerDupr,
+} from "@pkpkdupr/shared/player";
 import { buildApiUrl } from "@/lib/api";
 
 export interface PlayerInfo {
@@ -8,6 +11,9 @@ export interface PlayerInfo {
   duprRating?: PublicPlayerDupr | null;
   gender?: "M" | "F";
   avatarUrl?: string;
+  affiliations?: PlayerAffiliation[];
+  statusMessage?: string;
+  statusMessageBackgroundColor?: string;
 }
 
 interface AuthContextType {
@@ -25,7 +31,12 @@ interface AuthContextType {
     currentPassword: string | undefined,
     newPassword: string,
   ) => Promise<void>;
-  updateProfile: (input: { avatarUrl?: string | null }) => Promise<PlayerInfo>;
+  updateProfile: (input: {
+    avatarUrl?: string | null;
+    affiliations?: PlayerAffiliation[];
+    statusMessage?: string | null;
+    statusMessageBackgroundColor?: string | null;
+  }) => Promise<PlayerInfo>;
   uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
   deleteAvatar: () => Promise<PlayerInfo>;
   refreshMe: () => Promise<PlayerInfo>;

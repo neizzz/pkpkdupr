@@ -1,16 +1,22 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Spinner } from "@heroui/react";
+import type { PlayerAffiliation } from "@pkpkdupr/shared/player";
 import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
 import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
 import { IoPeople, IoPerson } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
+import AvatarUploadConfirmSheetBody from "@/components/AvatarUploadConfirmSheetBody";
+import BottomSheet from "@/components/BottomSheet";
 import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import RatingHistoryChart from "@/components/RatingHistoryChart";
+import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import SkeletonBlock from "@/components/SkeletonBlock";
+import StatusMessageEditSheetBody from "@/components/StatusMessageEditSheetBody";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
+import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { resizeAvatarImage } from "@/utils/avatar";
@@ -60,6 +66,7 @@ interface MemberProfileProps {
   ratingHistory?: MemberProfileRatingHistory;
   isStatsLoading?: boolean;
   showPlayerId?: boolean;
+  onProfileUpdated?: (player: PlayerInfo) => void;
 }
 
 const ProfileStatsSkeleton: React.FC = () => (
@@ -92,17 +99,34 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   ratingHistory,
   isStatsLoading = false,
   showPlayerId = false,
+  onProfileUpdated,
 }) => {
+  const [profileOverride, setProfileOverride] = useState<PlayerInfo | null>(null);
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
   const [expandedType, setExpandedType] = useState<MatchTopLevelType | null>(
     "doubles",
   );
   const [isUploading, setIsUploading] = useState(false);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [isAvatarConfirmOpen, setIsAvatarConfirmOpen] = useState(false);
+  const [isStatusEditorOpen, setIsStatusEditorOpen] = useState(false);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
-  const { uploadAvatar, refreshMe } = useAuth();
+  const { uploadAvatar, refreshMe, updateProfile } = useAuth();
+  const { closeDepth, pushDepth, selectedTab } = useTabNavigation();
   const isOnline = useOnlineStatus();
   const isProfileStatsLoading = useMinimumLoading(isStatsLoading);
+  const displayedPlayer: PlayerInfo | null =
+    profileOverride?.id === player?.id && player
+      ? { ...player, ...profileOverride }
+      : player;
+  const avatarConfirmDepthId = `profile-avatar-confirm:${player?.id ?? "unknown"}`;
+  const statusEditorDepthId = `profile-status-editor:${player?.id ?? "unknown"}`;
+
+  useEffect(() => {
+    setProfileOverride(null);
+  }, [player]);
 
   const duprItems = (["doubles", "singles"] as const).map((type) => {
     const stats = matchStats?.[type];
@@ -122,8 +146,8 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
           : "-";
     const rating =
       type === "singles"
-        ? formatRating(getCompositeSinglesRating(player?.duprRating))
-        : formatRating(getCompositeDoublesRating(player?.duprRating));
+        ? formatRating(getCompositeSinglesRating(displayedPlayer?.duprRating))
+        : formatRating(getCompositeDoublesRating(displayedPlayer?.duprRating));
     const delta = ratingDelta?.[type];
 
     return {
@@ -152,6 +176,24 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
     avatarInputRef.current?.click();
   };
 
+  const closeAvatarConfirm = useCallback(() => {
+    setIsAvatarConfirmOpen(false);
+    setAvatarPreviewUrl(null);
+  }, []);
+
+  const openAvatarConfirm = useCallback(
+    (previewUrl: string) => {
+      pushDepth(selectedTab, {
+        id: avatarConfirmDepthId,
+        kind: "bottom-sheet",
+        onClose: closeAvatarConfirm,
+      });
+      setAvatarPreviewUrl(previewUrl);
+      setIsAvatarConfirmOpen(true);
+    },
+    [avatarConfirmDepthId, closeAvatarConfirm, pushDepth, selectedTab],
+  );
+
   const handleAvatarFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -159,27 +201,118 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
     event.target.value = "";
     if (!file || isUploading || !isOnline) return;
 
-    setIsUploading(true);
     try {
       const dataUrl = await resizeAvatarImage(file);
-      await uploadAvatar(dataUrl);
-      await refreshMe();
+      openAvatarConfirm(dataUrl);
     } catch {
       // silently ignore upload errors
+    }
+  };
+
+  const confirmAvatarUpload = async () => {
+    if (!avatarPreviewUrl || isUploading || !isOnline) return;
+
+    setIsUploading(true);
+    try {
+      await uploadAvatar(avatarPreviewUrl);
+      await refreshMe();
+      closeDepth(selectedTab, avatarConfirmDepthId);
+      closeAvatarConfirm();
+    } catch {
+      // keep the preview open so the user can retry or cancel
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleAvatarConfirmOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      setIsAvatarConfirmOpen(true);
+      return;
+    }
+    closeDepth(selectedTab, avatarConfirmDepthId);
+    closeAvatarConfirm();
+  };
+
+  const closeStatusEditor = useCallback(() => {
+    setIsStatusEditorOpen(false);
+  }, []);
+
+  const openStatusEditor = () => {
+    if (!isMe) return;
+    pushDepth(selectedTab, {
+      id: statusEditorDepthId,
+      kind: "bottom-sheet",
+      onClose: closeStatusEditor,
+    });
+    setIsStatusEditorOpen(true);
+  };
+
+  const handleStatusEditorOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      openStatusEditor();
+      return;
+    }
+    closeDepth(selectedTab, statusEditorDepthId);
+    setIsStatusEditorOpen(false);
+  };
+
+  const saveStatusMessage = async (input: {
+    statusMessage: string | null;
+    statusMessageBackgroundColor: string | null;
+  }) => {
+    setIsProfileSaving(true);
+    try {
+      const updated = await updateProfile(input);
+      setProfileOverride(updated);
+      onProfileUpdated?.(updated);
+      closeDepth(selectedTab, statusEditorDepthId);
+      setIsStatusEditorOpen(false);
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
+
+  const saveAffiliationUpdate = async (input: {
+    affiliations: PlayerAffiliation[];
+    statusMessage: string | null;
+    statusMessageBackgroundColor: string | null;
+  }) => {
+    setIsProfileSaving(true);
+    try {
+      const updated = await updateProfile(input);
+      setProfileOverride(updated);
+      onProfileUpdated?.(updated);
+      closeDepth(selectedTab, statusEditorDepthId);
+      setIsStatusEditorOpen(false);
+    } finally {
+      setIsProfileSaving(false);
+    }
+  };
+
+  const setPrimaryAffiliation = async (name: string) => {
+    if (!displayedPlayer?.affiliations || isProfileSaving) return;
+    const affiliations = displayedPlayer.affiliations.map((affiliation) => ({
+      ...affiliation,
+      isPrimary: affiliation.name === name,
+    }));
+    await saveAffiliationUpdate({
+      affiliations,
+      statusMessage: displayedPlayer.statusMessage ?? null,
+      statusMessageBackgroundColor:
+        displayedPlayer.statusMessageBackgroundColor ?? null,
+    });
   };
 
   return (
     <div className="min-h-full">
       {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
       <div className="p-2">
-        <div className="mx-auto flex w-full max-w-[390px] flex-col gap-3">
-          <div className="flex flex-col items-center gap-2 pt-5 mb-1">
+        <div className="mx-auto flex w-full flex-col gap-3">
+          <div className="flex items-start justify-center gap-3 pt-5 pb-5">
             <Avatar
               size="lg"
-              avatarUrl={player?.avatarUrl}
+              avatarUrl={displayedPlayer?.avatarUrl}
               name={displayName}
               onEditClick={
                 isMe && !isUploading ? handleAvatarEditClick : undefined
@@ -194,26 +327,39 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 className="hidden"
               />
             ) : null}
-            <div className="flex max-w-full flex-col items-center gap-1">
-              <div className="flex max-w-full items-center gap-2">
-                <h2 className="min-w-0 truncate text-2xl text-pkpk-main-font">
+            <div className="flex min-w-[180px] w-full max-w-[50%] flex-1 flex-col items-start gap-1">
+              <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+                <h2 className="min-w-0 truncate text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font">
                   {displayName}
                 </h2>
+                {showPlayerId && player?.id ? (
+                  <CopyableId
+                    label="Player ID"
+                    value={displayedPlayer?.id ?? player.id}
+                    showLabel={false}
+                  />
+                ) : null}
                 {headerAction}
               </div>
-              {showPlayerId && player?.id ? (
-                <CopyableId
-                  label="Player ID"
-                  value={player.id}
-                  showLabel={false}
-                />
-              ) : null}
+              <PlayerProfileMeta
+                affiliations={displayedPlayer?.affiliations}
+                statusMessage={displayedPlayer?.statusMessage}
+                statusMessageBackgroundColor={
+                  displayedPlayer?.statusMessageBackgroundColor
+                }
+                align="start"
+                isMe={isMe}
+                showEmptyAffiliation
+                isUpdatingPrimary={isProfileSaving}
+                onEditStatus={openStatusEditor}
+                onSetPrimary={(name) => void setPrimaryAffiliation(name)}
+              />
             </div>
           </div>
 
           <div className="rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
             <h3
-              className={`text-[1.625rem] font-bold text-pkpk-secondary-font ${
+              className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold text-pkpk-secondary-font ${
                 showDetailHeader ? "pl-2" : ""
               }`}
             >
@@ -234,10 +380,10 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                         : "bg-white/15 opacity-80 hover:bg-white/20"
                     }`}
                   >
-                    <p className="text-2xl font-bold leading-none text-pkpk-secondary-font">
+                    <p className="text-[clamp(1.3rem,6cqw,1.8rem)] font-bold leading-none text-pkpk-secondary-font">
                       {item.rating}
                     </p>
-                    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-pkpk-secondary-font/70">
+                    <p className="mt-1 flex items-center gap-1 text-[clamp(0.6875rem,3cqw,0.9rem)] font-medium text-pkpk-secondary-font/70">
                       <Icon className="size-3" />
                       {item.label}
                     </p>
@@ -270,27 +416,27 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-xs font-semibold text-pkpk-sub-font">
+                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
                     매치 승률
                   </p>
                   <div className="mt-1 flex items-baseline gap-1.5">
-                    <p className="text-lg font-semibold leading-tight text-pkpk-main-font">
+                    <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-main-font">
                       {expandedItem.matchWinRate}
                     </p>
-                    <p className="text-xs text-pkpk-sub-font">
+                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-sub-font">
                       {expandedItem.matchWinLoss}
                     </p>
                   </div>
                 </div>
                 <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-xs font-semibold text-pkpk-sub-font">
+                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
                     세트 승률
                   </p>
                   <div className="mt-1 flex items-baseline gap-1.5">
-                    <p className="text-lg font-semibold leading-tight text-pkpk-main-font">
+                    <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-main-font">
                       {expandedItem.setWinRate}
                     </p>
-                    <p className="text-xs text-pkpk-sub-font">
+                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-sub-font">
                       {expandedItem.setWinLoss}
                     </p>
                   </div>
@@ -298,7 +444,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-xs font-semibold text-pkpk-sub-font">
+                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
                     최근 7일 변동
                   </p>
                   <div className="mt-1">
@@ -309,7 +455,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                   </div>
                 </div>
                 <div className="rounded-xl bg-white px-4 py-3 shadow-sm">
-                  <p className="text-xs font-semibold text-pkpk-sub-font">
+                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
                     최근 30일 변동
                   </p>
                   <div className="mt-1">
@@ -324,6 +470,39 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
           ) : null}
         </div>
       </div>
+      <BottomSheet
+        isOpen={isAvatarConfirmOpen}
+        isActive
+        onOpenChange={handleAvatarConfirmOpenChange}
+        ariaLabel="프로필 사진 확인"
+        className="px-5 pt-6"
+      >
+        {avatarPreviewUrl ? (
+          <AvatarUploadConfirmSheetBody
+            previewUrl={avatarPreviewUrl}
+            name={displayName}
+            isSaving={isUploading}
+            onConfirm={() => void confirmAvatarUpload()}
+            onCancel={() => handleAvatarConfirmOpenChange(false)}
+          />
+        ) : (
+          <div />
+        )}
+      </BottomSheet>
+      <BottomSheet
+        isOpen={isStatusEditorOpen}
+        isActive
+        onOpenChange={handleStatusEditorOpenChange}
+        ariaLabel="상태메시지 수정"
+        className="px-5 pt-6"
+      >
+        <StatusMessageEditSheetBody
+          key={`${displayedPlayer?.id ?? "unknown"}-${isStatusEditorOpen}`}
+          player={displayedPlayer}
+          isSaving={isProfileSaving}
+          onSave={saveStatusMessage}
+        />
+      </BottomSheet>
     </div>
   );
 };

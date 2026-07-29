@@ -1,5 +1,14 @@
 export type PlayerStatus = "active" | "inactive";
 
+export interface PlayerAffiliation {
+  name: string;
+  isPrimary: boolean;
+}
+
+export const PLAYER_AFFILIATION_MAX_COUNT = 5;
+export const PLAYER_AFFILIATION_NAME_MAX_LENGTH = 30;
+export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 30;
+
 export type PlayerCreationSource =
   | "self_register"
   | "admin_register"
@@ -433,6 +442,9 @@ export interface Player {
   gender: "M" | "F";
   status: PlayerStatus;
   avatarUrl?: string;
+  affiliations?: PlayerAffiliation[];
+  statusMessage?: string;
+  statusMessageBackgroundColor?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -19,9 +19,15 @@ import {
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import { generateEntityId, isEntityId } from "@pkpkdupr/shared/entityId";
+import {
+  PLAYER_AFFILIATION_MAX_COUNT,
+  PLAYER_AFFILIATION_NAME_MAX_LENGTH,
+  PLAYER_STATUS_MESSAGE_MAX_LENGTH,
+} from "@pkpkdupr/shared/player";
 import type {
   MemberListPlayer,
   Player,
+  PlayerAffiliation,
   PlayerStatus,
 } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
@@ -1402,6 +1408,72 @@ app.post("/api/change-password", async (req, res) => {
   }
 });
 
+const hasOwnProperty = (value: object, key: string) =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
+const normalizeProfileAffiliations = (value: unknown): PlayerAffiliation[] => {
+  if (!Array.isArray(value)) {
+    throw new Error("소속은 목록 형식이어야 합니다.");
+  }
+  if (value.length > PLAYER_AFFILIATION_MAX_COUNT) {
+    throw new Error(`소속은 최대 ${PLAYER_AFFILIATION_MAX_COUNT}개까지 등록할 수 있습니다.`);
+  }
+
+  const names = new Set<string>();
+  const affiliations = value.map((item) => {
+    if (!item || typeof item !== "object") {
+      throw new Error("소속 정보가 올바르지 않습니다.");
+    }
+    const { name, isPrimary } = item as Record<string, unknown>;
+    const normalizedName = typeof name === "string" ? name.trim() : "";
+    if (!normalizedName) {
+      throw new Error("소속명을 입력해 주세요.");
+    }
+    if (Array.from(normalizedName).length > PLAYER_AFFILIATION_NAME_MAX_LENGTH) {
+      throw new Error(
+        `소속명은 ${PLAYER_AFFILIATION_NAME_MAX_LENGTH}자 이하여야 합니다.`,
+      );
+    }
+    const duplicateKey = normalizedName.replace(/\s+/g, " ").toLocaleLowerCase();
+    if (names.has(duplicateKey)) {
+      throw new Error("같은 소속을 중복 등록할 수 없습니다.");
+    }
+    names.add(duplicateKey);
+    if (typeof isPrimary !== "boolean") {
+      throw new Error("대표 소속 정보를 확인해 주세요.");
+    }
+    return { name: normalizedName, isPrimary };
+  });
+
+  const primaryCount = affiliations.filter((item) => item.isPrimary).length;
+  if (affiliations.length > 0 && primaryCount !== 1) {
+    throw new Error("대표 소속을 하나 지정해 주세요.");
+  }
+  return affiliations;
+};
+
+const normalizeStatusMessage = (value: unknown): string | null => {
+  if (value == null) return null;
+  if (typeof value !== "string") {
+    throw new Error("상태메시지는 문자열이어야 합니다.");
+  }
+  const message = value.trim();
+  if (Array.from(message).length > PLAYER_STATUS_MESSAGE_MAX_LENGTH) {
+    throw new Error(
+      `상태메시지는 ${PLAYER_STATUS_MESSAGE_MAX_LENGTH}자 이하여야 합니다.`,
+    );
+  }
+  return message || null;
+};
+
+const normalizeStatusMessageBackgroundColor = (value: unknown): string | null => {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !/^#[0-9a-f]{6}$/i.test(value)) {
+    throw new Error("상태메시지 배경색 형식이 올바르지 않습니다.");
+  }
+  return value.toUpperCase();
+};
+
 app.patch("/api/me/profile", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -1409,7 +1481,14 @@ app.patch("/api/me/profile", async (req, res) => {
       return;
     }
 
-    const { avatarUrl } = req.body as { avatarUrl?: string | null };
+    const input = req.body as Record<string, unknown>;
+    const update: {
+      avatarUrl?: string | null;
+      affiliations?: PlayerAffiliation[];
+      statusMessage?: string | null;
+      statusMessageBackgroundColor?: string | null;
+    } = {};
+    const avatarUrl = input.avatarUrl;
     if (
       typeof avatarUrl === "string" &&
       avatarUrl.trim().length > 0 &&
@@ -1419,13 +1498,31 @@ app.patch("/api/me/profile", async (req, res) => {
         .status(400)
         .json({ error: "프로필 이미지 URL이 너무 깁니다." });
     }
+    if (hasOwnProperty(input, "avatarUrl")) {
+      update.avatarUrl =
+        typeof avatarUrl === "string" && avatarUrl.trim()
+          ? avatarUrl.trim()
+          : null;
+    }
+    if (hasOwnProperty(input, "affiliations")) {
+      update.affiliations = normalizeProfileAffiliations(input.affiliations);
+    }
+    if (hasOwnProperty(input, "statusMessage")) {
+      update.statusMessage = normalizeStatusMessage(input.statusMessage);
+      if (!update.statusMessage && !hasOwnProperty(input, "statusMessageBackgroundColor")) {
+        update.statusMessageBackgroundColor = null;
+      }
+    }
+    if (hasOwnProperty(input, "statusMessageBackgroundColor")) {
+      update.statusMessageBackgroundColor = normalizeStatusMessageBackgroundColor(
+        input.statusMessageBackgroundColor,
+      );
+    }
 
-    const player = await authService.updatePlayerProfile(decoded.playerId, {
-      avatarUrl,
-    });
+    const player = await authService.updatePlayerProfile(decoded.playerId, update);
     res.json(player);
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

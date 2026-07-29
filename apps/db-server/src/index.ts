@@ -307,6 +307,9 @@ const ensurePlayersDuprRatingNullable = async () => {
       gender TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
       avatar_url TEXT,
+      affiliations_json TEXT,
+      status_message TEXT,
+      status_message_background_color TEXT,
       password_hash TEXT NOT NULL DEFAULT '',
       is_first_login INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL,
@@ -321,6 +324,9 @@ const ensurePlayersDuprRatingNullable = async () => {
       gender,
       status,
       avatar_url,
+      affiliations_json,
+      status_message,
+      status_message_background_color,
       password_hash,
       is_first_login,
       created_at,
@@ -333,6 +339,9 @@ const ensurePlayersDuprRatingNullable = async () => {
       gender,
       status,
       avatar_url,
+      affiliations_json,
+      status_message,
+      status_message_background_color,
       password_hash,
       is_first_login,
       created_at,
@@ -349,8 +358,11 @@ const initSchema = async () => {
 	      username TEXT NOT NULL UNIQUE,
 	      dupr_rating TEXT,
 	      gender TEXT NOT NULL,
-	      status TEXT NOT NULL DEFAULT 'active',
+      status TEXT NOT NULL DEFAULT 'active',
       avatar_url TEXT,
+      affiliations_json TEXT,
+      status_message TEXT,
+      status_message_background_color TEXT,
       password_hash TEXT NOT NULL DEFAULT '',
       is_first_login INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL,
@@ -362,6 +374,11 @@ const initSchema = async () => {
     `ALTER TABLE players ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`,
   );
   await safeExec(`ALTER TABLE players ADD COLUMN avatar_url TEXT`);
+  await safeExec(`ALTER TABLE players ADD COLUMN affiliations_json TEXT`);
+  await safeExec(`ALTER TABLE players ADD COLUMN status_message TEXT`);
+  await safeExec(
+    `ALTER TABLE players ADD COLUMN status_message_background_color TEXT`,
+  );
   await safeExec(
     `ALTER TABLE players ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`,
   );
@@ -853,7 +870,7 @@ app.patch("/internal/players/:id/password", async (req, res) => {
 app.patch("/internal/players/:id/profile", async (req, res) => {
   try {
     const player = await playerRepository.updateProfile(req.params.id, {
-      avatarUrl: req.body.avatarUrl ?? null,
+      ...req.body,
     });
     if (!player) {
       return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
