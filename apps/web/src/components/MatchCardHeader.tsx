@@ -9,6 +9,7 @@ interface MatchCardHeaderProps {
   date: string;
   time: string;
   location?: string;
+  courtName?: string;
   title?: string;
   afterTime?: React.ReactNode;
   rightContent?: React.ReactNode;
@@ -20,6 +21,7 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
   date,
   time,
   location,
+  courtName,
   title,
   afterTime,
   rightContent,
@@ -48,13 +50,19 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
         </div>
       )}
     </div>
-    {location ? (
-      <div className="mt-0 flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold tabular-nums text-pkpk-sub-font">
+    {location || courtName ? (
+      <div className="mt-0 flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-pkpk-sub-font">
         <IoLocationOutline
           aria-hidden="true"
           className="size-3.5 shrink-0 [&_*]:stroke-[40]"
         />
-        <span className="relative top-px truncate">{location}</span>
+        <span className="relative top-px truncate">
+          {location ? <span>{location}</span> : null}
+          {location && courtName ? (
+            <span className="text-pkpk-sub-font/50"> · </span>
+          ) : null}
+          {courtName ? <span className="font-semibold">{courtName}</span> : null}
+        </span>
       </div>
     ) : null}
     {title ? (

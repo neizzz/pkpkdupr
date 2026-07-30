@@ -459,6 +459,7 @@ const initSchema = async () => {
       session_date INTEGER,
       status TEXT NOT NULL,
       location TEXT NOT NULL,
+      court_name TEXT,
       match_starts_at INTEGER NOT NULL,
       completed_at INTEGER,
       result_submitted_by_player_id TEXT,
@@ -481,6 +482,7 @@ const initSchema = async () => {
   await safeExec(`ALTER TABLE matches ADD COLUMN session_id TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN session_name TEXT`);
   await safeExec(`ALTER TABLE matches ADD COLUMN session_date INTEGER`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN court_name TEXT`);
   await safeExec(
     `ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`,
   );
@@ -1011,6 +1013,24 @@ app.post("/internal/matches", async (req, res) => {
       return res.status(409).json({ error: message });
     }
     res.status(500).json({ error: message });
+  }
+});
+
+app.post("/internal/matches/batch", async (req, res) => {
+  try {
+    const inputs = Array.isArray(req.body?.matches)
+      ? (req.body.matches as CreateMatchInput[])
+      : [];
+    if (inputs.length === 0) {
+      return res.status(400).json({ error: "한 개 이상의 예정 경기가 필요합니다." });
+    }
+    res.status(201).json(await matchRepository.createScheduledBatch(inputs));
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message.includes("UNIQUE") || message.includes("unique")) {
+      return res.status(409).json({ error: message });
+    }
+    res.status(400).json({ error: message });
   }
 });
 

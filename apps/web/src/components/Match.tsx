@@ -162,6 +162,7 @@ const Match: React.FC<MatchProps> = ({
           date={matchDate}
           time={matchTime}
           location={match.location}
+          courtName={match.courtName}
           title={displayTitle}
           rightContent={headerRightContent}
           showChevron={showChevron}

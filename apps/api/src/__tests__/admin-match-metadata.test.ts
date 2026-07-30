@@ -101,6 +101,34 @@ describe("admin match metadata", () => {
     });
   });
 
+  it("경기 예정 일시와 코트명을 독립적으로 수정한다", async () => {
+    const matchStartsAt = "2026-07-23T11:15:00.000Z";
+    const updateMetadata = vi
+      .spyOn(MatchRepository.prototype, "updateMetadata")
+      .mockImplementation(async (matchId, input) => ({
+        ...buildMatch(matchId),
+        courtName: input.courtName ?? undefined,
+        matchStartsAt: input.matchStartsAt
+          ? new Date(input.matchStartsAt)
+          : now,
+      }));
+
+    const response = await request(app)
+      .patch("/api/admin/matches/match-001/metadata")
+      .set("Authorization", "Bearer admin-token")
+      .send({ courtName: "코트 B", matchStartsAt });
+
+    expect(response.status).toBe(200);
+    expect(updateMetadata).toHaveBeenCalledWith("match-001", {
+      courtName: "코트 B",
+      matchStartsAt,
+    });
+    expect(response.body).toMatchObject({
+      courtName: "코트 B",
+      matchStartsAt,
+    });
+  });
+
   it("관리자 세션 조회 시 권한과 갱신 토큰을 함께 반환한다", async () => {
     const response = await request(app)
       .get("/api/me")

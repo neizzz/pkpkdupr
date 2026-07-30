@@ -84,6 +84,12 @@ export const matchModeLabels: Record<MatchMode, string> = {
   "best-of-3": "2선승",
 };
 
+export const getMatchScheduleDurationMinutes = (mode: MatchMode) =>
+  mode === "best-of-3" ? 30 : 15;
+
+export const getMatchScheduleDurationMs = (mode: MatchMode) =>
+  getMatchScheduleDurationMinutes(mode) * 60 * 1000;
+
 export const MATCH_RESULT_MAX_SCORE_COUNT = 3;
 
 export type MatchStatus =
@@ -248,6 +254,7 @@ export interface Match {
   resultSubmittedAt: Date | null;
   approvals: MatchResultApproval[];
   location: string;
+  courtName?: string;
   matchStartsAt: Date;
   createdAt: Date;
   completedAt: Date | null;

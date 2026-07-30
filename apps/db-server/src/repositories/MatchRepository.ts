@@ -74,6 +74,7 @@ export interface CreateMatchInput {
   teams: [Team, Team];
   scores?: MatchScore[];
   location: string;
+  courtName?: string;
   matchStartsAt: Date;
   completedAt: Date | null;
   resultSubmittedByPlayerId?: string | null;
@@ -86,6 +87,8 @@ export interface UpdateMatchMetadataInput {
   sessionName?: string | null;
   sessionDate?: Date | null;
   sessionLocation?: string | null;
+  courtName?: string | null;
+  matchStartsAt?: Date | string;
 }
 
 export interface MatchParticipantDuprSnapshot {
@@ -522,6 +525,7 @@ export class MatchRepository {
       sessionDate: toDateOrNull(data.session?.date),
       status: data.status,
       location: data.location,
+      courtName: data.courtName?.trim() || null,
       matchStartsAt: new Date(data.matchStartsAt),
       completedAt: toDateOrNull(data.completedAt),
       resultSubmittedByPlayerId: data.resultSubmittedByPlayerId ?? null,
@@ -539,6 +543,149 @@ export class MatchRepository {
       throw new Error("매치 생성에 실패했습니다.");
     }
     return created;
+  }
+
+  async createScheduledBatch(data: CreateMatchInput[]): Promise<Match[]> {
+    if (data.length === 0) {
+      return [];
+    }
+
+    const matchIds = new Set<string>();
+    for (const match of data) {
+      if (!isEntityId(match.id, "match")) {
+        throw new Error("유효한 매치 ID가 필요합니다.");
+      }
+      if (matchIds.has(match.id)) {
+        throw new Error("중복된 매치 ID가 있습니다.");
+      }
+      if (!match.session || !isEntityId(match.session.id, "session")) {
+        throw new Error("유효한 세션 정보가 필요합니다.");
+      }
+      if (match.status !== "created" || (match.scores?.length ?? 0) > 0) {
+        throw new Error("예정 경기만 일괄 생성할 수 있습니다.");
+      }
+      if (!match.courtName?.trim()) {
+        throw new Error("코트명이 필요합니다.");
+      }
+      if (Number.isNaN(new Date(match.matchStartsAt).getTime())) {
+        throw new Error("유효한 경기 예정 일시가 필요합니다.");
+      }
+      matchIds.add(match.id);
+    }
+
+    const sessionIds = [...new Set(data.map((match) => match.session!.id))];
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+
+    try {
+      for (const sessionId of sessionIds) {
+        const session = await transaction.execute({
+          sql: "SELECT id FROM match_sessions WHERE id = ?",
+          args: [sessionId],
+        });
+        if (session.rows.length === 0) {
+          throw new Error("세션을 찾을 수 없습니다.");
+        }
+      }
+
+      const now = new Date();
+      const nowSeconds = toUnixTimestampSeconds(now);
+      for (const match of data) {
+        const session = match.session!;
+        const sessionDate = new Date(session.date);
+        const matchStartsAt = new Date(match.matchStartsAt);
+        const courtName = match.courtName?.trim();
+        if (Number.isNaN(sessionDate.getTime())) {
+          throw new Error("유효한 세션 정보가 필요합니다.");
+        }
+        if (!courtName) {
+          throw new Error("코트명이 필요합니다.");
+        }
+
+        await transaction.execute({
+          sql: `
+            INSERT INTO matches (
+              id,
+              type,
+              mode,
+              source,
+              creator_player_id,
+              name,
+              session_id,
+              session_name,
+              session_date,
+              status,
+              location,
+              court_name,
+              match_starts_at,
+              completed_at,
+              result_submitted_by_player_id,
+              result_submitted_at,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          args: [
+            match.id,
+            match.type,
+            match.mode,
+            match.source ?? "admin_created",
+            match.creatorPlayerId,
+            match.name?.trim() || null,
+            session.id,
+            session.name?.trim() || null,
+            toUnixTimestampSeconds(sessionDate),
+            match.status,
+            match.location,
+            courtName,
+            toUnixTimestampSeconds(matchStartsAt),
+            null,
+            null,
+            null,
+            nowSeconds,
+            nowSeconds,
+          ],
+        });
+
+        for (const [teamIndex, team] of match.teams.entries()) {
+          for (const player of team.players) {
+            await transaction.execute({
+              sql: `
+                INSERT INTO match_participants (
+                  id,
+                  match_id,
+                  team_index,
+                  player_id,
+                  dupr_rating_json
+                )
+                VALUES (?, ?, ?, ?, ?)
+              `,
+              args: [
+                `${match.id}-team-${teamIndex}-${player.id}`,
+                match.id,
+                teamIndex,
+                player.id,
+                JSON.stringify(player.duprRating ?? null),
+              ],
+            });
+          }
+        }
+      }
+
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
+
+    const createdMatches = await Promise.all(data.map((match) => this.findById(match.id)));
+    if (createdMatches.some((match) => !match)) {
+      throw new Error("일괄 경기 생성에 실패했습니다.");
+    }
+    return createdMatches as Match[];
   }
 
   async fillMissingParticipantDuprSnapshots(
@@ -981,6 +1128,18 @@ export class MatchRepository {
       updatePayload.name = data.name?.trim() || null;
     }
 
+    if ("courtName" in data) {
+      updatePayload.courtName = data.courtName?.trim() || null;
+    }
+
+    if ("matchStartsAt" in data) {
+      const matchStartsAt = toDateOrNull(data.matchStartsAt);
+      if (!matchStartsAt || Number.isNaN(matchStartsAt.getTime())) {
+        throw new Error("유효한 경기 예정 일시가 필요합니다.");
+      }
+      updatePayload.matchStartsAt = matchStartsAt;
+    }
+
     if (
       "sessionName" in data ||
       "sessionDate" in data ||
@@ -1112,6 +1271,7 @@ export class MatchRepository {
       resultSubmittedAt: toDateOrNull(match.resultSubmittedAt),
       approvals: approvals.map(toApproval),
       location: match.location,
+      courtName: match.courtName?.trim() || undefined,
       matchStartsAt: toDate(match.matchStartsAt),
       createdAt: toDate(match.createdAt),
       completedAt: toDateOrNull(match.completedAt),

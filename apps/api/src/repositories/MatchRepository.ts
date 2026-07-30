@@ -82,6 +82,10 @@ const hydrateMatch = (record: any): Match => ({
     typeof record.name === "string" && record.name.trim()
       ? record.name.trim()
       : undefined,
+  courtName:
+    typeof record.courtName === "string" && record.courtName.trim()
+      ? record.courtName.trim()
+      : undefined,
   session: hydrateSession(record),
   teams: [
     {
@@ -240,6 +244,25 @@ export class MatchRepository {
     }
 
     throw new Error("매치 ID 생성에 실패했습니다.");
+  }
+
+  async createScheduledBatch(
+    matches: Array<
+      Omit<Match, "id" | "createdAt" | "updatedAt"> & { id?: string }
+    >,
+  ): Promise<Match[]> {
+    const inputs = matches.map((match) => ({
+      id: match.id ?? generateEntityId("match"),
+      ...match,
+      resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
+      resultSubmittedAt: match.resultSubmittedAt ?? null,
+      approvals: match.approvals ?? [],
+    }));
+    const created = await this.dbRequest<any[]>("/internal/matches/batch", {
+      method: "POST",
+      body: JSON.stringify({ matches: inputs }),
+    });
+    return created.map(hydrateMatch);
   }
 
   async createSession(
@@ -445,6 +468,8 @@ export class MatchRepository {
       sessionName?: string | null;
       sessionDate?: string | null;
       sessionLocation?: string | null;
+      courtName?: string | null;
+      matchStartsAt?: string;
     },
   ): Promise<Match> {
     const updated = await this.dbRequest<any>(

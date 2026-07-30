@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_MATCH_MODE,
+  getMatchScheduleDurationMs,
   isSinglesMatchType,
   matchModeLabels,
   matchModeValues,
@@ -31,6 +32,7 @@ type SessionMatchInfo = {
   type: MatchType;
   mode: MatchMode;
   status: MatchStatus;
+  courtName?: string;
   matchStartsAt: string;
   scores?: Array<{ scoreA: number; scoreB: number }>;
   teams: [
@@ -52,6 +54,22 @@ type AutoMatchDraft = {
   teams: [string[], string[]];
 };
 
+type AutoScheduledMatch = AutoMatchDraft & {
+  mode: MatchMode;
+  courtName: string;
+  matchStartsAt: string;
+};
+
+type AutoSchedulePreview = {
+  kind: AutoMatchKind;
+  matches: AutoScheduledMatch[];
+};
+
+type MatchScheduleDraft = {
+  courtName: string;
+  matchStartsAt: string;
+};
+
 const DELETE_HOLD_DURATION_MS = 800;
 
 const getMatchupKey = (teams: [string[], string[]]) =>
@@ -59,6 +77,57 @@ const getMatchupKey = (teams: [string[], string[]]) =>
     .map((team) => [...team].sort().join(","))
     .sort()
     .join("|");
+
+const getCourtKey = (courtName: string) =>
+  courtName.trim().toLocaleLowerCase();
+
+const getScheduleConflictMessages = (
+  existingMatches: SessionMatchInfo[],
+  preview: AutoSchedulePreview | null,
+) => {
+  if (!preview) {
+    return [];
+  }
+
+  const intervals = [
+    ...existingMatches
+      .filter((match) => match.status !== "cancelled" && match.courtName?.trim())
+      .map((match, index) => ({
+        label: match.name?.trim() || `${index + 1}번 경기`,
+        courtName: match.courtName!.trim(),
+        startsAt: new Date(match.matchStartsAt).getTime(),
+        endsAt:
+          new Date(match.matchStartsAt).getTime() +
+          getMatchScheduleDurationMs(match.mode),
+      })),
+    ...preview.matches.map((match, index) => ({
+      label: `${index + 1}번 새 경기`,
+      courtName: match.courtName.trim(),
+      startsAt: new Date(match.matchStartsAt).getTime(),
+      endsAt:
+        new Date(match.matchStartsAt).getTime() +
+        getMatchScheduleDurationMs(match.mode),
+    })),
+  ].filter((interval) => Number.isFinite(interval.startsAt));
+
+  const conflicts: string[] = [];
+  const courtKeys = [...new Set(intervals.map((interval) => getCourtKey(interval.courtName)))];
+  for (const courtKey of courtKeys) {
+    const courtIntervals = intervals
+      .filter((interval) => getCourtKey(interval.courtName) === courtKey)
+      .sort((left, right) => left.startsAt - right.startsAt);
+    for (let index = 1; index < courtIntervals.length; index += 1) {
+      const previous = courtIntervals[index - 1];
+      const current = courtIntervals[index];
+      if (previous && current && current.startsAt < previous.endsAt) {
+        conflicts.push(
+          `${current.courtName}: ${previous.label}와 ${current.label}의 시간이 겹칩니다.`,
+        );
+      }
+    }
+  }
+  return conflicts;
+};
 
 const inferSinglesType = (
   players: Array<Pick<Player, "gender">>,
@@ -232,6 +301,8 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
     useState<MatchType>("unrestricted-doubles");
   const [matchMode, setMatchMode] = useState<MatchMode>(DEFAULT_MATCH_MODE);
   const [matchStartsAt, setMatchStartsAt] = useState("");
+  const [matchCourtName, setMatchCourtName] = useState("코트 1");
+  const [courtNames, setCourtNames] = useState<string[]>(["코트 1"]);
   const [teams, setTeams] = useState<[string[], string[]]>(() =>
     createEmptyTeams("unrestricted-doubles"),
   );
@@ -243,6 +314,16 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
   const [isCreatingMatch, setIsCreatingMatch] = useState(false);
   const [creatingAutoMatchKind, setCreatingAutoMatchKind] =
     useState<AutoMatchKind | null>(null);
+  const [autoSchedulePreview, setAutoSchedulePreview] =
+    useState<AutoSchedulePreview | null>(null);
+  const [isConfirmingAutoSchedule, setIsConfirmingAutoSchedule] =
+    useState(false);
+  const [matchScheduleDrafts, setMatchScheduleDrafts] = useState<
+    Record<string, MatchScheduleDraft>
+  >({});
+  const [savingScheduleMatchId, setSavingScheduleMatchId] = useState<
+    string | null
+  >(null);
   const [savingResultMatchId, setSavingResultMatchId] = useState<string | null>(
     null,
   );
@@ -284,6 +365,17 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
     player.username
       .toLocaleLowerCase()
       .includes(participantQuery.trim().toLocaleLowerCase()),
+  );
+  const autoScheduleConflicts = useMemo(
+    () => getScheduleConflictMessages(sessionMatches, autoSchedulePreview),
+    [autoSchedulePreview, sessionMatches],
+  );
+  const isAutoSchedulePreviewInvalid = Boolean(
+    autoSchedulePreview?.matches.some(
+      (match) =>
+        !match.courtName.trim() ||
+        Number.isNaN(new Date(match.matchStartsAt).getTime()),
+    ),
   );
 
   const loadSessions = async (preferredSessionId?: string) => {
@@ -339,6 +431,27 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
         ]),
       ),
     );
+    setMatchScheduleDrafts((currentDrafts) =>
+      Object.fromEntries(
+        matches.map((match) => [
+          match.id,
+          currentDrafts[match.id] ?? {
+            courtName: match.courtName ?? "",
+            matchStartsAt: toLocalDateTimeValue(match.matchStartsAt),
+          },
+        ]),
+      ),
+    );
+    const existingCourtNames = [
+      ...new Map(
+        matches
+          .map((match) => match.courtName?.trim())
+          .filter((courtName): courtName is string => Boolean(courtName))
+          .map((courtName) => [getCourtKey(courtName), courtName]),
+      ).values(),
+    ];
+    setCourtNames(existingCourtNames.length > 0 ? existingCourtNames : ["코트 1"]);
+    setMatchCourtName(existingCourtNames[0] ?? "코트 1");
   };
 
   useEffect(() => {
@@ -375,6 +488,10 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
     }
     setParticipantIds(selectedSession.participantIds);
     setMatchStartsAt(toLocalDateTimeValue(selectedSession.date));
+    setMatchCourtName("코트 1");
+    setCourtNames(["코트 1"]);
+    setAutoSchedulePreview(null);
+    setMatchScheduleDrafts({});
     setTeams(createEmptyTeams(matchType));
     setError(null);
     setSuccess(null);
@@ -529,6 +646,12 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
     setError(null);
     setSuccess(null);
 
+    const normalizedCourtName = matchCourtName.trim();
+    if (!normalizedCourtName) {
+      setError("코트명을 입력해주세요.");
+      return;
+    }
+
     try {
       setIsCreatingMatch(true);
       const response = await fetch(
@@ -543,6 +666,7 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
             name: matchName.trim() || undefined,
             type: matchType,
             mode: matchMode,
+            courtName: normalizedCourtName,
             matchStartsAt: new Date(matchStartsAt).toISOString(),
             teams: [
               { name: "Team A", playerIds: teams[0] },
@@ -611,30 +735,119 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
 
     try {
       setCreatingAutoMatchKind(kind);
-      for (const draft of missingDrafts) {
-        const response = await fetch(
-          `/api/admin/match-sessions/${selectedSession.id}/matches`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
+      const response = await fetch(
+        `/api/admin/match-sessions/${selectedSession.id}/matches/schedule-preview`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            courts: courtNames,
+            matches: missingDrafts.map((draft) => ({
               type: draft.type,
               mode: matchMode,
-              matchStartsAt: new Date(matchStartsAt).toISOString(),
               teams: [
                 { name: "Team A", playerIds: draft.teams[0] },
                 { name: "Team B", playerIds: draft.teams[1] },
               ],
-            }),
+            })),
+          }),
+        },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "전체 대진 시간표 계산 실패");
+      }
+      const { schedule } = (await response.json()) as {
+        schedule: Array<{ courtName: string; matchStartsAt: string }>;
+      };
+      if (schedule.length !== missingDrafts.length) {
+        throw new Error("전체 대진 시간표를 계산하지 못했습니다.");
+      }
+      setAutoSchedulePreview({
+        kind,
+        matches: missingDrafts.map((draft, index) => ({
+          ...draft,
+          mode: matchMode,
+          courtName: schedule[index]!.courtName,
+          matchStartsAt: toLocalDateTimeValue(schedule[index]!.matchStartsAt),
+        })),
+      });
+      setSuccess(
+        `${kind === "singles" ? "단식" : "복식"} 전체 대진 ${missingDrafts.length}경기의 시간표를 확인해주세요.`,
+      );
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "전체 대진 시간표 계산에 실패했습니다.",
+      );
+    } finally {
+      setCreatingAutoMatchKind(null);
+    }
+  };
+
+  const updateAutoSchedulePreview = (
+    index: number,
+    update: Partial<Pick<AutoScheduledMatch, "courtName" | "matchStartsAt">>,
+  ) => {
+    setAutoSchedulePreview((currentPreview) =>
+      currentPreview
+        ? {
+            ...currentPreview,
+            matches: currentPreview.matches.map((match, matchIndex) =>
+              matchIndex === index ? { ...match, ...update } : match,
+            ),
+          }
+        : null,
+    );
+  };
+
+  const handleConfirmAutoSchedule = async () => {
+    if (!selectedSession || !autoSchedulePreview) {
+      return;
+    }
+    if (autoScheduleConflicts.length > 0) {
+      setError(autoScheduleConflicts[0]);
+      return;
+    }
+    if (isAutoSchedulePreviewInvalid) {
+      setError("모든 대진의 코트명과 예정 일시를 입력해주세요.");
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    try {
+      setIsConfirmingAutoSchedule(true);
+      const response = await fetch(
+        `/api/admin/match-sessions/${selectedSession.id}/matches/scheduled-batch`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-        );
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "전체 대진 생성 실패");
-        }
+          body: JSON.stringify({
+            courts: courtNames,
+            matches: autoSchedulePreview.matches.map((match) => ({
+              type: match.type,
+              mode: match.mode,
+              courtName: match.courtName,
+              matchStartsAt: new Date(match.matchStartsAt).toISOString(),
+              teams: [
+                { name: "Team A", playerIds: match.teams[0] },
+                { name: "Team B", playerIds: match.teams[1] },
+              ],
+            })),
+          }),
+        },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "전체 대진 생성 실패");
       }
 
       const [, matches] = await Promise.all([
@@ -642,23 +855,84 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
         loadSessionMatches(selectedSession.id),
       ]);
       setLoadedSessionMatches(matches);
+      setAutoSchedulePreview(null);
       setSuccess(
-        `${kind === "singles" ? "단식" : "복식"} 전체 대진 ${missingDrafts.length}경기를 생성했습니다.`,
+        `${autoSchedulePreview.kind === "singles" ? "단식" : "복식"} 전체 대진 ${autoSchedulePreview.matches.length}경기를 생성했습니다.`,
       );
     } catch (submitError) {
-      const matches = await loadSessionMatches(selectedSession.id).catch(
-        () => null,
-      );
-      if (matches) {
-        setLoadedSessionMatches(matches);
-      }
       setError(
         submitError instanceof Error
           ? submitError.message
           : "전체 대진 생성에 실패했습니다.",
       );
     } finally {
-      setCreatingAutoMatchKind(null);
+      setIsConfirmingAutoSchedule(false);
+    }
+  };
+
+  const updateMatchScheduleDraft = (
+    matchId: string,
+    update: Partial<MatchScheduleDraft>,
+  ) => {
+    setMatchScheduleDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [matchId]: {
+        courtName: currentDrafts[matchId]?.courtName ?? "",
+        matchStartsAt: currentDrafts[matchId]?.matchStartsAt ?? "",
+        ...update,
+      },
+    }));
+  };
+
+  const handleSaveMatchSchedule = async (match: SessionMatchInfo) => {
+    if (!selectedSession) {
+      return;
+    }
+    const draft = matchScheduleDrafts[match.id] ?? {
+      courtName: match.courtName ?? "",
+      matchStartsAt: toLocalDateTimeValue(match.matchStartsAt),
+    };
+    const courtName = draft.courtName.trim();
+    const matchStartsAt = new Date(draft.matchStartsAt);
+    if (!courtName) {
+      setError("코트명을 입력해주세요.");
+      return;
+    }
+    if (Number.isNaN(matchStartsAt.getTime())) {
+      setError("유효한 경기 예정 일시를 입력해주세요.");
+      return;
+    }
+
+    setError(null);
+    setSuccess(null);
+    try {
+      setSavingScheduleMatchId(match.id);
+      const response = await fetch(`/api/admin/matches/${match.id}/metadata`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          courtName,
+          matchStartsAt: matchStartsAt.toISOString(),
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "경기 일정 저장 실패");
+      }
+      const matches = await loadSessionMatches(selectedSession.id);
+      setLoadedSessionMatches(matches);
+      setSuccess("경기 예정 일시와 코트를 저장했습니다.");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "경기 일정 저장에 실패했습니다.",
+      );
+    } finally {
+      setSavingScheduleMatchId(null);
     }
   };
 
@@ -1010,13 +1284,84 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-end justify-end gap-2">
+                    <div className="min-w-52 space-y-1">
+                      <span className="block text-xs font-medium text-slate-500">
+                        자동 배정 코트명
+                      </span>
+                      {courtNames.map((courtName, index) => (
+                        <div key={`court-${index}`} className="flex gap-1">
+                          <input
+                            type="text"
+                            value={courtName}
+                            disabled={
+                              creatingAutoMatchKind !== null ||
+                              isConfirmingAutoSchedule ||
+                              autoSchedulePreview !== null
+                            }
+                            onChange={(event) =>
+                              setCourtNames((currentCourts) =>
+                                currentCourts.map((currentCourt, courtIndex) =>
+                                  courtIndex === index
+                                    ? event.target.value
+                                    : currentCourt,
+                                ),
+                              )
+                            }
+                            placeholder={`코트 ${index + 1}`}
+                            className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm text-slate-700 disabled:bg-slate-100"
+                          />
+                          {courtNames.length > 1 ? (
+                            <button
+                              type="button"
+                              disabled={
+                                creatingAutoMatchKind !== null ||
+                                isConfirmingAutoSchedule ||
+                                autoSchedulePreview !== null
+                              }
+                              onClick={() =>
+                                setCourtNames((currentCourts) =>
+                                  currentCourts.filter(
+                                    (_, courtIndex) => courtIndex !== index,
+                                  ),
+                                )
+                              }
+                              className="rounded-lg border px-2 text-sm text-slate-500 hover:bg-slate-50 disabled:text-slate-300"
+                              aria-label={`${courtName || index + 1} 코트 삭제`}
+                            >
+                              −
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={
+                          creatingAutoMatchKind !== null ||
+                          isConfirmingAutoSchedule ||
+                          autoSchedulePreview !== null
+                        }
+                        onClick={() =>
+                          setCourtNames((currentCourts) => [
+                            ...currentCourts,
+                            `코트 ${currentCourts.length + 1}`,
+                          ])
+                        }
+                        className="text-xs font-semibold text-blue-600 hover:underline disabled:text-slate-300"
+                      >
+                        코트 추가
+                      </button>
+                    </div>
                     <label className="min-w-36">
                       <span className="mb-1 block text-xs font-medium text-slate-500">
                         전체 대진 경기 모드
                       </span>
                       <select
                         value={matchMode}
-                        disabled={creatingAutoMatchKind !== null}
+                        disabled={
+                          creatingAutoMatchKind !== null ||
+                          isConfirmingAutoSchedule ||
+                          autoSchedulePreview !== null
+                        }
                         onChange={(event) =>
                           setMatchMode(event.target.value as MatchMode)
                         }
@@ -1034,7 +1379,9 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                       disabled={
                         registeredPlayers.length < 4 ||
                         registeredPlayers.length > 6 ||
-                        creatingAutoMatchKind !== null
+                        creatingAutoMatchKind !== null ||
+                        isConfirmingAutoSchedule ||
+                        autoSchedulePreview !== null
                       }
                       onClick={() => void handleCreateAllMatchups("singles")}
                       className="cursor-pointer rounded-lg border border-blue-200 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
@@ -1048,7 +1395,9 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                       disabled={
                         registeredPlayers.length < 4 ||
                         registeredPlayers.length > 5 ||
-                        creatingAutoMatchKind !== null
+                        creatingAutoMatchKind !== null ||
+                        isConfirmingAutoSchedule ||
+                        autoSchedulePreview !== null
                       }
                       onClick={() => void handleCreateAllMatchups("doubles")}
                       className="cursor-pointer rounded-lg border border-indigo-200 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
@@ -1063,8 +1412,123 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                 <p className="text-xs text-slate-500">
                   단식은 참여자 4~6명, 복식은 4~5명일 때만 생성하며 이미
                   존재하는 동일 대진은 제외합니다. 선택한 경기 모드가 생성되는
-                  모든 대진에 적용됩니다.
+                  모든 대진에 적용됩니다. 코트명과 기존 일정으로 시간표를 먼저
+                  계산한 뒤 확인합니다.
                 </p>
+
+                {autoSchedulePreview ? (
+                  <div className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h4 className="font-semibold text-slate-800">
+                          {autoSchedulePreview.kind === "singles"
+                            ? "단식"
+                            : "복식"}{" "}
+                          전체 대진 시간표 미리보기
+                        </h4>
+                        <p className="mt-1 text-xs text-slate-500">
+                          코트와 시간을 조정할 수 있습니다. 같은 코트의 시간이
+                          겹치면 생성할 수 없습니다.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={isConfirmingAutoSchedule}
+                          onClick={() => setAutoSchedulePreview(null)}
+                          className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white disabled:text-slate-300"
+                        >
+                          취소
+                        </button>
+                        <button
+                          type="button"
+                          disabled={
+                            isConfirmingAutoSchedule ||
+                            isAutoSchedulePreviewInvalid ||
+                            autoScheduleConflicts.length > 0
+                          }
+                          onClick={() => void handleConfirmAutoSchedule()}
+                          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300"
+                        >
+                          {isConfirmingAutoSchedule
+                            ? "생성 중..."
+                            : `${autoSchedulePreview.matches.length}경기 생성`}
+                        </button>
+                      </div>
+                    </div>
+                    {autoScheduleConflicts.length > 0 ? (
+                      <ul className="space-y-1 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                        {autoScheduleConflicts.map((conflict) => (
+                          <li key={conflict}>{conflict}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[680px] text-left text-sm">
+                        <thead className="text-xs text-slate-500">
+                          <tr>
+                            <th className="px-2 py-2">경기</th>
+                            <th className="px-2 py-2">대진</th>
+                            <th className="px-2 py-2">예정 일시</th>
+                            <th className="px-2 py-2">코트</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {autoSchedulePreview.matches.map((match, index) => (
+                            <tr key={`${match.type}-${index}`} className="border-t border-blue-100">
+                              <td className="px-2 py-2 font-medium text-slate-700">
+                                {index + 1}번
+                              </td>
+                              <td className="px-2 py-2 text-slate-600">
+                                {match.teams
+                                  .flat()
+                                  .map(
+                                    (playerId) =>
+                                      selectablePlayerById.get(playerId)
+                                        ?.username ?? playerId,
+                                  )
+                                  .join(" · ")}
+                              </td>
+                              <td className="px-2 py-2">
+                                <input
+                                  type="datetime-local"
+                                  value={match.matchStartsAt}
+                                  disabled={isConfirmingAutoSchedule}
+                                  onChange={(event) =>
+                                    updateAutoSchedulePreview(index, {
+                                      matchStartsAt: event.target.value,
+                                    })
+                                  }
+                                  className="rounded border bg-white px-2 py-1.5 text-sm"
+                                />
+                              </td>
+                              <td className="px-2 py-2">
+                                <select
+                                  value={match.courtName}
+                                  disabled={isConfirmingAutoSchedule}
+                                  onChange={(event) =>
+                                    updateAutoSchedulePreview(index, {
+                                      courtName: event.target.value,
+                                    })
+                                  }
+                                  className="rounded border bg-white px-2 py-1.5 text-sm"
+                                >
+                                  {courtNames
+                                    .filter((courtName) => courtName.trim())
+                                    .map((courtName) => (
+                                      <option key={courtName} value={courtName}>
+                                        {courtName}
+                                      </option>
+                                    ))}
+                                </select>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
 
                 {isLoadingSessionMatches ? (
                   <p className="bg-slate-50 px-4 py-5 text-sm text-slate-500">
@@ -1076,7 +1540,7 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[980px] text-left text-sm">
+                    <table className="w-full min-w-[1160px] text-left text-sm">
                       <thead className="bg-slate-100 text-xs font-semibold text-slate-600">
                         <tr>
                           <th className="whitespace-nowrap px-4 py-3">경기</th>
@@ -1084,7 +1548,8 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                           <th className="px-4 py-3">A팀</th>
                           <th className="px-4 py-3">B팀</th>
                           <th className="px-4 py-3">결과</th>
-                          <th className="px-4 py-3">일시</th>
+                          <th className="px-4 py-3">예정 일시</th>
+                          <th className="px-4 py-3">코트</th>
                           <th className="px-4 py-3">상태</th>
                           <th className="px-4 py-3 text-right">관리</th>
                         </tr>
@@ -1098,6 +1563,12 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                           const canAddScore =
                             match.mode === "best-of-3" &&
                             scoreDraft.length < MATCH_RESULT_MAX_SCORE_COUNT;
+                          const scheduleDraft = matchScheduleDrafts[match.id] ?? {
+                            courtName: match.courtName ?? "",
+                            matchStartsAt: toLocalDateTimeValue(
+                              match.matchStartsAt,
+                            ),
+                          };
                           const renderResultCell = () => (
                             <td className="min-w-52 px-4 py-3">
                               {isCompleted ? (
@@ -1216,9 +1687,31 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                               </td>
                               {renderResultCell()}
                               <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                {new Date(match.matchStartsAt).toLocaleString(
-                                  "ko-KR",
-                                )}
+                                <input
+                                  type="datetime-local"
+                                  value={scheduleDraft.matchStartsAt}
+                                  disabled={savingScheduleMatchId === match.id}
+                                  onChange={(event) =>
+                                    updateMatchScheduleDraft(match.id, {
+                                      matchStartsAt: event.target.value,
+                                    })
+                                  }
+                                  className="rounded border bg-white px-2 py-1.5 text-xs disabled:bg-slate-100"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">
+                                <input
+                                  type="text"
+                                  value={scheduleDraft.courtName}
+                                  disabled={savingScheduleMatchId === match.id}
+                                  onChange={(event) =>
+                                    updateMatchScheduleDraft(match.id, {
+                                      courtName: event.target.value,
+                                    })
+                                  }
+                                  placeholder="코트명"
+                                  className="w-24 rounded border bg-white px-2 py-1.5 text-xs disabled:bg-slate-100"
+                                />
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 <span
@@ -1228,6 +1721,18 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                                 </span>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  disabled={savingScheduleMatchId === match.id}
+                                  onClick={() =>
+                                    void handleSaveMatchSchedule(match)
+                                  }
+                                  className="mr-2 rounded px-2 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:text-slate-300"
+                                >
+                                  {savingScheduleMatchId === match.id
+                                    ? "저장 중..."
+                                    : "일정 저장"}
+                                </button>
                                 <button
                                   type="button"
                                   disabled={deletingMatchId === match.id}
@@ -1274,7 +1779,7 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                   </p>
                 ) : (
                   <form onSubmit={handleCreateMatch} className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-5">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-gray-700">
                           경기명
@@ -1339,6 +1844,29 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                           }
                           className="w-full rounded-lg border bg-white px-4 py-2"
                         />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          코트명
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          list="session-court-names"
+                          value={matchCourtName}
+                          onChange={(event) =>
+                            setMatchCourtName(event.target.value)
+                          }
+                          placeholder="코트 1"
+                          className="w-full rounded-lg border bg-white px-4 py-2"
+                        />
+                        <datalist id="session-court-names">
+                          {courtNames
+                            .filter((courtName) => courtName.trim())
+                            .map((courtName) => (
+                              <option key={courtName} value={courtName} />
+                            ))}
+                        </datalist>
                       </div>
                     </div>
 
