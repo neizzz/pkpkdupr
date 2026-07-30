@@ -68,37 +68,39 @@ const SessionCard: React.FC<SessionCardProps> = ({
 
   const card = (
     <Card
-      className={`w-full rounded-3xl border border-pkpk-primary-bg bg-pkpk-session-bg p-3 shadow-sm ${
+      className={`relative w-full overflow-hidden rounded-3xl border border-pkpk-primary-bg p-3 shadow-sm before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-5 before:bg-[linear-gradient(to_bottom,_var(--color-pkpk-primary-bg),_transparent)] before:opacity-5 ${
         onPress ? "transition-colors hover:bg-amber-50" : ""
       }`}
     >
-      <MatchCardHeader
-        date={date}
-        time={time}
-        location={session.location}
-        title={session.name}
-        rightGapClassName="gap-0"
-        rightContent={
-          headerRightContent ??
-          (showMatchCount ? (
-            <span className="text-sm font-semibold leading-none">
-              총 {session.matchCount}경기
-            </span>
-          ) : undefined)
-        }
-        showChevron={showChevron}
-        afterTime={
-          <>
-            <span
-              className={`${sessionChipClassName} ${sessionStatusBadgeClassMap[session.status]}`}
-            >
-              {sessionStatusLabelMap[session.status]}
-            </span>
-            {sessionChip}
-          </>
-        }
-      />
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="relative z-10">
+        <MatchCardHeader
+          date={date}
+          time={time}
+          location={session.location}
+          title={session.name}
+          rightGapClassName="gap-0"
+          rightContent={
+            headerRightContent ??
+            (showMatchCount ? (
+              <span className="text-sm font-semibold leading-none">
+                총 {session.matchCount}경기
+              </span>
+            ) : undefined)
+          }
+          showChevron={showChevron}
+          afterTime={
+            <>
+              <span
+                className={`${sessionChipClassName} ${sessionStatusBadgeClassMap[session.status]}`}
+              >
+                {sessionStatusLabelMap[session.status]}
+              </span>
+              {sessionChip}
+            </>
+          }
+        />
+      </div>
+      <div className="relative z-10 mt-3 flex items-center justify-between gap-3">
         <AvatarGroup
           items={session.participants.map((participant) => ({
             id: participant.id,
