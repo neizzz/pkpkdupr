@@ -97,10 +97,8 @@ const readCachedMatchFeed = (key: string): CachedMatchFeed | null => {
       return null;
     }
 
-    return {
-      items: parsed.items as MatchFeedItemInfo[],
-      total: Math.max(parsed.items.length, parsed.total),
-    };
+    const items = dedupeFeedItems(parsed.items as MatchFeedItemInfo[]);
+    return { items, total: Math.max(items.length, parsed.total) };
   } catch {
     return null;
   }
@@ -113,23 +111,38 @@ const writeCachedMatchFeed = (key: string, cachedFeed: CachedMatchFeed) => {
 const getFeedItemKey = (item: MatchFeedItemInfo) =>
   item.kind === "match"
     ? `match:${item.match.id}`
-    : `session:${item.session.name}\u0000${item.session.date}`;
+    : `session:${item.session.id}`;
+
+const dedupeFeedItems = (items: MatchFeedItemInfo[]) => {
+  const itemIndexByKey = new Map<string, number>();
+  const dedupedItems: MatchFeedItemInfo[] = [];
+
+  for (const item of items) {
+    const key = getFeedItemKey(item);
+    const existingIndex = itemIndexByKey.get(key);
+
+    if (existingIndex == null) {
+      itemIndexByKey.set(key, dedupedItems.length);
+      dedupedItems.push(item);
+      continue;
+    }
+
+    // 동일 세션의 더 최신 응답으로 갱신하되, 피드에서의 표시 순서는 유지한다.
+    dedupedItems[existingIndex] = item;
+  }
+
+  return dedupedItems;
+};
 
 const mergeFeedItems = (
   currentItems: MatchFeedItemInfo[],
   nextItems: MatchFeedItemInfo[],
-) => {
-  const existingItemKeys = new Set(currentItems.map(getFeedItemKey));
-  return [
-    ...currentItems,
-    ...nextItems.filter((item) => !existingItemKeys.has(getFeedItemKey(item))),
-  ];
-};
+) => dedupeFeedItems([...currentItems, ...nextItems]);
 
 const isSameSession = (
   left: MatchSessionSummaryInfo,
   right: MatchSessionSummaryInfo,
-) => left.name === right.name && left.date === right.date;
+) => left.id === right.id;
 
 const noop = () => {};
 
@@ -245,7 +258,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         setFeedItems((currentItems) => {
           const nextItems = append
             ? mergeFeedItems(currentItems, data.items)
-            : data.items;
+            : dedupeFeedItems(data.items);
           writeCachedMatchFeed(cachedFeedKey, {
             items: nextItems,
             total: data.total,

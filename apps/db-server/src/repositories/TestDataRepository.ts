@@ -45,6 +45,9 @@ const devMatchIdByLegacyId: Record<string, string> = {
   "dev-session-open-play-001": "Mdev0003",
   "dev-session-open-play-002": "Mdev0004",
   "dev-session-open-play-003": "Mdev0005",
+  "dev-session-scheduled-001": "Mdev0008",
+  "dev-session-scheduled-002": "Mdev0009",
+  "dev-session-scheduled-003": "Mdev0010",
   "dev-match-missing-opponent-004": "Mdev0006",
   "dev-match-without-players-005": "Mdev0007",
 };
@@ -52,6 +55,7 @@ const devMatchIdByLegacyId: Record<string, string> = {
 const toDevPlayerId = (id: string) => devPlayerIdByLegacyId[id] ?? id;
 const toDevMatchId = (id: string) => devMatchIdByLegacyId[id] ?? id;
 const DEV_OPEN_PLAY_SESSION_ID = "Sdev0001";
+const DEV_SCHEDULED_SESSION_ID = "Sdev0002";
 
 const devMockPlayerReferenceColumns = [
   ["player_creation_logs", "player_id"],
@@ -298,6 +302,60 @@ const mockMatches = [
     updatedAt: new Date("2026-07-19T10:35:00+09:00"),
   },
   {
+    id: "dev-session-scheduled-001",
+    type: "mixed-doubles",
+    source: "admin_created",
+    creatorPlayerId: "dev-player-alice",
+    sessionId: DEV_SCHEDULED_SESSION_ID,
+    sessionName: "시간 분리 검증 세션",
+    sessionDate: new Date("2026-08-01T18:00:00+09:00"),
+    status: "created",
+    location: "Dev Court Schedule",
+    courtName: "코트 1",
+    matchStartsAt: new Date("2026-08-01T18:00:00+09:00"),
+    completedAt: null,
+    resultSubmittedByPlayerId: null,
+    resultSubmittedAt: null,
+    createdAt: new Date("2026-07-30T09:00:00+09:00"),
+    updatedAt: new Date("2026-07-30T09:00:00+09:00"),
+  },
+  {
+    id: "dev-session-scheduled-002",
+    type: "mixed-doubles",
+    source: "admin_created",
+    creatorPlayerId: "dev-player-bob",
+    sessionId: DEV_SCHEDULED_SESSION_ID,
+    sessionName: "시간 분리 검증 세션",
+    sessionDate: new Date("2026-08-01T18:00:00+09:00"),
+    status: "created",
+    location: "Dev Court Schedule",
+    courtName: "코트 1",
+    matchStartsAt: new Date("2026-08-01T18:35:00+09:00"),
+    completedAt: null,
+    resultSubmittedByPlayerId: null,
+    resultSubmittedAt: null,
+    createdAt: new Date("2026-07-30T09:01:00+09:00"),
+    updatedAt: new Date("2026-07-30T09:01:00+09:00"),
+  },
+  {
+    id: "dev-session-scheduled-003",
+    type: "mixed-doubles",
+    source: "admin_created",
+    creatorPlayerId: "dev-player-cara",
+    sessionId: DEV_SCHEDULED_SESSION_ID,
+    sessionName: "시간 분리 검증 세션",
+    sessionDate: new Date("2026-08-01T18:00:00+09:00"),
+    status: "created",
+    location: "Dev Court Schedule",
+    courtName: "코트 2",
+    matchStartsAt: new Date("2026-08-01T19:10:00+09:00"),
+    completedAt: null,
+    resultSubmittedByPlayerId: null,
+    resultSubmittedAt: null,
+    createdAt: new Date("2026-07-30T09:02:00+09:00"),
+    updatedAt: new Date("2026-07-30T09:02:00+09:00"),
+  },
+  {
     id: "dev-match-missing-opponent-004",
     type: "singles",
     source: "player_created",
@@ -538,6 +596,78 @@ const mockMatchParticipants = [
   {
     id: "dev-session-open-play-003-team-1-gabe",
     matchId: "dev-session-open-play-003",
+    teamIndex: 1,
+    playerId: "dev-player-gabe",
+  },
+  {
+    id: "dev-session-scheduled-001-team-0-alice",
+    matchId: "dev-session-scheduled-001",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-session-scheduled-001-team-0-bob",
+    matchId: "dev-session-scheduled-001",
+    teamIndex: 0,
+    playerId: "dev-player-bob",
+  },
+  {
+    id: "dev-session-scheduled-001-team-1-cara",
+    matchId: "dev-session-scheduled-001",
+    teamIndex: 1,
+    playerId: "dev-player-cara",
+  },
+  {
+    id: "dev-session-scheduled-001-team-1-finn",
+    matchId: "dev-session-scheduled-001",
+    teamIndex: 1,
+    playerId: "dev-player-finn",
+  },
+  {
+    id: "dev-session-scheduled-002-team-0-bob",
+    matchId: "dev-session-scheduled-002",
+    teamIndex: 0,
+    playerId: "dev-player-bob",
+  },
+  {
+    id: "dev-session-scheduled-002-team-0-gabe",
+    matchId: "dev-session-scheduled-002",
+    teamIndex: 0,
+    playerId: "dev-player-gabe",
+  },
+  {
+    id: "dev-session-scheduled-002-team-1-dana",
+    matchId: "dev-session-scheduled-002",
+    teamIndex: 1,
+    playerId: "dev-player-dana",
+  },
+  {
+    id: "dev-session-scheduled-002-team-1-hugo",
+    matchId: "dev-session-scheduled-002",
+    teamIndex: 1,
+    playerId: "dev-player-hugo",
+  },
+  {
+    id: "dev-session-scheduled-003-team-0-alice",
+    matchId: "dev-session-scheduled-003",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-session-scheduled-003-team-0-ella",
+    matchId: "dev-session-scheduled-003",
+    teamIndex: 0,
+    playerId: "dev-player-ella",
+  },
+  {
+    id: "dev-session-scheduled-003-team-1-finn",
+    matchId: "dev-session-scheduled-003",
+    teamIndex: 1,
+    playerId: "dev-player-finn",
+  },
+  {
+    id: "dev-session-scheduled-003-team-1-gabe",
+    matchId: "dev-session-scheduled-003",
     teamIndex: 1,
     playerId: "dev-player-gabe",
   },
@@ -891,6 +1021,14 @@ export class TestDataRepository {
       createdAt: new Date("2026-07-19T08:40:00+09:00"),
       updatedAt: new Date("2026-07-19T08:40:00+09:00"),
     });
+    const scheduledSessionId = await this.createSessionIfMissing({
+      id: DEV_SCHEDULED_SESSION_ID,
+      name: "시간 분리 검증 세션",
+      date: new Date("2026-08-01T18:00:00+09:00"),
+      location: "Dev Court Schedule",
+      createdAt: new Date("2026-07-30T09:00:00+09:00"),
+      updatedAt: new Date("2026-07-30T09:00:00+09:00"),
+    });
 
     for (const match of mockMatches) {
       await this.createMatchIfMissing(
@@ -901,7 +1039,9 @@ export class TestDataRepository {
           sessionId:
             match.sessionId === DEV_OPEN_PLAY_SESSION_ID
               ? openPlaySessionId
-              : match.sessionId,
+              : match.sessionId === DEV_SCHEDULED_SESSION_ID
+                ? scheduledSessionId
+                : match.sessionId,
           resultSubmittedByPlayerId: match.resultSubmittedByPlayerId
             ? this.resolveDevPlayerId(match.resultSubmittedByPlayerId)
             : null,
