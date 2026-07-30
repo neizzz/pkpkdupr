@@ -4,6 +4,7 @@ export type TabKey = "match" | "members" | "me";
 
 export type TabDepthKind =
   | "match-detail"
+  | "match-history"
   | "session-detail"
   | "member-profile"
   | "bottom-sheet"

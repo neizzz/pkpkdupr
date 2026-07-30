@@ -7,9 +7,11 @@ import React, {
 } from "react";
 import { IoChevronForward } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
-import type { MatchListResponse } from "@/components/Match";
+import type { MatchInfo, MatchListResponse } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
+import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
+import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
 import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader from "@/components/TabPanelHeader";
@@ -27,6 +29,8 @@ import {
 } from "@/utils/dupr";
 import {
   buildMatchStats,
+  buildProfileMatchList,
+  buildRecentProfileMatches,
   buildRatingDelta,
   buildRatingHistory,
   createEmptyMatchStats,
@@ -131,8 +135,15 @@ const Members: React.FC = () => {
   );
   const [selectedMemberRatingHistory, setSelectedMemberRatingHistory] =
     useState(createEmptyRatingHistory);
+  const [selectedMemberMatches, setSelectedMemberMatches] = useState<
+    MatchInfo[]
+  >([]);
   const [isSelectedMemberStatsLoading, setIsSelectedMemberStatsLoading] =
     useState(false);
+  const [isMemberMatchHistoryRequested, setIsMemberMatchHistoryRequested] =
+    useState(false);
+  const [selectedMemberProfileMatch, setSelectedMemberProfileMatch] =
+    useState<MatchInfo | null>(null);
   const isMemberListLoading = useMinimumLoading(isLoading);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
@@ -213,6 +224,7 @@ const Members: React.FC = () => {
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
         setSelectedMemberRatingHistory(createEmptyRatingHistory());
+        setSelectedMemberMatches([]);
         setIsSelectedMemberStatsLoading(false);
         return;
       }
@@ -221,6 +233,7 @@ const Members: React.FC = () => {
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
         setSelectedMemberRatingHistory(createEmptyRatingHistory());
+        setSelectedMemberMatches([]);
         setIsSelectedMemberStatsLoading(true);
       }
 
@@ -241,6 +254,7 @@ const Members: React.FC = () => {
         const data = (await res.json()) as MatchListResponse;
         setSelectedMemberMatchStats(buildMatchStats(data.matches, memberId));
         setSelectedMemberRatingDelta(buildRatingDelta(data.matches, memberId));
+        setSelectedMemberMatches(data.matches);
         setSelectedMemberRatingHistory(
           buildRatingHistory(
             data.matches,
@@ -253,6 +267,7 @@ const Members: React.FC = () => {
           setSelectedMemberMatchStats(createEmptyMatchStats());
           setSelectedMemberRatingDelta(createEmptyRatingDelta());
           setSelectedMemberRatingHistory(createEmptyRatingHistory());
+          setSelectedMemberMatches([]);
         }
         if (throwOnError) {
           throw err;
@@ -286,6 +301,7 @@ const Members: React.FC = () => {
       setSelectedMemberMatchStats(createEmptyMatchStats());
       setSelectedMemberRatingDelta(createEmptyRatingDelta());
       setSelectedMemberRatingHistory(createEmptyRatingHistory());
+      setSelectedMemberMatches([]);
       setIsSelectedMemberStatsLoading(false);
       return;
     }
@@ -358,6 +374,33 @@ const Members: React.FC = () => {
     : null;
   const isMemberDrawerOpen =
     !!memberDepthId && depthStacks.members.includes(memberDepthId);
+  const selectedMemberProfileMatches = useMemo(
+    () =>
+      selectedMemberId
+        ? buildProfileMatchList(selectedMemberMatches, selectedMemberId)
+        : [],
+    [selectedMemberId, selectedMemberMatches],
+  );
+  const recentSelectedMemberMatches = useMemo(
+    () =>
+      selectedMemberId
+        ? buildRecentProfileMatches(selectedMemberMatches, selectedMemberId)
+        : [],
+    [selectedMemberId, selectedMemberMatches],
+  );
+  const memberMatchHistoryDepthId = selectedMemberId
+    ? `member-match-history:${selectedMemberId}`
+    : null;
+  const isMemberMatchHistoryDrawerOpen =
+    isMemberMatchHistoryRequested &&
+    !!memberMatchHistoryDepthId &&
+    depthStacks.members.includes(memberMatchHistoryDepthId);
+  const memberProfileMatchDetailDepthId = selectedMemberProfileMatch
+    ? `member-match-detail:${selectedMemberProfileMatch.id}`
+    : null;
+  const isMemberProfileMatchDetailDrawerOpen =
+    !!memberProfileMatchDetailDepthId &&
+    depthStacks.members.includes(memberProfileMatchDetailDepthId);
   const registerMemberScrollContainer = useCallback(
     (element: HTMLDivElement | null) => {
       if (!memberDepthId) return;
@@ -365,6 +408,58 @@ const Members: React.FC = () => {
     },
     [memberDepthId, registerScrollContainer],
   );
+  const registerMemberMatchHistoryScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!memberMatchHistoryDepthId) return;
+      registerScrollContainer("members", memberMatchHistoryDepthId, element);
+    },
+    [memberMatchHistoryDepthId, registerScrollContainer],
+  );
+  const registerMemberProfileMatchDetailScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!memberProfileMatchDetailDepthId) return;
+      registerScrollContainer(
+        "members",
+        memberProfileMatchDetailDepthId,
+        element,
+      );
+    },
+    [memberProfileMatchDetailDepthId, registerScrollContainer],
+  );
+
+  const openMemberMatchHistory = () => {
+    if (!memberMatchHistoryDepthId) return;
+
+    saveScrollPosition("members");
+    pushDepth("members", {
+      id: memberMatchHistoryDepthId,
+      kind: "match-history",
+      onClose: noop,
+    });
+    setIsMemberMatchHistoryRequested(true);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+  };
+
+  const openMemberProfileMatchDetail = (match: MatchInfo) => {
+    saveScrollPosition("members");
+    pushDepth("members", {
+      id: `member-match-detail:${match.id}`,
+      kind: "match-detail",
+      onClose: noop,
+    });
+    setSelectedMemberProfileMatch(match);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+  };
+
+  const completeMemberMatchHistoryClose = useCallback(() => {
+    setIsMemberMatchHistoryRequested(false);
+    restoreScrollTop("members");
+  }, [restoreScrollTop]);
+
+  const completeMemberProfileMatchDetailClose = useCallback(() => {
+    setSelectedMemberProfileMatch(null);
+    restoreScrollTop("members");
+  }, [restoreScrollTop]);
   const sortedMembers = useMemo(
     () =>
       [...members].sort((left, right) => {
@@ -495,8 +590,36 @@ const Members: React.FC = () => {
             ratingDelta={selectedMemberRatingDelta}
             ratingHistory={selectedMemberRatingHistory}
             isStatsLoading={isSelectedMemberStatsLoading}
+            recentMatches={recentSelectedMemberMatches}
+            onPressRecentMatch={openMemberProfileMatchDetail}
+            onViewAllMatches={openMemberMatchHistory}
           />
         </RightDrawer>
+      ) : null}
+      {selectedMember && memberMatchHistoryDepthId ? (
+        <ProfileMatchHistoryDrawer
+          isOpen={isMemberMatchHistoryDrawerOpen}
+          isActive={selectedTab === "members"}
+          tabKey="members"
+          matches={selectedMemberProfileMatches}
+          isLoading={isSelectedMemberStatsLoading}
+          onPressMatch={openMemberProfileMatchDetail}
+          onExited={completeMemberMatchHistoryClose}
+          onScrollContainerChange={registerMemberMatchHistoryScrollContainer}
+          layer={60}
+        />
+      ) : null}
+      {selectedMemberProfileMatch && memberProfileMatchDetailDepthId ? (
+        <ProfileMatchDetailDrawer
+          isOpen={isMemberProfileMatchDetailDrawerOpen}
+          isActive={selectedTab === "members"}
+          tabKey="members"
+          match={selectedMemberProfileMatch}
+          currentPlayerId={player?.id}
+          onExited={completeMemberProfileMatchDetailClose}
+          onScrollContainerChange={registerMemberProfileMatchDetailScrollContainer}
+          layer={70}
+        />
       ) : null}
     </>
   );

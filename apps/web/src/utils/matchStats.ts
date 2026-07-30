@@ -2,6 +2,10 @@ import { getMatchTopLevelType } from "@pkpkdupr/shared/match";
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import type { MatchInfo } from "@/components/Match";
 import type {
+  ProfileMatchListItem,
+  ProfileMatchOutcome,
+} from "@/components/ProfileMatchList";
+import type {
   MemberProfileMatchStats,
   MemberProfileRatingDelta,
   MemberProfileRatingHistory,
@@ -42,7 +46,9 @@ const getRatingHistoryDateKey = (value: string) => {
   return `${parts.year}-${parts.month}-${parts.day}`;
 };
 
-const getWinningTeamIndex = (scores: MatchInfo["scores"]): 0 | 1 | null => {
+export const getWinningTeamIndex = (
+  scores: MatchInfo["scores"],
+): 0 | 1 | null => {
   if (!scores?.length) {
     return null;
   }
@@ -72,7 +78,7 @@ const getWinningTeamIndex = (scores: MatchInfo["scores"]): 0 | 1 | null => {
   return points[0] > points[1] ? 0 : 1;
 };
 
-const getPlayerTeamIndex = (
+export const getPlayerTeamIndex = (
   match: MatchInfo,
   playerId: string,
 ): 0 | 1 | null => {
@@ -82,6 +88,60 @@ const getPlayerTeamIndex = (
 
   return teamIndex === 0 || teamIndex === 1 ? teamIndex : null;
 };
+
+const getMatchStartsAtMs = (match: MatchInfo) => {
+  const value = new Date(match.matchStartsAt).getTime();
+  return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value;
+};
+
+export const buildProfileMatchList = (
+  matches: MatchInfo[],
+  playerId: string,
+): ProfileMatchListItem[] =>
+  matches
+    .flatMap((match) => {
+      if (match.status !== "completed") return [];
+
+      const playerTeamIndex = getPlayerTeamIndex(match, playerId);
+      if (playerTeamIndex === null) return [];
+
+      const winningTeamIndex = getWinningTeamIndex(match.scores);
+      const outcome: ProfileMatchOutcome =
+        winningTeamIndex === null
+          ? "unknown"
+          : winningTeamIndex === playerTeamIndex
+            ? "win"
+            : "loss";
+      const category = getMatchTopLevelType(match.type);
+      const ratingChange = match.ratingChanges?.find(
+        (change) => change.playerId === playerId,
+      );
+      const rawDelta = ratingChange?.delta[category];
+      const ratingDelta =
+        typeof rawDelta === "number" && Number.isFinite(rawDelta)
+          ? rawDelta
+          : null;
+      const opponentTeam = match.teams[1 - playerTeamIndex];
+      const opponentMemberNames = opponentTeam.players
+        .map((player) => player.username?.trim() || player.id)
+        .filter(Boolean)
+        .join(", ");
+      // 팀명은 DB에 영속되지 않아 조회 시 항상 Team A/B로 재구성된다.
+      // 최근 매치에서는 신뢰할 수 있는 상대 선수 이름만 사용한다.
+      const opponentName = opponentMemberNames || "상대 선수 정보 없음";
+
+      return [{ match, opponentName, outcome, ratingDelta }];
+    })
+    .sort(
+      (left, right) =>
+        getMatchStartsAtMs(right.match) - getMatchStartsAtMs(left.match),
+    );
+
+export const buildRecentProfileMatches = (
+  matches: MatchInfo[],
+  playerId: string,
+  limit: number = 5,
+) => buildProfileMatchList(matches, playerId).slice(0, limit);
 
 export const buildMatchStats = (
   matches: MatchInfo[],

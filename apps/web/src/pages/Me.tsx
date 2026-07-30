@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { IoSettingsOutline } from "react-icons/io5";
 import BottomSheet from "@/components/BottomSheet";
-import type { MatchListResponse } from "@/components/Match";
+import type { MatchInfo, MatchListResponse } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
+import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
+import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
 import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import { useAuth } from "@/context/AuthContext";
@@ -12,6 +14,8 @@ import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
 import {
   buildMatchStats,
+  buildProfileMatchList,
+  buildRecentProfileMatches,
   buildRatingDelta,
   buildRatingHistory,
   createEmptyMatchStats,
@@ -19,15 +23,31 @@ import {
   createEmptyRatingHistory,
 } from "@/utils/matchStats";
 
+const noop = () => {};
+const MATCH_HISTORY_DEPTH_ID = "me-match-history";
+
 const Me: React.FC = () => {
   const { player, token, refreshMe } = useAuth();
-  const { closeDepth, pushDepth, selectedTab, registerPullToRefresh } =
-    useTabNavigation();
+  const {
+    closeDepth,
+    depthStacks,
+    pushDepth,
+    registerPullToRefresh,
+    registerScrollContainer,
+    restoreScrollTop,
+    saveScrollPosition,
+    scrollToTop,
+    selectedTab,
+  } = useTabNavigation();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
   const [ratingDelta, setRatingDelta] = useState(createEmptyRatingDelta);
   const [ratingHistory, setRatingHistory] = useState(createEmptyRatingHistory);
+  const [profileMatches, setProfileMatches] = useState<MatchInfo[]>([]);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
+  const [isMatchHistoryRequested, setIsMatchHistoryRequested] = useState(false);
+  const [selectedProfileMatch, setSelectedProfileMatch] =
+    useState<MatchInfo | null>(null);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
   const playerId = player?.id;
@@ -47,6 +67,7 @@ const Me: React.FC = () => {
         setMatchStats(createEmptyMatchStats());
         setRatingDelta(createEmptyRatingDelta());
         setRatingHistory(createEmptyRatingHistory());
+        setProfileMatches([]);
         setIsMatchStatsLoading(false);
         return;
       }
@@ -77,6 +98,7 @@ const Me: React.FC = () => {
         if (!signal.aborted) {
           setMatchStats(buildMatchStats(data.matches, playerId));
           setRatingDelta(buildRatingDelta(data.matches, playerId));
+          setProfileMatches(data.matches);
           setRatingHistory(
             buildRatingHistory(
               data.matches,
@@ -91,6 +113,7 @@ const Me: React.FC = () => {
           setMatchStats(createEmptyMatchStats());
           setRatingDelta(createEmptyRatingDelta());
           setRatingHistory(createEmptyRatingHistory());
+          setProfileMatches([]);
         }
         if (!signal.aborted && throwOnError) {
           throw new Error("내 경기 통계를 새로고침하지 못했습니다.");
@@ -136,6 +159,7 @@ const Me: React.FC = () => {
       setMatchStats(createEmptyMatchStats());
       setRatingDelta(createEmptyRatingDelta());
       setRatingHistory(createEmptyRatingHistory());
+      setProfileMatches([]);
       setIsMatchStatsLoading(false);
     }
   }, [playerId, token]);
@@ -169,6 +193,68 @@ const Me: React.FC = () => {
     setIsSettingsOpen(false);
   };
 
+  const profileMatchList = useMemo(
+    () => (playerId ? buildProfileMatchList(profileMatches, playerId) : []),
+    [playerId, profileMatches],
+  );
+  const recentProfileMatches = useMemo(
+    () => (playerId ? buildRecentProfileMatches(profileMatches, playerId) : []),
+    [playerId, profileMatches],
+  );
+  const isMatchHistoryDrawerOpen =
+    isMatchHistoryRequested && depthStacks.me.includes(MATCH_HISTORY_DEPTH_ID);
+  const profileMatchDetailDepthId = selectedProfileMatch
+    ? `me-match-detail:${selectedProfileMatch.id}`
+    : null;
+  const isProfileMatchDetailDrawerOpen =
+    !!profileMatchDetailDepthId && depthStacks.me.includes(profileMatchDetailDepthId);
+
+  const registerMatchHistoryScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      registerScrollContainer("me", MATCH_HISTORY_DEPTH_ID, element);
+    },
+    [registerScrollContainer],
+  );
+  const registerProfileMatchDetailScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!profileMatchDetailDepthId) return;
+      registerScrollContainer("me", profileMatchDetailDepthId, element);
+    },
+    [profileMatchDetailDepthId, registerScrollContainer],
+  );
+
+  const openMatchHistory = () => {
+    saveScrollPosition("me");
+    pushDepth("me", {
+      id: MATCH_HISTORY_DEPTH_ID,
+      kind: "match-history",
+      onClose: noop,
+    });
+    setIsMatchHistoryRequested(true);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+  };
+
+  const openProfileMatchDetail = (match: MatchInfo) => {
+    saveScrollPosition("me");
+    pushDepth("me", {
+      id: `me-match-detail:${match.id}`,
+      kind: "match-detail",
+      onClose: noop,
+    });
+    setSelectedProfileMatch(match);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+  };
+
+  const completeMatchHistoryClose = useCallback(() => {
+    setIsMatchHistoryRequested(false);
+    restoreScrollTop("me");
+  }, [restoreScrollTop]);
+
+  const completeProfileMatchDetailClose = useCallback(() => {
+    setSelectedProfileMatch(null);
+    restoreScrollTop("me");
+  }, [restoreScrollTop]);
+
   const settingsButton = (
     <Button
       type="button"
@@ -193,7 +279,32 @@ const Me: React.FC = () => {
         ratingDelta={ratingDelta}
         ratingHistory={ratingHistory}
         isStatsLoading={isMatchStatsLoading}
+        recentMatches={recentProfileMatches}
         showPlayerId
+        onPressRecentMatch={openProfileMatchDetail}
+        onViewAllMatches={openMatchHistory}
+      />
+
+      <ProfileMatchHistoryDrawer
+        isOpen={isMatchHistoryDrawerOpen}
+        isActive={selectedTab === "me"}
+        tabKey="me"
+        matches={profileMatchList}
+        isLoading={isMatchStatsLoading}
+        onPressMatch={openProfileMatchDetail}
+        onExited={completeMatchHistoryClose}
+        onScrollContainerChange={registerMatchHistoryScrollContainer}
+        layer={60}
+      />
+      <ProfileMatchDetailDrawer
+        isOpen={isProfileMatchDetailDrawerOpen}
+        isActive={selectedTab === "me"}
+        tabKey="me"
+        match={selectedProfileMatch}
+        currentPlayerId={playerId}
+        onExited={completeProfileMatchDetailClose}
+        onScrollContainerChange={registerProfileMatchDetailScrollContainer}
+        layer={70}
       />
 
       <BottomSheet

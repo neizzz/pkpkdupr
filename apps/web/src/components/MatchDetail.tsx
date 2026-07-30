@@ -13,11 +13,13 @@ import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import SkeletonBlock from "@/components/SkeletonBlock";
+import type { TabKey } from "@/context/TabNavigationContext";
 import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { formatRating } from "@/utils/dupr";
 
 interface MatchDetailProps {
   match: MatchInfo;
+  tabKey?: TabKey;
   currentPlayerId?: string;
   onSubmitResult?: (matchId: string, scores: MatchScore[]) => Promise<void>;
   onApproveResult?: (matchId: string) => Promise<void>;
@@ -203,6 +205,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 
 const MatchDetail: React.FC<MatchDetailProps> = ({
   match,
+  tabKey = "match",
   currentPlayerId,
   onSubmitResult,
   onApproveResult,
@@ -371,7 +374,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
   return (
     <div className="min-h-full">
-      <DetailPageHeader title="Match Detail" tabKey="match" />
+      <DetailPageHeader title="Match Detail" tabKey={tabKey} />
       <div className="p-2">
         <div className="mx-auto flex w-full flex-col gap-3">
           <Match

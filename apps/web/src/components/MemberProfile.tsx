@@ -12,6 +12,9 @@ import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import RatingHistoryChart from "@/components/RatingHistoryChart";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
+import ProfileMatchList, {
+  type ProfileMatchListItem,
+} from "@/components/ProfileMatchList";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import StatusMessageEditSheetBody from "@/components/StatusMessageEditSheetBody";
 import type { PlayerInfo } from "@/context/AuthContext";
@@ -65,7 +68,10 @@ interface MemberProfileProps {
   ratingDelta?: MemberProfileRatingDelta;
   ratingHistory?: MemberProfileRatingHistory;
   isStatsLoading?: boolean;
+  recentMatches?: ProfileMatchListItem[];
   showPlayerId?: boolean;
+  onPressRecentMatch?: (match: ProfileMatchListItem["match"]) => void;
+  onViewAllMatches?: () => void;
   onProfileUpdated?: (player: PlayerInfo) => void;
 }
 
@@ -98,7 +104,10 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   ratingDelta,
   ratingHistory,
   isStatsLoading = false,
+  recentMatches = [],
   showPlayerId = false,
+  onPressRecentMatch,
+  onViewAllMatches,
   onProfileUpdated,
 }) => {
   const [profileOverride, setProfileOverride] = useState<PlayerInfo | null>(null);
@@ -478,6 +487,35 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               </>
             ) : null}
           </div>
+
+          <section
+            aria-labelledby="profile-recent-matches-title"
+            className="mt-3"
+          >
+            <div className="mb-2 flex items-center justify-between gap-3 px-1">
+              <h3
+                id="profile-recent-matches-title"
+                className="text-[clamp(1.1rem,5cqw,1.45rem)] font-bold text-pkpk-main-font"
+              >
+                최근 매치
+              </h3>
+              {onViewAllMatches ? (
+                <button
+                  type="button"
+                  onClick={onViewAllMatches}
+                  className="shrink-0 text-sm font-bold text-pkpk-primary-bg transition-opacity hover:opacity-75"
+                >
+                  전체 보기
+                </button>
+              ) : null}
+            </div>
+            <ProfileMatchList
+              matches={recentMatches}
+              isLoading={isProfileStatsLoading}
+              emptyMessage="최근 완료된 매치가 없어요."
+              onPressMatch={onPressRecentMatch}
+            />
+          </section>
         </div>
       </div>
       <BottomSheet
