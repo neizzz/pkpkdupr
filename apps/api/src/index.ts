@@ -1670,6 +1670,21 @@ app.delete("/api/matches/:matchId/approval", async (req, res) => {
   }
 });
 
+app.post("/api/matches/:matchId/rejection", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+
+    res.json(
+      await matchRepository.rejectResult(req.params.matchId, decoded.playerId),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/change-password", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);

@@ -219,6 +219,46 @@ describe("POST /api/matches/:matchId/result", () => {
   });
 });
 
+describe("POST /api/matches/:matchId/rejection", () => {
+  beforeEach(() => {
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(session);
+    vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("참여자가 대기 중인 결과를 거부하면 결과와 승인이 초기화된다", async () => {
+    const rejectResult = vi
+      .spyOn(MatchRepository.prototype, "rejectResult")
+      .mockResolvedValue({
+        ...match,
+        scores: [],
+        resultSubmittedByPlayerId: null,
+        resultSubmittedAt: null,
+        approvals: [],
+      });
+
+    const response = await request(app)
+      .post(`/api/matches/${match.id}/rejection`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(rejectResult).toHaveBeenCalledWith(match.id, player.id);
+    expect(response.body).toMatchObject({
+      status: "created",
+      scores: [],
+      approvals: [],
+      resultSubmittedByPlayerId: null,
+      resultSubmittedAt: null,
+    });
+  });
+});
+
 describe("GET /api/matches", () => {
   beforeEach(() => {
     vi.spyOn(

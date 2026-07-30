@@ -1141,6 +1141,18 @@ app.delete("/internal/matches/:id/approvals/:playerId", async (req, res) => {
   }
 });
 
+app.post("/internal/matches/:id/rejection", async (req, res) => {
+  try {
+    const match = await matchRepository.rejectResult(
+      req.params.id,
+      req.body.playerId,
+    );
+    res.json(match);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
 app.get("/internal/player-creation-logs", async (_req, res) => {
   try {
     res.json(await playerCreationLogRepository.findAll());

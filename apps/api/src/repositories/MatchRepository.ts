@@ -376,6 +376,18 @@ export class MatchRepository {
     return hydrateMatch(updated);
   }
 
+  async rejectResult(matchId: string, playerId: string): Promise<Match> {
+    const updated = await this.dbRequest<any>(
+      `/internal/matches/${matchId}/rejection`,
+      {
+        method: "POST",
+        body: JSON.stringify({ playerId }),
+      },
+    );
+
+    return hydrateMatch(updated);
+  }
+
   /** 특정 플레이어의 rating 변동 로그 조회 */
   async getPlayerRatingChangeLogs(
     playerId: string,

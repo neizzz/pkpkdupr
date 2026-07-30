@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Card, Separator } from "@heroui/react";
+import { AlertDialog, Button, Card, Separator } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import {
   getMaxScoreCountForMatchMode,
@@ -11,6 +11,7 @@ import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
 import Match, { type MatchInfo } from "@/components/Match";
 import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import type { TabKey } from "@/context/TabNavigationContext";
@@ -24,10 +25,12 @@ interface MatchDetailProps {
   onSubmitResult?: (matchId: string, scores: MatchScore[]) => Promise<void>;
   onApproveResult?: (matchId: string) => Promise<void>;
   onCancelApproval?: (matchId: string) => Promise<void>;
+  onRejectResult?: (matchId: string) => Promise<void>;
   isOnline?: boolean;
   isSubmittingResult?: boolean;
   isApprovingResult?: boolean;
   isCancellingApproval?: boolean;
+  isRejectingResult?: boolean;
   isLoading?: boolean;
 }
 
@@ -210,16 +213,20 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   onSubmitResult,
   onApproveResult,
   onCancelApproval,
+  onRejectResult,
   isOnline = true,
   isSubmittingResult = false,
   isApprovingResult = false,
   isCancellingApproval = false,
+  isRejectingResult = false,
   isLoading = false,
 }) => {
   const [scoreRows, setScoreRows] = useState(() => [createEmptyScoreRow()]);
   const [resultError, setResultError] = useState<string | null>(null);
   const isSectionsLoading = useMinimumLoading(isLoading);
   const [isResultFormOpen, setIsResultFormOpen] = useState(false);
+  const [isRejectConfirmationOpen, setIsRejectConfirmationOpen] =
+    useState(false);
   const isMyMatch = match.teams.some((team) =>
     team.players.some((teamPlayer) => teamPlayer.id === currentPlayerId),
   );
@@ -251,6 +258,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     hasApproved &&
     isOnline &&
     !!onCancelApproval;
+  const canRejectResult =
+    isPendingApprovalMatch &&
+    isMyMatch &&
+    !hasApproved &&
+    isOnline &&
+    !!onRejectResult;
   const resultActionLabel = hasResultScores ? "결과 수정" : "결과 입력";
   const shouldShowResultForm =
     canSubmitResult && (!hasResultScores || isResultFormOpen);
@@ -368,6 +381,20 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     } catch (err) {
       setResultError(
         err instanceof Error ? err.message : "합의를 취소하지 못했어요.",
+      );
+    }
+  };
+
+  const handleRejectResult = async () => {
+    if (!onRejectResult) return;
+
+    try {
+      setResultError(null);
+      await onRejectResult(match.id);
+      setIsRejectConfirmationOpen(false);
+    } catch (err) {
+      setResultError(
+        err instanceof Error ? err.message : "결과를 거부하지 못했어요.",
       );
     }
   };
@@ -701,7 +728,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                   );
                 })}
             </Card>
-            {canApproveResult || canCancelApproval ? (
+            {canApproveResult || canCancelApproval || canRejectResult ? (
               <div className="mt-3 flex justify-end gap-2">
                 {canCancelApproval ? (
                   <Button
@@ -713,6 +740,74 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                   >
                     합의 취소
                   </Button>
+                ) : null}
+                {canRejectResult ? (
+                  <AlertDialog.Root
+                    isOpen={isRejectConfirmationOpen}
+                    onOpenChange={setIsRejectConfirmationOpen}
+                  >
+                    <AlertDialog.Trigger>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="rounded-2xl text-red-600"
+                        isDisabled={isRejectingResult}
+                      >
+                        결과 거부
+                      </Button>
+                    </AlertDialog.Trigger>
+                    <AlertDialog.Backdrop
+                      variant="blur"
+                      isDismissable={!isRejectingResult}
+                      isKeyboardDismissDisabled={isRejectingResult}
+                    >
+                      <AlertDialog.Container placement="center" size="sm">
+                        <AlertDialog.Dialog>
+                          <AlertDialog.Header>
+                            <AlertDialog.Icon status="warning" />
+                            <AlertDialog.Heading>
+                              정말 거부하시겠습니까?
+                            </AlertDialog.Heading>
+                          </AlertDialog.Header>
+                          <AlertDialog.Body>
+                            <p>
+                              <strong>주의:</strong> 거부하면 입력된 스코어와
+                              모든 승인 내역이 삭제됩니다. 결과 입력 후 처음부터
+                              다시 합의해야 합니다.
+                            </p>
+                            <p className="mt-3 text-sm font-medium text-amber-700">
+                              별다른 이유 없이 결과를 거부하는 행위는 이용 제재
+                              대상이 될 수 있습니다.
+                            </p>
+                            {resultError ? (
+                              <p className="mt-3 text-sm font-medium text-red-600">
+                                {resultError}
+                              </p>
+                            ) : null}
+                          </AlertDialog.Body>
+                          <AlertDialog.Footer>
+                            <AlertDialog.CloseTrigger
+                              isDisabled={isRejectingResult}
+                            >
+                              취소
+                            </AlertDialog.CloseTrigger>
+                            <HoldToConfirmButton
+                              holdDurationMs={1000}
+                              ariaLabel="길게 눌러 결과 거부"
+                              onComplete={() => void handleRejectResult()}
+                              isDisabled={isRejectingResult}
+                              className="justify-center bg-red-600 font-semibold text-white hover:bg-red-700"
+                              progressClassName="bg-white/20"
+                            >
+                              {isRejectingResult
+                                ? "거부 처리 중..."
+                                : "길게 눌러 거부"}
+                            </HoldToConfirmButton>
+                          </AlertDialog.Footer>
+                        </AlertDialog.Dialog>
+                      </AlertDialog.Container>
+                    </AlertDialog.Backdrop>
+                  </AlertDialog.Root>
                 ) : null}
                 {canApproveResult ? (
                   <Button

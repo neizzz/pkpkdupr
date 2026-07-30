@@ -1116,6 +1116,74 @@ export class MatchRepository {
     return updated;
   }
 
+  async rejectResult(matchId: string, playerId: string): Promise<Match> {
+    const existing = await this.findById(matchId);
+    if (!existing) {
+      throw new Error("매치를 찾을 수 없습니다.");
+    }
+
+    if (existing.status !== "pending-approval") {
+      throw new Error("거부할 수 없는 매치 상태입니다.");
+    }
+
+    const participantIds = existing.teams.flatMap((team) =>
+      team.players.map((player) => player.id),
+    );
+    if (!participantIds.includes(playerId)) {
+      throw new Error("매치 참여자만 결과를 거부할 수 있습니다.");
+    }
+
+    const rejectedAt = new Date();
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+
+    try {
+      const updateResult = await transaction.execute({
+        sql: `
+          UPDATE matches
+          SET
+            status = ?,
+            result_submitted_by_player_id = NULL,
+            result_submitted_at = NULL,
+            completed_at = NULL,
+            updated_at = ?
+          WHERE id = ?
+            AND status = 'pending-approval'
+        `,
+        args: ["created", toUnixTimestampSeconds(rejectedAt), matchId],
+      });
+
+      if (!updateResult.rowsAffected) {
+        throw new Error("RESULT_REJECT_STATE_CONFLICT");
+      }
+
+      await transaction.execute({
+        sql: `DELETE FROM match_scores WHERE match_id = ?`,
+        args: [matchId],
+      });
+      await transaction.execute({
+        sql: `DELETE FROM match_result_approvals WHERE match_id = ?`,
+        args: [matchId],
+      });
+
+      await transaction.commit();
+      committed = true;
+    } catch (error) {
+      transaction.close();
+      throw error;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
+
+    const updated = await this.findById(matchId);
+    if (!updated) {
+      throw new Error("결과 거부 처리에 실패했습니다.");
+    }
+    return updated;
+  }
+
   async updateMetadata(
     id: string,
     data: UpdateMatchMetadataInput,
