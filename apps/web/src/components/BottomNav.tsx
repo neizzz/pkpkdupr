@@ -1063,7 +1063,7 @@ const BottomNav: React.FC = () => {
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
         <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-3">
-          <Tabs.ListContainer className="mr-[4.35rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
+          <Tabs.ListContainer className="mr-[5.07rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
               className="grid grid-cols-3 gap-1 rounded-full shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
@@ -1243,7 +1243,7 @@ const BottomNav: React.FC = () => {
                   <Button
                     isIconOnly
                     aria-label="Global plus menu"
-                    className={`h-[3.6rem] w-[3.6rem] shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors ${
+                    className={`h-[4.32rem] w-[4.32rem] shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors ${
                       isGlobalMenuVisible
                         ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
                         : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
@@ -1253,7 +1253,7 @@ const BottomNav: React.FC = () => {
                       className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
                         isGlobalMenuVisible ? "rotate-45" : "rotate-0"
                       }`}
-                      style={{ width: "28px", height: "28px" }}
+                      style={{ width: "33.6px", height: "33.6px" }}
                     />
                   </Button>
                   <Dropdown.Popover
