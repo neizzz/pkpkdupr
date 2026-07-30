@@ -27,7 +27,7 @@ const RatingDeltaChip: React.FC<RatingDeltaChipProps> = ({
       : "";
   const textSizeClassName =
     appearance === "rating"
-      ? "text-[clamp(0.9rem,4cqw,1.2rem)] leading-none"
+      ? "text-[clamp(0.72rem,3.2cqw,0.96rem)] leading-none"
       : "text-[11px]";
   const ratingTextClassName =
     appearance === "rating"
