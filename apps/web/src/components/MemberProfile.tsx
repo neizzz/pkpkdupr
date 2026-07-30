@@ -428,9 +428,9 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                   history={ratingHistory?.[expandedItem.type] ?? []}
                   label={expandedItem.label}
                 />
-                <div className="mt-3 flex flex-col gap-3">
+                <div className="mt-3 flex flex-col">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                    <div className="rounded-xl px-4 py-3">
                       <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
                         매치 승률
                       </p>
@@ -443,7 +443,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                         </p>
                       </div>
                     </div>
-                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                    <div className="rounded-xl px-4 py-3">
                       <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
                         세트 승률
                       </p>
@@ -458,7 +458,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                    <div className="rounded-xl px-4 py-3">
                       <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
                         최근 7일 변동
                       </p>
@@ -470,7 +470,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                         />
                       </div>
                     </div>
-                    <div className="rounded-xl bg-white/30 px-4 py-3 shadow-sm">
+                    <div className="rounded-xl px-4 py-3">
                       <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
                         최근 30일 변동
                       </p>
