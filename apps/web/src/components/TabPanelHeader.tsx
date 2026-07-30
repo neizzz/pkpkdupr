@@ -20,7 +20,7 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({ title, children }) => {
   }, []);
 
   return (
-    <div className="sticky top-0 z-10">
+    <div className="sticky top-0 z-20 bg-pkpk-bg">
       <div
         className={`flex h-12 items-center justify-between border-b bg-pkpk-bg px-4 transition-colors ${
           isScrolled ? "border-border" : "border-transparent"
