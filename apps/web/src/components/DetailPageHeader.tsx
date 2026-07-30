@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import TabBackButton from "@/components/TabBackButton";
+import { useRightDrawerScrollContainer } from "@/components/RightDrawer";
 import { type TabKey, useTabNavigation } from "@/context/TabNavigationContext";
 
 interface DetailPageHeaderProps {
@@ -14,9 +15,12 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   const { depthStacks, selectedTab } = useTabNavigation();
   const targetTabKey = tabKey ?? selectedTab;
   const [isScrolled, setIsScrolled] = useState(false);
+  const rightDrawerScrollContainer = useRightDrawerScrollContainer();
 
   useEffect(() => {
-    const container = document.querySelector(".app-tab-panel-scroll-area");
+    const container =
+      rightDrawerScrollContainer ??
+      document.querySelector<HTMLDivElement>(".app-tab-panel-scroll-area");
     if (!container) return;
 
     const onScroll = () => setIsScrolled(container.scrollTop > 1);
@@ -24,9 +28,12 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
 
     container.addEventListener("scroll", onScroll, { passive: true });
     return () => container.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [rightDrawerScrollContainer]);
 
-  if (depthStacks[targetTabKey].length === 0) {
+  if (
+    depthStacks[targetTabKey].length === 0 &&
+    !rightDrawerScrollContainer
+  ) {
     return null;
   }
 

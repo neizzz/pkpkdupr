@@ -10,6 +10,7 @@ import Avatar from "@/components/Avatar";
 import type { MatchListResponse } from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
+import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
@@ -36,6 +37,8 @@ import {
 const CACHED_MEMBERS_KEY = "pkpkdupr:members";
 const OFFLINE_FALLBACK_MESSAGE =
   "최신 정보를 불러오지 못해 저장된 멤버 목록을 표시합니다.";
+
+const noop = () => {};
 
 type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
@@ -106,7 +109,9 @@ const Members: React.FC = () => {
   const { player, token, updateProfile } = useAuth();
   const isOnline = useOnlineStatus();
   const {
+    depthStacks,
     pushDepth,
+    registerScrollContainer,
     restoreScrollTop,
     saveScrollPosition,
     selectedTab,
@@ -304,7 +309,7 @@ const Members: React.FC = () => {
     ],
   );
 
-  const closeMemberProfile = useCallback(() => {
+  const completeMemberProfileClose = useCallback(() => {
     setSelectedMemberId(null);
     setIsSelectedMemberStatsLoading(false);
     restoreScrollTop("members");
@@ -339,7 +344,7 @@ const Members: React.FC = () => {
     pushDepth("members", {
       id: `member-profile:${memberId}`,
       kind: "member-profile",
-      onClose: closeMemberProfile,
+      onClose: noop,
     });
     setIsSelectedMemberStatsLoading(true);
     setSelectedMemberId(memberId);
@@ -348,6 +353,18 @@ const Members: React.FC = () => {
 
   const selectedMember =
     members.find((member) => member.id === selectedMemberId) || null;
+  const memberDepthId = selectedMemberId
+    ? `member-profile:${selectedMemberId}`
+    : null;
+  const isMemberDrawerOpen =
+    !!memberDepthId && depthStacks.members.includes(memberDepthId);
+  const registerMemberScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!memberDepthId) return;
+      registerScrollContainer("members", memberDepthId, element);
+    },
+    [memberDepthId, registerScrollContainer],
+  );
   const sortedMembers = useMemo(
     () =>
       [...members].sort((left, right) => {
@@ -369,20 +386,6 @@ const Members: React.FC = () => {
       }),
     [members],
   );
-
-  if (selectedMember) {
-    return (
-      <MemberProfile
-        player={selectedMember}
-        isMe={selectedMember.id === player?.id}
-        onProfileUpdated={handleMemberProfileUpdated}
-        matchStats={selectedMemberMatchStats}
-        ratingDelta={selectedMemberRatingDelta}
-        ratingHistory={selectedMemberRatingHistory}
-        isStatsLoading={isSelectedMemberStatsLoading}
-      />
-    );
-  }
 
   return (
     <>
@@ -476,6 +479,25 @@ const Members: React.FC = () => {
           </div>
         </div>
       </div>
+      {selectedMember && memberDepthId ? (
+        <RightDrawer
+          isOpen={isMemberDrawerOpen}
+          isActive={selectedTab === "members"}
+          ariaLabel="멤버 프로필"
+          onExited={completeMemberProfileClose}
+          onScrollContainerChange={registerMemberScrollContainer}
+        >
+          <MemberProfile
+            player={selectedMember}
+            isMe={selectedMember.id === player?.id}
+            onProfileUpdated={handleMemberProfileUpdated}
+            matchStats={selectedMemberMatchStats}
+            ratingDelta={selectedMemberRatingDelta}
+            ratingHistory={selectedMemberRatingHistory}
+            isStatsLoading={isSelectedMemberStatsLoading}
+          />
+        </RightDrawer>
+      ) : null}
     </>
   );
 };

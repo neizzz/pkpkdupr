@@ -132,14 +132,24 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .app-right-drawer-scroll-area {
+    min-width: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
   @media (max-width: 480px) {
     .app-tab-panel-scroll-area,
-    .app-bottom-sheet-surface {
+    .app-bottom-sheet-surface,
+    .app-right-drawer-scroll-area {
       scrollbar-width: none;
     }
 
     .app-tab-panel-scroll-area::-webkit-scrollbar,
-    .app-bottom-sheet-surface::-webkit-scrollbar {
+    .app-bottom-sheet-surface::-webkit-scrollbar,
+    .app-right-drawer-scroll-area::-webkit-scrollbar {
       display: none;
     }
   }

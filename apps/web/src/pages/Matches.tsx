@@ -8,6 +8,7 @@ import Match, {
 } from "@/components/Match";
 import MatchDetail, { MatchDetailSkeleton } from "@/components/MatchDetail";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import RightDrawer from "@/components/RightDrawer";
 import SessionCard from "@/components/SessionCard";
 import SessionDetail from "@/components/SessionDetail";
 import SkeletonBlock from "@/components/SkeletonBlock";
@@ -130,11 +131,15 @@ const isSameSession = (
   right: MatchSessionSummaryInfo,
 ) => left.name === right.name && left.date === right.date;
 
+const noop = () => {};
+
 const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const { player, token } = useAuth();
   const isOnline = useOnlineStatus();
   const {
+    depthStacks,
     pushDepth,
+    registerScrollContainer,
     restoreScrollTop,
     saveScrollPosition,
     selectedTab,
@@ -567,7 +572,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     [isOnline, refreshFeedAndSession, token],
   );
 
-  const closeMatchDetail = useCallback(() => {
+  const completeMatchDetailClose = useCallback(() => {
     setSelectedMatchId(null);
     setSelectedMatch(null);
     setSelectedMatchError(null);
@@ -575,7 +580,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     restoreScrollTop("match");
   }, [restoreScrollTop]);
 
-  const closeSessionDetail = useCallback(() => {
+  const completeSessionDetailClose = useCallback(() => {
     setSelectedSession(null);
     setSelectedSessionMatches([]);
     setSessionError(null);
@@ -588,7 +593,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       pushDepth("match", {
         id: `match-detail:${match.id}`,
         kind: "match-detail",
-        onClose: closeMatchDetail,
+        onClose: noop,
       });
       setSelectedMatchId(match.id);
       setSelectedMatch(match);
@@ -596,7 +601,6 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       void loadMatchDetail(match.id);
     },
     [
-      closeMatchDetail,
       loadMatchDetail,
       pushDepth,
       saveScrollPosition,
@@ -610,7 +614,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       pushDepth("match", {
         id: `session-detail:${session.id}`,
         kind: "session-detail",
-        onClose: closeSessionDetail,
+        onClose: noop,
       });
       setSelectedSession(session);
       setSelectedSessionMatches([]);
@@ -619,7 +623,6 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       void loadSessionMatches(session).catch(() => {});
     },
     [
-      closeSessionDetail,
       loadSessionMatches,
       pushDepth,
       saveScrollPosition,
@@ -628,9 +631,37 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   );
 
   const hasMoreItems = isOnline && feedItems.length < total;
+  const sessionDepthId = selectedSession
+    ? `session-detail:${selectedSession.id}`
+    : null;
+  const matchDepthId = selectedMatchId
+    ? `match-detail:${selectedMatchId}`
+    : null;
+  const isSessionDrawerOpen =
+    !!sessionDepthId && depthStacks.match.includes(sessionDepthId);
+  const isMatchDrawerOpen =
+    !!matchDepthId && depthStacks.match.includes(matchDepthId);
+
+  const registerSessionScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!sessionDepthId) return;
+      registerScrollContainer("match", sessionDepthId, element);
+    },
+    [registerScrollContainer, sessionDepthId],
+  );
+
+  const registerMatchScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!matchDepthId) return;
+      registerScrollContainer("match", matchDepthId, element);
+    },
+    [matchDepthId, registerScrollContainer],
+  );
+
+  let matchDrawerContent: React.ReactNode = null;
 
   if (selectedMatchId && selectedMatchError && !isSelectedMatchLoading) {
-    return (
+    matchDrawerContent = (
       <div className="min-h-full">
         <DetailPageHeader title="Match Detail" tabKey="match" />
         <div className="p-2">
@@ -650,14 +681,10 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         </div>
       </div>
     );
-  }
-
-  if (selectedMatchId && isSelectedMatchLoading && !selectedMatch) {
-    return <MatchDetailSkeleton />;
-  }
-
-  if (selectedMatch) {
-    return (
+  } else if (selectedMatchId && isSelectedMatchLoading && !selectedMatch) {
+    matchDrawerContent = <MatchDetailSkeleton />;
+  } else if (selectedMatch) {
+    matchDrawerContent = (
       <MatchDetail
         match={selectedMatch}
         currentPlayerId={player?.id}
@@ -682,8 +709,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     );
   }
 
-  if (selectedSession) {
-    return (
+  const sessionDrawerContent = selectedSession ? (
       <SessionDetail
         session={selectedSession}
         matches={selectedSessionMatches}
@@ -693,8 +719,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         onRetry={() => void loadSessionMatches(selectedSession)}
         onPressMatch={openMatchDetail}
       />
-    );
-  }
+    ) : null;
 
   return (
     <>
@@ -784,6 +809,29 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           )}
         </div>
       </div>
+      {selectedSession && sessionDepthId ? (
+        <RightDrawer
+          isOpen={isSessionDrawerOpen}
+          isActive={selectedTab === "match"}
+          ariaLabel="세션 상세"
+          onExited={completeSessionDetailClose}
+          onScrollContainerChange={registerSessionScrollContainer}
+        >
+          {sessionDrawerContent}
+        </RightDrawer>
+      ) : null}
+      {selectedMatchId && matchDepthId ? (
+        <RightDrawer
+          isOpen={isMatchDrawerOpen}
+          isActive={selectedTab === "match"}
+          ariaLabel="매치 상세"
+          onExited={completeMatchDetailClose}
+          onScrollContainerChange={registerMatchScrollContainer}
+          layer={60}
+        >
+          {matchDrawerContent}
+        </RightDrawer>
+      ) : null}
     </>
   );
 };

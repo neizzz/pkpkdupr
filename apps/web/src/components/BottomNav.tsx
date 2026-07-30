@@ -127,6 +127,9 @@ const BottomNav: React.FC = () => {
     setCreateMatchQrScannerCloseRequestKey,
   ] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const depthScrollContainersRef = useRef(
+    new Map<string, HTMLDivElement>(),
+  );
   const selectedTabRef = useRef<TabKey>(selectedTab);
   const depthEntriesRef = useRef<Record<TabKey, TabDepthEntry[]>>({
     match: [],
@@ -169,17 +172,48 @@ const BottomNav: React.FC = () => {
     });
   }, []);
 
-  const getScrollTop = useCallback(
-    () => scrollContainerRef.current?.scrollTop ?? 0,
-    [],
-  );
-
   const getScrollPositionKey = useCallback((tabKey: TabKey) => {
     const tabDepthStack = depthEntriesRef.current[tabKey];
     const activeDepth = tabDepthStack[tabDepthStack.length - 1];
 
     return `${tabKey}:${activeDepth?.id ?? "root"}`;
   }, []);
+
+  const getActiveScrollContainer = useCallback(
+    (tabKey = selectedTabRef.current) => {
+      const tabDepthStack = depthEntriesRef.current[tabKey];
+      const activeDepth = tabDepthStack[tabDepthStack.length - 1];
+
+      if (activeDepth) {
+        const depthScrollContainer = depthScrollContainersRef.current.get(
+          `${tabKey}:${activeDepth.id}`,
+        );
+        if (depthScrollContainer) return depthScrollContainer;
+      }
+
+      return scrollContainerRef.current;
+    },
+    [],
+  );
+
+  const getScrollTop = useCallback(
+    () => getActiveScrollContainer()?.scrollTop ?? 0,
+    [getActiveScrollContainer],
+  );
+
+  const registerScrollContainer = useCallback(
+    (tabKey: TabKey, depthId: string, element: HTMLDivElement | null) => {
+      const key = `${tabKey}:${depthId}`;
+
+      if (element) {
+        depthScrollContainersRef.current.set(key, element);
+        return;
+      }
+
+      depthScrollContainersRef.current.delete(key);
+    },
+    [],
+  );
 
   const saveScrollPosition = useCallback(
     (tabKey = selectedTabRef.current) => {
@@ -195,19 +229,22 @@ const BottomNav: React.FC = () => {
       window.requestAnimationFrame(() => {
         if (selectedTabRef.current !== tabKey) return;
 
-        const scrollContainer = scrollContainerRef.current;
+        const scrollContainer = getActiveScrollContainer(tabKey);
         if (!scrollContainer) return;
 
         scrollContainer.scrollTop =
           scrollPositionsRef.current[scrollPositionKey] ?? 0;
       });
     },
-    [getScrollPositionKey],
+    [getActiveScrollContainer, getScrollPositionKey],
   );
 
-  const scrollToTop = useCallback((behavior: ScrollBehavior = "smooth") => {
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior });
-  }, []);
+  const scrollToTop = useCallback(
+    (behavior: ScrollBehavior = "smooth") => {
+      getActiveScrollContainer()?.scrollTo({ top: 0, behavior });
+    },
+    [getActiveScrollContainer],
+  );
 
   const registerPullToRefresh = useCallback(
     (tabKey: TabKey, handler: PullToRefreshHandler) => {
@@ -997,6 +1034,7 @@ const BottomNav: React.FC = () => {
       restoreScrollTop,
       scrollToTop,
       getScrollTop,
+      registerScrollContainer,
       registerPullToRefresh,
     }),
     [
@@ -1005,6 +1043,7 @@ const BottomNav: React.FC = () => {
       getScrollTop,
       pushDepth,
       requestCloseTopDepth,
+      registerScrollContainer,
       registerPullToRefresh,
       restoreScrollTop,
       saveScrollPosition,

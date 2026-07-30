@@ -32,6 +32,11 @@ export interface TabNavigationContextValue {
   restoreScrollTop: (tabKey?: TabKey) => void;
   scrollToTop: (behavior?: ScrollBehavior) => void;
   getScrollTop: () => number;
+  registerScrollContainer: (
+    tabKey: TabKey,
+    depthId: string,
+    element: HTMLDivElement | null,
+  ) => void;
   registerPullToRefresh: (
     tabKey: TabKey,
     handler: PullToRefreshHandler,
