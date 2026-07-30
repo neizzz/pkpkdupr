@@ -70,7 +70,7 @@ interface MatchProps {
 
 const titleChipClassName =
   "inline-flex h-6 items-center rounded-full px-2 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold leading-none";
-const teamChipWidthClass = "w-[clamp(6rem,32vw,10rem)]";
+const teamChipWidthClass = "w-[clamp(6rem,32cqw,10rem)]";
 
 const statusLabelMap: Record<MatchStatus, string> = {
   created: "예정",
@@ -139,6 +139,8 @@ const Match: React.FC<MatchProps> = ({
   const displayedTeamSetScores =
     match.status === "created" ? ([0, 0] as const) : teamSetScores;
   const shouldShowTeamSetScores = hasResultScores || match.status === "created";
+  const isTeamALosing = hasResultScores && teamSetScores[0] < teamSetScores[1];
+  const isTeamBLosing = hasResultScores && teamSetScores[1] < teamSetScores[0];
   const teamAverageDuprs = useMemo(
     () => match.teams.map((team) => getTeamAverageDupr(match, team)),
     [match],
@@ -151,7 +153,7 @@ const Match: React.FC<MatchProps> = ({
 
   const card = (
     <Card
-      className={`relative w-full rounded-3xl border border-pkpk-sub-bg bg-white/95 p-3 shadow-sm ${
+      className={`relative w-full [container-type:inline-size] rounded-3xl border border-pkpk-sub-bg bg-white/95 p-3 shadow-sm ${
         onPress ? "transition-colors hover:bg-amber-50" : ""
       }`}
     >
@@ -203,13 +205,21 @@ const Match: React.FC<MatchProps> = ({
               </div>
             ))}
             <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-pkpk-main-font">
-              <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
+              <span
+                className={`text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight ${
+                  isTeamALosing ? "text-[#888]" : ""
+                }`}
+              >
                 {displayedTeamSetScores[0]}
               </span>
               <span className="text-[clamp(1.25rem,5vw,1.5rem)] font-bold leading-none text-[#888]">
-                :
+                -
               </span>
-              <span className="text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight">
+              <span
+                className={`text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight ${
+                  isTeamBLosing ? "text-[#888]" : ""
+                }`}
+              >
                 {displayedTeamSetScores[1]}
               </span>
             </div>

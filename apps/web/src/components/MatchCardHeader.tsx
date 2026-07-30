@@ -58,7 +58,7 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
       </div>
     ) : null}
     {title ? (
-      <p className="mt-1 truncate text-[clamp(1.125rem,5vw,1.25rem)] font-semibold text-pkpk-main-font">
+      <p className="mt-1 truncate text-[clamp(1.3rem,5.75vw,1.4rem)] font-semibold text-pkpk-main-font">
         {title}
       </p>
     ) : null}
