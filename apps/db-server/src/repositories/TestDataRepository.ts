@@ -45,11 +45,25 @@ const devMatchIdByLegacyId: Record<string, string> = {
   "dev-session-open-play-001": "Mdev0003",
   "dev-session-open-play-002": "Mdev0004",
   "dev-session-open-play-003": "Mdev0005",
+  "dev-match-missing-opponent-004": "Mdev0006",
+  "dev-match-without-players-005": "Mdev0007",
 };
 
 const toDevPlayerId = (id: string) => devPlayerIdByLegacyId[id] ?? id;
 const toDevMatchId = (id: string) => devMatchIdByLegacyId[id] ?? id;
 const DEV_OPEN_PLAY_SESSION_ID = "Sdev0001";
+
+const devMockPlayerReferenceColumns = [
+  ["player_creation_logs", "player_id"],
+  ["player_creation_logs", "created_by_player_id"],
+  ["player_status_change_logs", "player_id"],
+  ["player_status_change_logs", "changed_by_player_id"],
+  ["player_rating_change_logs", "player_id"],
+  ["official_dupr_adjustment_logs", "player_id"],
+  ["official_dupr_adjustment_logs", "changed_by_player_id"],
+  ["matches", "creator_player_id"],
+  ["matches", "result_submitted_by_player_id"],
+] as const;
 
 const mockPlayers: CreateStoredPlayerInput[] = [
   {
@@ -284,6 +298,34 @@ const mockMatches = [
     updatedAt: new Date("2026-07-19T10:35:00+09:00"),
   },
   {
+    id: "dev-match-missing-opponent-004",
+    type: "singles",
+    source: "player_created",
+    creatorPlayerId: "dev-player-alice",
+    status: "completed",
+    location: "Dev Court Singles A",
+    matchStartsAt: new Date("2026-07-30T18:00:00+09:00"),
+    completedAt: new Date("2026-07-30T18:20:00+09:00"),
+    resultSubmittedByPlayerId: "dev-player-alice",
+    resultSubmittedAt: new Date("2026-07-30T18:20:00+09:00"),
+    createdAt: new Date("2026-07-30T17:30:00+09:00"),
+    updatedAt: new Date("2026-07-30T18:20:00+09:00"),
+  },
+  {
+    id: "dev-match-without-players-005",
+    type: "singles",
+    source: "player_created",
+    creatorPlayerId: "dev-player-alice",
+    status: "completed",
+    location: "Dev Court Singles B",
+    matchStartsAt: new Date("2026-07-30T19:00:00+09:00"),
+    completedAt: new Date("2026-07-30T19:20:00+09:00"),
+    resultSubmittedByPlayerId: "dev-player-alice",
+    resultSubmittedAt: new Date("2026-07-30T19:20:00+09:00"),
+    createdAt: new Date("2026-07-30T18:30:00+09:00"),
+    updatedAt: new Date("2026-07-30T19:20:00+09:00"),
+  },
+  {
     id: "Mtest001",
     type: "mixed-doubles",
     source: "player_created",
@@ -375,6 +417,18 @@ const mockMatchScores = [
     matchId: "Mtest003",
     scoreA: 8,
     scoreB: 11,
+  },
+  {
+    id: "dev-match-missing-opponent-004-score-1",
+    matchId: "dev-match-missing-opponent-004",
+    scoreA: 11,
+    scoreB: 8,
+  },
+  {
+    id: "dev-match-without-players-005-score-1",
+    matchId: "dev-match-without-players-005",
+    scoreA: 11,
+    scoreB: 8,
   },
 ];
 
@@ -486,6 +540,30 @@ const mockMatchParticipants = [
     matchId: "dev-session-open-play-003",
     teamIndex: 1,
     playerId: "dev-player-gabe",
+  },
+  {
+    id: "dev-match-missing-opponent-004-team-0-alice",
+    matchId: "dev-match-missing-opponent-004",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-match-missing-opponent-004-team-1-bob",
+    matchId: "dev-match-missing-opponent-004",
+    teamIndex: 1,
+    playerId: "dev-player-bob",
+  },
+  {
+    id: "dev-match-without-players-005-team-0-alice",
+    matchId: "dev-match-without-players-005",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-match-without-players-005-team-1-bob",
+    matchId: "dev-match-without-players-005",
+    teamIndex: 1,
+    playerId: "dev-player-bob",
   },
   {
     id: "Mtest001-team-0-Ptest001",
@@ -744,6 +822,8 @@ const isUniqueConstraintError = (error: unknown) => {
 };
 
 export class TestDataRepository {
+  private readonly persistedDevPlayerIds = new Map<string, string>();
+
   constructor(
     private db: any,
     private client: any,
@@ -757,12 +837,13 @@ export class TestDataRepository {
       const existing = await this.playerRepository.findByUsername(
         player.username,
       );
-      if (!existing) {
-        await this.playerRepository.create({
+      const persistedPlayer =
+        existing ??
+        (await this.playerRepository.create({
           ...player,
           id: toDevPlayerId(player.id),
-        });
-      } else {
+        }));
+      if (existing) {
         await this.playerRepository.updatePassword(
           existing.id,
           player.passwordHash,
@@ -774,14 +855,22 @@ export class TestDataRepository {
           });
         }
       }
+
+      this.persistedDevPlayerIds.set(player.id, persistedPlayer.id);
+      this.persistedDevPlayerIds.set(
+        toDevPlayerId(player.id),
+        persistedPlayer.id,
+      );
     }
+
+    await this.repairDevMockPlayerReferences();
 
     for (const log of mockCreationLogs) {
       await this.createCreationLogIfMissing({
         ...log,
-        playerId: toDevPlayerId(log.playerId),
+        playerId: this.resolveDevPlayerId(log.playerId),
         createdByPlayerId: log.createdByPlayerId
-          ? toDevPlayerId(log.createdByPlayerId)
+          ? this.resolveDevPlayerId(log.createdByPlayerId)
           : null,
       });
     }
@@ -789,8 +878,8 @@ export class TestDataRepository {
     for (const log of mockStatusLogs) {
       await this.createStatusLogIfMissing({
         ...log,
-        playerId: toDevPlayerId(log.playerId),
-        changedByPlayerId: toDevPlayerId(log.changedByPlayerId),
+        playerId: this.resolveDevPlayerId(log.playerId),
+        changedByPlayerId: this.resolveDevPlayerId(log.changedByPlayerId),
       });
     }
 
@@ -808,13 +897,13 @@ export class TestDataRepository {
         {
           ...match,
           id: toDevMatchId(match.id),
-          creatorPlayerId: toDevPlayerId(match.creatorPlayerId),
+          creatorPlayerId: this.resolveDevPlayerId(match.creatorPlayerId),
           sessionId:
             match.sessionId === DEV_OPEN_PLAY_SESSION_ID
               ? openPlaySessionId
               : match.sessionId,
           resultSubmittedByPlayerId: match.resultSubmittedByPlayerId
-            ? toDevPlayerId(match.resultSubmittedByPlayerId)
+            ? this.resolveDevPlayerId(match.resultSubmittedByPlayerId)
             : null,
         } as (typeof mockMatches)[number],
       );
@@ -831,7 +920,7 @@ export class TestDataRepository {
       await this.createMatchParticipantIfMissing({
         ...participant,
         matchId: toDevMatchId(participant.matchId),
-        playerId: toDevPlayerId(participant.playerId),
+        playerId: this.resolveDevPlayerId(participant.playerId),
       });
     }
 
@@ -839,16 +928,106 @@ export class TestDataRepository {
       await this.createMatchResultApprovalIfMissing({
         ...approval,
         matchId: toDevMatchId(approval.matchId),
-        playerId: toDevPlayerId(approval.playerId),
+        playerId: this.resolveDevPlayerId(approval.playerId),
       });
     }
 
     for (const log of mockPlayerRatingChangeLogs) {
-      await this.createRatingChangeLogIfMissing(log);
+      await this.createRatingChangeLogIfMissing({
+        ...log,
+        playerId: this.resolveDevPlayerId(log.playerId),
+      });
     }
 
     await this.seedAdditionalTestRatingHistory();
     await this.seedNamedTestAccountRatingHistory();
+  }
+
+  private resolveDevPlayerId(id: string) {
+    return this.persistedDevPlayerIds.get(id) ?? toDevPlayerId(id);
+  }
+
+  private async repairDevMockPlayerReferences() {
+    const replacements = [...this.persistedDevPlayerIds].filter(
+      ([legacyId, persistedId]) => legacyId !== persistedId,
+    );
+    if (replacements.length === 0) {
+      return;
+    }
+
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+    try {
+      for (const [legacyId, persistedId] of replacements) {
+        for (const [table, column] of devMockPlayerReferenceColumns) {
+          await transaction.execute({
+            sql: `UPDATE ${table} SET ${column} = ? WHERE ${column} = ?`,
+            args: [persistedId, legacyId],
+          });
+        }
+        await transaction.execute({
+          sql: `
+            DELETE FROM match_participants AS legacy
+            WHERE legacy.player_id = ?
+              AND EXISTS (
+                SELECT 1
+                FROM match_participants AS persisted
+                WHERE persisted.match_id = legacy.match_id
+                  AND persisted.team_index = legacy.team_index
+                  AND persisted.player_id = ?
+              )
+          `,
+          args: [legacyId, persistedId],
+        });
+        await transaction.execute({
+          sql: "UPDATE match_participants SET player_id = ? WHERE player_id = ?",
+          args: [persistedId, legacyId],
+        });
+        await transaction.execute({
+          sql: `
+            DELETE FROM match_result_approvals AS legacy
+            WHERE legacy.player_id = ?
+              AND EXISTS (
+                SELECT 1
+                FROM match_result_approvals AS persisted
+                WHERE persisted.match_id = legacy.match_id
+                  AND persisted.player_id = ?
+              )
+          `,
+          args: [legacyId, persistedId],
+        });
+        await transaction.execute({
+          sql:
+            "UPDATE match_result_approvals SET player_id = ? WHERE player_id = ?",
+          args: [persistedId, legacyId],
+        });
+        await transaction.execute({
+          sql: `
+            DELETE FROM match_session_participants AS legacy
+            WHERE legacy.player_id = ?
+              AND EXISTS (
+                SELECT 1
+                FROM match_session_participants AS persisted
+                WHERE persisted.session_id = legacy.session_id
+                  AND persisted.player_id = ?
+              )
+          `,
+          args: [legacyId, persistedId],
+        });
+        await transaction.execute({
+          sql:
+            "UPDATE match_session_participants SET player_id = ? WHERE player_id = ?",
+          args: [persistedId, legacyId],
+        });
+      }
+
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
   }
 
   private async seedAdditionalTestRatingHistory() {
@@ -911,9 +1090,9 @@ export class TestDataRepository {
 
     const participants = [
       { teamIndex: 0, playerId },
-      { teamIndex: 0, playerId: "Pdev0001" },
-      { teamIndex: 1, playerId: "Pdev0002" },
-      { teamIndex: 1, playerId: "Pdev0003" },
+      { teamIndex: 0, playerId: this.resolveDevPlayerId("dev-player-alice") },
+      { teamIndex: 1, playerId: this.resolveDevPlayerId("dev-player-bob") },
+      { teamIndex: 1, playerId: this.resolveDevPlayerId("dev-player-cara") },
     ] as const;
     for (const participant of participants) {
       await this.createMatchParticipantIfMissing({
