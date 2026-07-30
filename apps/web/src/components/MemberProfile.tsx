@@ -336,7 +336,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 className="hidden"
               />
             ) : null}
-            <div className="flex min-w-[180px] w-full max-w-[50%] flex-1 flex-col items-start gap-1">
+            <div className="flex min-w-[180px] w-full max-w-[50%] flex-1 flex-col items-start gap-0.5">
               <div className="flex min-w-0 max-w-full flex-nowrap items-baseline gap-2">
                 <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font">
                   {displayName}

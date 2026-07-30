@@ -123,7 +123,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
         <button
           type="button"
           onClick={onEditStatus}
-          className="flex items-center gap-1 text-[clamp(0.8125rem,3.5cqw,1.05rem)] text-pkpk-detail-font underline decoration-dashed underline-offset-2"
+          className="flex items-center gap-1 text-[clamp(0.8125rem,3.5cqw,1.05rem)] text-pkpk-detail-font"
           aria-label="상태메시지 추가"
         >
           상태메시지 추가
