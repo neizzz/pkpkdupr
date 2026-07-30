@@ -46,7 +46,7 @@ const SCORE_TABLE_SET_COUNT = 3;
 
 export const MatchDetailSkeleton: React.FC = () => (
   <div
-    className="min-h-full [&_section>p]:text-sm"
+    className="min-h-full [&_section>p]:text-[1.1rem]"
     role="status"
     aria-label="매치 상세 로딩 중"
   >
@@ -113,11 +113,10 @@ export const MatchDetailSkeleton: React.FC = () => (
         <section>
           <div className="flex items-center justify-between gap-3">
             <p
-              className={`!text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
+              className={`!text-[1.1rem] font-semibold uppercase tracking-wide ${subTextClassName}`}
             >
               Approval
             </p>
-            <SkeletonBlock className="h-3 w-12" />
           </div>
           <Card className="mt-3 rounded-3xl bg-white/95 p-3 shadow-sm">
             <div className="flex flex-col gap-3">
@@ -136,7 +135,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 );
 
 const MatchDetailSectionsSkeleton: React.FC = () => (
-  <div className="contents [&_section>p]:text-sm">
+  <div className="contents [&_section>p]:text-[1.1rem]">
     <span className="sr-only" role="status">
       매치 상세 정보 로딩 중
     </span>
@@ -183,11 +182,10 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <section>
       <div className="flex items-center justify-between gap-3">
         <p
-          className={`!text-sm pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
+          className={`!text-[1.1rem] pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
         >
           Approval
         </p>
-        <SkeletonBlock className="h-3 w-12" />
       </div>
       <Card className="mt-1.5 rounded-3xl bg-white/95 p-3 shadow-sm">
         <div className="flex flex-col gap-3">
@@ -379,30 +377,29 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           <Match
             match={match}
             currentPlayerId={currentPlayerId}
+            headerRightContent={
+              <div className="flex max-w-24 items-center gap-1.5">
+                <span
+                  className={`shrink-0 text-[0.625rem] font-semibold uppercase tracking-wide ${subTextClassName}`}
+                >
+                  ID
+                </span>
+                <CopyableId
+                  label="Match ID"
+                  value={match.id}
+                  showLabel={false}
+                />
+              </div>
+            }
             showChevron={false}
           />
-
-          <section>
-            <div className="flex min-w-0 items-center gap-3">
-              <p
-                className={`shrink-0 pl-2 text-sm font-semibold uppercase tracking-wide ${subTextClassName}`}
-              >
-                ID
-              </p>
-              <CopyableId
-                label="Match ID"
-                value={match.id}
-                showLabel={false}
-              />
-            </div>
-          </section>
 
           {isSectionsLoading ? <MatchDetailSectionsSkeleton /> : null}
           <div
             className={
               isSectionsLoading
                 ? "hidden"
-                : "flex flex-col gap-3 [&_section>p]:text-sm"
+                : "flex flex-col gap-3 [&_section>p]:text-[1.1rem]"
             }
           >
             <section>
@@ -643,14 +640,10 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <section>
             <div className="flex items-center justify-between gap-3">
               <p
-                className={`!text-sm pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
+                className={`!text-[1.1rem] pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
               >
                 Approval
               </p>
-              <span className="text-xs font-medium text-[#888]">
-                승인 {match.approvals.length}/
-                {match.teams.flatMap((team) => team.players).length}
-              </span>
             </div>
             <Card className="mt-1.5 rounded-3xl bg-white/95 p-3 shadow-sm">
               {match.teams

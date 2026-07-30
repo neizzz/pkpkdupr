@@ -21,6 +21,7 @@ const sessionStatusBadgeClassMap = {
 interface SessionCardProps {
   session: MatchSessionSummaryInfo;
   onPress?: (session: MatchSessionSummaryInfo) => void;
+  headerRightContent?: React.ReactNode;
   showMatchCount?: boolean;
   showChevron?: boolean;
 }
@@ -48,6 +49,7 @@ const formatSessionDateTime = (value: string) => {
 const SessionCard: React.FC<SessionCardProps> = ({
   session,
   onPress,
+  headerRightContent,
   showMatchCount = true,
   showChevron = true,
 }) => {
@@ -77,11 +79,12 @@ const SessionCard: React.FC<SessionCardProps> = ({
         title={session.name}
         rightGapClassName="gap-0"
         rightContent={
-          showMatchCount ? (
+          headerRightContent ??
+          (showMatchCount ? (
             <span className="text-sm font-semibold leading-none">
               총 {session.matchCount}경기
             </span>
-          ) : undefined
+          ) : undefined)
         }
         showChevron={showChevron}
         afterTime={

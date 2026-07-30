@@ -79,26 +79,26 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
         <div className="mx-auto flex w-full flex-col gap-3">
           <SessionCard
             session={session}
+            headerRightContent={
+              <div className="flex w-24 items-center gap-1.5">
+                <span className="shrink-0 text-[0.625rem] font-semibold uppercase tracking-wide text-pkpk-sub-font">
+                  ID
+                </span>
+                <CopyableId
+                  label="Session ID"
+                  value={sessionId}
+                  showLabel={false}
+                  truncate={false}
+                />
+              </div>
+            }
             showMatchCount={false}
             showChevron={false}
           />
 
-          <section>
-            <div className="flex min-w-0 items-center gap-3">
-              <p className="shrink-0 pl-2 text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
-                ID
-              </p>
-              <CopyableId
-                label="Session ID"
-                value={sessionId}
-                showLabel={false}
-              />
-            </div>
-          </section>
-
         <section>
           <div className="flex items-center justify-between gap-3">
-            <p className="pl-2 text-sm font-semibold uppercase tracking-wide text-pkpk-sub-font">
+            <p className="pl-2 text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-sub-font">
               Matches
             </p>
             <Switch

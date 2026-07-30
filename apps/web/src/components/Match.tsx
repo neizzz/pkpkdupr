@@ -64,6 +64,7 @@ interface MatchProps {
   match: MatchInfo;
   currentPlayerId?: string;
   onPress?: (match: MatchInfo) => void;
+  headerRightContent?: React.ReactNode;
   showChevron?: boolean;
 }
 
@@ -127,6 +128,7 @@ const Match: React.FC<MatchProps> = ({
   match,
   currentPlayerId,
   onPress,
+  headerRightContent,
   showChevron = true,
 }) => {
   const hasResultScores = !!match.scores?.length;
@@ -159,6 +161,7 @@ const Match: React.FC<MatchProps> = ({
           time={matchTime}
           location={match.location}
           title={displayTitle}
+          rightContent={headerRightContent}
           showChevron={showChevron}
           afterTime={
             <span
