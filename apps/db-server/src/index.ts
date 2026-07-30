@@ -633,6 +633,10 @@ const initSchema = async () => {
   await client.execute(`
     UPDATE matches
     SET
+      match_starts_at = CASE
+        WHEN match_starts_at >= 100000000000 THEN match_starts_at / 1000
+        ELSE match_starts_at
+      END,
       result_submitted_at = CASE
         WHEN result_submitted_at >= 100000000000 THEN result_submitted_at / 1000
         ELSE result_submitted_at
@@ -645,7 +649,8 @@ const initSchema = async () => {
         WHEN updated_at >= 100000000000 THEN updated_at / 1000
         ELSE updated_at
       END
-    WHERE result_submitted_at >= 100000000000
+    WHERE match_starts_at >= 100000000000
+       OR result_submitted_at >= 100000000000
        OR completed_at >= 100000000000
        OR updated_at >= 100000000000
   `);
