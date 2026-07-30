@@ -151,7 +151,7 @@ const Match: React.FC<MatchProps> = ({
 
   const card = (
     <Card
-      className={`relative w-full rounded-3xl bg-white/95 p-3 shadow-sm ${
+      className={`relative w-full rounded-3xl border border-pkpk-sub-bg bg-white/95 p-3 shadow-sm ${
         onPress ? "transition-colors hover:bg-amber-50" : ""
       }`}
     >
