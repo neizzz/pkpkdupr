@@ -19,10 +19,13 @@ import {
   IoAdd,
   IoAddCircleOutline,
   IoLogOutOutline,
+  IoPeople,
   IoPeopleOutline,
+  IoPersonCircle,
   IoPersonCircleOutline,
   IoQrCodeSharp,
   IoSettingsOutline,
+  IoTennisball,
   IoTennisballOutline,
 } from "react-icons/io5";
 import AppSettingsSheetBody from "@/components/AppSettingsSheetBody";
@@ -1059,7 +1062,7 @@ const BottomNav: React.FC = () => {
         onSelectionChange={handleSelectionChange}
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
-        <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-2">
+        <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-3">
           <Tabs.ListContainer className="mr-[4.35rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
@@ -1070,11 +1073,15 @@ const BottomNav: React.FC = () => {
                 onPointerDownCapture={() =>
                   handleActiveTabPointerDown("match")
                 }
-                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="min-h-[3.2rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
-                <div className="flex flex-col items-center gap-0.5 py-1">
-                  <IoTennisballOutline className="text-base" />
-                  <span className="text-[11px] leading-none">Matches</span>
+                <div className="flex flex-col items-center gap-1 py-1.5">
+                  {selectedTab === "match" ? (
+                    <IoTennisball className="text-lg" />
+                  ) : (
+                    <IoTennisballOutline className="text-lg" />
+                  )}
+                  <span className="text-[13.2px] leading-none">Matches</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1083,22 +1090,30 @@ const BottomNav: React.FC = () => {
                 onPointerDownCapture={() =>
                   handleActiveTabPointerDown("members")
                 }
-                className="min-h-[2.8rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
-                <div className="flex flex-col items-center gap-0.5 py-1">
-                  <IoPeopleOutline className="text-base" />
-                  <span className="text-[11px] leading-none">Members</span>
+                <div className="flex flex-col items-center gap-1 py-1.5">
+                  {selectedTab === "members" ? (
+                    <IoPeople className="text-lg" />
+                  ) : (
+                    <IoPeopleOutline className="text-lg" />
+                  )}
+                  <span className="text-[13.2px] leading-none">Members</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
               <Tabs.Tab
                 id="me"
                 onPointerDownCapture={() => handleActiveTabPointerDown("me")}
-                className="min-h-[2.8rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="min-h-[3.2rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
-                <div className="flex flex-col items-center gap-0.5 py-1">
-                  <IoPersonCircleOutline className="text-base" />
-                  <span className="text-[11px] leading-none">Me</span>
+                <div className="flex flex-col items-center gap-1 py-1.5">
+                  {selectedTab === "me" ? (
+                    <IoPersonCircle className="text-lg" />
+                  ) : (
+                    <IoPersonCircleOutline className="text-lg" />
+                  )}
+                  <span className="text-[13.2px] leading-none">Me</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1144,21 +1159,21 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+var(--safe-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Matches reloadKey={matchesReloadKey} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+var(--safe-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"
             shouldForceMount={visitedTabs.me}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(4rem+var(--safe-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Me />
           </Tabs.Panel>
