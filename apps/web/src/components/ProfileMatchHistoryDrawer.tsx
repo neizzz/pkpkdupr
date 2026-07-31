@@ -37,13 +37,19 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
     onExited={onExited}
     onScrollContainerChange={onScrollContainerChange}
     layer={layer}
+    className="!bg-white"
   >
-    <div className="min-h-full">
-      <DetailPageHeader title="전체 매치" tabKey={tabKey} />
+    <div className="min-h-full bg-white">
+      <DetailPageHeader
+        title="전체 매치"
+        tabKey={tabKey}
+        backgroundClassName="bg-white"
+      />
       <div className="p-2">
         <ProfileMatchList
           matches={matches}
           isLoading={isLoading}
+          variant="plain"
           emptyMessage="완료된 매치가 없어요."
           onPressMatch={onPressMatch}
         />

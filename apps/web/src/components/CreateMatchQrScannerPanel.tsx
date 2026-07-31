@@ -71,7 +71,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
 
       {qrScannerStatus === "confirm" && pendingQrMember ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white px-5 text-center">
-          <div className="flex w-full max-w-[180px] min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center shadow-sm ring-1 ring-border">
+          <div className="flex w-full max-w-[180px] min-w-0 flex-col items-center rounded-2xl bg-white/90 px-3 py-4 text-center ring-1 ring-border">
             <Avatar
               size="sm"
               avatarUrl={pendingQrMember.avatarUrl}

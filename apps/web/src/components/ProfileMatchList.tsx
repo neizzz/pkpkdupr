@@ -16,6 +16,7 @@ export interface ProfileMatchListItem {
 interface ProfileMatchListProps {
   matches: ProfileMatchListItem[];
   isLoading?: boolean;
+  variant?: "card" | "plain";
   emptyMessage: string;
   onPressMatch?: (match: MatchInfo) => void;
 }
@@ -57,17 +58,27 @@ const getOutcomeClassName = (outcome: ProfileMatchOutcome) => {
   return "text-pkpk-sub-font";
 };
 
-const ProfileMatchListSkeleton: React.FC = () => (
+const ProfileMatchListSkeleton: React.FC<{ variant: "card" | "plain" }> = ({
+  variant,
+}) => (
   <div
     role="status"
     aria-label="최근 매치 로딩 중"
-    className="overflow-hidden rounded-2xl border border-border bg-white"
+    className={
+      variant === "card"
+        ? "overflow-hidden rounded-2xl border border-border bg-white"
+        : "overflow-hidden"
+    }
   >
     {Array.from({ length: 3 }, (_, index) => (
       <div
         key={index}
-        className={`flex items-center gap-3 px-3 py-3 ${
-          index > 0 ? "border-t border-border" : ""
+        className={`relative flex items-center gap-3 px-3 py-3 ${
+          index > 0
+            ? variant === "card"
+              ? "before:absolute before:inset-x-3 before:top-0 before:border-t before:border-border before:content-['']"
+              : "border-t border-border"
+            : ""
         }`}
       >
         <div className="flex w-11 shrink-0 flex-col items-center gap-1 border-r border-border pr-3">
@@ -88,23 +99,36 @@ const ProfileMatchListSkeleton: React.FC = () => (
 const ProfileMatchList: React.FC<ProfileMatchListProps> = ({
   matches,
   isLoading = false,
+  variant = "card",
   emptyMessage,
   onPressMatch,
 }) => {
   if (isLoading) {
-    return <ProfileMatchListSkeleton />;
+    return <ProfileMatchListSkeleton variant={variant} />;
   }
 
   if (!matches.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-white px-4 py-6 text-center">
+      <div
+        className={
+          variant === "card"
+            ? "rounded-2xl border border-dashed border-border bg-white px-4 py-6 text-center"
+            : "px-4 py-6 text-center"
+        }
+      >
         <p className="text-sm font-medium text-pkpk-sub-font">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm">
+    <div
+      className={
+        variant === "card"
+          ? "overflow-hidden rounded-2xl border border-border bg-white"
+          : "overflow-hidden"
+      }
+    >
       {matches.map((item, index) => {
         const { month, day } = formatMatchDate(item.match.matchStartsAt);
         const opponentLabel = item.opponentName;
@@ -146,8 +170,12 @@ const ProfileMatchList: React.FC<ProfileMatchListProps> = ({
           </>
         );
 
-        const rowClassName = `flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors ${
-          index > 0 ? "border-t border-border" : ""
+        const rowClassName = `relative flex w-full items-center gap-2.5 px-3 py-3 text-left transition-colors ${
+          index > 0
+            ? variant === "card"
+              ? "before:absolute before:inset-x-3 before:top-0 before:border-t before:border-border before:content-['']"
+              : "border-t border-border"
+            : ""
         } ${onPressMatch ? "hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10" : ""}`;
 
         return onPressMatch ? (

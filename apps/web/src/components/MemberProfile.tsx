@@ -3,7 +3,7 @@ import { Spinner } from "@heroui/react";
 import type { PlayerAffiliation } from "@pkpkdupr/shared/player";
 import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
 import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
-import { IoPeople, IoPerson } from "react-icons/io5";
+import { IoChevronForward, IoPeople, IoPerson } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
 import AvatarUploadConfirmSheetBody from "@/components/AvatarUploadConfirmSheetBody";
 import BottomSheet from "@/components/BottomSheet";
@@ -503,9 +503,10 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 <button
                   type="button"
                   onClick={onViewAllMatches}
-                  className="shrink-0 text-sm font-bold text-pkpk-primary-bg transition-opacity hover:opacity-75"
+                  className="inline-flex shrink-0 items-center gap-0.5 text-sm font-bold text-pkpk-primary-bg transition-opacity hover:opacity-75"
                 >
                   전체 보기
+                  <IoChevronForward aria-hidden="true" className="size-4" />
                 </button>
               ) : null}
             </div>

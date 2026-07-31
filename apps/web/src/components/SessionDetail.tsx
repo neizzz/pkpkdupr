@@ -28,7 +28,7 @@ const SessionMatchListSkeleton: React.FC = () => (
     aria-label="세션 경기 목록 로딩 중"
   >
     {Array.from({ length: 2 }, (_, index) => (
-      <Card key={index} className="rounded-3xl bg-white p-4 shadow-sm">
+      <Card key={index} className="rounded-3xl bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <SkeletonBlock className="size-10 shrink-0 rounded-full" />

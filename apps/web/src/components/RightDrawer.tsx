@@ -23,6 +23,7 @@ interface RightDrawerProps {
   onExited?: () => void;
   onScrollContainerChange?: (element: HTMLDivElement | null) => void;
   layer?: number;
+  className?: string;
 }
 
 const RightDrawer: React.FC<RightDrawerProps> = ({
@@ -33,6 +34,7 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
   onExited,
   onScrollContainerChange,
   layer = 50,
+  className,
 }) => {
   const [shouldRender, setShouldRender] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -146,7 +148,7 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
           aria-label={ariaLabel}
           className={`app-right-drawer-scroll-area ${
             isOpen && isActive ? "pointer-events-auto" : "pointer-events-none"
-          } h-[calc(var(--app-shell-height)-var(--app-keyboard-offset))] w-full bg-pkpk-bg pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl ${transformClassName}`}
+          } h-[calc(var(--app-shell-height)-var(--app-keyboard-offset))] w-full bg-pkpk-bg pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl ${transformClassName} ${className ?? ""}`}
         >
           <RightDrawerScrollContext.Provider value={scrollContainer}>
             {children}

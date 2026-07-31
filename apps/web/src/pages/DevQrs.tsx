@@ -15,7 +15,7 @@ const getGenderClassName = (gender: DevPlayerQrToken["player"]["gender"]) =>
     : "bg-[#f8626c]/10 text-[#f8626c]";
 
 const DevQrCard: React.FC<{ token: DevPlayerQrToken }> = ({ token }) => (
-  <div className="rounded-3xl border border-border bg-white p-3 shadow-sm">
+  <div className="rounded-3xl border border-border bg-white p-3">
     <div className="flex items-start justify-between gap-2">
       <div className="min-w-0">
         <p className="truncate text-sm font-bold text-pkpk-sub-font">
@@ -146,11 +146,11 @@ const DevQrs: React.FC = () => {
         </header>
 
         {isLoading ? (
-          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm text-pkpk-sub-font shadow-sm">
+          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm text-pkpk-sub-font">
             Dev QR 목록을 불러오는 중입니다...
           </div>
         ) : error ? (
-          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm font-semibold text-error shadow-sm">
+          <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm font-semibold text-error">
             {error}
           </div>
         ) : (

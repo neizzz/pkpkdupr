@@ -58,7 +58,7 @@ export const MatchDetailSkeleton: React.FC = () => (
     <DetailPageHeader title="Match Detail" tabKey="match" />
     <div className="p-2">
       <div className="mx-auto flex w-full flex-col gap-3">
-        <Card className="rounded-3xl bg-white p-4 shadow-sm">
+        <Card className="rounded-3xl bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3">
               <SkeletonBlock className="size-10 shrink-0 rounded-full" />
@@ -81,7 +81,7 @@ export const MatchDetailSkeleton: React.FC = () => (
           >
             Score
           </p>
-          <div className="mt-3 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5 p-3 shadow-sm">
+          <div className="mt-3 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5 p-3">
             <SkeletonBlock className="h-4 w-full" />
             <div className="mt-3 flex flex-col gap-2">
               {Array.from({ length: 2 }, (_, index) => (
@@ -103,7 +103,7 @@ export const MatchDetailSkeleton: React.FC = () => (
           >
             Rating Change
           </p>
-          <Card className="mt-3 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3 shadow-sm">
+          <Card className="mt-3 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
             <div className="flex flex-col gap-3">
               {Array.from({ length: 3 }, (_, index) => (
                 <div key={index} className="flex items-center justify-between gap-3">
@@ -123,7 +123,7 @@ export const MatchDetailSkeleton: React.FC = () => (
               Approval
             </p>
           </div>
-          <Card className="mt-3 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3 shadow-sm">
+          <Card className="mt-3 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
             <div className="flex flex-col gap-3">
               {Array.from({ length: 4 }, (_, index) => (
                 <div key={index} className="flex items-center justify-between gap-3">
@@ -150,7 +150,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
       >
         Score
       </p>
-      <div className="mt-1.5 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5 p-3 shadow-sm">
+      <div className="mt-1.5 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5 p-3">
         <SkeletonBlock className="h-4 w-full" />
         <div className="mt-3 flex flex-col gap-2">
           {Array.from({ length: 2 }, (_, index) => (
@@ -172,7 +172,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
       >
         Rating Change
       </p>
-      <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3 shadow-sm">
+      <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
         <div className="flex flex-col gap-3">
           {Array.from({ length: 3 }, (_, index) => (
             <div key={index} className="flex items-center justify-between gap-3">
@@ -192,7 +192,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
           Approval
         </p>
       </div>
-      <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3 shadow-sm">
+      <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
         <div className="flex flex-col gap-3">
           {Array.from({ length: 4 }, (_, index) => (
             <div key={index} className="flex items-center justify-between gap-3">
@@ -438,7 +438,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             >
               Score
             </p>
-            <div className="mt-1.5 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5 shadow-sm">
+            <div className="mt-1.5 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5">
               <table className="w-full table-fixed border-collapse text-sm text-pkpk-sub-font">
                 <colgroup>
                   <col className="w-[40%]" />
@@ -534,7 +534,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             </section>
 
             {shouldShowResultForm ? (
-            <Card className="rounded-xl border border-pkpk-sub-bg/30 bg-white p-3 shadow-sm">
+            <Card className="rounded-xl border border-pkpk-sub-bg/30 bg-white p-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
                 {hasResultScores ? "Edit Result" : "Result"}
               </p>
@@ -614,7 +614,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             >
               Rating Change
             </p>
-            <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3 shadow-sm">
+            <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
               {hasRatingChanges ? (
                 (() => {
                   const entries = match.teams
@@ -675,7 +675,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 Approval
               </p>
             </div>
-            <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3 shadow-sm">
+            <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
               {match.teams
                 .flatMap((team) => team.players)
                 .map((player, index, players) => {

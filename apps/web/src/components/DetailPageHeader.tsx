@@ -6,11 +6,13 @@ import { type TabKey, useTabNavigation } from "@/context/TabNavigationContext";
 interface DetailPageHeaderProps {
   title: string;
   tabKey?: TabKey;
+  backgroundClassName?: string;
 }
 
 const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   title,
   tabKey,
+  backgroundClassName = "bg-pkpk-bg",
 }) => {
   const { depthStacks, selectedTab } = useTabNavigation();
   const targetTabKey = tabKey ?? selectedTab;
@@ -38,9 +40,9 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   }
 
   return (
-    <div className="sticky top-0 z-20 bg-pkpk-bg">
+    <div className={`sticky top-0 z-20 ${backgroundClassName}`}>
       <div
-        className={`flex h-12 items-center justify-center border-b bg-pkpk-bg px-3 transition-colors ${
+        className={`flex h-12 items-center justify-center border-b ${backgroundClassName} px-3 transition-colors ${
           isScrolled ? "border-border" : "border-transparent"
         }`}
       >

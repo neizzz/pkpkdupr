@@ -53,7 +53,7 @@ const MatchFeedSkeleton: React.FC = () => (
     aria-label="매치 목록 로딩 중"
   >
     {Array.from({ length: 4 }, (_, index) => (
-      <Card key={index} className="rounded-3xl bg-white/95 p-3 shadow-sm">
+      <Card key={index} className="rounded-3xl bg-white/95 p-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <SkeletonBlock className="h-3 w-28" />

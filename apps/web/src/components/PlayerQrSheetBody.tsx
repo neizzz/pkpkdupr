@@ -32,7 +32,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
       <h2 className="bs-text-head text-center text-pkpk-main-font">QR 코드</h2>
       {qrToken ? (
         <>
-          <div className="rounded-2xl bg-white p-3 shadow-sm ring-1 ring-border">
+          <div className="rounded-2xl bg-white p-3 ring-1 ring-border">
             <QrCode
               value={qrToken.payload}
               size={180}
