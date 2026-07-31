@@ -70,7 +70,7 @@ const formatAutoApprovalRemaining = (remainingMs: number) => {
 
 export const MatchDetailSkeleton: React.FC = () => (
   <div
-    className="min-h-full [&_section>p]:text-[1.1rem]"
+    className="min-h-full"
     role="status"
     aria-label="매치 상세 로딩 중"
   >
@@ -96,7 +96,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 
         <section>
           <p
-            className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
+            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
           >
             Score
           </p>
@@ -118,7 +118,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 
         <section>
           <p
-            className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
+            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
           >
             Rating Change
           </p>
@@ -137,7 +137,7 @@ export const MatchDetailSkeleton: React.FC = () => (
         <section>
           <div className="flex items-center justify-between gap-3">
             <p
-              className="!text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font"
+              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
             >
               Approval
             </p>
@@ -159,13 +159,13 @@ export const MatchDetailSkeleton: React.FC = () => (
 );
 
 const MatchDetailSectionsSkeleton: React.FC = () => (
-  <div className="contents [&_section>p]:text-[1.1rem]">
+  <div className="contents">
     <span className="sr-only" role="status">
       매치 상세 정보 로딩 중
     </span>
     <section>
       <p
-        className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
+        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
       >
         Score
       </p>
@@ -187,7 +187,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 
     <section>
       <p
-        className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
+        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
       >
         Rating Change
       </p>
@@ -206,7 +206,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <section>
       <div className="flex items-center justify-between gap-3">
         <p
-          className="!text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font"
+          className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
         >
           Approval
         </p>
@@ -484,12 +484,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             className={
               isSectionsLoading
                 ? "hidden"
-                : "flex flex-col gap-3 [&_section>p]:text-[1.1rem]"
+                : "flex flex-col gap-3"
             }
           >
             <section>
             <p
-              className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
+              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
             >
               Score
             </p>
@@ -665,7 +665,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
             <section>
             <p
-              className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
+              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
             >
               Rating Change
             </p>
@@ -725,7 +725,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <section>
             <div className="flex items-center justify-between gap-3">
               <p
-                className="!text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font"
+                className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
               >
                 Approval
               </p>

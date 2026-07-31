@@ -98,7 +98,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 
         <section>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font">
+            <p className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font">
               Matches
             </p>
             <Switch
