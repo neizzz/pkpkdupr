@@ -92,6 +92,27 @@
     overflow-x: hidden;
     overscroll-behavior: none;
   }
+
+  /*
+   * Native buttons and HeroUI primitives intentionally keep their default
+   * cursor. Make every enabled action discoverable when the mobile-first UI
+   * is used with a mouse, while allowing explicit cursor utilities (such as
+   * the backdrop's cursor-default) to override this baseline.
+   */
+  :where(
+    button:not(:disabled):not([aria-disabled="true"]),
+    input[type="checkbox"]:not(:disabled):not([aria-disabled="true"]),
+    input[type="radio"]:not(:disabled):not([aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="tab"]:not([aria-disabled="true"]),
+    [role="menuitem"]:not([aria-disabled="true"]),
+    [role="menuitemcheckbox"]:not([aria-disabled="true"]),
+    [role="menuitemradio"]:not([aria-disabled="true"]),
+    [role="radio"]:not([aria-disabled="true"]),
+    [role="switch"]:not([aria-disabled="true"])
+  ) {
+    cursor: pointer;
+  }
 }
 
 @supports (overflow: clip) {
