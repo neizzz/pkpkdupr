@@ -366,7 +366,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
+          <div className="min-h-[28.5rem] rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
             <h3
               className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold text-pkpk-secondary-font ${
                 showDetailHeader ? "pl-2" : ""
