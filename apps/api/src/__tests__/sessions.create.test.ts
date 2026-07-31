@@ -353,7 +353,7 @@ describe("admin match sessions", () => {
     ]);
   });
 
-  it("관리자가 세션 예정 경기의 결과를 입력하고 레이팅을 재계산한다", async () => {
+  it("관리자가 세션 예정 경기의 결과를 입력하고 해당 경기 레이팅만 반영한다", async () => {
     const completedMatch: Match = {
       id: "Mmatch01",
       name: "1번 경기",
@@ -388,19 +388,11 @@ describe("admin match sessions", () => {
     const recordResult = vi
       .spyOn(MatchRepository.prototype, "recordAdminResult")
       .mockResolvedValue(completedMatch);
-    vi.spyOn(MatchRepository.prototype, "findAll").mockResolvedValue({
-      matches: [completedMatch],
-      total: 1,
-    });
-    const recalculate = vi
-      .spyOn(AuthService.prototype, "recalculateDuprRatings")
+    const applyMatchResult = vi
+      .spyOn(AuthService.prototype, "applyMatchResultToRatings")
       .mockResolvedValue({
         ratingChangeLogs: [],
-        perMatchLogs: [],
         changedPlayerCount: 0,
-        restoredMatchDuprSnapshotCount: 0,
-        restoredMatchDuprSnapshotMatchCount: 0,
-        perMatchLogCount: 0,
       });
 
     const response = await request(app)
@@ -414,10 +406,7 @@ describe("admin match sessions", () => {
       admin.id,
       completedMatch.scores,
     );
-    expect(recalculate).toHaveBeenCalledWith(
-      [completedMatch],
-      expect.objectContaining({ source: "manual_recalculation" }),
-    );
+    expect(applyMatchResult).toHaveBeenCalledWith(completedMatch);
     expect(response.body.match).toMatchObject({
       id: completedMatch.id,
       status: "completed",

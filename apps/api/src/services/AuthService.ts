@@ -7,6 +7,7 @@ import {
   PlayerCreationLog,
   PlayerCreationSource,
   PlayerDupr,
+  PlayerDuprCategory,
   PlayerDuprMetrics,
   PlayerRatingChangeLog,
   PlayerRatingChangeSource,
@@ -1649,6 +1650,49 @@ export class AuthService {
     });
   }
 
+  /**
+   * 증분 반영 시 confidence 감쇠에만 사용할 해당 종목의 직전 경기 시각을 찾는다.
+   * 전체 경기를 다시 계산하지 않고, 이번 경기 참가자별 이력만 조회한다.
+   */
+  private async getPreviousCompletedAtForRating(
+    playerId: string,
+    category: PlayerDuprCategory,
+    currentMatch: Match,
+  ): Promise<Date | null> {
+    const { matches } = await this.dbRequest<{ matches: any[]; total: number }>(
+      `/internal/matches?page=0&limit=10000&playerId=${encodeURIComponent(playerId)}`,
+    );
+    const currentCompletedAtMs = currentMatch.completedAt!.getTime();
+
+    const previousCompletedAtMs = matches.reduce<number | null>(
+      (latest, candidate) => {
+        if (
+          candidate.id === currentMatch.id ||
+          candidate.status !== "completed" ||
+          !candidate.completedAt ||
+          getDuprCategoryForMatchType(candidate.type) !== category
+        ) {
+          return latest;
+        }
+
+        const completedAtMs = new Date(candidate.completedAt).getTime();
+        if (
+          !Number.isFinite(completedAtMs) ||
+          completedAtMs >= currentCompletedAtMs
+        ) {
+          return latest;
+        }
+
+        return latest == null ? completedAtMs : Math.max(latest, completedAtMs);
+      },
+      null,
+    );
+
+    return previousCompletedAtMs == null
+      ? null
+      : new Date(previousCompletedAtMs);
+  }
+
   private buildOfficialDuprImpacts(
     result: DuprRecalculationResult,
   ): OfficialDuprAdjustmentImpact[] {
@@ -1872,42 +1916,130 @@ export class AuthService {
     ratingChangeLogs: PlayerRatingChangeLog[];
     changedPlayerCount: number;
   }> {
-    if (buildWinnerTeamIndex(match) == null || !match.completedAt) {
+    const winnerTeamIndex = buildWinnerTeamIndex(match);
+    if (winnerTeamIndex == null || !match.completedAt) {
       return { ratingChangeLogs: [], changedPlayerCount: 0 };
     }
 
-    const { matches: allMatches } = await this.dbRequest<{
-      matches: any[];
-      total: number;
-    }>("/internal/matches?page=0&limit=10000");
-    const recalculation = await this.recalculateDuprRatings(
-      allMatches
-        .filter(
-          (candidate: any) =>
-            candidate.status === "completed" && candidate.completedAt,
-        )
-        .map(
-          (candidate: any) =>
-            ({
-              ...candidate,
-              matchStartsAt: new Date(candidate.matchStartsAt),
-              completedAt: new Date(candidate.completedAt),
-              createdAt: new Date(candidate.createdAt),
-              updatedAt: new Date(candidate.updatedAt),
-              resultSubmittedAt: candidate.resultSubmittedAt
-                ? new Date(candidate.resultSubmittedAt)
-                : null,
-            }) as Match,
-        ),
-      { perMatchLogs: true },
+    const existingLogs = (
+      await this.dbRequest<any[]>(
+        `/internal/matches/${encodeURIComponent(match.id)}/rating-change-logs`,
+      )
+    ).map(hydratePlayerRatingChangeLog);
+    if (existingLogs.length > 0) {
+      return {
+        ratingChangeLogs: existingLogs,
+        changedPlayerCount: existingLogs.filter((log) =>
+          hasDuprChange(log.delta),
+        ).length,
+      };
+    }
+
+    const category = getDuprCategoryForMatchType(match.type);
+    const participantEntries = match.teams.flatMap((team, teamIndex) =>
+      team.players.map((player) => ({
+        playerId: player.id,
+        teamIndex: teamIndex as 0 | 1,
+      })),
     );
-    const matchPrefix = `match-completed-${match.id}-`;
+    const playerIds = [...new Set(participantEntries.map((entry) => entry.playerId))];
+    const storedPlayerEntries = await Promise.all(
+      playerIds.map(async (playerId) => [
+        playerId,
+        await this.getStoredPlayerById(playerId),
+      ] as const),
+    );
+    const storedPlayerById = new Map(
+      storedPlayerEntries.filter(
+        (entry): entry is readonly [string, StoredPlayerRecord] =>
+          entry[1] != null,
+      ),
+    );
+    const participants = participantEntries
+      .map((entry) => {
+        const stored = storedPlayerById.get(entry.playerId);
+        return stored ? { ...entry, state: stored.duprState } : null;
+      })
+      .filter(
+        (participant): participant is NonNullable<typeof participant> =>
+          participant != null,
+      );
+
+    if (participants.length < 2) {
+      return { ratingChangeLogs: [], changedPlayerCount: 0 };
+    }
+
+    const previousCompletedAtEntries = await Promise.all(
+      [...new Set(participants.map((participant) => participant.playerId))].map(
+        async (playerId) => [
+          playerId,
+          await this.getPreviousCompletedAtForRating(playerId, category, match),
+        ] as const,
+      ),
+    );
+    const completedAtMs = match.completedAt.getTime();
+    const inactiveElapsedMsByPlayerId = Object.fromEntries(
+      previousCompletedAtEntries.map(([playerId, previousCompletedAt]) => [
+        playerId,
+        previousCompletedAt
+          ? Math.max(0, completedAtMs - previousCompletedAt.getTime())
+          : 0,
+      ]),
+    );
+    const nextStateByPlayerId = this.ratingService.replayMatch({
+      type: match.type,
+      winnerTeamIndex,
+      participants,
+      scores: match.scores,
+      inactiveElapsedMsByPlayerId,
+    });
+
+    const changes = Object.entries(nextStateByPlayerId)
+      .map(([playerId, nextState]) => {
+        const previousState = storedPlayerById.get(playerId)?.duprState;
+        if (!previousState) return null;
+        return {
+          playerId,
+          previousRating: previousState.rating,
+          nextRating: nextState.rating,
+          delta: buildDuprDelta(nextState.rating, previousState.rating),
+          nextState,
+        };
+      })
+      .filter((change): change is NonNullable<typeof change> => change != null);
+
+    await Promise.all(
+      changes.map((change) =>
+        this.updateStoredPlayerDuprState(change.playerId, change.nextState),
+      ),
+    );
+    await this.fillMissingMatchParticipantDuprSnapshots(
+      participants.map((participant) => ({
+        matchId: match.id,
+        playerId: participant.playerId,
+        duprRating: toPublicPlayerDupr(participant.state),
+      })),
+    );
+
+    const sourceLogId = `match-completed-${match.id}-${match.completedAt.getTime()}`;
+    const ratingChangeLogs = await Promise.all(
+      changes.map((change) =>
+        this.insertPlayerRatingChangeLog({
+          playerId: change.playerId,
+          source: "match_completed",
+          sourceLogId,
+          previousRating: change.previousRating,
+          nextRating: change.nextRating,
+          delta: change.delta,
+          createdAt: match.completedAt!,
+        }),
+      ),
+    );
 
     return {
-      ratingChangeLogs: recalculation.perMatchLogs.filter((log) =>
-        log.sourceLogId.startsWith(matchPrefix),
-      ),
-      changedPlayerCount: recalculation.changedPlayerCount,
+      ratingChangeLogs,
+      changedPlayerCount: changes.filter((change) => hasDuprChange(change.delta))
+        .length,
     };
   }
 

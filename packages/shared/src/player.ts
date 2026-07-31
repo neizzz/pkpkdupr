@@ -71,6 +71,19 @@ export interface PlayerRatingChangeLog {
   createdAt: Date;
 }
 
+/** 프로필 차트에 표시하는 재계산 완료 레이팅 지점입니다. */
+export interface PlayerRatingHistoryPoint {
+  rating: number;
+  createdAt: Date;
+  /** 완료 경기 또는 완료 경기가 없는 종목의 현재 레이팅입니다. */
+  source: "match" | "current";
+}
+
+export type PlayerRatingHistory = Record<
+  PlayerDuprCategory,
+  PlayerRatingHistoryPoint[]
+>;
+
 export interface OfficialDuprAdjustmentImpact {
   playerId: string;
   username: string;

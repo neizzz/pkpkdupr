@@ -9,7 +9,10 @@ import {
   getMatchTopLevelType,
   matchTopLevelTypeLabels,
 } from "@pkpkdupr/shared/match";
-import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
+import type {
+  PlayerRatingChangeLog,
+  PlayerRatingHistory,
+} from "@pkpkdupr/shared/player";
 import UserChip from "@/components/UserChip";
 import MatchCardHeader from "@/components/MatchCardHeader";
 import { formatRating, getDisplayRatingForMatchType } from "@/utils/dupr";
@@ -58,8 +61,10 @@ export type MatchFeedItemInfo =
 export interface MatchListResponse {
   matches: MatchInfo[];
   total: number;
-  /** 경기와 별도로 기록되는 공식 레이팅 반영 이벤트(그래프 전용). */
+  /** 공식 레이팅 반영 감사 이벤트. 프로필 그래프에는 직접 표시하지 않는다. */
   ratingAdjustmentLogs?: PlayerRatingChangeLog[];
+  /** API가 공식 DUPR 보정을 분배해 만든 프로필 차트 전용 이력. */
+  ratingHistory?: PlayerRatingHistory;
 }
 
 interface MatchProps {

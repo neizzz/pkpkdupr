@@ -38,6 +38,7 @@ import {
 } from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 import { AutoApprovalService } from "./services/AutoApprovalService";
+import { buildPlayerRatingHistory } from "./services/PlayerRatingHistoryService";
 import {
   buildCourtSchedule,
   findCourtScheduleConflicts,
@@ -771,8 +772,10 @@ app.get("/api/matches", async (req, res) => {
       : await matchRepository.findAll(page, limit);
 
     if (playerId) {
-      const ratingChangeLogs =
-        await matchRepository.getPlayerRatingChangeLogs(playerId);
+      const [ratingChangeLogs, player] = await Promise.all([
+        matchRepository.getPlayerRatingChangeLogs(playerId),
+        authService.getPlayerById(playerId),
+      ]);
 
       const logsByMatch = new Map<string, typeof ratingChangeLogs>();
       for (const log of ratingChangeLogs) {
@@ -793,8 +796,14 @@ app.get("/api/matches", async (req, res) => {
       const ratingAdjustmentLogs = ratingChangeLogs.filter(
         (log) => log.source === "official_adjustment_recalculation",
       );
+      const ratingHistory = buildPlayerRatingHistory(
+        result.matches,
+        playerId,
+        player?.duprRating,
+        ratingChangeLogs,
+      );
 
-      return res.json({ ...result, ratingAdjustmentLogs });
+      return res.json({ ...result, ratingAdjustmentLogs, ratingHistory });
     }
 
     res.json(result);
@@ -1357,24 +1366,30 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       createdMatches.push(await matchRepository.create(matchInput));
     }
 
-    const { matches } = await matchRepository.findAll(0, 10000);
-    const completedMatches = matches.filter(
-      (match) => match.status === "completed",
+    const ratingResults = [];
+    for (const match of [...createdMatches].sort(
+      (left, right) =>
+        left.completedAt!.getTime() - right.completedAt!.getTime(),
+    )) {
+      ratingResults.push(await authService.applyMatchResultToRatings(match));
+    }
+    const ratingChangeLogs = ratingResults.flatMap(
+      (result) => result.ratingChangeLogs,
     );
-    const recalculation = await authService.recalculateDuprRatings(
-      completedMatches,
-      {
-        source: "manual_recalculation",
-        sourceLogId: `admin-match-batch-${Date.now()}-${randomUUID()}`,
-        perMatchLogs: true,
-      },
-    );
+    const changedPlayerCount = new Set(
+      ratingChangeLogs
+        .filter(
+          (log) => log.delta.singles !== 0 || log.delta.doubles !== 0,
+        )
+        .map((log) => log.playerId),
+    ).size;
 
     res.status(201).json({
       matches: createdMatches,
       createdCount: createdMatches.length,
-      completedMatchCount: completedMatches.length,
-      ...recalculation,
+      completedMatchCount: createdMatches.length,
+      changedPlayerCount,
+      ratingChangeLogs,
     });
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
@@ -1533,17 +1548,9 @@ app.post(
         decoded.playerId,
         scores,
       );
-      const { matches } = await matchRepository.findAll(0, 10000);
-      const recalculation = await authService.recalculateDuprRatings(
-        matches.filter((candidate) => candidate.status === "completed"),
-        {
-          source: "manual_recalculation",
-          sourceLogId: `admin-match-result-${match.id}-${Date.now()}-${randomUUID()}`,
-          perMatchLogs: true,
-        },
-      );
+      const ratingResult = await authService.applyMatchResultToRatings(match);
 
-      res.json({ match, ...recalculation });
+      res.json({ match, ...ratingResult });
     } catch (err) {
       if (err instanceof DbRequestError && err.status === 409) {
         return res.status(409).json({ error: err.message });

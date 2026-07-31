@@ -1,5 +1,5 @@
 import { getMatchTopLevelType } from "@pkpkdupr/shared/match";
-import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
+import type { PlayerRatingHistory } from "@pkpkdupr/shared/player";
 import type { MatchInfo } from "@/components/Match";
 import type {
   ProfileMatchListItem,
@@ -26,24 +26,26 @@ export const createEmptyRatingHistory = (): MemberProfileRatingHistory => ({
   doubles: [],
 });
 
-const ratingHistoryDateFormatter = new Intl.DateTimeFormat("ko-KR", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  timeZone: "Asia/Seoul",
-});
+/** API가 만든 차트 이력의 JSON 날짜를 웹 표시용 문자열로 hydrate한다. */
+export const buildRatingHistory = (
+  ratingHistory?: PlayerRatingHistory,
+): MemberProfileRatingHistory => {
+  if (!ratingHistory) return createEmptyRatingHistory();
 
-const getRatingHistoryDateKey = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  const parts = Object.fromEntries(
-    ratingHistoryDateFormatter
-      .formatToParts(date)
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return {
+    singles: ratingHistory.singles.flatMap((point) => {
+      const createdAt = new Date(point.createdAt);
+      return Number.isNaN(createdAt.getTime())
+        ? []
+        : [{ ...point, createdAt: createdAt.toISOString() }];
+    }),
+    doubles: ratingHistory.doubles.flatMap((point) => {
+      const createdAt = new Date(point.createdAt);
+      return Number.isNaN(createdAt.getTime())
+        ? []
+        : [{ ...point, createdAt: createdAt.toISOString() }];
+    }),
+  };
 };
 
 export const getWinningTeamIndex = (
@@ -223,79 +225,4 @@ export const buildRatingDelta = (
   }
 
   return delta;
-};
-
-export const buildRatingHistory = (
-  matches: MatchInfo[],
-  playerId: string,
-  ratingAdjustmentLogs: PlayerRatingChangeLog[] = [],
-): MemberProfileRatingHistory => {
-  const history = createEmptyRatingHistory();
-
-  for (const match of matches) {
-    if (match.status !== "completed" || !match.ratingChanges) {
-      continue;
-    }
-
-    const change = match.ratingChanges.find((item) => item.playerId === playerId);
-    if (!change) continue;
-
-    const category = getMatchTopLevelType(match.type);
-    const rating = change.nextRating[category];
-    const createdAt = new Date(change.createdAt);
-
-    if (!Number.isFinite(rating) || Number.isNaN(createdAt.getTime())) {
-      continue;
-    }
-
-    history[category].push({
-      rating,
-      createdAt: createdAt.toISOString(),
-      source: "match",
-    });
-  }
-
-  for (const adjustment of ratingAdjustmentLogs) {
-    if (
-      adjustment.playerId !== playerId ||
-      adjustment.source !== "official_adjustment_recalculation"
-    ) {
-      continue;
-    }
-
-    const createdAt = new Date(adjustment.createdAt);
-    if (Number.isNaN(createdAt.getTime())) {
-      continue;
-    }
-
-    for (const category of ["singles", "doubles"] as const) {
-      const rating = adjustment.nextRating[category];
-      if (!Number.isFinite(rating) || adjustment.delta[category] === 0) {
-        continue;
-      }
-
-      history[category].push({
-        rating,
-        createdAt: createdAt.toISOString(),
-        source: "official-adjustment",
-      });
-    }
-  }
-
-  for (const category of ["singles", "doubles"] as const) {
-    history[category].sort(
-      (left, right) =>
-        new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
-    );
-
-    // 하루에 여러 경기·공식 반영이 있어도 차트에는 해당 날짜의 마지막
-    // 레이팅만 남겨 날짜별 한 점으로 읽히게 한다.
-    const latestPointByDate = new Map<string, (typeof history)[typeof category][number]>();
-    for (const point of history[category]) {
-      latestPointByDate.set(getRatingHistoryDateKey(point.createdAt), point);
-    }
-    history[category] = [...latestPointByDate.values()];
-  }
-
-  return history;
 };

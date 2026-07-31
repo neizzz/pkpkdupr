@@ -1021,7 +1021,7 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
       ]);
       setLoadedSessionMatches(matches);
       onMatchResultSaved?.(savedMatch);
-      setSuccess("경기 결과를 저장하고 관리자 승인 및 레이팅 재계산을 완료했습니다.");
+      setSuccess("경기 결과를 저장하고 관리자 승인 및 레이팅 반영을 완료했습니다.");
     } catch (submitError) {
       setError(
         submitError instanceof Error

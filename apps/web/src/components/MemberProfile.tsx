@@ -28,6 +28,9 @@ import {
   getCompositeDoublesRating,
   getCompositeSinglesRating,
 } from "@/utils/dupr";
+import type {
+  PlayerRatingHistoryPoint,
+} from "@pkpkdupr/shared/player";
 
 export type MemberProfileMatchStats = Record<
   MatchTopLevelType,
@@ -47,11 +50,10 @@ export type MemberProfileRatingDelta = Record<
   }
 >;
 
-export interface MemberProfileRatingHistoryPoint {
-  rating: number;
-  createdAt: string;
-  source: "match" | "official-adjustment" | "current";
-}
+export type MemberProfileRatingHistoryPoint = Omit<
+  PlayerRatingHistoryPoint,
+  "createdAt"
+> & { createdAt: string };
 
 export type MemberProfileRatingHistory = Record<
   MatchTopLevelType,

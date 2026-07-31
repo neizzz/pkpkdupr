@@ -256,11 +256,7 @@ const Members: React.FC = () => {
         setSelectedMemberRatingDelta(buildRatingDelta(data.matches, memberId));
         setSelectedMemberMatches(data.matches);
         setSelectedMemberRatingHistory(
-          buildRatingHistory(
-            data.matches,
-            memberId,
-            data.ratingAdjustmentLogs,
-          ),
+          buildRatingHistory(data.ratingHistory),
         );
       } catch (err) {
         if (!preserveVisibleData) {

@@ -193,23 +193,19 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
     return () => window.cancelAnimationFrame(frameId);
   }, []);
 
-  const graphHistory = useMemo(
-    () => history.filter((point) => point.source !== "official-adjustment"),
-    [history],
-  );
   const historyWithToday = useMemo(() => {
-    const latestPoint = graphHistory[graphHistory.length - 1];
-    if (!latestPoint || isToday(latestPoint.createdAt)) return graphHistory;
+    const latestPoint = history[history.length - 1];
+    if (!latestPoint || isToday(latestPoint.createdAt)) return history;
 
     return [
-      ...graphHistory,
+      ...history,
       {
         rating: latestPoint.rating,
         createdAt: new Date().toISOString(),
         source: "current" as const,
       },
     ];
-  }, [graphHistory]);
+  }, [history]);
   const values = useMemo(
     () => historyWithToday.map((point) => point.rating),
     [historyWithToday],
@@ -329,7 +325,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
     [dateLabelIndexes, displayHistory],
   );
 
-  if (graphHistory.length === 0) {
+  if (history.length === 0) {
     return (
       <div className="mt-2 flex h-36 items-center justify-center px-4 text-center text-sm font-medium text-pkpk-secondary-font/70">
         평점 이력이 없습니다.

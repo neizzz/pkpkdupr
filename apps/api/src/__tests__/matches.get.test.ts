@@ -63,6 +63,10 @@ describe("GET /api/matches/:matchId", () => {
       "authenticateAccessToken",
     ).mockResolvedValue(session);
     vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+    vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue({
+      ...player,
+      duprRating: { singles: 3.2, doubles: 3 },
+    });
   });
 
   afterEach(() => {
@@ -266,6 +270,10 @@ describe("GET /api/matches", () => {
       "authenticateAccessToken",
     ).mockResolvedValue(session);
     vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+    vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue({
+      ...player,
+      duprRating: { singles: 3.2, doubles: 3 },
+    });
   });
 
   afterEach(() => {
@@ -314,6 +322,14 @@ describe("GET /api/matches", () => {
     expect(response.body.ratingAdjustmentLogs).toEqual([
       expect.objectContaining({ id: "adjustment-001" }),
     ]);
+    expect(response.body.ratingHistory).toEqual({
+      singles: [
+        expect.objectContaining({ rating: 3.2, source: "current" }),
+      ],
+      doubles: [
+        expect.objectContaining({ rating: 3, source: "current" }),
+      ],
+    });
   });
 
   it("playerId 없이 요청하면 ratingChanges를 포함하지 않는다", async () => {

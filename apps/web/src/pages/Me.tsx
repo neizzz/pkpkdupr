@@ -100,11 +100,7 @@ const Me: React.FC = () => {
           setRatingDelta(buildRatingDelta(data.matches, playerId));
           setProfileMatches(data.matches);
           setRatingHistory(
-            buildRatingHistory(
-              data.matches,
-              playerId,
-              data.ratingAdjustmentLogs,
-            ),
+            buildRatingHistory(data.ratingHistory),
           );
           lastSuccessfulLoadAtRef.current = Date.now();
         }
