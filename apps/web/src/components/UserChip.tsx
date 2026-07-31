@@ -11,6 +11,7 @@ interface UserChipProps {
   isMe?: boolean;
   size?: "default" | "match";
   chipWidthClass?: string;
+  isMirrored?: boolean;
   endAdornment?: React.ReactNode;
   reserveRemoveSlot?: boolean;
   onPress?: () => void;
@@ -26,6 +27,7 @@ const UserChip: React.FC<UserChipProps> = ({
   isMe = false,
   size = "default",
   chipWidthClass,
+  isMirrored = false,
   endAdornment,
   reserveRemoveSlot = false,
   onPress,
@@ -76,9 +78,13 @@ const UserChip: React.FC<UserChipProps> = ({
               }
             : undefined
         }
-        className={`relative ${isMatchSize ? "h-[clamp(2rem,10cqw,2.75rem)]" : "h-6"} min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? "w-full pr-2" : `${resolvedChipWidthClass} pr-3`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+        className={`relative ${isMatchSize ? "h-[clamp(2rem,10cqw,2.75rem)]" : "h-6"} min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? `w-full ${isMirrored ? "pl-2" : "pr-2"}` : `${resolvedChipWidthClass} ${isMirrored ? "pl-3" : "pr-3"}`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
       >
-        <div className="flex min-w-0 max-w-full items-center gap-1">
+        <div
+          className={`flex w-full min-w-0 max-w-full items-center gap-1 ${
+            isMirrored ? "flex-row-reverse" : ""
+          }`}
+        >
           <Avatar
             size="xs"
             avatarUrl={player.avatarUrl}
@@ -94,12 +100,16 @@ const UserChip: React.FC<UserChipProps> = ({
               isMatchSize
                 ? "text-[clamp(0.875rem,3.5cqw,1.125rem)]"
                 : "text-[clamp(0.75rem,3vw,0.875rem)]"
-            } text-current ${isMe ? "font-bold" : "font-medium"}`}
+            } text-current ${isMe ? "font-bold" : "font-medium"} ${
+              isMirrored ? "text-right" : ""
+            }`}
           >
             {player.username}
           </span>
           {endAdornment ? (
-            <span className="absolute right-[6px] shrink-0 leading-none">
+            <span
+              className={`absolute ${isMirrored ? "left-[6px]" : "right-[6px]"} shrink-0 leading-none`}
+            >
               {endAdornment}
             </span>
           ) : null}

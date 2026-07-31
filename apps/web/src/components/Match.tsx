@@ -71,6 +71,7 @@ interface MatchProps {
 const titleChipClassName =
   "inline-flex h-6 items-center rounded-full px-2 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold leading-none";
 const teamChipWidthClass = "w-[clamp(6rem,32cqw,10rem)]";
+const teamSetScoreChipWidthClass = "w-[clamp(6.6rem,35.2cqw,11rem)]";
 
 const statusLabelMap: Record<MatchStatus, string> = {
   created: "예정",
@@ -189,7 +190,7 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-dupr-font`}
+                  className={`${teamSetScoreChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-dupr-font`}
                 >
                   {formatRating(teamAverageDuprs[index])}
                 </p>
@@ -200,6 +201,8 @@ const Match: React.FC<MatchProps> = ({
                       player={teamPlayer}
                       isMe={teamPlayer.id === currentPlayerId}
                       size="match"
+                      chipWidthClass={teamSetScoreChipWidthClass}
+                      isMirrored={index === 1}
                     />
                   ))}
                 </div>
@@ -245,6 +248,7 @@ const Match: React.FC<MatchProps> = ({
                     player={teamPlayer}
                     isMe={teamPlayer.id === currentPlayerId}
                     size="match"
+                    isMirrored={index === 1}
                   />
                 ))}
               </div>

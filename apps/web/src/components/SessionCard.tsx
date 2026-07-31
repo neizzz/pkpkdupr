@@ -109,7 +109,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
           }))}
           max={6}
           size="session"
-          ringClassName="ring-pkpk-session-bg"
+          ringClassName="ring-white"
         />
         <span className="flex shrink-0 items-center gap-1 text-xs font-medium leading-none text-pkpk-primary-bg">
           <IoPeopleOutline className="size-4 [&_*]:stroke-[40]" />
