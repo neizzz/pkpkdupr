@@ -289,6 +289,7 @@ const AdminDashboard: React.FC = () => {
   >({});
   const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
   const [bulkSessionId, setBulkSessionId] = useState("");
+  const [bulkMatchStartsAt, setBulkMatchStartsAt] = useState("");
   const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<
     string | null
   >(null);
@@ -1015,42 +1016,81 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleSessionDisconnect = async (matchId: string) => {
-    const targetMatch = matches.find((match) => match.id === matchId);
-    if (!targetMatch?.session?.id) return;
-    if (!window.confirm("이 매치의 세션 연결을 해제할까요?")) return;
+  const handleBulkMatchStartsAtApply = async () => {
+    if (selectedMatchIds.length === 0) {
+      setError("경기 일시를 일괄 설정할 매치를 먼저 선택해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    const nextMatchStartsAt = bulkMatchStartsAt.trim();
+    if (!nextMatchStartsAt) {
+      setError("일괄 적용할 경기 예정 일시를 입력해주세요.");
+      setSuccess(null);
+      return;
+    }
 
     try {
-      setSavingMatchMetadataIds((prev) =>
-        prev.includes(matchId) ? prev : [...prev, matchId],
+      const serializedMatchStartsAt =
+        serializeLocalDateTimeInput(nextMatchStartsAt);
+      const matchesToUpdate = matches.filter(
+        (match) =>
+          selectedMatchIds.includes(match.id) &&
+          toLocalDateTimeInputValue(match.matchStartsAt) !== nextMatchStartsAt,
       );
+      if (!matchesToUpdate.length) {
+        setSuccess("선택한 매치에 반영할 경기 일시 변경이 없습니다.");
+        setError(null);
+        return;
+      }
+
+      setIsSavingBulkMatchMetadata(true);
+      setSavingMatchMetadataIds((prev) => [
+        ...new Set([...prev, ...matchesToUpdate.map((match) => match.id)]),
+      ]);
       setError(null);
       setSuccess(null);
-      const res = await fetch(`/api/admin/matches/${matchId}/metadata`, {
+      const res = await fetch("/api/admin/matches/bulk-metadata", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ sessionId: null }),
+        body: JSON.stringify({
+          matchIds: matchesToUpdate.map((match) => match.id),
+          matchStartsAt: serializedMatchStartsAt,
+        }),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "세션 연결 해제 실패");
+        throw new Error(errData.error || "경기 일시 일괄 설정 실패");
       }
-      const updatedMatch = (await res.json()) as MatchInfo;
-      setMatches((prev) =>
-        prev.map((match) =>
-          match.id === updatedMatch.id ? updatedMatch : match,
-        ),
+
+      const { matches: updatedMatches } = (await res.json()) as {
+        matches: MatchInfo[];
+      };
+      const updatedMatchesById = new Map(
+        updatedMatches.map((match) => [match.id, match]),
       );
-      setMatchSessionIdDrafts((prev) => ({ ...prev, [matchId]: "" }));
-      setSuccess("매치의 세션 연결을 해제했습니다.");
+      setMatches((prev) =>
+        prev.map((match) => updatedMatchesById.get(match.id) ?? match),
+      );
+      setMatchStartsAtDrafts((prev) => {
+        const next = { ...prev };
+        updatedMatches.forEach((match) => {
+          next[match.id] = toLocalDateTimeInputValue(match.matchStartsAt);
+        });
+        return next;
+      });
+      setSelectedMatchIds([]);
+      setSuccess(`${updatedMatches.length}개 매치의 경기 예정 일시를 설정했습니다.`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
+      setSuccess(null);
     } finally {
+      setIsSavingBulkMatchMetadata(false);
       setSavingMatchMetadataIds((prev) =>
-        prev.filter((savingMatchId) => savingMatchId !== matchId),
+        prev.filter((savingMatchId) => !selectedMatchIds.includes(savingMatchId)),
       );
     }
   };
@@ -1623,6 +1663,9 @@ const AdminDashboard: React.FC = () => {
           ) : (
             <>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                  선택 매치 설정
+                </h3>
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                   <div className="flex-1">
                     <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -1688,9 +1731,35 @@ const AdminDashboard: React.FC = () => {
                     </button>
                   </div>
                 </div>
+                <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-end">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      일괄 경기 예정 일시
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={bulkMatchStartsAt}
+                      onChange={(e) => setBulkMatchStartsAt(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      isSavingBulkMatchMetadata ||
+                      selectedMatchIds.length === 0
+                    }
+                    onClick={() => void handleBulkMatchStartsAtApply()}
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+                  >
+                    {isSavingBulkMatchMetadata
+                      ? "일괄 설정 중..."
+                      : `선택 ${selectedMatchIds.length}개 일시 설정`}
+                  </button>
+                </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  수정할 매치를 선택한 뒤 세션 ID로 일괄 연결합니다. 연결 해제는
-                  별도 버튼과 확인 절차로만 수행됩니다.
+                  선택한 매치의 세션 연결 또는 경기 예정 일시를 일괄 설정할 수
+                  있습니다. 연결 해제는 별도 버튼과 확인 절차로만 수행됩니다.
                 </p>
               </div>
 
@@ -1707,6 +1776,7 @@ const AdminDashboard: React.FC = () => {
                           }
                           onChange={handleToggleAllMatches}
                           aria-label="전체 매치 선택"
+                          className="size-6"
                         />
                       </th>
                       <th className="px-4 py-3 whitespace-nowrap">일시</th>
@@ -1757,6 +1827,7 @@ const AdminDashboard: React.FC = () => {
                               checked={selectedMatchIds.includes(match.id)}
                               onChange={() => toggleMatchSelection(match.id)}
                               aria-label={`${match.name ?? match.id} 선택`}
+                              className="size-6"
                             />
                           </td>
                           <td className="px-4 py-4 min-w-[190px] text-xs text-gray-600">
@@ -1878,16 +1949,6 @@ const AdminDashboard: React.FC = () => {
                             >
                               {isSavingMatchMetadata ? "저장 중..." : "저장"}
                             </button>
-                            {match.session?.id ? (
-                              <button
-                                type="button"
-                                disabled={isSavingMatchMetadata}
-                                onClick={() => void handleSessionDisconnect(match.id)}
-                                className="mt-2 rounded-lg border border-rose-300 px-3 py-2 text-xs text-rose-700 disabled:border-slate-200 disabled:text-slate-400"
-                              >
-                                연결 해제
-                              </button>
-                            ) : null}
                           </td>
                         </tr>
                       );

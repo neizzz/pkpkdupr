@@ -180,6 +180,10 @@ export class MatchRepository {
       );
     }
 
+    if (res.status === 204) {
+      return undefined as T;
+    }
+
     return (await res.json()) as T;
   }
 

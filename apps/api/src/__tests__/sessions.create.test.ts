@@ -124,6 +124,19 @@ describe("admin match sessions", () => {
     expect(deleteSession).toHaveBeenCalledWith(managedSession.id);
   });
 
+  it("DB 서버의 204 빈 응답을 세션 삭제 성공으로 처리한다", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    const repository = new MatchRepository();
+
+    await expect(repository.deleteSession(managedSession.id)).resolves.toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`/internal/match-sessions/${managedSession.id}`),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
   it("연결된 경기가 있는 세션 삭제의 409 응답을 전달한다", async () => {
     const { DbRequestError } = await import("../repositories/MatchRepository");
     vi.spyOn(MatchRepository.prototype, "deleteSession").mockRejectedValue(
