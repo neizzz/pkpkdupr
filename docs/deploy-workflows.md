@@ -37,9 +37,8 @@ PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/
   - Admin: `/admin/`
   - API health: `/api/health`
   - API ping: `/api/ping`
-  - Uptime Kuma: `/uptime/`
-  - sqlite-web (read-only): `/db/`
-- Grafana는 현재 구성에 포함되지 않습니다. 모니터링 확인은 Uptime Kuma를 사용합니다.
+  - Adminer (read-only viewer): `/db/`
+- 현재 저장소에는 별도 모니터링 서비스를 포함하지 않습니다. 모니터링은 New Relic 도입 시 별도로 구성합니다.
 
 ## 서버에서 실행하는 배포 스크립트
 
@@ -61,11 +60,18 @@ PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/
 ssh -p <DEPLOY_PORT> <DEPLOY_USER>@<DEPLOY_HOST>
 cd /opt/pkpkdupr
 chmod +x scripts/manual-deploy.sh scripts/update-server.sh
+# 최초 SQLite -> MySQL 전환 시 (API/DB 쓰기를 잠시 중단)
+bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --migrate-sqlite
+
+# 이관 완료 이후 일반 배포
 bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG>
 ```
 
-배포 스크립트는 web, admin-web, api, db-server, Uptime Kuma, sqlite-web을 기동하고
+배포 스크립트는 web, admin-web, api, MySQL, db-server, Adminer를 기동하고
 위 운영 스택 URL을 확인합니다.
+
+기존 SQLite 데이터가 있으면 새 MySQL 스택을 서비스하기 전에
+`scripts/migrate-sqlite-to-mysql.sh`를 실행해 백업·이관·검증을 완료해야 합니다.
 
 예시:
 

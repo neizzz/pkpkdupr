@@ -147,25 +147,34 @@ sed "s/__DOMAIN__/${DOMAIN_VALUE}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
 echo "✅ SWAG site config 동기화 완료: ${SWAG_TARGET}"
 
 echo "📥 이미지 pull 중 (tag=${IMAGE_TAG})..."
-docker compose --env-file "${ENV_FILE}" pull web admin-web api db-server uptime-kuma sqlite-web
+docker compose --env-file "${ENV_FILE}" pull web admin-web api mysql db-server adminer
 
 echo "🚀 서비스 업데이트 중..."
-docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api db-server uptime-kuma sqlite-web
+docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api mysql db-server adminer
 docker compose --env-file "${ENV_FILE}" restart proxy
+
+if docker container inspect pkpkdupr-uptime-kuma >/dev/null 2>&1; then
+  echo "🧹 제거된 Uptime Kuma 컨테이너를 정리합니다..."
+  docker rm -f pkpkdupr-uptime-kuma
+fi
+
+if docker container inspect pkpkdupr-sqlite-web >/dev/null 2>&1; then
+  echo "🧹 Adminer로 교체된 sqlite-web 컨테이너를 정리합니다..."
+  docker rm -f pkpkdupr-sqlite-web
+fi
 
 echo "📦 현재 컨테이너 상태"
 docker compose --env-file "${ENV_FILE}" ps
 
 echo "🪵 최근 로그"
-docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api db-server uptime-kuma sqlite-web || true
+docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api mysql db-server adminer || true
 
 echo "🔎 HTTPS 응답 확인 중..."
 wait_for_url "${WEB_BASE_URL}/" "" "404 not found"
 wait_for_url "${ADMIN_STACK_BASE_URL}/api/health" "\"status\":\"ok\""
 wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping" "\"message\":\"pong\""
 wait_for_url "${ADMIN_STACK_BASE_URL}/admin/" "" "404 not found"
-wait_for_url "${ADMIN_STACK_BASE_URL}/uptime/" "uptime kuma" "404 not found"
-wait_for_url "${ADMIN_STACK_BASE_URL}/db/" "sqlite-web" "404 not found"
+wait_for_url "${ADMIN_STACK_BASE_URL}/db/" "adminer" "404 not found"
 
 if command -v node >/dev/null 2>&1; then
   echo "🩺 Node healthy check 실행"

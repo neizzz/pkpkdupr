@@ -1107,17 +1107,14 @@ export class TestDataRepository {
         }
         await transaction.execute({
           sql: `
-            DELETE FROM match_participants AS legacy
+            DELETE legacy FROM match_participants AS legacy
+            INNER JOIN match_participants AS persisted
+              ON persisted.match_id = legacy.match_id
+             AND persisted.team_index = legacy.team_index
+             AND persisted.player_id = ?
             WHERE legacy.player_id = ?
-              AND EXISTS (
-                SELECT 1
-                FROM match_participants AS persisted
-                WHERE persisted.match_id = legacy.match_id
-                  AND persisted.team_index = legacy.team_index
-                  AND persisted.player_id = ?
-              )
           `,
-          args: [legacyId, persistedId],
+          args: [persistedId, legacyId],
         });
         await transaction.execute({
           sql: "UPDATE match_participants SET player_id = ? WHERE player_id = ?",
@@ -1125,16 +1122,13 @@ export class TestDataRepository {
         });
         await transaction.execute({
           sql: `
-            DELETE FROM match_result_approvals AS legacy
+            DELETE legacy FROM match_result_approvals AS legacy
+            INNER JOIN match_result_approvals AS persisted
+              ON persisted.match_id = legacy.match_id
+             AND persisted.player_id = ?
             WHERE legacy.player_id = ?
-              AND EXISTS (
-                SELECT 1
-                FROM match_result_approvals AS persisted
-                WHERE persisted.match_id = legacy.match_id
-                  AND persisted.player_id = ?
-              )
           `,
-          args: [legacyId, persistedId],
+          args: [persistedId, legacyId],
         });
         await transaction.execute({
           sql:
@@ -1143,16 +1137,13 @@ export class TestDataRepository {
         });
         await transaction.execute({
           sql: `
-            DELETE FROM match_session_participants AS legacy
+            DELETE legacy FROM match_session_participants AS legacy
+            INNER JOIN match_session_participants AS persisted
+              ON persisted.session_id = legacy.session_id
+             AND persisted.player_id = ?
             WHERE legacy.player_id = ?
-              AND EXISTS (
-                SELECT 1
-                FROM match_session_participants AS persisted
-                WHERE persisted.session_id = legacy.session_id
-                  AND persisted.player_id = ?
-              )
           `,
-          args: [legacyId, persistedId],
+          args: [persistedId, legacyId],
         });
         await transaction.execute({
           sql:
@@ -1362,29 +1353,9 @@ export class TestDataRepository {
   }
 
   private async insertMatchScore(data: (typeof mockMatchScores)[number]) {
-    const result = await this.client.execute(`PRAGMA table_info(match_scores)`);
-    const columns = new Set(
-      result.rows.map((row: { name?: unknown }) => String(row.name)),
-    );
-    const insertColumns = ["id", "match_id"];
-    const args: Array<string | number> = [data.id, data.matchId];
-    const addColumn = (column: string, value: number) => {
-      if (!columns.has(column)) {
-        return;
-      }
-      insertColumns.push(column);
-      args.push(value);
-    };
-
-    addColumn("score_a", data.scoreA);
-    addColumn("score_b", data.scoreB);
-    addColumn("team_a", data.scoreA);
-    addColumn("team_b", data.scoreB);
-    addColumn("t_b", data.scoreB);
-
     await this.client.execute({
-      sql: `INSERT INTO match_scores (${insertColumns.join(", ")}) VALUES (${insertColumns.map(() => "?").join(", ")})`,
-      args,
+      sql: "INSERT INTO match_scores (id, match_id, score_a, score_b) VALUES (?, ?, ?, ?)",
+      args: [data.id, data.matchId, data.scoreA, data.scoreB],
     });
   }
 

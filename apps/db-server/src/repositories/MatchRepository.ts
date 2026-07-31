@@ -886,7 +886,7 @@ export class MatchRepository {
       }
       await transaction.execute({
         sql: `
-          INSERT OR IGNORE INTO match_result_approvals (id, match_id, player_id, approved_at)
+          INSERT IGNORE INTO match_result_approvals (id, match_id, player_id, approved_at)
           VALUES (?, ?, ?, ?)
         `,
         args: [
@@ -1795,10 +1795,7 @@ export class MatchRepository {
   }
 
   private async getMatchScoreColumns(): Promise<Set<string>> {
-    const result = await this.client.execute(`PRAGMA table_info(match_scores)`);
-    return new Set(
-      result.rows.map((row: { name?: unknown }) => String(row.name)),
-    );
+    return new Set(["score_a", "score_b"]);
   }
 
   private async insertScore({
@@ -1827,12 +1824,6 @@ export class MatchRepository {
 
     addColumn("score_a", score.scoreA);
     addColumn("score_b", score.scoreB);
-    // Legacy local SQLite files may still have these NOT NULL columns.
-    // Keep them populated until old DB files are recreated or migrated away.
-    addColumn("team_a", score.scoreA);
-    addColumn("team_b", score.scoreB);
-    addColumn("t_b", score.scoreB);
-
     await executor.execute({
       sql: `INSERT INTO match_scores (${insertColumns.join(", ")}) VALUES (${insertColumns.map(() => "?").join(", ")})`,
       args,

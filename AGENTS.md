@@ -39,13 +39,13 @@ pnpm build:api
 pnpm build:admin
 pnpm lint
 
-pnpm dev:monitoring              # Uptime Kuma :3300, sqlite-web :3301
-pnpm dev:monitoring:down
+pnpm dev:db                     # MySQL :3306
+pnpm dev:db-browser             # Adminer :3301
 PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333 pnpm check:healthy
 ```
 
-- 루트 `pnpm dev`는 `ENABLE_DEV_MOCK_DATA=true`와 `data/db/db.sqlite`를 사용합니다.
-- web Vite proxy는 `/api`, `/uploads`, `/uptime`, `/db`를 각각 API 또는 개발 모니터링 서비스로 연결합니다.
+- 루트 `pnpm dev`는 Docker MySQL을 준비한 뒤 `ENABLE_DEV_MOCK_DATA=true`와 `DB_HOST=127.0.0.1`을 사용합니다.
+- web Vite proxy는 `/api`, `/uploads`, `/db`를 각각 API 또는 Adminer 개발 도구로 연결합니다.
 - `apps/web/dist/`는 빌드 산출물이므로 커밋하지 않습니다.
 
 ## Web 규칙
@@ -79,10 +79,9 @@ PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333
 - 운영 proxy는 SWAG이며, 템플릿 원본은 `infra/swag/site-confs/default.conf.template`입니다.
 - 운영 경로:
   - Web: `https://<DOMAIN>/`
-  - Admin/API/운영 도구: `https://<DOMAIN>:3333/{admin/,api/health,api/ping,uptime/,db/}`
-  - Uptime Kuma 초기 설정도 `/uptime/setup-database`를 사용합니다. 루트 `/setup-database`는 이 경로로 리다이렉트됩니다.
+  - Admin/API/운영 도구: `https://<DOMAIN>:3333/{admin/,api/health,api/ping,db/}` (`/db/`는 Adminer)
 - 실제 서버 SWAG 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`이며, 배포 스크립트가 템플릿에서 생성합니다.
-- `/uptime/`, `/db/`은 HTML 응답이므로 상태 코드뿐 아니라 기대 텍스트와 `404 not found` 여부를 함께 확인합니다.
+- `/db/` Adminer는 HTML 응답이므로 상태 코드뿐 아니라 기대 텍스트와 `404 not found` 여부를 함께 확인합니다.
 
 ## 작업 및 커밋 규칙
 

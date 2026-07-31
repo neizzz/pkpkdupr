@@ -1,14 +1,12 @@
 services:
+  mysql:
+    ports:
+      - "3306:3306"
+
   db-server:
     environment:
       - ENABLE_DEV_MOCK_DATA=true
 
-  uptime-kuma:
-    ports:
-      - "3300:3001"
-
-  sqlite-web:
+  adminer:
     ports:
       - "3301:8080"
-    environment:
-      - SQLITE_WEB_PASSWORD=${SQLITE_WEB_PASSWORD:-dev-password}

@@ -4,9 +4,11 @@
     "private": true,
     "description": "Pickleball DUPR System - Monorepo with pnpm",
     "scripts": {
-        "dev": "mkdir -p data/db && ENABLE_DEV_MOCK_DATA=true DB_FILE_PATH=file:$PWD/data/db/db.sqlite pnpm -r --parallel dev",
-        "dev:monitoring": "mkdir -p data/db && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-deps uptime-kuma sqlite-web",
-        "dev:monitoring:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml stop uptime-kuma sqlite-web",
+        "dev": "bash scripts/dev-app.sh",
+        "dev:db": "bash scripts/dev-db.sh",
+        "dev:db:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml stop mysql",
+        "dev:db-browser": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --remove-orphans --force-recreate adminer",
+        "dev:db-browser:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml stop adminer",
         "dev:web": "pnpm --filter @pkpkdupr/web dev",
         "dev:api": "pnpm --filter @pkpkdupr/api dev",
         "dev:admin": "pnpm --filter @pkpkdupr/admin-web dev",
@@ -18,7 +20,9 @@
         "verify:pre-push": "pnpm build",
         "lint": "pnpm -r lint",
         "clean": "pnpm -r --parallel clean",
-        "check:healthy": "node scripts/check-healthy.mjs"
+        "check:healthy": "node scripts/check-healthy.mjs",
+        "db:migrate": "pnpm --filter @pkpkdupr/db-server exec tsx src/db/migrate.ts",
+        "db:import-sqlite": "pnpm --filter @pkpkdupr/db-server exec tsx src/db/importSqlite.ts"
     },
     "devDependencies": {
         "typescript": "^5.3.3"

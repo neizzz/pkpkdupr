@@ -153,7 +153,7 @@ jobs:
           \`\`\`
 
           3. \`${DEPLOY_PATH}\`에서 배포를 실행합니다.
-             - 최초 설치 시에만 \`.env.example\`을 \`.env\`로 복사하고, 실제 운영 값(도메인, DuckDNS 토큰, JWT secret, 관리자 계정, sqlite-web 비밀번호)을 직접 설정합니다.
+             - 최초 설치 시에만 \`.env.example\`을 \`.env\`로 복사하고, 실제 운영 값(도메인, DuckDNS 토큰, JWT secret, 관리자 계정, MySQL 비밀번호)을 직접 설정합니다.
              - \`scripts/manual-deploy.sh\`는 기존 \`${DEPLOY_PATH}/.env\`를 변경하지 않습니다.
              - 최초 설치, 인증서/SWAG 설정 생성 또는 런타임 설정 복구가 필요하면 \`scripts/install-server.sh\`를 먼저 실행합니다.
 
@@ -181,6 +181,5 @@ jobs:
           - API health: \`https://${TARGET_DOMAIN}:3333/api/health\`
           - API ping: \`https://${TARGET_DOMAIN}:3333/api/ping\`
           - Admin: \`https://${TARGET_DOMAIN}:3333/admin/\`
-          - Uptime Kuma: \`https://${TARGET_DOMAIN}:3333/uptime/\`
-          - sqlite-web (read-only): \`https://${TARGET_DOMAIN}:3333/db/\`
+          - Adminer (read-only viewer): \`https://${TARGET_DOMAIN}:3333/db/\`
           EOF

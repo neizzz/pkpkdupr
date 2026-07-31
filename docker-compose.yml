@@ -58,52 +58,75 @@ services:
         # 운영 reverse proxy는 /uploads/avatars/* 요청을 api:4000으로 전달해야 합니다.
         - ${PKPKDUPR_DEPLOY_PATH:-.}/data/uploads/avatars:/app/data/uploads/avatars
     depends_on:
-        - db-server
+        db-server:
+          condition: service_healthy
     expose:
         - "4000"
     networks:
         - pkpkdupr-network
 
-   # 💾 Database Server (SQLite)
+  # 🐬 MySQL (Internal Only)
+  mysql:
+    image: mysql:9.7
+    container_name: pkpkdupr-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-pkpkdupr}
+      - MYSQL_USER=${MYSQL_USER:-pkpkdupr}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-change-me}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-change-root-me}
+      - MYSQL_VIEWER_USER=${MYSQL_VIEWER_USER:-pkpkdupr_viewer}
+      - MYSQL_VIEWER_PASSWORD=${MYSQL_VIEWER_PASSWORD:-change-viewer-me}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./infra/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    expose:
+      - "3306"
+    networks:
+      - pkpkdupr-network
+
+   # 💾 Database Server (MySQL)
   db-server:
     image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkpkdupr-db-server:${IMAGE_TAG:-latest}
     container_name: pkpkdupr-db-server
     environment:
-        - DB_FILE_PATH=file:/app/data/db.sqlite
-    volumes:
-        - ${PKPKDUPR_DEPLOY_PATH:-.}/data/db:/app/data # SQLite 파일 영구 보관을 위해 외부 저장소 마운트
+        - DB_HOST=mysql
+        - DB_PORT=3306
+        - DB_NAME=${MYSQL_DATABASE:-pkpkdupr}
+        - DB_USER=${MYSQL_USER:-pkpkdupr}
+        - DB_PASSWORD=${MYSQL_PASSWORD:-change-me}
+    depends_on:
+      mysql:
+        condition: service_healthy
     expose:
-        - "5001"
+      - "5001"
+    healthcheck:
+      test:
+        ["CMD-SHELL", "node -e \"fetch('http://localhost:5001/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     networks:
         - pkpkdupr-network
 
-  uptime-kuma:
-    image: louislam/uptime-kuma:2
-    container_name: pkpkdupr-uptime-kuma
-    volumes:
-      - uptime-kuma-data:/app/data
-    expose:
-      - "3001"
-    networks:
-      - pkpkdupr-network
-
-  sqlite-web:
-    image: ghcr.io/coleifer/sqlite-web:latest
-    container_name: pkpkdupr-sqlite-web
-    volumes:
-      - ${PKPKDUPR_DEPLOY_PATH:-.}/data/db:/data:ro
+  adminer:
+    image: adminer:4.8.1
+    container_name: pkpkdupr-adminer
     environment:
-      - SQLITE_WEB_PASSWORD=${SQLITE_WEB_PASSWORD:-change-me}
-    command:
-      - /data/db.sqlite
-      - --host=0.0.0.0
-      - --port=8080
-      - --read-only
-      - --url-prefix=/db/
+      - ADMINER_DEFAULT_SERVER=mysql
     expose:
       - "8080"
     depends_on:
-      - db-server
+      mysql:
+        condition: service_healthy
     networks:
       - pkpkdupr-network
 
@@ -112,4 +135,4 @@ networks:
     driver: bridge
 
 volumes:
-  uptime-kuma-data:
+  mysql-data:

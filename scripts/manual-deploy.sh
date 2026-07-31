@@ -9,10 +9,12 @@ SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ROOT_DIR="${SOURCE_REPO_ROOT}"
 ENV_FILE="${DEPLOY_ROOT}/.env"
 UPDATE_SERVER_SCRIPT="${SOURCE_REPO_ROOT}/scripts/update-server.sh"
+MIGRATE_SQLITE_SCRIPT="${SOURCE_REPO_ROOT}/scripts/migrate-sqlite-to-mysql.sh"
 
 IMAGE_TAG=""
 GHCR_USERNAME_ARG=""
 GHCR_TOKEN_ARG=""
+MIGRATE_SQLITE=false
 
 usage() {
   cat <<'EOF'
@@ -28,6 +30,7 @@ usage: bash scripts/manual-deploy.sh --image-tag <tag> [options]
 선택:
   --ghcr-username <value>         update-server.sh용 GHCR_USERNAME export
   --ghcr-token <value>            update-server.sh용 GHCR_TOKEN export
+  --migrate-sqlite                SQLite 백업·MySQL 이관 검증 후 배포
   -h, --help                      도움말 출력
 
 예시:
@@ -63,6 +66,10 @@ while [[ $# -gt 0 ]]; do
       GHCR_TOKEN_ARG="${2:-}"
       shift 2
       ;;
+    --migrate-sqlite)
+      MIGRATE_SQLITE=true
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -83,6 +90,9 @@ fi
 
 require_file "${UPDATE_SERVER_SCRIPT}"
 require_file "${ENV_FILE}"
+if [[ "${MIGRATE_SQLITE}" == true ]]; then
+  require_file "${MIGRATE_SQLITE_SCRIPT}"
+fi
 
 cd "${SOURCE_REPO_ROOT}"
 
@@ -98,6 +108,12 @@ if [[ -n "${GHCR_TOKEN_ARG}" ]]; then
 fi
 
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
+export IMAGE_TAG
+
+if [[ "${MIGRATE_SQLITE}" == true ]]; then
+  echo "🔁 SQLite → MySQL 이관을 시작합니다. 이 동안 API/DB 쓰기가 중단됩니다."
+  bash "${MIGRATE_SQLITE_SCRIPT}"
+fi
 
 echo "🚀 서버 배포 스크립트를 실행합니다."
 echo "   - IMAGE_TAG=${IMAGE_TAG}"
