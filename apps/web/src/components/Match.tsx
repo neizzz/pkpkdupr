@@ -154,7 +154,7 @@ const Match: React.FC<MatchProps> = ({
   const card = (
     <Card
       className={`relative w-full overflow-hidden [container-type:inline-size] rounded-3xl border border-pkpk-sub-bg bg-white/95 p-3 shadow-sm before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-5 before:bg-[linear-gradient(to_bottom,_var(--color-pkpk-secondary-bg),_transparent)] before:opacity-5 ${
-        onPress ? "transition-colors hover:bg-amber-50" : ""
+        onPress ? "transition-colors hover:bg-pkpk-accent-bg/30" : ""
       }`}
     >
       <div className="relative z-10 min-w-0">

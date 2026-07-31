@@ -512,7 +512,7 @@ const Members: React.FC = () => {
                   return (
                     <div
                       key={member.id}
-                      className={`relative flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-amber-50 active:bg-amber-50 ${
+                      className={`relative flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-pkpk-accent-bg/30 active:bg-amber-50 ${
                         index < sortedMembers.length - 1
                           ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
                           : ""
