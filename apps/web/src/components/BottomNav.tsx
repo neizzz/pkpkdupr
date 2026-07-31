@@ -1257,49 +1257,65 @@ const BottomNav: React.FC = () => {
                     />
                   </Button>
                   <Dropdown.Popover
-                    className="relative z-[70] min-w-[180px] overflow-hidden border border-border bg-white"
+                    className="global-plus-menu-popover relative z-[70] min-w-[194px] overflow-visible border-0 bg-transparent p-0 shadow-none"
                     offset={12}
                     placement="top end"
                   >
-                    <Dropdown.Menu
-                      onAction={handleGlobalAction}
-                      className="bg-transparent"
-                    >
-                      <Dropdown.Item
-                        id="qr"
-                        textValue="QR code"
-                        isDisabled={!isOnline}
+                    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
+                      <div className="px-1.5 py-1.5">
+                        <HoldToConfirmButton
+                          holdDurationMs={1000}
+                          ariaLabel="길게 눌러 로그아웃"
+                          onComplete={handleLogout}
+                          className="rounded-lg text-[#f8626c] hover:bg-[#f8626c]/6"
+                          progressClassName="bg-[#f8626c]/18"
+                        >
+                          <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
+                          <span className="truncate text-[1.05rem] font-medium leading-5 text-[#f8626c]">
+                            길게 눌러 로그아웃
+                          </span>
+                        </HoldToConfirmButton>
+                      </div>
+                      <Separator className="mx-[3%] w-[94%]" />
+                      <Dropdown.Menu
+                        onAction={handleGlobalAction}
+                        className="bg-transparent"
                       >
-                        <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
-                        <Label>QR 코드</Label>
-                      </Dropdown.Item>
-                      <Dropdown.Item
-                        id="create-match"
-                        textValue="Create match"
-                        isDisabled={!isOnline}
+                        <Dropdown.Item id="settings" textValue="Settings">
+                          <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
+                          <Label className="text-[1.05rem] font-medium leading-5">
+                            설정
+                          </Label>
+                        </Dropdown.Item>
+                      </Dropdown.Menu>
+                    </div>
+                    <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
+                      <Dropdown.Menu
+                        onAction={handleGlobalAction}
+                        className="bg-transparent"
                       >
-                        <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
-                        <Label>매치 생성</Label>
-                      </Dropdown.Item>
-                      <Dropdown.Item id="settings" textValue="Settings">
-                        <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
-                        <Label>설정</Label>
-                      </Dropdown.Item>
-                    </Dropdown.Menu>
-                    <Separator className="my-1" />
-                    <div className="px-1 pb-1">
-                      <HoldToConfirmButton
-                        holdDurationMs={1000}
-                        ariaLabel="길게 눌러 로그아웃"
-                        onComplete={handleLogout}
-                        className="rounded-lg text-[#f8626c] hover:bg-[#f8626c]/6"
-                        progressClassName="bg-[#f8626c]/18"
-                      >
-                        <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
-                        <span className="truncate text-sm font-medium text-[#f8626c]">
-                          길게 눌러 로그아웃
-                        </span>
-                      </HoldToConfirmButton>
+                        <Dropdown.Item
+                          id="qr"
+                          textValue="QR code"
+                          isDisabled={!isOnline}
+                        >
+                          <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
+                          <Label className="text-[1.05rem] font-medium leading-5">
+                            QR 코드
+                          </Label>
+                        </Dropdown.Item>
+                        <Separator className="mx-2" />
+                        <Dropdown.Item
+                          id="create-match"
+                          textValue="Create match"
+                          isDisabled={!isOnline}
+                        >
+                          <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
+                          <Label className="text-[1.05rem] font-medium leading-5">
+                            매치 생성
+                          </Label>
+                        </Dropdown.Item>
+                      </Dropdown.Menu>
                     </div>
                   </Dropdown.Popover>
                 </Dropdown>
@@ -1308,13 +1324,19 @@ const BottomNav: React.FC = () => {
             document.body,
           )
         : null}
-      {isGlobalMenuVisible && typeof document !== "undefined"
+      {typeof document !== "undefined"
         ? createPortal(
             <button
               type="button"
               aria-label="전역 메뉴 닫기"
+              aria-hidden={!isGlobalMenuVisible}
+              tabIndex={-1}
               onClick={() => handleGlobalMenuOpenChange(false)}
-              className="fixed inset-0 z-50 cursor-default bg-black/30 backdrop-blur-sm"
+              className={`fixed inset-0 z-50 cursor-default bg-black/30 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+                isGlobalMenuVisible
+                  ? "opacity-100"
+                  : "pointer-events-none opacity-0"
+              }`}
             />,
             document.body,
           )
