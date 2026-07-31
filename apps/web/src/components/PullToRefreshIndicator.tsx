@@ -30,7 +30,7 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
   return (
     <div
       aria-hidden={!isVisible}
-      className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center"
+      className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center"
       style={{
         opacity: isVisible ? 1 : 0,
         transform: `translateY(${translateY}px)`,
