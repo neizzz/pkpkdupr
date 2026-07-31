@@ -1436,6 +1436,18 @@ app.get("/api/admin/matches", requireAdmin, async (_req, res) => {
   }
 });
 
+app.get(
+  "/api/admin/diagnostics/timestamp-units",
+  requireAdmin,
+  async (_req, res) => {
+    try {
+      res.json(await matchRepository.getTimestampUnitAudit());
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  },
+);
+
 app.patch("/api/admin/matches/bulk-metadata", requireAdmin, async (req, res) => {
   try {
     const body = req.body as AdminBulkMatchMetadataUpdateRequest;

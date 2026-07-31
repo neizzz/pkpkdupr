@@ -628,8 +628,18 @@ const initSchema = async () => {
   `);
 
   // Match mutations used raw libSQL statements which stored milliseconds while
-  // Drizzle's timestamp columns expect Unix seconds. Repair already-written
-  // values once at startup; normal timestamps are far below this threshold.
+  // Drizzle's timestamp columns expect Unix seconds. Record the affected count
+  // before repair so production deployment logs prove whether this migration
+  // was needed for the mounted database volume.
+  const timestampUnitAudit = await matchRepository.getTimestampUnitAudit();
+  if (timestampUnitAudit.legacyMatchStartsAtCount > 0) {
+    console.warn(
+      `[DB-SERVER] Detected ${timestampUnitAudit.legacyMatchStartsAtCount} legacy millisecond match_starts_at value(s) before repair.`,
+    );
+  }
+
+  // Repair already-written values once at startup; normal timestamps are far
+  // below this threshold.
   await client.execute(`
     UPDATE matches
     SET
@@ -660,6 +670,12 @@ const initSchema = async () => {
     SET approved_at = approved_at / 1000
     WHERE approved_at >= 100000000000
   `);
+
+  if (timestampUnitAudit.legacyMatchStartsAtCount > 0) {
+    console.log(
+      `[DB-SERVER] Repaired ${timestampUnitAudit.legacyMatchStartsAtCount} match_starts_at value(s) from milliseconds to Unix seconds.`,
+    );
+  }
 
   await client.execute(`
     CREATE TABLE IF NOT EXISTS match_sessions (
@@ -919,6 +935,14 @@ app.get("/internal/matches", async (req, res) => {
 app.get("/internal/matches/last-played", async (_req, res) => {
   try {
     res.json(await matchRepository.findLastPlayedAtByPlayerId());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/matches/timestamp-unit-audit", async (_req, res) => {
+  try {
+    res.json(await matchRepository.getTimestampUnitAudit());
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

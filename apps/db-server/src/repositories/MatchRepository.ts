@@ -97,6 +97,16 @@ export interface MatchParticipantDuprSnapshot {
   duprRating: PublicPlayerDupr | null;
 }
 
+export interface TimestampUnitAudit {
+  legacyMatchStartsAtCount: number;
+  affectedPlayers: Array<{
+    playerId: string;
+    username: string;
+    completedMatchCount: number;
+    latestLegacyMatchStartsAt: number;
+  }>;
+}
+
 const toDateOrNull = (value: Date | string | number | null | undefined) =>
   value == null ? null : new Date(value);
 
@@ -394,6 +404,59 @@ export class MatchRepository {
         lastPlayedAt == null ? [] : [[playerId, toDate(lastPlayedAt)]],
       ),
     );
+  }
+
+  /**
+   * Drizzle timestamp columns store Unix seconds. This audit deliberately uses
+   * the raw libSQL client so an already-corrupted millisecond value can be
+   * inspected before Drizzle hydrates it into a far-future Date.
+   */
+  async getTimestampUnitAudit(): Promise<TimestampUnitAudit> {
+    const legacyMatchStartsAtThreshold = 100_000_000_000;
+    const countResult = await this.client.execute({
+      sql: `
+        SELECT COUNT(*) AS legacy_match_starts_at_count
+        FROM matches
+        WHERE match_starts_at >= ?
+      `,
+      args: [legacyMatchStartsAtThreshold],
+    });
+    const affectedPlayersResult = await this.client.execute({
+      sql: `
+        SELECT
+          players.id AS player_id,
+          players.username AS username,
+          COUNT(DISTINCT matches.id) AS completed_match_count,
+          MAX(matches.match_starts_at) AS latest_legacy_match_starts_at
+        FROM matches
+        INNER JOIN match_participants
+          ON match_participants.match_id = matches.id
+        INNER JOIN players
+          ON players.id = match_participants.player_id
+        WHERE matches.status = 'completed'
+          AND matches.completed_at IS NOT NULL
+          AND matches.match_starts_at >= ?
+        GROUP BY players.id, players.username
+        ORDER BY latest_legacy_match_starts_at DESC, players.username ASC
+      `,
+      args: [legacyMatchStartsAtThreshold],
+    });
+
+    const countRow = countResult.rows[0] as
+      | { legacy_match_starts_at_count?: unknown }
+      | undefined;
+
+    return {
+      legacyMatchStartsAtCount: Number(
+        countRow?.legacy_match_starts_at_count ?? 0,
+      ),
+      affectedPlayers: affectedPlayersResult.rows.map((row: any) => ({
+        playerId: String(row.player_id),
+        username: String(row.username),
+        completedMatchCount: Number(row.completed_match_count),
+        latestLegacyMatchStartsAt: Number(row.latest_legacy_match_starts_at),
+      })),
+    };
   }
 
   async findFeed(

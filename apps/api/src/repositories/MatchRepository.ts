@@ -23,6 +23,16 @@ export class DbRequestError extends Error {
   }
 }
 
+export interface TimestampUnitAudit {
+  legacyMatchStartsAtCount: number;
+  affectedPlayers: Array<{
+    playerId: string;
+    username: string;
+    completedMatchCount: number;
+    latestLegacyMatchStartsAt: number;
+  }>;
+}
+
 const toDateOrNull = (value: string | Date | null | undefined) =>
   value == null ? null : new Date(value);
 
@@ -417,6 +427,12 @@ export class MatchRepository {
         playerId,
         new Date(lastPlayedAt),
       ]),
+    );
+  }
+
+  async getTimestampUnitAudit(): Promise<TimestampUnitAudit> {
+    return await this.dbRequest<TimestampUnitAudit>(
+      "/internal/matches/timestamp-unit-audit",
     );
   }
 
