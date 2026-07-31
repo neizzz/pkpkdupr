@@ -121,6 +121,7 @@ const hydrateMatch = (record: any): Match => ({
   })),
   resultSubmittedByPlayerId: record.resultSubmittedByPlayerId ?? null,
   resultSubmittedAt: toDateOrNull(record.resultSubmittedAt),
+  autoApprovalDueAt: toDateOrNull(record.autoApprovalDueAt),
   approvals: (record.approvals ?? []).map(
     (approval: { playerId: string; approvedAt: string | Date }) => ({
       playerId: approval.playerId,
@@ -407,6 +408,38 @@ export class MatchRepository {
     );
 
     return hydrateMatch(updated);
+  }
+
+  async completeExpiredAutoApprovals(now: Date): Promise<Match[]> {
+    const records = await this.dbRequest<any[]>(
+      "/internal/matches/auto-approvals/complete-expired",
+      {
+        method: "POST",
+        body: JSON.stringify({ now }),
+      },
+    );
+
+    return records.map(hydrateMatch);
+  }
+
+  async findAutoApprovedMatchesAwaitingRating(): Promise<Match[]> {
+    const records = await this.dbRequest<any[]>(
+      "/internal/matches/auto-approvals/awaiting-rating",
+    );
+    return records.map(hydrateMatch);
+  }
+
+  async markAutoApprovalRatingApplied(
+    matchId: string,
+    appliedAt: Date,
+  ): Promise<void> {
+    await this.dbRequest<void>(
+      `/internal/matches/${matchId}/auto-approval-rating-applied`,
+      {
+        method: "POST",
+        body: JSON.stringify({ appliedAt }),
+      },
+    );
   }
 
   /** 특정 플레이어의 rating 변동 로그 조회 */

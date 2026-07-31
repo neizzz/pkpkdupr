@@ -14,6 +14,7 @@ import type {
 } from "@pkpkdupr/shared/match";
 import {
   DEFAULT_MATCH_MODE,
+  getAutoApprovalDueAt,
   getMatchSessionStatus,
   getMaxScoreCountForMatchMode,
   MATCH_RESULT_MAX_SCORE_COUNT,
@@ -835,6 +836,9 @@ export class MatchRepository {
     const scoreColumns = await this.getMatchScoreColumns();
     const shouldResetApprovals =
       existing.status === "created" || !areScoresEqual(existing.scores, scores);
+    const autoApprovalDueAt = shouldResetApprovals || !existing.autoApprovalDueAt
+      ? getAutoApprovalDueAt(existing.matchStartsAt, submittedAt)
+      : existing.autoApprovalDueAt;
     const transaction = await this.client.transaction("write");
     let committed = false;
 
@@ -847,6 +851,9 @@ export class MatchRepository {
             result_submitted_by_player_id = ?,
             result_submitted_at = ?,
             completed_at = NULL,
+            auto_approval_due_at = ?,
+            auto_approved_at = NULL,
+            auto_approval_rating_applied_at = NULL,
             updated_at = ?
           WHERE id = ?
             AND status IN ('created', 'pending-approval')
@@ -855,6 +862,7 @@ export class MatchRepository {
           "pending-approval",
           submittedByPlayerId,
           toUnixTimestampSeconds(submittedAt),
+          toUnixTimestampSeconds(autoApprovalDueAt),
           toUnixTimestampSeconds(submittedAt),
           matchId,
         ],
@@ -959,6 +967,9 @@ export class MatchRepository {
             result_submitted_by_player_id = ?,
             result_submitted_at = ?,
             completed_at = ?,
+            auto_approval_due_at = NULL,
+            auto_approved_at = NULL,
+            auto_approval_rating_applied_at = NULL,
             updated_at = ?
           WHERE id = ?
             AND status IN ('created', 'pending-approval')
@@ -1258,6 +1269,9 @@ export class MatchRepository {
             result_submitted_by_player_id = NULL,
             result_submitted_at = NULL,
             completed_at = NULL,
+            auto_approval_due_at = NULL,
+            auto_approved_at = NULL,
+            auto_approval_rating_applied_at = NULL,
             updated_at = ?
           WHERE id = ?
             AND status = 'pending-approval'
@@ -1294,6 +1308,110 @@ export class MatchRepository {
       throw new Error("결과 거부 처리에 실패했습니다.");
     }
     return updated;
+  }
+
+  async completeExpiredAutoApprovals(now: Date = new Date()): Promise<Match[]> {
+    const nowSeconds = toUnixTimestampSeconds(now);
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+    const completedIds: string[] = [];
+
+    try {
+      const candidates = await transaction.execute({
+        sql: `
+          SELECT id
+          FROM matches
+          WHERE status = 'pending-approval'
+            AND auto_approval_due_at IS NOT NULL
+            AND auto_approval_due_at <= ?
+        `,
+        args: [nowSeconds],
+      });
+
+      for (const candidate of candidates.rows) {
+        const matchId = String(candidate.id);
+        const updateResult = await transaction.execute({
+          sql: `
+            UPDATE matches
+            SET
+              status = 'completed',
+              completed_at = ?,
+              auto_approval_due_at = NULL,
+              auto_approved_at = ?,
+              auto_approval_rating_applied_at = NULL,
+              updated_at = ?
+            WHERE id = ?
+              AND status = 'pending-approval'
+              AND auto_approval_due_at IS NOT NULL
+              AND auto_approval_due_at <= ?
+          `,
+          args: [
+            nowSeconds,
+            nowSeconds,
+            nowSeconds,
+            matchId,
+            nowSeconds,
+          ],
+        });
+
+        if (updateResult.rowsAffected) {
+          completedIds.push(matchId);
+        }
+      }
+
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
+
+    return await Promise.all(
+      completedIds.map(async (matchId) => {
+        const match = await this.findById(matchId);
+        if (!match) {
+          throw new Error("자동 합의 처리한 매치를 찾을 수 없습니다.");
+        }
+        return match;
+      }),
+    );
+  }
+
+  async findAutoApprovedMatchesAwaitingRating(): Promise<Match[]> {
+    const result = await this.client.execute(`
+      SELECT id
+      FROM matches
+      WHERE status = 'completed'
+        AND auto_approved_at IS NOT NULL
+        AND auto_approval_rating_applied_at IS NULL
+    `);
+
+    return await Promise.all(
+      result.rows.map(async (row: { id: unknown }) => {
+        const match = await this.findById(String(row.id));
+        if (!match) {
+          throw new Error("자동 합의 매치를 찾을 수 없습니다.");
+        }
+        return match;
+      }),
+    );
+  }
+
+  async markAutoApprovalRatingApplied(
+    matchId: string,
+    appliedAt: Date = new Date(),
+  ): Promise<void> {
+    await this.client.execute({
+      sql: `
+        UPDATE matches
+        SET auto_approval_rating_applied_at = ?
+        WHERE id = ?
+          AND status = 'completed'
+          AND auto_approved_at IS NOT NULL
+      `,
+      args: [toUnixTimestampSeconds(appliedAt), matchId],
+    });
   }
 
   async updateMetadata(
@@ -1437,6 +1555,10 @@ export class MatchRepository {
         ),
       resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
       resultSubmittedAt: toDateOrNull(match.resultSubmittedAt),
+      autoApprovalDueAt:
+        match.status === "pending-approval"
+          ? toDateOrNull(match.autoApprovalDueAt)
+          : null,
       approvals: approvals.map(toApproval),
       location: match.location,
       courtName: match.courtName?.trim() || undefined,
@@ -1648,6 +1770,7 @@ export class MatchRepository {
         SET
           status = 'completed',
           completed_at = ?,
+          auto_approval_due_at = NULL,
           updated_at = ?
         WHERE id = ?
           AND status = 'pending-approval'

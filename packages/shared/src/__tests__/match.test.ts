@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeMatchStartsAt, getMatchSessionStatus } from "../match";
+import {
+  computeMatchStartsAt,
+  getAutoApprovalDueAt,
+  getMatchSessionStatus,
+} from "../match";
 
 describe("getMatchSessionStatus", () => {
   it("모든 매치가 완료일 때만 완료 상태를 반환한다", () => {
@@ -65,5 +69,48 @@ describe("computeMatchStartsAt", () => {
 
     const remainder = result.getTime() % (30 * 60 * 1000);
     expect(remainder).toBe(0);
+  });
+});
+
+describe("getAutoApprovalDueAt", () => {
+  const startsAt = new Date("2026-07-31T10:00:00.000Z");
+
+  it("경기 시작 전 또는 시작 후 1시간 이내 입력은 2시간을 적용한다", () => {
+    expect(
+      getAutoApprovalDueAt(
+        startsAt,
+        new Date("2026-07-31T09:50:00.000Z"),
+      ),
+    ).toEqual(new Date("2026-07-31T11:50:00.000Z"));
+    expect(
+      getAutoApprovalDueAt(
+        startsAt,
+        new Date("2026-07-31T11:00:00.000Z"),
+      ),
+    ).toEqual(new Date("2026-07-31T13:00:00.000Z"));
+  });
+
+  it("시작 후 1시간 초과~4시간 이내 입력은 8시간을 적용한다", () => {
+    expect(
+      getAutoApprovalDueAt(
+        startsAt,
+        new Date("2026-07-31T11:00:00.001Z"),
+      ),
+    ).toEqual(new Date("2026-07-31T19:00:00.001Z"));
+    expect(
+      getAutoApprovalDueAt(
+        startsAt,
+        new Date("2026-07-31T14:00:00.000Z"),
+      ),
+    ).toEqual(new Date("2026-07-31T22:00:00.000Z"));
+  });
+
+  it("시작 후 4시간 초과 입력은 24시간을 적용한다", () => {
+    expect(
+      getAutoApprovalDueAt(
+        startsAt,
+        new Date("2026-07-31T14:00:00.001Z"),
+      ),
+    ).toEqual(new Date("2026-08-01T14:00:00.001Z"));
   });
 });

@@ -465,6 +465,9 @@ const initSchema = async () => {
       completed_at INTEGER,
       result_submitted_by_player_id TEXT,
       result_submitted_at INTEGER,
+      auto_approval_due_at INTEGER,
+      auto_approved_at INTEGER,
+      auto_approval_rating_applied_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
@@ -488,6 +491,11 @@ const initSchema = async () => {
     `ALTER TABLE matches ADD COLUMN result_submitted_by_player_id TEXT`,
   );
   await safeExec(`ALTER TABLE matches ADD COLUMN result_submitted_at INTEGER`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN auto_approval_due_at INTEGER`);
+  await safeExec(`ALTER TABLE matches ADD COLUMN auto_approved_at INTEGER`);
+  await safeExec(
+    `ALTER TABLE matches ADD COLUMN auto_approval_rating_applied_at INTEGER`,
+  );
   await safeExec(`ALTER TABLE matches ADD COLUMN match_starts_at INTEGER`);
 
   await client.execute(`
@@ -656,6 +664,18 @@ const initSchema = async () => {
         WHEN completed_at >= 100000000000 THEN completed_at / 1000
         ELSE completed_at
       END,
+      auto_approval_due_at = CASE
+        WHEN auto_approval_due_at >= 100000000000 THEN auto_approval_due_at / 1000
+        ELSE auto_approval_due_at
+      END,
+      auto_approved_at = CASE
+        WHEN auto_approved_at >= 100000000000 THEN auto_approved_at / 1000
+        ELSE auto_approved_at
+      END,
+      auto_approval_rating_applied_at = CASE
+        WHEN auto_approval_rating_applied_at >= 100000000000 THEN auto_approval_rating_applied_at / 1000
+        ELSE auto_approval_rating_applied_at
+      END,
       updated_at = CASE
         WHEN updated_at >= 100000000000 THEN updated_at / 1000
         ELSE updated_at
@@ -663,6 +683,9 @@ const initSchema = async () => {
     WHERE match_starts_at >= 100000000000
        OR result_submitted_at >= 100000000000
        OR completed_at >= 100000000000
+       OR auto_approval_due_at >= 100000000000
+       OR auto_approved_at >= 100000000000
+       OR auto_approval_rating_applied_at >= 100000000000
        OR updated_at >= 100000000000
   `);
 
@@ -670,6 +693,20 @@ const initSchema = async () => {
     UPDATE match_result_approvals
     SET approved_at = approved_at / 1000
     WHERE approved_at >= 100000000000
+  `);
+
+  // 기존 합의 대기 경기도 현재 자동 합의 규칙으로 한 번만 마감 시각을 채운다.
+  // 시작 전 입력은 2시간, 시작 후 1시간/4시간 경계는 각각 2시간/8시간을 적용한다.
+  await client.execute(`
+    UPDATE matches
+    SET auto_approval_due_at = result_submitted_at + CASE
+      WHEN result_submitted_at <= match_starts_at + 3600 THEN 7200
+      WHEN result_submitted_at <= match_starts_at + 14400 THEN 28800
+      ELSE 86400
+    END
+    WHERE status = 'pending-approval'
+      AND result_submitted_at IS NOT NULL
+      AND auto_approval_due_at IS NULL
   `);
 
   if (timestampUnitAudit.legacyMatchStartsAtCount > 0) {
@@ -1195,6 +1232,44 @@ app.post("/internal/matches/:id/rejection", async (req, res) => {
     res.status(400).json({ error: (error as Error).message });
   }
 });
+
+app.post("/internal/matches/auto-approvals/complete-expired", async (req, res) => {
+  try {
+    const now = req.body?.now ? new Date(req.body.now) : new Date();
+    if (Number.isNaN(now.getTime())) {
+      return res.status(400).json({ error: "유효한 자동 합의 처리 시각이 필요합니다." });
+    }
+    res.json(await matchRepository.completeExpiredAutoApprovals(now));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/matches/auto-approvals/awaiting-rating", async (_req, res) => {
+  try {
+    res.json(await matchRepository.findAutoApprovedMatchesAwaitingRating());
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post(
+  "/internal/matches/:id/auto-approval-rating-applied",
+  async (req, res) => {
+    try {
+      const appliedAt = req.body?.appliedAt
+        ? new Date(req.body.appliedAt)
+        : new Date();
+      if (Number.isNaN(appliedAt.getTime())) {
+        return res.status(400).json({ error: "유효한 평점 반영 시각이 필요합니다." });
+      }
+      await matchRepository.markAutoApprovalRatingApplied(req.params.id, appliedAt);
+      res.status(204).end();
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  },
+);
 
 app.get("/internal/player-creation-logs", async (_req, res) => {
   try {

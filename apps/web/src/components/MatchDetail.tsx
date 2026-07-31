@@ -1,5 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { AlertDialog, Button, Card, Separator } from "@heroui/react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  AlertDialog,
+  Button,
+  Card,
+  Separator,
+  TooltipArrow,
+  TooltipContent,
+  TooltipRoot,
+  TooltipTrigger,
+} from "@heroui/react";
+import { IoInformationCircleOutline } from "react-icons/io5";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import {
   getMaxScoreCountForMatchMode,
@@ -26,6 +36,7 @@ interface MatchDetailProps {
   onApproveResult?: (matchId: string) => Promise<void>;
   onCancelApproval?: (matchId: string) => Promise<void>;
   onRejectResult?: (matchId: string) => Promise<void>;
+  onAutoApprovalDue?: () => void;
   isOnline?: boolean;
   isSubmittingResult?: boolean;
   isApprovingResult?: boolean;
@@ -48,6 +59,14 @@ const formatDateTime = (value: string) =>
 
 const createEmptyScoreRow = () => ({ scoreA: "", scoreB: "" });
 const SCORE_TABLE_SET_COUNT = 3;
+
+const formatAutoApprovalRemaining = (remainingMs: number) => {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours}시간 ${minutes}분 ${seconds}초`;
+};
 
 export const MatchDetailSkeleton: React.FC = () => (
   <div
@@ -77,7 +96,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 
         <section>
           <p
-            className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
           >
             Score
           </p>
@@ -99,7 +118,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 
         <section>
           <p
-            className={`text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+            className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
           >
             Rating Change
           </p>
@@ -118,7 +137,7 @@ export const MatchDetailSkeleton: React.FC = () => (
         <section>
           <div className="flex items-center justify-between gap-3">
             <p
-              className={`!text-[1.1rem] font-semibold uppercase tracking-wide ${subTextClassName}`}
+              className="!text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font"
             >
               Approval
             </p>
@@ -146,7 +165,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     </span>
     <section>
       <p
-        className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+        className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
       >
         Score
       </p>
@@ -168,7 +187,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 
     <section>
       <p
-        className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+        className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
       >
         Rating Change
       </p>
@@ -187,7 +206,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <section>
       <div className="flex items-center justify-between gap-3">
         <p
-          className={`!text-[1.1rem] pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
+          className="!text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font"
         >
           Approval
         </p>
@@ -214,6 +233,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   onApproveResult,
   onCancelApproval,
   onRejectResult,
+  onAutoApprovalDue,
   isOnline = true,
   isSubmittingResult = false,
   isApprovingResult = false,
@@ -227,10 +247,22 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   const [isResultFormOpen, setIsResultFormOpen] = useState(false);
   const [isRejectConfirmationOpen, setIsRejectConfirmationOpen] =
     useState(false);
+  const [isAutoApprovalTooltipOpen, setIsAutoApprovalTooltipOpen] =
+    useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const lastAutoApprovalRefreshAtRef = useRef(0);
   const isMyMatch = match.teams.some((team) =>
     team.players.some((teamPlayer) => teamPlayer.id === currentPlayerId),
   );
   const isPendingApprovalMatch = match.status === "pending-approval";
+  const autoApprovalDueAtMs = match.autoApprovalDueAt
+    ? new Date(match.autoApprovalDueAt).getTime()
+    : Number.NaN;
+  const hasAutoApprovalTimer =
+    isPendingApprovalMatch && Number.isFinite(autoApprovalDueAtMs);
+  const autoApprovalRemainingMs = hasAutoApprovalTimer
+    ? Math.max(0, autoApprovalDueAtMs - nowMs)
+    : 0;
   const isCreator = match.creatorPlayerId === currentPlayerId;
   const hasResultScores = !!match.scores?.length;
   const canSubmitResult =
@@ -309,6 +341,29 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     setResultError(null);
     setIsResultFormOpen(false);
   }, [match.id, match.scores]);
+
+  useEffect(() => {
+    if (!hasAutoApprovalTimer) return;
+
+    const updateNow = () => setNowMs(Date.now());
+    updateNow();
+    const interval = window.setInterval(updateNow, 1000);
+    return () => window.clearInterval(interval);
+  }, [hasAutoApprovalTimer, autoApprovalDueAtMs]);
+
+  useEffect(() => {
+    if (
+      !hasAutoApprovalTimer ||
+      nowMs < autoApprovalDueAtMs ||
+      !onAutoApprovalDue ||
+      nowMs - lastAutoApprovalRefreshAtRef.current < 60_000
+    ) {
+      return;
+    }
+
+    lastAutoApprovalRefreshAtRef.current = nowMs;
+    onAutoApprovalDue();
+  }, [autoApprovalDueAtMs, hasAutoApprovalTimer, nowMs, onAutoApprovalDue]);
 
   const updateScoreRow = (
     index: number,
@@ -434,7 +489,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           >
             <section>
             <p
-              className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+              className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
             >
               Score
             </p>
@@ -610,7 +665,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
             <section>
             <p
-              className={`pl-2 text-xs font-semibold uppercase tracking-wide ${subTextClassName}`}
+              className="text-xs font-semibold uppercase tracking-wide text-pkpk-main-font"
             >
               Rating Change
             </p>
@@ -670,7 +725,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <section>
             <div className="flex items-center justify-between gap-3">
               <p
-                className={`!text-[1.1rem] pl-2 font-semibold uppercase tracking-wide ${subTextClassName}`}
+                className="!text-[1.1rem] font-semibold uppercase tracking-wide text-pkpk-main-font"
               >
                 Approval
               </p>
@@ -727,6 +782,59 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                     </React.Fragment>
                   );
                 })}
+              {hasAutoApprovalTimer ? (
+                <>
+                  <Separator className="-mx-3 w-[calc(100%+1.5rem)]" />
+                  <div className="flex items-center justify-center gap-1 text-sm font-semibold text-pkpk-main-font">
+                    <span>
+                      {autoApprovalRemainingMs > 0
+                        ? `자동 합의까지 ${formatAutoApprovalRemaining(autoApprovalRemainingMs)}`
+                        : "자동 합의 처리 중..."}
+                    </span>
+                    <TooltipRoot
+                      isOpen={isAutoApprovalTooltipOpen}
+                      onOpenChange={setIsAutoApprovalTooltipOpen}
+                      delay={0}
+                      closeDelay={0}
+                    >
+                      <TooltipTrigger
+                        aria-label="자동 합의 안내 보기"
+                        className="shrink-0 text-pkpk-sub-font transition-colors hover:text-pkpk-main-font"
+                        onClick={() =>
+                          setIsAutoApprovalTooltipOpen((isOpen) => !isOpen)
+                        }
+                      >
+                        <IoInformationCircleOutline className="size-4" />
+                      </TooltipTrigger>
+                      <TooltipContent
+                        placement="top"
+                        shouldFlip
+                        containerPadding={8}
+                        showArrow
+                        className="w-64 rounded-2xl bg-white p-3 text-left text-pkpk-main-font shadow-xl ring-1 ring-black/10"
+                        style={{ "--overlay": "#fff" } as React.CSSProperties}
+                      >
+                        <TooltipArrow />
+                        <p className="font-semibold">자동 합의 안내</p>
+                        <p className="mt-1 text-xs leading-5 text-pkpk-sub-font">
+                          거부 없이 합의 대기 상태가 유지되면 정해진 시간 뒤에
+                          결과와 평점이 자동 합의·확정됩니다.
+                        </p>
+                        <ul className="mt-2 space-y-1 text-xs leading-5 text-pkpk-sub-font">
+                          <li>
+                            경기 시작 전 또는 1시간 이내 입력: 2시간 이후 자동
+                            합의
+                          </li>
+                          <li>
+                            시작 후 1~4시간 이내 입력: 8시간 이후 자동 합의
+                          </li>
+                          <li>시작 후 4시간 초과 입력: 24시간 이후 자동 합의</li>
+                        </ul>
+                      </TooltipContent>
+                    </TooltipRoot>
+                  </div>
+                </>
+              ) : null}
             </Card>
             {canApproveResult || canCancelApproval || canRejectResult ? (
               <div className="mt-3 flex justify-end gap-2">

@@ -37,6 +37,7 @@ import {
   MatchRepository,
 } from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
+import { AutoApprovalService } from "./services/AutoApprovalService";
 import {
   buildCourtSchedule,
   findCourtScheduleConflicts,
@@ -112,6 +113,9 @@ app.get("/api/ping", (_req, res) => {
 
 const authService = new AuthService();
 const matchRepository = new MatchRepository();
+const autoApprovalService = new AutoApprovalService(matchRepository, authService);
+const AUTO_APPROVAL_INTERVAL_MS = 60_000;
+let autoApprovalInterval: ReturnType<typeof setInterval> | undefined;
 const playerStatuses: PlayerStatus[] = ["active", "inactive"];
 const playerGenders: Array<Player["gender"]> = ["M", "F"];
 
@@ -2084,8 +2088,26 @@ app.post("/api/admin/register", requireAdmin, async (req, res) => {
 
 export { app };
 
+export const processAutoApprovals = (now: Date = new Date()) =>
+  autoApprovalService.process(now);
+
+const startAutoApprovalScheduler = () => {
+  if (autoApprovalInterval) return;
+
+  const process = () => {
+    void processAutoApprovals().catch((error) => {
+      console.error("[AUTO_APPROVAL] 자동 합의 처리 실패", error);
+    });
+  };
+
+  process();
+  autoApprovalInterval = setInterval(process, AUTO_APPROVAL_INTERVAL_MS);
+  autoApprovalInterval.unref?.();
+};
+
 export const startServer = async () => {
   await authService.initAdmin();
+  startAutoApprovalScheduler();
   return (app as any).listen(PORT, () => {
     console.log(`🚀 API Server running on http://localhost:${PORT}`);
     console.log(

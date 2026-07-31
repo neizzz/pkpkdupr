@@ -21,6 +21,7 @@ export type MatchInfo = Omit<
   | "updatedAt"
   | "completedAt"
   | "resultSubmittedAt"
+  | "autoApprovalDueAt"
   | "session"
   | "approvals"
 > & {
@@ -29,6 +30,7 @@ export type MatchInfo = Omit<
   updatedAt: string;
   completedAt: string | null;
   resultSubmittedAt: string | null;
+  autoApprovalDueAt?: string | null;
   session?: {
     id: string;
     name?: string;

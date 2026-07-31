@@ -92,6 +92,30 @@ export const getMatchScheduleDurationMs = (mode: MatchMode) =>
 
 export const MATCH_RESULT_MAX_SCORE_COUNT = 3;
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * 결과가 경기 시작 시각에 가까울수록 더 짧은 합의 대기 시간을 적용한다.
+ * 경기 시작 전 입력은 가장 빠른 입력으로 간주한다.
+ */
+export const getAutoApprovalDueAt = (
+  matchStartsAt: Date,
+  resultSubmittedAt: Date,
+): Date => {
+  const elapsedMs = Math.max(
+    0,
+    resultSubmittedAt.getTime() - matchStartsAt.getTime(),
+  );
+  const approvalWindowMs =
+    elapsedMs <= ONE_HOUR_MS
+      ? 2 * ONE_HOUR_MS
+      : elapsedMs <= 4 * ONE_HOUR_MS
+        ? 8 * ONE_HOUR_MS
+        : 24 * ONE_HOUR_MS;
+
+  return new Date(resultSubmittedAt.getTime() + approvalWindowMs);
+};
+
 export type MatchStatus =
   | "created"
   | "pending-approval"
@@ -252,6 +276,7 @@ export interface Match {
   scores?: MatchScore[];
   resultSubmittedByPlayerId: string | null;
   resultSubmittedAt: Date | null;
+  autoApprovalDueAt?: Date | null;
   approvals: MatchResultApproval[];
   location: string;
   courtName?: string;

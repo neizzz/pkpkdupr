@@ -736,6 +736,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         onApproveResult={handleApproveResult}
         onCancelApproval={handleCancelApproval}
         onRejectResult={handleRejectResult}
+        onAutoApprovalDue={() => {
+          void refreshFeedAndSession();
+        }}
         isOnline={isOnline}
         isSubmittingResult={
           pendingMatchAction?.matchId === selectedMatch.id &&

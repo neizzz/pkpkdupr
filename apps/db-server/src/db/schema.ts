@@ -73,6 +73,12 @@ export const matches = sqliteTable("matches", {
   completedAt: integer("completed_at", { mode: "timestamp" }),
   resultSubmittedByPlayerId: text("result_submitted_by_player_id"),
   resultSubmittedAt: integer("result_submitted_at", { mode: "timestamp" }),
+  autoApprovalDueAt: integer("auto_approval_due_at", { mode: "timestamp" }),
+  autoApprovedAt: integer("auto_approved_at", { mode: "timestamp" }),
+  autoApprovalRatingAppliedAt: integer(
+    "auto_approval_rating_applied_at",
+    { mode: "timestamp" },
+  ),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });

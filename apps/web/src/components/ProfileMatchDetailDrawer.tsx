@@ -110,6 +110,9 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
           match={displayedMatch}
           tabKey={tabKey}
           currentPlayerId={currentPlayerId}
+          onAutoApprovalDue={() => {
+            void loadMatchDetail(displayedMatch.id);
+          }}
           isLoading={isLoading}
         />
       </>
