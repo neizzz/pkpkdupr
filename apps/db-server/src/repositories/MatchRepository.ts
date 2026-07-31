@@ -62,6 +62,13 @@ export class CompletedMatchApprovalCancelError extends Error {
   }
 }
 
+export class SessionHasMatchesError extends Error {
+  constructor() {
+    super("연결된 경기가 있는 세션은 삭제할 수 없습니다.");
+    this.name = "SessionHasMatchesError";
+  }
+}
+
 export interface CreateMatchInput {
   id: string;
   type: MatchType;
@@ -84,9 +91,7 @@ export interface CreateMatchInput {
 
 export interface UpdateMatchMetadataInput {
   name?: string | null;
-  sessionName?: string | null;
-  sessionDate?: Date | null;
-  sessionLocation?: string | null;
+  sessionId?: string | null;
   courtName?: string | null;
   matchStartsAt?: Date | string;
 }
@@ -1044,6 +1049,50 @@ export class MatchRepository {
     }
   }
 
+  async deleteSession(sessionId: string): Promise<boolean> {
+    if (!isEntityId(sessionId, "session")) {
+      throw new Error("유효한 세션 ID가 필요합니다.");
+    }
+
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+    try {
+      const session = await transaction.execute({
+        sql: "SELECT id FROM match_sessions WHERE id = ?",
+        args: [sessionId],
+      });
+      if (!session.rows.length) {
+        await transaction.commit();
+        committed = true;
+        return false;
+      }
+
+      const matchCount = await transaction.execute({
+        sql: "SELECT COUNT(*) AS count FROM matches WHERE session_id = ?",
+        args: [sessionId],
+      });
+      if (Number(matchCount.rows[0]?.count ?? 0) > 0) {
+        throw new SessionHasMatchesError();
+      }
+
+      await transaction.execute({
+        sql: "DELETE FROM match_session_participants WHERE session_id = ?",
+        args: [sessionId],
+      });
+      await transaction.execute({
+        sql: "DELETE FROM match_sessions WHERE id = ?",
+        args: [sessionId],
+      });
+      await transaction.commit();
+      committed = true;
+      return true;
+    } finally {
+      if (!committed) {
+        transaction.close();
+      }
+    }
+  }
+
   async approveResult(
     matchId: string,
     playerId: string,
@@ -1271,39 +1320,27 @@ export class MatchRepository {
       updatePayload.matchStartsAt = matchStartsAt;
     }
 
-    if (
-      "sessionName" in data ||
-      "sessionDate" in data ||
-      "sessionLocation" in data
-    ) {
-      const current = await this.findById(id);
-      if (!current) return undefined;
-      const nextName =
-        "sessionName" in data
-          ? data.sessionName?.trim() || undefined
-          : current.session?.name;
-      const nextDate =
-        "sessionDate" in data
-          ? toDateOrNull(data.sessionDate) ?? undefined
-          : current.session?.date;
-      const nextLocation =
-        "sessionLocation" in data
-          ? data.sessionLocation?.trim() || undefined
-          : current.session?.location;
-      if (
-        (nextName || nextDate || nextLocation) &&
-        (!nextName || !nextDate || !nextLocation)
-      ) {
-        throw new Error("세션명, 세션 날짜, 세션 장소가 모두 필요합니다.");
+    if ("sessionId" in data) {
+      if (data.sessionId === null) {
+        updatePayload.sessionId = null;
+        updatePayload.sessionName = null;
+        updatePayload.sessionDate = null;
+      } else {
+        if (!isEntityId(data.sessionId, "session")) {
+          throw new Error("유효한 세션 ID가 필요합니다.");
+        }
+        const session = await this.db
+          .select()
+          .from(matchSessions)
+          .where(eq(matchSessions.id, data.sessionId))
+          .get();
+        if (!session) {
+          throw new Error("세션을 찾을 수 없습니다.");
+        }
+        updatePayload.sessionId = session.id;
+        updatePayload.sessionName = session.name;
+        updatePayload.sessionDate = toDate(session.date);
       }
-      const sessionId =
-        nextName && nextDate && nextLocation
-          ? await this.getOrCreateSession(nextName, nextDate, nextLocation)
-          : null;
-
-      updatePayload.sessionId = sessionId;
-      updatePayload.sessionName = nextName ?? null;
-      updatePayload.sessionDate = nextDate ?? null;
     }
 
     await this.db.update(matches).set(updatePayload).where(eq(matches.id, id));
@@ -1527,33 +1564,12 @@ export class MatchRepository {
       throw new Error("유효한 세션 정보가 필요합니다.");
     }
 
-    const existingByMetadata = await this.db
-      .select()
-      .from(matchSessions)
-      .where(and(eq(matchSessions.name, name), eq(matchSessions.date, date)))
-      .get();
-    if (existingByMetadata) {
-      if (existingByMetadata.location !== location) {
-        await this.db
-          .update(matchSessions)
-          .set({ location, updatedAt: new Date() })
-          .where(eq(matchSessions.id, existingByMetadata.id));
-      }
-      return existingByMetadata.id;
-    }
-
     const existingById = await this.db
       .select()
       .from(matchSessions)
       .where(eq(matchSessions.id, session.id))
       .get();
     if (existingById) {
-      if (existingById.location !== location) {
-        await this.db
-          .update(matchSessions)
-          .set({ location, updatedAt: new Date() })
-          .where(eq(matchSessions.id, existingById.id));
-      }
       return existingById.id;
     }
 
@@ -1574,63 +1590,11 @@ export class MatchRepository {
         const concurrentSession = await this.db
           .select()
           .from(matchSessions)
-          .where(
-            and(
-              eq(matchSessions.name, name),
-              eq(matchSessions.date, date),
-            ),
-          )
+          .where(eq(matchSessions.id, candidateId))
           .get();
         if (concurrentSession) return concurrentSession.id;
         if (attempt === 7) throw error;
         candidateId = generateEntityId("session");
-      }
-    }
-
-    throw new Error("세션 ID 생성에 실패했습니다.");
-  }
-
-  private async getOrCreateSession(
-    name: string,
-    date: Date,
-    location: string,
-  ): Promise<string> {
-    const normalizedName = name.trim();
-    const existing = await this.db
-      .select()
-      .from(matchSessions)
-      .where(
-        and(
-          eq(matchSessions.name, normalizedName),
-          eq(matchSessions.date, date),
-        ),
-      )
-      .get();
-    if (existing) {
-      if (existing.location !== location) {
-        await this.db
-          .update(matchSessions)
-          .set({ location, updatedAt: new Date() })
-          .where(eq(matchSessions.id, existing.id));
-      }
-      return existing.id;
-    }
-
-    for (let attempt = 0; attempt < 8; attempt += 1) {
-      const id = generateEntityId("session");
-      try {
-        const now = new Date();
-        await this.db.insert(matchSessions).values({
-          id,
-          name: normalizedName,
-          date,
-          location,
-          createdAt: now,
-          updatedAt: now,
-        });
-        return id;
-      } catch (error) {
-        if (attempt === 7) throw error;
       }
     }
 

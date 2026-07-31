@@ -300,6 +300,13 @@ export class MatchRepository {
     return sessions.find((session) => session.id === sessionId);
   }
 
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.dbRequest<void>(
+      `/internal/match-sessions/${encodeURIComponent(sessionId)}`,
+      { method: "DELETE" },
+    );
+  }
+
   async replaceSessionParticipants(
     sessionId: string,
     playerIds: string[],
@@ -493,9 +500,7 @@ export class MatchRepository {
     matchId: string,
     input: {
       name?: string | null;
-      sessionName?: string | null;
-      sessionDate?: string | null;
-      sessionLocation?: string | null;
+      sessionId?: string | null;
       courtName?: string | null;
       matchStartsAt?: string;
     },

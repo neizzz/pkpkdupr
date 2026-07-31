@@ -328,6 +328,9 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
     null,
   );
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(
+    null,
+  );
   const [deleteHoldMatchId, setDeleteHoldMatchId] = useState<string | null>(
     null,
   );
@@ -1090,6 +1093,50 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
     }
   };
 
+  const handleDeleteSession = async () => {
+    if (!selectedSession) return;
+    if (selectedSession.matchCount > 0) {
+      setError("연결된 경기가 있는 세션은 삭제할 수 없습니다.");
+      setSuccess(null);
+      return;
+    }
+    if (
+      !window.confirm(
+        `세션 "${selectedSession.name}"과 참여자 등록을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingSessionId(selectedSession.id);
+      setError(null);
+      setSuccess(null);
+      const response = await fetch(
+        `/api/admin/match-sessions/${selectedSession.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "세션 삭제 실패");
+      }
+      await loadSessions();
+      setSessionMatches([]);
+      setSuccess("세션과 참여자 등록을 삭제했습니다.");
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "세션 삭제에 실패했습니다.",
+      );
+    } finally {
+      setDeletingSessionId(null);
+    }
+  };
+
   return (
     <div className="space-y-10">
       <section className="space-y-4">
@@ -1210,6 +1257,31 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                 {selectedSession.participantIds.length}명 ·{" "}
                 {selectedSession.matchCount}경기
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={
+                    selectedSession.matchCount > 0 ||
+                    deletingSessionId === selectedSession.id
+                  }
+                  onClick={() => void handleDeleteSession()}
+                  title={
+                    selectedSession.matchCount > 0
+                      ? "연결된 경기를 다른 세션으로 옮기거나 연결 해제한 뒤 삭제할 수 있습니다."
+                      : "세션 삭제"
+                  }
+                  className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  {deletingSessionId === selectedSession.id
+                    ? "세션 삭제 중..."
+                    : "세션 삭제"}
+                </button>
+                {selectedSession.matchCount > 0 ? (
+                  <span className="text-xs text-slate-500">
+                    연결된 경기 {selectedSession.matchCount}개가 있어 삭제할 수 없습니다.
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             <div className="mt-8 space-y-10">

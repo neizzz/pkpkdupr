@@ -170,9 +170,7 @@ type SubmitMatchResultRequest = {
 
 type AdminMatchMetadataUpdateRequest = {
   name?: unknown;
-  sessionName?: unknown;
-  sessionDate?: unknown;
-  sessionLocation?: unknown;
+  sessionId?: unknown;
   courtName?: unknown;
   matchStartsAt?: unknown;
 };
@@ -241,75 +239,11 @@ const normalizeMatchSession = (
   return { id: generateEntityId("session"), name, date, location };
 };
 
-const normalizeOptionalDateString = (value: unknown) => {
-  if (value == null) {
-    return null;
-  }
-
-  if (typeof value !== "string") {
-    throw new Error("유효한 세션 날짜가 필요합니다.");
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const date = new Date(trimmed);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("유효한 세션 날짜가 필요합니다.");
-  }
-
-  return date.toISOString();
-};
-
-const validateSessionMetadataUpdate = ({
-  hasSessionName,
-  hasSessionDate,
-  sessionName,
-  sessionDate,
-}: {
-  hasSessionName: boolean;
-  hasSessionDate: boolean;
-  sessionName: string | undefined;
-  sessionDate: string | null;
-}) => {
-  const hasEffectiveSessionName = Boolean(sessionName);
-  const hasEffectiveSessionDate = Boolean(sessionDate);
-
-  if (!hasSessionName && !hasSessionDate) {
-    return;
-  }
-
-  if (!hasEffectiveSessionName && !hasEffectiveSessionDate) {
-    return;
-  }
-
-  if (!hasEffectiveSessionName) {
-    throw new Error("세션명이 필요합니다.");
-  }
-
-  if (!hasEffectiveSessionDate) {
-    throw new Error("세션 날짜를 입력해주세요.");
-  }
-};
-
 const parseAdminMatchMetadataUpdate = (
   body: AdminMatchMetadataUpdateRequest,
 ) => {
   const hasName = Object.prototype.hasOwnProperty.call(body, "name");
-  const hasSessionName = Object.prototype.hasOwnProperty.call(
-    body,
-    "sessionName",
-  );
-  const hasSessionDate = Object.prototype.hasOwnProperty.call(
-    body,
-    "sessionDate",
-  );
-  const hasSessionLocation = Object.prototype.hasOwnProperty.call(
-    body,
-    "sessionLocation",
-  );
+  const hasSessionId = Object.prototype.hasOwnProperty.call(body, "sessionId");
   const hasCourtName = Object.prototype.hasOwnProperty.call(body, "courtName");
   const hasMatchStartsAt = Object.prototype.hasOwnProperty.call(
     body,
@@ -317,24 +251,29 @@ const parseAdminMatchMetadataUpdate = (
   );
 
   if (
+    Object.prototype.hasOwnProperty.call(body, "sessionName") ||
+    Object.prototype.hasOwnProperty.call(body, "sessionDate") ||
+    Object.prototype.hasOwnProperty.call(body, "sessionLocation")
+  ) {
+    throw new Error("세션 연결은 sessionId로만 변경할 수 있습니다.");
+  }
+  if (
     !hasName &&
-    !hasSessionName &&
-    !hasSessionDate &&
-    !hasSessionLocation &&
+    !hasSessionId &&
     !hasCourtName &&
     !hasMatchStartsAt
   ) {
     throw new Error("수정할 필드가 없습니다.");
   }
-
-  const normalizedSessionName = hasSessionName
-    ? normalizeOptionalName(body.sessionName)
-    : undefined;
-  const normalizedSessionDate = hasSessionDate
-    ? normalizeOptionalDateString(body.sessionDate)
-    : undefined;
-  const normalizedSessionLocation = hasSessionLocation
-    ? normalizeOptionalName(body.sessionLocation)
+  if (hasSessionId && body.sessionId !== null) {
+    if (typeof body.sessionId !== "string" || !isEntityId(body.sessionId, "session")) {
+      throw new Error("유효한 세션 ID가 필요합니다.");
+    }
+  }
+  const normalizedSessionId: string | null | undefined = hasSessionId
+    ? body.sessionId === null
+      ? null
+      : (body.sessionId as string)
     : undefined;
   const normalizedCourtName = hasCourtName
     ? normalizeNullableCourtName(body.courtName)
@@ -343,20 +282,9 @@ const parseAdminMatchMetadataUpdate = (
     ? normalizeMatchStartsAt(body.matchStartsAt)
     : undefined;
 
-  validateSessionMetadataUpdate({
-    hasSessionName,
-    hasSessionDate,
-    sessionName: normalizedSessionName,
-    sessionDate: normalizedSessionDate ?? null,
-  });
-
   return {
     ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
-    ...(hasSessionName ? { sessionName: normalizedSessionName ?? null } : {}),
-    ...(hasSessionDate ? { sessionDate: normalizedSessionDate ?? null } : {}),
-    ...(hasSessionLocation
-      ? { sessionLocation: normalizedSessionLocation ?? null }
-      : {}),
+    ...(hasSessionId ? { sessionId: normalizedSessionId } : {}),
     ...(hasCourtName ? { courtName: normalizedCourtName } : {}),
     ...(hasMatchStartsAt ? { matchStartsAt: normalizedMatchStartsAt } : {}),
   };
@@ -1022,6 +950,28 @@ app.get("/api/admin/match-sessions", requireAdmin, async (_req, res) => {
     res.status(500).json({ error: (err as Error).message });
   }
 });
+
+app.delete(
+  "/api/admin/match-sessions/:sessionId",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      if (!isEntityId(req.params.sessionId, "session")) {
+        return res.status(400).json({ error: "유효한 세션 ID가 필요합니다." });
+      }
+      await matchRepository.deleteSession(req.params.sessionId);
+      res.status(204).send();
+    } catch (err) {
+      if (err instanceof DbRequestError && err.status === 404) {
+        return res.status(404).json({ error: err.message });
+      }
+      if (err instanceof DbRequestError && err.status === 409) {
+        return res.status(409).json({ error: err.message });
+      }
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
 
 app.put(
   "/api/admin/match-sessions/:sessionId/participants",

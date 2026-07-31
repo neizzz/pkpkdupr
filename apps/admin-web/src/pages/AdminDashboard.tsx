@@ -67,9 +67,17 @@ type MatchApprovalInfo = {
   approvedAt: string;
 };
 type MatchSessionInfo = {
+  id: string;
   name?: string;
   date: string;
   location: string;
+};
+type ManagedSessionInfo = {
+  id: string;
+  name: string;
+  date: string;
+  location: string;
+  matchCount: number;
 };
 type MatchInfo = {
   id: string;
@@ -95,8 +103,6 @@ type MatchInfo = {
 
 const recentInputFieldKeys = {
   matchName: "admin.match.name",
-  sessionName: "admin.session.name",
-  sessionLocation: "admin.session.location",
 } as const;
 
 const toLocalDateTimeInputValue = (value?: string | null) => {
@@ -126,7 +132,7 @@ const serializeLocalDateTimeInput = (value: string) => {
 
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) {
-    throw new Error("세션 날짜를 확인해주세요.");
+    throw new Error("경기 예정 일시를 확인해주세요.");
   }
 
   return date.toISOString();
@@ -250,6 +256,7 @@ const AdminDashboard: React.FC = () => {
     useState<AdminSection>("members");
   const [players, setPlayers] = useState<PlayerInfo[]>([]);
   const [matches, setMatches] = useState<MatchInfo[]>([]);
+  const [sessions, setSessions] = useState<ManagedSessionInfo[]>([]);
   const [ratingComparison, setRatingComparison] =
     useState<RatingMethodComparison | null>(null);
   const [isLoadingRatingComparison, setIsLoadingRatingComparison] =
@@ -274,19 +281,14 @@ const AdminDashboard: React.FC = () => {
   const [matchNameDrafts, setMatchNameDrafts] = useState<
     Record<string, string>
   >({});
-  const [matchSessionNameDrafts, setMatchSessionNameDrafts] = useState<
+  const [matchStartsAtDrafts, setMatchStartsAtDrafts] = useState<
     Record<string, string>
   >({});
-  const [matchSessionDateDrafts, setMatchSessionDateDrafts] = useState<
-    Record<string, string>
-  >({});
-  const [matchSessionLocationDrafts, setMatchSessionLocationDrafts] = useState<
+  const [matchSessionIdDrafts, setMatchSessionIdDrafts] = useState<
     Record<string, string>
   >({});
   const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
-  const [bulkSessionName, setBulkSessionName] = useState("");
-  const [bulkSessionDate, setBulkSessionDate] = useState("");
-  const [bulkSessionLocation, setBulkSessionLocation] = useState("");
+  const [bulkSessionId, setBulkSessionId] = useState("");
   const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<
     string | null
   >(null);
@@ -364,31 +366,21 @@ const AdminDashboard: React.FC = () => {
       });
       return next;
     });
-    setMatchSessionNameDrafts((prev) => {
+    setMatchStartsAtDrafts((prev) => {
       const next: Record<string, string> = {};
       loadedMatches.forEach((loadedMatch) => {
         next[loadedMatch.id] =
           prev[loadedMatch.id] ??
-          loadedMatch.sessionName ??
-          loadedMatch.session?.name ??
-          "";
+          toLocalDateTimeInputValue(loadedMatch.matchStartsAt);
       });
       return next;
     });
-    setMatchSessionDateDrafts((prev) => {
+    setMatchSessionIdDrafts((prev) => {
       const next: Record<string, string> = {};
       loadedMatches.forEach((loadedMatch) => {
         next[loadedMatch.id] =
           prev[loadedMatch.id] ??
-          toLocalDateTimeInputValue(loadedMatch.session?.date ?? null);
-      });
-      return next;
-    });
-    setMatchSessionLocationDrafts((prev) => {
-      const next: Record<string, string> = {};
-      loadedMatches.forEach((loadedMatch) => {
-        next[loadedMatch.id] =
-          prev[loadedMatch.id] ?? loadedMatch.session?.location ?? "";
+          loadedMatch.session?.id ?? "";
       });
       return next;
     });
@@ -450,6 +442,16 @@ const AdminDashboard: React.FC = () => {
     syncMatchDrafts(data);
   };
 
+  const loadSessions = async () => {
+    const res = await fetch("/api/admin/match-sessions", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      throw new Error("세션 목록을 불러오지 못했습니다.");
+    }
+    setSessions((await res.json()) as ManagedSessionInfo[]);
+  };
+
   const loadRatingComparison = async () => {
     try {
       setIsLoadingRatingComparison(true);
@@ -481,6 +483,7 @@ const AdminDashboard: React.FC = () => {
         loadCreationLogs(),
         loadStatusLogs(),
         loadMatches(),
+        loadSessions(),
       ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
@@ -492,6 +495,18 @@ const AdminDashboard: React.FC = () => {
       loadDashboardData();
     }
   }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (token && isAdmin && activeSection === "matches") {
+      void loadSessions().catch((loadError) => {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "세션 목록을 불러오지 못했습니다.",
+        );
+      });
+    }
+  }, [activeSection, token, isAdmin]);
 
   useEffect(() => {
     if (
@@ -812,65 +827,21 @@ const AdminDashboard: React.FC = () => {
     }
 
     const nextName = normalizeDraftValue(matchNameDrafts[matchId] ?? "");
-    const nextSessionName = normalizeDraftValue(
-      matchSessionNameDrafts[matchId] ?? "",
-    );
-    const nextSessionDate = (matchSessionDateDrafts[matchId] ?? "").trim();
-    const nextSessionLocation = normalizeDraftValue(
-      matchSessionLocationDrafts[matchId] ?? "",
-    );
-
     const isNameChanged = nextName !== (targetMatch.name ?? "");
-    const currentSessionName =
-      targetMatch.sessionName ?? targetMatch.session?.name ?? "";
-    const isSessionNameChanged = nextSessionName !== currentSessionName;
-    const currentSessionDate = toLocalDateTimeInputValue(
-      targetMatch.session?.date ?? null,
-    );
-    const isSessionDateChanged = nextSessionDate !== currentSessionDate;
-    const currentSessionLocation = targetMatch.session?.location ?? "";
-    const isSessionLocationChanged =
-      nextSessionLocation !== currentSessionLocation;
+    const nextMatchStartsAt = (matchStartsAtDrafts[matchId] ?? "").trim();
+    const nextSessionId = (matchSessionIdDrafts[matchId] ?? "").trim();
+    const isMatchStartsAtChanged =
+      nextMatchStartsAt !== toLocalDateTimeInputValue(targetMatch.matchStartsAt);
+    const isSessionIdChanged = nextSessionId !== (targetMatch.session?.id ?? "");
 
-    if (
-      !isNameChanged &&
-      !isSessionNameChanged &&
-      !isSessionDateChanged &&
-      !isSessionLocationChanged
-    ) {
-      return;
-    }
-
-    if (
-      (nextSessionName || nextSessionDate || nextSessionLocation) &&
-      !nextSessionName
-    ) {
-      setError("세션이 있으면 세션명을 입력해주세요.");
-      setSuccess(null);
-      return;
-    }
-
-    if (
-      (nextSessionName || nextSessionDate || nextSessionLocation) &&
-      !nextSessionDate
-    ) {
-      setError("세션이 있으면 세션 날짜를 입력해주세요.");
-      setSuccess(null);
-      return;
-    }
-
-    if (
-      (nextSessionName || nextSessionDate || nextSessionLocation) &&
-      !nextSessionLocation
-    ) {
-      setError("세션이 있으면 장소를 입력해주세요.");
+    if (!isNameChanged && !isMatchStartsAtChanged && !isSessionIdChanged) return;
+    if (isSessionIdChanged && !nextSessionId) {
+      setError("세션 연결 해제는 별도 버튼으로 진행해주세요.");
       setSuccess(null);
       return;
     }
 
     try {
-      const serializedSessionDate =
-        serializeLocalDateTimeInput(nextSessionDate);
       setSavingMatchMetadataIds((prev) =>
         prev.includes(matchId) ? prev : [...prev, matchId],
       );
@@ -884,10 +855,11 @@ const AdminDashboard: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: nextName,
-          sessionName: nextSessionName,
-          sessionDate: serializedSessionDate,
-          sessionLocation: nextSessionLocation,
+          ...(isNameChanged ? { name: nextName } : {}),
+          ...(isMatchStartsAtChanged
+            ? { matchStartsAt: serializeLocalDateTimeInput(nextMatchStartsAt) }
+            : {}),
+          ...(isSessionIdChanged ? { sessionId: nextSessionId } : {}),
         }),
       });
 
@@ -898,14 +870,6 @@ const AdminDashboard: React.FC = () => {
 
       const updatedMatch = (await res.json()) as MatchInfo;
       rememberRecentInputValue(recentInputFieldKeys.matchName, nextName);
-      rememberRecentInputValue(
-        recentInputFieldKeys.sessionName,
-        nextSessionName,
-      );
-      rememberRecentInputValue(
-        recentInputFieldKeys.sessionLocation,
-        nextSessionLocation,
-      );
       setMatches((prev) =>
         prev.map((match) =>
           match.id === updatedMatch.id ? updatedMatch : match,
@@ -915,21 +879,15 @@ const AdminDashboard: React.FC = () => {
         ...prev,
         [matchId]: updatedMatch.name ?? "",
       }));
-      setMatchSessionNameDrafts((prev) => ({
+      setMatchStartsAtDrafts((prev) => ({
         ...prev,
-        [matchId]: updatedMatch.sessionName ?? updatedMatch.session?.name ?? "",
+        [matchId]: toLocalDateTimeInputValue(updatedMatch.matchStartsAt),
       }));
-      setMatchSessionDateDrafts((prev) => ({
+      setMatchSessionIdDrafts((prev) => ({
         ...prev,
-        [matchId]: toLocalDateTimeInputValue(
-          updatedMatch.session?.date ?? null,
-        ),
+        [matchId]: updatedMatch.session?.id ?? "",
       }));
-      setMatchSessionLocationDrafts((prev) => ({
-        ...prev,
-        [matchId]: updatedMatch.session?.location ?? "",
-      }));
-      setSuccess("매치 세션명/세션 날짜/장소/매치명을 수정했습니다.");
+      setSuccess("매치명, 경기 예정 일시, 세션 연결을 저장했습니다.");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
     } finally {
@@ -960,33 +918,9 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
-    const nextSessionName = normalizeDraftValue(bulkSessionName);
-    const nextSessionDate = bulkSessionDate.trim();
-    const nextSessionLocation = normalizeDraftValue(bulkSessionLocation);
-
-    if (
-      (nextSessionName || nextSessionDate || nextSessionLocation) &&
-      !nextSessionName
-    ) {
-      setError("세션을 일괄 반영하려면 세션명을 입력해주세요.");
-      setSuccess(null);
-      return;
-    }
-
-    if (
-      (nextSessionName || nextSessionDate || nextSessionLocation) &&
-      !nextSessionDate
-    ) {
-      setError("세션을 일괄 반영하려면 세션 날짜를 입력해주세요.");
-      setSuccess(null);
-      return;
-    }
-
-    if (
-      (nextSessionName || nextSessionDate || nextSessionLocation) &&
-      !nextSessionLocation
-    ) {
-      setError("세션을 일괄 반영하려면 장소를 입력해주세요.");
+    const nextSessionId = bulkSessionId.trim();
+    if (!nextSessionId) {
+      setError("연결할 세션 ID를 입력하거나 목록에서 선택해주세요.");
       setSuccess(null);
       return;
     }
@@ -994,19 +928,9 @@ const AdminDashboard: React.FC = () => {
     const selectedMatches = matches.filter((match) =>
       selectedMatchIds.includes(match.id),
     );
-    const matchesToUpdate = selectedMatches.filter((match) => {
-      const currentSessionName = match.sessionName ?? match.session?.name ?? "";
-      const currentSessionDate = toLocalDateTimeInputValue(
-        match.session?.date ?? null,
-      );
-      const currentSessionLocation = match.session?.location ?? "";
-
-      return (
-        currentSessionName !== nextSessionName ||
-        currentSessionDate !== nextSessionDate ||
-        currentSessionLocation !== nextSessionLocation
-      );
-    });
+    const matchesToUpdate = selectedMatches.filter(
+      (match) => (match.session?.id ?? "") !== nextSessionId,
+    );
 
     if (matchesToUpdate.length === 0) {
       setSuccess("선택한 매치에 반영할 세션 변경이 없습니다.");
@@ -1015,8 +939,6 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
-      const serializedSessionDate =
-        serializeLocalDateTimeInput(nextSessionDate);
       setIsSavingBulkMatchMetadata(true);
       setSavingMatchMetadataIds((prev) => [
         ...new Set([...prev, ...matchesToUpdate.map((match) => match.id)]),
@@ -1032,9 +954,7 @@ const AdminDashboard: React.FC = () => {
         },
         body: JSON.stringify({
           matchIds: matchesToUpdate.map((match) => match.id),
-          sessionName: nextSessionName,
-          sessionDate: serializedSessionDate,
-          sessionLocation: nextSessionLocation,
+          sessionId: nextSessionId,
         }),
       });
 
@@ -1048,14 +968,6 @@ const AdminDashboard: React.FC = () => {
       };
 
       if (updatedMatches.length > 0) {
-        rememberRecentInputValue(
-          recentInputFieldKeys.sessionName,
-          nextSessionName,
-        );
-        rememberRecentInputValue(
-          recentInputFieldKeys.sessionLocation,
-          nextSessionLocation,
-        );
         const updatedMatchesById = new Map(
           updatedMatches.map((updatedMatch) => [updatedMatch.id, updatedMatch]),
         );
@@ -1069,27 +981,17 @@ const AdminDashboard: React.FC = () => {
           });
           return next;
         });
-        setMatchSessionNameDrafts((prev) => {
+        setMatchStartsAtDrafts((prev) => {
           const next = { ...prev };
           updatedMatches.forEach((updatedMatch) => {
-            next[updatedMatch.id] =
-              updatedMatch.sessionName ?? updatedMatch.session?.name ?? "";
+            next[updatedMatch.id] = toLocalDateTimeInputValue(updatedMatch.matchStartsAt);
           });
           return next;
         });
-        setMatchSessionDateDrafts((prev) => {
+        setMatchSessionIdDrafts((prev) => {
           const next = { ...prev };
           updatedMatches.forEach((updatedMatch) => {
-            next[updatedMatch.id] = toLocalDateTimeInputValue(
-              updatedMatch.session?.date ?? null,
-            );
-          });
-          return next;
-        });
-        setMatchSessionLocationDrafts((prev) => {
-          const next = { ...prev };
-          updatedMatches.forEach((updatedMatch) => {
-            next[updatedMatch.id] = updatedMatch.session?.location ?? "";
+            next[updatedMatch.id] = updatedMatch.session?.id ?? "";
           });
           return next;
         });
@@ -1097,8 +999,108 @@ const AdminDashboard: React.FC = () => {
 
       setSelectedMatchIds([]);
       setSuccess(
-        `${updatedMatches.length}개 매치에 세션명/세션 날짜/세션 장소를 일괄 반영했습니다.`,
+        `${updatedMatches.length}개 매치를 세션 ID ${nextSessionId}에 연결했습니다.`,
       );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+      setSuccess(null);
+    } finally {
+      setIsSavingBulkMatchMetadata(false);
+      setSavingMatchMetadataIds((prev) =>
+        prev.filter(
+          (savingMatchId) =>
+            !matchesToUpdate.some((match) => match.id === savingMatchId),
+        ),
+      );
+    }
+  };
+
+  const handleSessionDisconnect = async (matchId: string) => {
+    const targetMatch = matches.find((match) => match.id === matchId);
+    if (!targetMatch?.session?.id) return;
+    if (!window.confirm("이 매치의 세션 연결을 해제할까요?")) return;
+
+    try {
+      setSavingMatchMetadataIds((prev) =>
+        prev.includes(matchId) ? prev : [...prev, matchId],
+      );
+      setError(null);
+      setSuccess(null);
+      const res = await fetch(`/api/admin/matches/${matchId}/metadata`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sessionId: null }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "세션 연결 해제 실패");
+      }
+      const updatedMatch = (await res.json()) as MatchInfo;
+      setMatches((prev) =>
+        prev.map((match) =>
+          match.id === updatedMatch.id ? updatedMatch : match,
+        ),
+      );
+      setMatchSessionIdDrafts((prev) => ({ ...prev, [matchId]: "" }));
+      setSuccess("매치의 세션 연결을 해제했습니다.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+    } finally {
+      setSavingMatchMetadataIds((prev) =>
+        prev.filter((savingMatchId) => savingMatchId !== matchId),
+      );
+    }
+  };
+
+  const handleBulkSessionDisconnect = async () => {
+    const matchesToUpdate = matches.filter(
+      (match) => selectedMatchIds.includes(match.id) && match.session?.id,
+    );
+    if (!matchesToUpdate.length) {
+      setError("연결 해제할 세션 연결 매치를 선택해주세요.");
+      setSuccess(null);
+      return;
+    }
+    if (!window.confirm(`${matchesToUpdate.length}개 매치의 세션 연결을 해제할까요?`)) {
+      return;
+    }
+    try {
+      setIsSavingBulkMatchMetadata(true);
+      setSavingMatchMetadataIds((prev) => [
+        ...new Set([...prev, ...matchesToUpdate.map((match) => match.id)]),
+      ]);
+      const res = await fetch("/api/admin/matches/bulk-metadata", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          matchIds: matchesToUpdate.map((match) => match.id),
+          sessionId: null,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "세션 일괄 연결 해제 실패");
+      }
+      const { matches: updatedMatches } = (await res.json()) as {
+        matches: MatchInfo[];
+      };
+      const updatedById = new Map(updatedMatches.map((match) => [match.id, match]));
+      setMatches((prev) => prev.map((match) => updatedById.get(match.id) ?? match));
+      setMatchSessionIdDrafts((prev) => {
+        const next = { ...prev };
+        updatedMatches.forEach((match) => {
+          next[match.id] = "";
+        });
+        return next;
+      });
+      setSelectedMatchIds([]);
+      setSuccess(`${updatedMatches.length}개 매치의 세션 연결을 해제했습니다.`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류");
       setSuccess(null);
@@ -1624,40 +1626,31 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
                   <div className="flex-1">
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      일괄 세션명
-                    </label>
-                    <RecentValueComboBox
-                      fieldKey={recentInputFieldKeys.sessionName}
-                      value={bulkSessionName}
-                      onChange={setBulkSessionName}
-                      placeholder="예: 수요일 저녁 세션"
-                      className="w-full"
-                      inputClassName="w-full rounded-lg border px-3 py-2"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">
-                      일괄 세션 날짜
+                      일괄 세션 ID
                     </label>
                     <input
-                      type="datetime-local"
-                      value={bulkSessionDate}
-                      onChange={(e) => setBulkSessionDate(e.target.value)}
+                      value={bulkSessionId}
+                      onChange={(e) => setBulkSessionId(e.target.value)}
+                      placeholder="예: Ssnj75xd"
                       className="w-full rounded-lg border px-3 py-2"
                     />
                   </div>
                   <div className="flex-1">
                     <label className="mb-1 block text-sm font-medium text-slate-700">
-                      일괄 장소
+                      등록 세션에서 선택
                     </label>
-                    <RecentValueComboBox
-                      fieldKey={recentInputFieldKeys.sessionLocation}
-                      value={bulkSessionLocation}
-                      onChange={setBulkSessionLocation}
-                      placeholder="예: PKELO Court A"
-                      className="w-full"
-                      inputClassName="w-full rounded-lg border px-3 py-2"
-                    />
+                    <select
+                      value={bulkSessionId}
+                      onChange={(e) => setBulkSessionId(e.target.value)}
+                      className="w-full rounded-lg border px-3 py-2"
+                    >
+                      <option value="">세션 선택</option>
+                      {sessions.map((session) => (
+                        <option key={session.id} value={session.id}>
+                          {session.name} · {formatDateTime(session.date)} · {session.id}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -1680,19 +1673,29 @@ const AdminDashboard: React.FC = () => {
                     >
                       {isSavingBulkMatchMetadata
                         ? "일괄 반영 중..."
-                        : `선택 ${selectedMatchIds.length}개 일괄 반영`}
+                        : `선택 ${selectedMatchIds.length}개 세션 연결`}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        isSavingBulkMatchMetadata ||
+                        selectedMatchIds.length === 0
+                      }
+                      onClick={() => void handleBulkSessionDisconnect()}
+                      className="rounded-lg border border-rose-300 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400"
+                    >
+                      선택 연결 해제
                     </button>
                   </div>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  수정할 매치를 선택한 뒤 같은 세션명/세션 날짜/장소를 한
-                  번에 반영할 수 있습니다. 세 값을 모두 비우고 반영하면 선택한
-                  매치의 세션 정보가 제거됩니다.
+                  수정할 매치를 선택한 뒤 세션 ID로 일괄 연결합니다. 연결 해제는
+                  별도 버튼과 확인 절차로만 수행됩니다.
                 </p>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1600px] table-auto text-sm">
+                <table className="w-full min-w-[1800px] table-auto text-sm">
                   <thead className="bg-slate-100">
                     <tr className="text-left text-slate-600">
                       <th className="px-4 py-3 whitespace-nowrap">
@@ -1707,6 +1710,7 @@ const AdminDashboard: React.FC = () => {
                         />
                       </th>
                       <th className="px-4 py-3 whitespace-nowrap">일시</th>
+                      <th className="px-4 py-3 whitespace-nowrap">세션 ID</th>
                       <th className="px-4 py-3 whitespace-nowrap">세션명</th>
                       <th className="px-4 py-3 whitespace-nowrap">세션 날짜</th>
                       <th className="px-4 py-3 whitespace-nowrap">장소</th>
@@ -1725,33 +1729,20 @@ const AdminDashboard: React.FC = () => {
                     {matches.map((match) => {
                       const draftMatchName =
                         matchNameDrafts[match.id] ?? match.name ?? "";
-                      const draftSessionName =
-                        matchSessionNameDrafts[match.id] ??
-                        match.sessionName ??
-                        match.session?.name ??
-                        "";
-                      const draftSessionDate =
-                        matchSessionDateDrafts[match.id] ??
-                        toLocalDateTimeInputValue(match.session?.date ?? null);
-                      const draftSessionLocation =
-                        matchSessionLocationDrafts[match.id] ??
-                        match.session?.location ??
-                        "";
+                      const draftMatchStartsAt =
+                        matchStartsAtDrafts[match.id] ??
+                        toLocalDateTimeInputValue(match.matchStartsAt);
+                      const draftSessionId =
+                        matchSessionIdDrafts[match.id] ?? match.session?.id ?? "";
                       const normalizedDraftMatchName =
                         normalizeDraftValue(draftMatchName);
-                      const normalizedDraftSessionName =
-                        normalizeDraftValue(draftSessionName);
                       const isMatchNameDirty =
                         normalizedDraftMatchName !== (match.name ?? "");
-                      const isSessionNameDirty =
-                        normalizedDraftSessionName !==
-                        (match.sessionName ?? match.session?.name ?? "");
-                      const isSessionDateDirty =
-                        draftSessionDate !==
-                        toLocalDateTimeInputValue(match.session?.date ?? null);
-                      const isSessionLocationDirty =
-                        normalizeDraftValue(draftSessionLocation) !==
-                        (match.session?.location ?? "");
+                      const isMatchStartsAtDirty =
+                        draftMatchStartsAt !==
+                        toLocalDateTimeInputValue(match.matchStartsAt);
+                      const isSessionIdDirty =
+                        draftSessionId.trim() !== (match.session?.id ?? "");
                       const isSavingMatchMetadata =
                         savingMatchMetadataIds.includes(match.id);
 
@@ -1768,60 +1759,68 @@ const AdminDashboard: React.FC = () => {
                               aria-label={`${match.name ?? match.id} 선택`}
                             />
                           </td>
-                          <td className="px-4 py-4 min-w-[130px] text-xs text-gray-600">
-                            <div className="space-y-1">
-                              <div>{formatDateTime(match.matchStartsAt)}</div>
-                              {match.session?.date ? (
-                                <div className="text-slate-400">
-                                  세션 날짜:{" "}
-                                  {formatDateTime(match.session.date)}
-                                </div>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 min-w-[180px]">
-                            <RecentValueComboBox
-                              fieldKey={recentInputFieldKeys.sessionName}
-                              value={draftSessionName}
-                              onChange={(nextValue) =>
-                                setMatchSessionNameDrafts((prev) => ({
-                                  ...prev,
-                                  [match.id]: nextValue,
-                                }))
-                              }
-                              placeholder="세션명"
-                              className="w-full"
-                              inputClassName="w-full rounded-lg border px-3 py-2"
-                            />
-                          </td>
-                          <td className="px-4 py-4 min-w-[220px]">
+                          <td className="px-4 py-4 min-w-[190px] text-xs text-gray-600">
                             <input
                               type="datetime-local"
-                              value={draftSessionDate}
+                              value={draftMatchStartsAt}
                               onChange={(e) =>
-                                setMatchSessionDateDrafts((prev) => ({
+                                setMatchStartsAtDrafts((prev) => ({
                                   ...prev,
                                   [match.id]: e.target.value,
                                 }))
                               }
-                              placeholder="2026-07-09T18:30"
                               className="w-full rounded-lg border px-3 py-2"
+                              aria-label={`${match.name ?? match.id} 경기 예정 일시`}
                             />
                           </td>
                           <td className="px-4 py-4 min-w-[180px]">
-                            <RecentValueComboBox
-                              fieldKey={recentInputFieldKeys.sessionLocation}
-                              value={draftSessionLocation}
-                              onChange={(nextValue) =>
-                                setMatchSessionLocationDrafts((prev) => ({
-                                  ...prev,
-                                  [match.id]: nextValue,
-                                }))
-                              }
-                              placeholder="장소"
-                              className="w-full"
-                              inputClassName="w-full rounded-lg border px-3 py-2"
-                            />
+                            <div className="space-y-2">
+                              <input
+                                value={draftSessionId}
+                                onChange={(e) =>
+                                  setMatchSessionIdDrafts((prev) => ({
+                                    ...prev,
+                                    [match.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="세션 ID"
+                                className="w-full rounded-lg border px-3 py-2 font-mono text-xs"
+                              />
+                              <select
+                                value={draftSessionId}
+                                onChange={(e) =>
+                                  setMatchSessionIdDrafts((prev) => ({
+                                    ...prev,
+                                    [match.id]: e.target.value,
+                                  }))
+                                }
+                                className="w-full rounded-lg border px-3 py-2 text-xs"
+                              >
+                                <option value="">세션 선택</option>
+                                {sessions.map((session) => (
+                                  <option key={session.id} value={session.id}>
+                                    {session.name} · {formatDateTime(session.date)}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 min-w-[220px]">
+                            <span className="text-xs text-slate-600">
+                              {match.session?.name ?? "연결된 세션 없음"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 min-w-[180px]">
+                            <span className="text-xs text-slate-600">
+                              {match.session?.date
+                                ? formatDateTime(match.session.date)
+                                : "-"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 min-w-[180px]">
+                            <span className="text-xs text-slate-600">
+                              {match.session?.location ?? "-"}
+                            </span>
                           </td>
                           <td className="px-4 py-4 min-w-[180px]">
                             <RecentValueComboBox
@@ -1869,9 +1868,8 @@ const AdminDashboard: React.FC = () => {
                               disabled={
                                 isSavingMatchMetadata ||
                                 (!isMatchNameDirty &&
-                                  !isSessionNameDirty &&
-                                  !isSessionDateDirty &&
-                                  !isSessionLocationDirty)
+                                  !isMatchStartsAtDirty &&
+                                  !isSessionIdDirty)
                               }
                               onClick={() =>
                                 void handleMatchMetadataSave(match.id)
@@ -1880,6 +1878,16 @@ const AdminDashboard: React.FC = () => {
                             >
                               {isSavingMatchMetadata ? "저장 중..." : "저장"}
                             </button>
+                            {match.session?.id ? (
+                              <button
+                                type="button"
+                                disabled={isSavingMatchMetadata}
+                                onClick={() => void handleSessionDisconnect(match.id)}
+                                className="mt-2 rounded-lg border border-rose-300 px-3 py-2 text-xs text-rose-700 disabled:border-slate-200 disabled:text-slate-400"
+                              >
+                                연결 해제
+                              </button>
+                            ) : null}
                           </td>
                         </tr>
                       );

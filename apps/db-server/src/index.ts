@@ -37,6 +37,7 @@ import {
   CompletedMatchApprovalCancelError,
   CompletedMatchResultEditError,
   MatchRepository,
+  SessionHasMatchesError,
   type CreateMatchInput,
   type UpdateMatchMetadataInput,
 } from "./repositories/MatchRepository";
@@ -978,6 +979,24 @@ app.get("/internal/match-sessions", async (_req, res) => {
     res.json(await matchRepository.findSessions());
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete("/internal/match-sessions/:sessionId", async (req, res) => {
+  try {
+    if (!isEntityId(req.params.sessionId, "session")) {
+      return res.status(400).json({ error: "유효한 세션 ID가 필요합니다." });
+    }
+    const deleted = await matchRepository.deleteSession(req.params.sessionId);
+    if (!deleted) {
+      return res.status(404).json({ error: "세션을 찾을 수 없습니다." });
+    }
+    res.status(204).send();
+  } catch (error) {
+    if (error instanceof SessionHasMatchesError) {
+      return res.status(409).json({ error: error.message });
+    }
+    res.status(400).json({ error: (error as Error).message });
   }
 });
 

@@ -38,7 +38,7 @@ const participants: Player[] = Array.from({ length: 4 }, (_, index) => ({
   updatedAt: now,
 }));
 const managedSession: ManagedMatchSession = {
-  id: "Ssession1",
+  id: "Ssession",
   name: "토요 오전 세션",
   date: new Date("2026-07-25T01:00:00.000Z"),
   location: "PKELO Court A",
@@ -63,7 +63,7 @@ describe("admin match sessions", () => {
 
   it("경기 결과 없이 예정 세션 정보만 생성한다", async () => {
     const createdSession: Session = {
-      id: "Ssession1",
+      id: "Ssession",
       name: "토요 오전 세션",
       date: new Date("2026-07-25T01:00:00.000Z"),
       location: "PKELO Court A",
@@ -109,6 +109,33 @@ describe("admin match sessions", () => {
     expect(response.status).toBe(400);
     expect(response.body).toEqual({ error: "세션 정보가 필요합니다." });
     expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("경기가 없는 세션을 삭제한다", async () => {
+    const deleteSession = vi
+      .spyOn(MatchRepository.prototype, "deleteSession")
+      .mockResolvedValue(undefined);
+
+    const response = await request(app)
+      .delete(`/api/admin/match-sessions/${managedSession.id}`)
+      .set("Authorization", "Bearer admin-token");
+
+    expect(response.status).toBe(204);
+    expect(deleteSession).toHaveBeenCalledWith(managedSession.id);
+  });
+
+  it("연결된 경기가 있는 세션 삭제의 409 응답을 전달한다", async () => {
+    const { DbRequestError } = await import("../repositories/MatchRepository");
+    vi.spyOn(MatchRepository.prototype, "deleteSession").mockRejectedValue(
+      new DbRequestError("연결된 경기가 있는 세션은 삭제할 수 없습니다.", 409),
+    );
+
+    const response = await request(app)
+      .delete(`/api/admin/match-sessions/${managedSession.id}`)
+      .set("Authorization", "Bearer admin-token");
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toContain("연결된 경기가");
   });
 
   it("세션 참여자를 등록한다", async () => {
