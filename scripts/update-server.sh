@@ -2,189 +2,178 @@
 
 set -euo pipefail
 
-DEPLOY_ROOT="/opt/pkpkdupr"
+DEPLOY_ROOT="${PKPKDUPR_DEPLOY_PATH:-/opt/pkpkdupr}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-
-ROOT_DIR="${SOURCE_REPO_ROOT}"
-ENV_FILE="${DEPLOY_ROOT}/.env"
+ENV_DIR="${DEPLOY_ROOT}/env"
+SHARED_ENV_FILE="${ENV_DIR}/shared.env"
+PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
+PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
 IMAGE_TAG_INPUT="${1:-${IMAGE_TAG:-latest}}"
-DOMAIN_DEFAULT="pkpkdupr.duckdns.org"
-WEB_PUBLIC_PORT_DEFAULT="443"
-ADMIN_STACK_PORT_DEFAULT="3333"
+TARGET_STACK="${2:-all}"
 SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
 SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
+PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
+PKELO_CERT_ROOT="${DEPLOY_ROOT}/data/pkelo-certs"
 
 require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "❌ '$1' 명령이 필요합니다." >&2
-    exit 1
-  fi
+  command -v "$1" >/dev/null 2>&1 || { echo "❌ '$1' 명령이 필요합니다." >&2; exit 1; }
 }
 
 require_file() {
-  local path="$1"
-  if [[ ! -f "${path}" ]]; then
-    echo "❌ 필요한 파일이 없습니다: ${path}" >&2
-    exit 1
-  fi
+  [[ -f "$1" ]] || { echo "❌ 필요한 파일이 없습니다: $1" >&2; exit 1; }
 }
 
 read_env_value() {
-  local key="$1"
-  local value
-  value="$(awk -F= -v target="$key" '$1 == target { print substr($0, index($0, "=") + 1) }' "${ENV_FILE}" | tail -n 1)"
-  printf '%s' "${value}"
+  local env_file="$1" key="$2"
+  awk -F= -v target="${key}" '$1 == target { print substr($0, index($0, "=") + 1) }' "${env_file}" | tail -n 1
 }
 
-sync_duckdns_credentials() {
-  local token="$1"
-  local credentials_file="${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini"
+require_env_value() {
+  case "$3" in
+    ""|replace-with-*) echo "❌ $1의 $2 값을 설정해야 합니다." >&2; exit 1 ;;
+  esac
+}
 
-  mkdir -p "$(dirname "${credentials_file}")"
+sync_credentials() {
+  mkdir -p "${DEPLOY_ROOT}/data/certs/dns-conf" "${PKELO_CERT_ROOT}/dns-conf"
   umask 077
-  printf 'dns_duckdns_token=%s\n' "${token}" > "${credentials_file}"
-  chmod 600 "${credentials_file}"
+  printf 'dns_duckdns_token=%s\n' "${PRIMARY_DUCKDNS_TOKEN}" > "${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini"
+  printf 'dns_cloudflare_api_token=%s\n' "${PKELO_CLOUDFLARE_TOKEN}" > "${PKELO_CERT_ROOT}/dns-conf/cloudflare.ini"
+  chmod 600 "${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini" "${PKELO_CERT_ROOT}/dns-conf/cloudflare.ini"
+}
 
-  echo "✅ DuckDNS credential 파일 동기화 완료: ${credentials_file}"
+sync_proxy_site_configs() {
+  mkdir -p "$(dirname "${SWAG_TARGET}")"
+  sed -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
+  sed "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" "${PKELO_SSL_TEMPLATE}" > "${PKELO_SSL_TARGET}"
 }
 
 wait_for_file() {
-  local path="$1"
-  local attempts="${2:-60}"
-
-  for _ in $(seq 1 "${attempts}"); do
-    if [[ -f "${path}" ]]; then
-      return 0
-    fi
+  for _ in $(seq 1 "${2:-60}"); do
+    [[ -f "$1" ]] && return 0
     sleep 2
   done
-
-  echo "❌ 필요한 파일이 생성되지 않았습니다: ${path}" >&2
+  echo "❌ 필요한 파일이 생성되지 않았습니다: $1" >&2
   exit 1
 }
 
-wait_for_url() {
-  local url="$1"
-  local expected_text="${2:-}"
-  local forbidden_text="${3:-}"
-  local attempts="${4:-60}"
-  local response=""
+compose_proxy() {
+  docker compose --project-name pkpkdupr --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" -f docker-compose.proxy.yml "$@"
+}
 
-  for _ in $(seq 1 "${attempts}"); do
-    response="$(curl -fsSL "${url}" 2>/dev/null || true)"
-    if [[ -n "${response}" ]]; then
-      if [[ -n "${expected_text}" ]] && ! grep -Fqi -- "${expected_text}" <<<"${response}"; then
-        sleep 5
-        continue
-      fi
-      if [[ -n "${forbidden_text}" ]] && grep -Fqi -- "${forbidden_text}" <<<"${response}"; then
-        sleep 5
-        continue
-      fi
-      return 0
-    fi
+compose_certificate() {
+  docker compose --project-name pkelo-certificate --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo-certificate.yml "$@"
+}
+
+compose_primary() {
+  docker compose --project-name pkpkdupr --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" -f docker-compose.yml -f docker-compose.pkpkdupr-gateway.yml "$@"
+}
+
+compose_pkelo() {
+  docker compose --project-name pkelo --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
+}
+
+resolve_environment() {
+  require_file "${SHARED_ENV_FILE}"
+  require_file "${PRIMARY_ENV_FILE}"
+  require_file "${PKELO_ENV_FILE}"
+  require_file "${SWAG_TEMPLATE}"
+  require_file "${PKELO_SSL_TEMPLATE}"
+  PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"; PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-pkpkdupr.duckdns.org}"
+  PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"; PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
+  ADMIN_STACK_PORT="$(read_env_value "${SHARED_ENV_FILE}" ADMIN_STACK_PORT)"; ADMIN_STACK_PORT="${ADMIN_STACK_PORT:-3333}"
+  PRIMARY_DUCKDNS_TOKEN="$(read_env_value "${PRIMARY_ENV_FILE}" DUCKDNSTOKEN)"
+  PKELO_CLOUDFLARE_TOKEN="$(read_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN)"
+  PRIMARY_JWT_SECRET="$(read_env_value "${PRIMARY_ENV_FILE}" JWT_SECRET)"
+  PKELO_JWT_SECRET="$(read_env_value "${PKELO_ENV_FILE}" JWT_SECRET)"
+  PRIMARY_USER_AUTH_PROVIDER="$(read_env_value "${PRIMARY_ENV_FILE}" USER_AUTH_PROVIDER)"; PRIMARY_USER_AUTH_PROVIDER="${PRIMARY_USER_AUTH_PROVIDER:-password}"
+  PKELO_USER_AUTH_PROVIDER="$(read_env_value "${PKELO_ENV_FILE}" USER_AUTH_PROVIDER)"; PKELO_USER_AUTH_PROVIDER="${PKELO_USER_AUTH_PROVIDER:-kakao}"
+  require_env_value "${PRIMARY_ENV_FILE}" DUCKDNSTOKEN "${PRIMARY_DUCKDNS_TOKEN}"
+  require_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN "${PKELO_CLOUDFLARE_TOKEN}"
+  require_env_value "${PRIMARY_ENV_FILE}" JWT_SECRET "${PRIMARY_JWT_SECRET}"
+  require_env_value "${PKELO_ENV_FILE}" JWT_SECRET "${PKELO_JWT_SECRET}"
+  local env_file key
+  for env_file in "${PRIMARY_ENV_FILE}" "${PKELO_ENV_FILE}"; do
+    for key in API_ADMIN_PASSWORD MYSQL_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_VIEWER_PASSWORD; do
+      require_env_value "${env_file}" "${key}" "$(read_env_value "${env_file}" "${key}")"
+    done
+  done
+  [[ "${PRIMARY_JWT_SECRET}" != "${PKELO_JWT_SECRET}" ]] || { echo "❌ 두 앱의 JWT_SECRET은 서로 달라야 합니다." >&2; exit 1; }
+  [[ "${PRIMARY_USER_AUTH_PROVIDER}" == "password" ]] || { echo "❌ ${PRIMARY_ENV_FILE}의 USER_AUTH_PROVIDER는 password여야 합니다." >&2; exit 1; }
+  [[ "${PKELO_USER_AUTH_PROVIDER}" == "kakao" ]] || { echo "❌ ${PKELO_ENV_FILE}의 USER_AUTH_PROVIDER는 운영에서 kakao여야 합니다." >&2; exit 1; }
+  local key
+  for key in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI KAKAO_WEB_ORIGIN; do
+    require_env_value "${PKELO_ENV_FILE}" "${key}" "$(read_env_value "${PKELO_ENV_FILE}" "${key}")"
+  done
+}
+
+run_health_checks() {
+  local target="$1"
+  local primary_web_url="https://${PRIMARY_DOMAIN}" primary_admin_url="https://${PRIMARY_DOMAIN}:${ADMIN_STACK_PORT}"
+  local pkelo_web_url="https://${PKELO_DOMAIN}" pkelo_admin_url="https://${PKELO_DOMAIN}:${ADMIN_STACK_PORT}"
+  for _ in $(seq 1 60); do
+    case "${target}" in
+      pkpkdupr)
+        if HEALTHCHECK_APPS=pkpkdupr PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
+        ;;
+      pkelo)
+        if HEALTHCHECK_APPS=pkelo PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
+        ;;
+      all)
+        if HEALTHCHECK_APPS=all PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
+        ;;
+    esac
     sleep 5
   done
-
-  echo "❌ URL 응답 대기 실패: ${url}" >&2
-  if [[ -n "${expected_text}" ]]; then
-    echo "   - 기대 텍스트: ${expected_text}" >&2
-  fi
-  if [[ -n "${forbidden_text}" ]]; then
-    echo "   - 금지 텍스트: ${forbidden_text}" >&2
-  fi
+  echo "❌ ${target} HTTPS health check가 준비 시간 내에 통과하지 못했습니다." >&2
   exit 1
 }
 
+case "${TARGET_STACK}" in
+  pkpkdupr|pkelo|all) ;;
+  *) echo "❌ 배포 대상은 pkpkdupr, pkelo, all 중 하나여야 합니다." >&2; exit 1 ;;
+esac
+
 require_command docker
-require_command curl
 require_command sed
-
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "❌ .env 파일이 없습니다. 먼저 scripts/install-server.sh를 실행하세요." >&2
-  exit 1
-fi
-
+require_command node
 docker compose version >/dev/null
-require_file "${SWAG_TEMPLATE}"
-
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
-echo "ℹ️ 소스 repo 루트: ${SOURCE_REPO_ROOT}"
-echo "ℹ️ 배포 루트: ${DEPLOY_ROOT}"
+export IMAGE_TAG="${IMAGE_TAG_INPUT}"
+resolve_environment
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
-else
-  echo "ℹ️ GHCR_USERNAME/GHCR_TOKEN이 없어 기존 docker login 상태를 사용합니다."
 fi
 
-export IMAGE_TAG="${IMAGE_TAG_INPUT}"
-DUCKDNS_TOKEN_VALUE="$(read_env_value DUCKDNSTOKEN)"
-if [[ -z "${DUCKDNS_TOKEN_VALUE}" || "${DUCKDNS_TOKEN_VALUE}" == "replace-with-your-duckdns-token" ]]; then
-  echo "❌ DUCKDNSTOKEN 값을 ${ENV_FILE}에 설정해야 DuckDNS DNS 검증으로 인증서를 발급/갱신할 수 있습니다." >&2
-  echo "   예: DUCKDNSTOKEN=your-real-duckdns-token" >&2
-  exit 1
-fi
-
-sync_duckdns_credentials "${DUCKDNS_TOKEN_VALUE}"
-
-DOMAIN_VALUE="$(read_env_value DOMAIN)"
-DOMAIN_VALUE="${DOMAIN_VALUE:-${DOMAIN_DEFAULT}}"
-WEB_PUBLIC_PORT_VALUE="$(read_env_value WEB_PUBLIC_PORT)"
-WEB_PUBLIC_PORT_VALUE="${WEB_PUBLIC_PORT_VALUE:-${WEB_PUBLIC_PORT_DEFAULT}}"
-ADMIN_STACK_PORT_VALUE="$(read_env_value ADMIN_STACK_PORT)"
-ADMIN_STACK_PORT_VALUE="${ADMIN_STACK_PORT_VALUE:-${ADMIN_STACK_PORT_DEFAULT}}"
-WEB_BASE_URL="https://${DOMAIN_VALUE}"
-ADMIN_STACK_BASE_URL="https://${DOMAIN_VALUE}:${ADMIN_STACK_PORT_VALUE}"
-
-echo "🧩 SWAG 프록시 설정 동기화 중..."
-docker compose --env-file "${ENV_FILE}" up -d proxy
+mkdir -p "${DEPLOY_ROOT}/data/uploads/avatars" "${DEPLOY_ROOT}/data/uploads/pkelo/avatars" "${PKELO_CERT_ROOT}"
+sync_credentials
+compose_proxy up -d
+compose_certificate up -d
 wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
-mkdir -p "$(dirname "${SWAG_TARGET}")"
-sed "s/__DOMAIN__/${DOMAIN_VALUE}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
-echo "✅ SWAG site config 동기화 완료: ${SWAG_TARGET}"
+wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
+sync_proxy_site_configs
 
-echo "📥 이미지 pull 중 (tag=${IMAGE_TAG})..."
-docker compose --env-file "${ENV_FILE}" pull web admin-web api mysql db-server adminer
+case "${TARGET_STACK}" in
+  pkpkdupr)
+    compose_primary pull web admin-web api mysql db-server adminer
+    compose_primary up -d web admin-web api mysql db-server adminer
+    ;;
+  pkelo)
+    compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    compose_pkelo up -d pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    ;;
+  all)
+    compose_primary pull web admin-web api mysql db-server adminer
+    compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    compose_primary up -d web admin-web api mysql db-server adminer
+    compose_pkelo up -d pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    ;;
+esac
 
-echo "🚀 서비스 업데이트 중..."
-docker compose --env-file "${ENV_FILE}" up -d proxy web admin-web api mysql db-server adminer
-docker compose --env-file "${ENV_FILE}" restart proxy
-
-if docker container inspect pkpkdupr-uptime-kuma >/dev/null 2>&1; then
-  echo "🧹 제거된 Uptime Kuma 컨테이너를 정리합니다..."
-  docker rm -f pkpkdupr-uptime-kuma
-fi
-
-if docker container inspect pkpkdupr-sqlite-web >/dev/null 2>&1; then
-  echo "🧹 Adminer로 교체된 sqlite-web 컨테이너를 정리합니다..."
-  docker rm -f pkpkdupr-sqlite-web
-fi
-
-echo "📦 현재 컨테이너 상태"
-docker compose --env-file "${ENV_FILE}" ps
-
-echo "🪵 최근 로그"
-docker compose --env-file "${ENV_FILE}" logs --tail=40 proxy web admin-web api mysql db-server adminer || true
-
-echo "🔎 HTTPS 응답 확인 중..."
-wait_for_url "${WEB_BASE_URL}/" "" "404 not found"
-wait_for_url "${ADMIN_STACK_BASE_URL}/api/health" "\"status\":\"ok\""
-wait_for_url "${ADMIN_STACK_BASE_URL}/api/ping" "\"message\":\"pong\""
-wait_for_url "${ADMIN_STACK_BASE_URL}/admin/" "" "404 not found"
-wait_for_url "${ADMIN_STACK_BASE_URL}/db/" "adminer" "404 not found"
-
-if command -v node >/dev/null 2>&1; then
-  echo "🩺 Node healthy check 실행"
-  PKPKDUPR_WEB_URL="${WEB_BASE_URL}" \
-    PKPKDUPR_ADMIN_STACK_URL="${ADMIN_STACK_BASE_URL}" \
-    node scripts/check-healthy.mjs
-else
-  echo "ℹ️ node가 없어 scripts/check-healthy.mjs는 건너뜁니다."
-  echo "   필요 시 node 설치 후 아래 명령을 실행하세요:"
-  echo "   PKPKDUPR_WEB_URL=${WEB_BASE_URL} PKPKDUPR_ADMIN_STACK_URL=${ADMIN_STACK_BASE_URL} node scripts/check-healthy.mjs"
-fi
-
-echo "🎉 서버 업데이트가 완료되었습니다: web=${WEB_BASE_URL}, admin-stack=${ADMIN_STACK_BASE_URL} (tag=${IMAGE_TAG})"
+compose_proxy restart proxy
+run_health_checks "${TARGET_STACK}"
+echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG})"

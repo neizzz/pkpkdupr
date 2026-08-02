@@ -1,0 +1,14 @@
+services:
+  pkelo-mysql:
+    container_name: pkelo-dev-mysql
+    ports:
+      - "${PKELO_DEV_MYSQL_PORT:-3307}:3306"
+
+  pkelo-adminer:
+    container_name: pkelo-dev-adminer
+    ports:
+      - "${PKELO_DEV_ADMINER_PORT:-3302}:8080"
+
+volumes:
+  pkelo-mysql-data:
+    name: pkelo-dev-mysql-data

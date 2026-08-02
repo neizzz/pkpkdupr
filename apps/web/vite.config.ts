@@ -31,6 +31,29 @@ const appVersion = (() => {
   }
 })();
 
+const resolvePort = (value: string | undefined, fallback: number) => {
+  const port = Number(value);
+  return Number.isInteger(port) && port > 0 ? port : fallback;
+};
+
+const resolveAllowedHosts = (value: string | undefined, fallback: string[]) => {
+  const hosts = value
+    ?.split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+  return hosts?.length ? hosts : fallback;
+};
+
+const devPort = resolvePort(process.env.VITE_DEV_PORT, 8080);
+const devApiTarget = process.env.VITE_DEV_API_TARGET || "http://localhost:4000";
+const devAdminerTarget =
+  process.env.VITE_DEV_ADMINER_TARGET || "http://localhost:3301";
+const devHmrHost =
+  process.env.VITE_DEV_HMR_HOST || "neiz-office.fedev.kakao.com";
+const devAllowedHosts = resolveAllowedHosts(process.env.VITE_DEV_ALLOWED_HOSTS, [
+  "neiz-office.fedev.kakao.com",
+]);
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
@@ -44,7 +67,12 @@ export default defineConfig({
       devOptions: {
         enabled: true,
         navigateFallback: "/index.html",
-        navigateFallbackAllowlist: [/^\/$/, /^\/login$/],
+        navigateFallbackAllowlist: [
+          /^\/$/,
+          /^\/login$/,
+          /^\/login\/kakao\/callback$/,
+          /^\/login\/kakao\/onboarding$/,
+        ],
       },
       includeAssets: [
         "favicon-v2.png",
@@ -89,6 +117,7 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [
           /^\/api\//,
+          /^\/auth\//,
           /^\/uploads\//,
           /^\/db\//,
         ],
@@ -134,22 +163,26 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 8080,
-    allowedHosts: ["neiz-office.fedev.kakao.com"],
+    port: devPort,
+    allowedHosts: devAllowedHosts,
     hmr: {
-      host: "neiz-office.fedev.kakao.com",
+      host: devHmrHost,
     },
     proxy: {
       "/api": {
-        target: "http://localhost:4000",
+        target: devApiTarget,
+        changeOrigin: true,
+      },
+      "/auth": {
+        target: devApiTarget,
         changeOrigin: true,
       },
       "/uploads": {
-        target: "http://localhost:4000",
+        target: devApiTarget,
         changeOrigin: true,
       },
       "/db": {
-        target: "http://localhost:3301",
+        target: devAdminerTarget,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/db/, ""),
       },

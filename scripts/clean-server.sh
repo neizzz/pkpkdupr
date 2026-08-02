@@ -2,43 +2,55 @@
 
 set -euo pipefail
 
-DEPLOY_ROOT="/opt/pkpkdupr"
+DEPLOY_ROOT="${PKPKDUPR_DEPLOY_PATH:-/opt/pkpkdupr}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-
-ROOT_DIR="${SOURCE_REPO_ROOT}"
+ENV_DIR="${DEPLOY_ROOT}/env"
+SHARED_ENV_FILE="${ENV_DIR}/shared.env"
+PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
+PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
 
 require_command() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    echo "❌ '$1' 명령이 필요합니다." >&2
-    exit 1
-  fi
+  command -v "$1" >/dev/null 2>&1 || { echo "❌ '$1' 명령이 필요합니다." >&2; exit 1; }
+}
+
+require_file() {
+  [[ -f "$1" ]] || { echo "❌ 필요한 파일이 없습니다: $1" >&2; exit 1; }
+}
+
+compose_proxy() {
+  docker compose --project-name pkpkdupr --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" -f docker-compose.proxy.yml "$@"
+}
+
+compose_certificate() {
+  docker compose --project-name pkelo-certificate --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo-certificate.yml "$@"
+}
+
+compose_primary() {
+  docker compose --project-name pkpkdupr --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" -f docker-compose.yml -f docker-compose.pkpkdupr-gateway.yml "$@"
+}
+
+compose_pkelo() {
+  docker compose --project-name pkelo --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
 }
 
 require_command docker
-
 docker compose version >/dev/null
+require_file "${SHARED_ENV_FILE}"
+require_file "${PRIMARY_ENV_FILE}"
+require_file "${PKELO_ENV_FILE}"
 
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
+echo "🧹 앱 컨테이너·orphan만 정리합니다. named volume, data, 이미지는 유지됩니다."
 
-echo "ℹ️ 소스 repo 루트: ${SOURCE_REPO_ROOT}"
-echo "ℹ️ 배포 루트: ${DEPLOY_ROOT}"
-echo "🧹 안전 청소를 시작합니다."
-echo "   - 프로젝트 컨테이너 및 orphan 컨테이너만 정리"
-echo "   - named volume, data 디렉터리, 이미지 tag는 유지"
+compose_primary down --remove-orphans
+compose_pkelo down --remove-orphans
+compose_certificate down --remove-orphans
+compose_proxy down --remove-orphans
 
-if [[ -f "${DEPLOY_ROOT}/.env" ]]; then
-  docker compose --env-file "${DEPLOY_ROOT}/.env" down --remove-orphans
-else
-  docker compose down --remove-orphans
-fi
-
-echo "📦 현재 compose 상태"
-if [[ -f "${DEPLOY_ROOT}/.env" ]]; then
-  docker compose --env-file "${DEPLOY_ROOT}/.env" ps --all || true
-else
-  docker compose ps --all || true
-fi
-
+echo "📦 현재 컨테이너 상태"
+compose_primary ps --all || true
+compose_pkelo ps --all || true
+compose_proxy ps --all || true
 echo "✅ 안전 청소가 완료되었습니다."

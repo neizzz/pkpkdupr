@@ -9,6 +9,7 @@ export interface JwtPayload {
     isAdmin?: boolean;
     rememberMe?: boolean;
     passwordFingerprint?: string;
+    authProvider?: "password" | "kakao" | "kakao-mock";
 }
 
 export const createAccessToken = (

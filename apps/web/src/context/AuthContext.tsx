@@ -14,6 +14,7 @@ export interface PlayerInfo {
   affiliations?: PlayerAffiliation[];
   statusMessage?: string;
   statusMessageBackgroundColor?: string;
+  authProvider?: "password" | "kakao" | "kakao-mock";
 }
 
 interface AuthContextType {
@@ -26,6 +27,10 @@ interface AuthContextType {
     username: string,
     password: string,
     rememberMe?: boolean,
+  ) => Promise<void>;
+  loginWithAccessToken: (
+    accessToken: string,
+    isFirstLogin?: boolean,
   ) => Promise<void>;
   changePassword: (
     currentPassword: string | undefined,
@@ -181,6 +186,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return null;
   };
 
+  const loginWithAccessToken = async (
+    accessToken: string,
+    isFirstLogin?: boolean,
+  ) => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    setToken(accessToken);
+    setRequiresPasswordChange(shouldRequirePasswordChange(isFirstLogin));
+    setIsLoading(true);
+    await fetchMe(accessToken);
+    setIsLoading(false);
+  };
+
   const login = async (
     username: string,
     password: string,
@@ -202,12 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(errorData.error || "로그인 실패");
     }
     const data = (await res.json()) as LoginResponse;
-    localStorage.setItem(TOKEN_STORAGE_KEY, data.accessToken);
-    setToken(data.accessToken);
-    setRequiresPasswordChange(shouldRequirePasswordChange(data.isFirstLogin));
-    setIsLoading(true);
-    await fetchMe(data.accessToken);
-    setIsLoading(false);
+    await loginWithAccessToken(data.accessToken, data.isFirstLogin);
   };
 
   const changePassword = async (
@@ -343,6 +355,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         isAuthenticated: !!token,
         requiresPasswordChange,
         login,
+        loginWithAccessToken,
         changePassword,
         updateProfile,
         uploadAvatar,

@@ -2,12 +2,18 @@
 
 const DEFAULT_TIMEOUT_MS = 5000;
 
-const webUrlFromEnv =
+const pkpkduprWebUrl =
   process.env.PKPKDUPR_WEB_URL?.trim() ||
   process.env.PKPKDUPR_SERVER_URL?.trim();
-const adminStackUrlFromEnv =
+const pkpkduprAdminStackUrl =
   process.env.PKPKDUPR_ADMIN_STACK_URL?.trim() ||
   process.env.PKPKDUPR_SERVER_URL?.trim();
+const pkeloWebUrl = process.env.PKELO_WEB_URL?.trim();
+const pkeloAdminStackUrl = process.env.PKELO_ADMIN_STACK_URL?.trim();
+const requestedApps = (process.env.HEALTHCHECK_APPS?.trim() || "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
 const timeoutMs = Number.parseInt(
   process.env.HEALTHCHECK_TIMEOUT_MS ?? `${DEFAULT_TIMEOUT_MS}`,
   10,
@@ -18,9 +24,39 @@ const fail = (message) => {
   process.exitCode = 1;
 };
 
-if (!webUrlFromEnv || !adminStackUrlFromEnv) {
+const requestedAppSet = new Set(
+  requestedApps.length > 0
+    ? requestedApps.includes("all")
+      ? ["pkpkdupr", "pkelo"]
+      : requestedApps
+    : pkeloWebUrl || pkeloAdminStackUrl
+      ? ["pkpkdupr", "pkelo"]
+      : ["pkpkdupr"],
+);
+
+for (const appName of requestedAppSet) {
+  if (appName !== "pkpkdupr" && appName !== "pkelo") {
+    fail("HEALTHCHECK_APPS는 pkpkdupr, pkelo, all만 허용합니다.");
+    process.exit();
+  }
+}
+
+if (
+  requestedAppSet.has("pkpkdupr") &&
+  (!pkpkduprWebUrl || !pkpkduprAdminStackUrl)
+) {
   fail(
     "PKPKDUPR_WEB_URL 및 PKPKDUPR_ADMIN_STACK_URL 환경변수가 필요합니다.",
+  );
+  process.exit();
+}
+
+if (
+  requestedAppSet.has("pkelo") &&
+  (!pkeloWebUrl || !pkeloAdminStackUrl)
+) {
+  fail(
+    "pkelo.app 검증에는 PKELO_WEB_URL과 PKELO_ADMIN_STACK_URL을 함께 설정해야 합니다.",
   );
   process.exit();
 }
@@ -151,35 +187,64 @@ const checks = [
   },
 ];
 
+const buildAppTargets = () => {
+  const targets = [];
+
+  if (requestedAppSet.has("pkpkdupr")) {
+    targets.push({
+      name: "PkpkDupr",
+      webBaseUrl: normalizeBaseUrl(pkpkduprWebUrl),
+      adminStackBaseUrl: normalizeBaseUrl(pkpkduprAdminStackUrl),
+    });
+  }
+
+  if (requestedAppSet.has("pkelo")) {
+    targets.push({
+      name: "pkelo.app",
+      webBaseUrl: normalizeBaseUrl(pkeloWebUrl),
+      adminStackBaseUrl: normalizeBaseUrl(pkeloAdminStackUrl),
+    });
+  }
+
+  return targets;
+};
+
 const run = async () => {
-  let baseUrl;
-  let webBaseUrl;
-  let adminStackBaseUrl;
+  let appTargets;
   try {
-    webBaseUrl = normalizeBaseUrl(webUrlFromEnv);
-    adminStackBaseUrl = normalizeBaseUrl(adminStackUrlFromEnv);
+    appTargets = buildAppTargets();
   } catch (error) {
     throw new Error(
       `healthy check URL이 올바르지 않습니다: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
-  console.log(`🔎 PkpkDupr healthy check: web=${webBaseUrl}, admin=${adminStackBaseUrl}`);
   console.log(`⏱️  Timeout: ${timeoutMs}ms`);
 
-  for (const check of checks) {
-    const baseUrl = check.target === "web" ? webBaseUrl : adminStackBaseUrl;
-    const url = resolveUrl(baseUrl, check.path);
-    const startedAt = Date.now();
+  for (const appTarget of appTargets) {
+    console.log(
+      `🔎 ${appTarget.name} healthy check: web=${appTarget.webBaseUrl}, admin=${appTarget.adminStackBaseUrl}`,
+    );
 
-    try {
-      const response = await fetchWithTimeout(url, { method: "GET" });
-      await check.verify(response);
-      console.log(`✅ ${check.name} (${check.path}) - ${Date.now() - startedAt}ms`);
-    } catch (error) {
-      throw new Error(
-        `${check.name} (${url}) 실패: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    for (const check of checks) {
+      const baseUrl =
+        check.target === "web"
+          ? appTarget.webBaseUrl
+          : appTarget.adminStackBaseUrl;
+      const url = resolveUrl(baseUrl, check.path);
+      const startedAt = Date.now();
+
+      try {
+        const response = await fetchWithTimeout(url, { method: "GET" });
+        await check.verify(response);
+        console.log(
+          `✅ ${appTarget.name} ${check.name} (${check.path}) - ${Date.now() - startedAt}ms`,
+        );
+      } catch (error) {
+        throw new Error(
+          `${appTarget.name} ${check.name} (${url}) 실패: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
   }
 

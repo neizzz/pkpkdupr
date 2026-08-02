@@ -1,0 +1,29 @@
+services:
+  pkelo-web:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkelo-web
+
+  pkelo-admin-web:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkelo-admin-web
+
+  pkelo-api:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkelo-api
+
+  pkelo-adminer:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkelo-adminer
+
+networks:
+  pkpkdupr-gateway:
+    external: true
+    name: ${GATEWAY_NETWORK:-pkpkdupr-gateway}

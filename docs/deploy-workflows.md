@@ -1,81 +1,84 @@
-# 배포 workflow 정리
+# 두 도메인 배포 운영
 
-PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/푸시** 후 **서버에서 `scripts/manual-deploy.sh` 실행**하는 방식입니다.
+한 SWAG 인그레스에서 `pkpkdupr.duckdns.org`와 `pkelo.app`을 동시에 운영합니다.
+두 앱은 web 이미지는 공유하지만 API, MySQL, 업로드 경로, JWT, 관리자 계정 및 인증서 발급 자격증명을 공유하지 않습니다.
 
-## 1. `build-and-push-images`
+## 운영 환경파일
 
-파일: `/Users/neiz/pkpkdupr/.github/workflows/deploy.yml`
-
-- 목적: GHCR에 배포용 이미지를 빌드하고 푸시합니다.
-- 수행 범위:
-  - web/admin-web/api/db-server 이미지 빌드
-  - GHCR push
-  - 배포 후 서버 실행용 `scripts/manual-deploy.sh` 기준 수동 반영 절차와 검증 URL summary 출력
-- 수행하지 않는 것:
-  - GitHub Actions runner에서 서버로 SSH 접속
-  - `ssh-keyscan`
-  - `scp`
-  - 원격 `update-server.sh` 실행
-
-### 필요한 설정
-
-- `PUBLIC_DOMAIN` 또는 `DEPLOY_HOST` 중 하나
-  - web 이미지의 `VITE_API_BASE_URL` 빌드 값 계산에 필요
-- `DEPLOY_PORT` (선택, 기본값 `22`)
-
-## 현재 운영 원칙
-
-- GitHub Actions 안에서는 더 이상 `DEPLOY_SSH_KEY` 기반 자동 원격 반영을 수행하지 않습니다.
-- 서버 반영은 사람이 로컬 SSH 환경에서 직접 수행합니다.
-- 서버 접속 후 실제 배포 반영은 `scripts/manual-deploy.sh` 가 담당합니다.
-- 추후 자동화가 필요하면 SSH secret 복구가 아니라 별도 self-hosted runner 또는 서버 pull 기반 구조로 다시 설계합니다.
-
-## 현재 운영 구조와 확인 경로
-
-- 기본 웹은 `https://<DOMAIN>/`에서 제공됩니다.
-- 관리/운영 스택은 `https://<DOMAIN>:3333` 포트에서 제공합니다.
-  - Admin: `/admin/`
-  - API health: `/api/health`
-  - API ping: `/api/ping`
-  - Adminer (read-only viewer): `/db/`
-- 현재 저장소에는 별도 모니터링 서비스를 포함하지 않습니다. 모니터링은 New Relic 도입 시 별도로 구성합니다.
-
-## 서버에서 실행하는 배포 스크립트
-
-파일: `/Users/neiz/pkpkdupr/scripts/manual-deploy.sh`
-
-- 목적: SSH로 서버에 접속한 뒤, 기존 `.env`를 그대로 사용해 `update-server.sh`를 실행합니다.
-- 기본 동작:
-  - `/opt/pkpkdupr/.env` 파일이 이미 존재하는지 확인
-  - 필요 시 GHCR 로그인 정보 export 후 `scripts/update-server.sh <image_tag>` 실행
-  - 기존 `.env`는 수정하지 않음
-
-최초 설치 또는 인증서/SWAG 설정 생성·복구가 필요한 경우에는 일반 배포 전에
-`scripts/install-server.sh`를 실행합니다. `.env` 값 자체의 변경은 서버에서 별도로
-관리해야 합니다.
-
-서버 반영 순서:
+운영 서버의 `/opt/pkpkdupr/env/`에 다음 세 파일을 생성합니다. 설치·업데이트 스크립트는 이 파일들을 생성하거나 수정하지 않습니다.
 
 ```bash
-ssh -p <DEPLOY_PORT> <DEPLOY_USER>@<DEPLOY_HOST>
 cd /opt/pkpkdupr
-chmod +x scripts/manual-deploy.sh scripts/update-server.sh
-# 최초 SQLite -> MySQL 전환 시 (API/DB 쓰기를 잠시 중단)
-bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --migrate-sqlite
-
-# 이관 완료 이후 일반 배포
-bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG>
+mkdir -p env
+cp env/shared.env.example env/shared.env
+cp env/pkpkdupr.env.example env/pkpkdupr.env
+cp env/pkelo.env.example env/pkelo.env
+chmod 600 env/*.env
 ```
 
-배포 스크립트는 web, admin-web, api, MySQL, db-server, Adminer를 기동하고
-위 운영 스택 URL을 확인합니다.
+| 파일 | 소유 설정 |
+| --- | --- |
+| `shared.env` | 이미지 태그, 외부 포트, 공용 게이트웨이 네트워크, SWAG 런타임 계정 |
+| `pkpkdupr.env` | 기존 DuckDNS 앱의 도메인·DuckDNS 토큰·JWT·관리자·MySQL·업로드 경로와 `USER_AUTH_PROVIDER=password` |
+| `pkelo.env` | `pkelo.app`의 도메인·Cloudflare 토큰·JWT·관리자·MySQL·업로드 경로와 Kakao OAuth 시크릿 |
 
-기존 SQLite 데이터가 있으면 새 MySQL 스택을 서비스하기 전에
-`scripts/migrate-sqlite-to-mysql.sh`를 실행해 백업·이관·검증을 완료해야 합니다.
+두 앱 파일은 모두 같은 일반 변수명(`DOMAIN`, `JWT_SECRET`, `MYSQL_*`, `API_ADMIN_*`, `CORS_ADDITIONAL_ORIGINS`)을 사용합니다. `pkelo`용 접두사 변수는 사용하지 않습니다. 두 `JWT_SECRET`은 반드시 서로 달라야 합니다.
 
-예시:
+## PKELO Kakao 로그인
+
+`pkelo.env`에는 아래 값을 반드시 설정합니다. 이 값은 `pkelo-api` 컨테이너에만 전달되며 기존 `pkpkdupr` API나 Compose 렌더링에는 포함되지 않습니다.
+
+```dotenv
+USER_AUTH_PROVIDER=kakao
+KAKAO_REST_API_KEY=<Kakao REST API 키>
+KAKAO_CLIENT_SECRET=<Kakao client secret>
+KAKAO_REDIRECT_URI=https://pkelo.app/auth/kakao/callback
+KAKAO_WEB_ORIGIN=https://pkelo.app
+```
+
+Kakao Developers 콘솔에는 `https://pkelo.app/auth/kakao/callback`을 Redirect URI로 정확히 등록합니다. 일반 사용자는 Kakao 로그인만 사용하며 첫 로그인 뒤 PKELO 사용자명과 성별을 한 번 입력합니다. 관리자는 계속 `https://pkelo.app:3333/admin/`에서 별도 아이디·비밀번호로 로그인합니다.
+
+로컬은 `pnpm dev:pkelo`을 사용하면 `USER_AUTH_PROVIDER=kakao-mock` 기본값으로 외부 Kakao 호출 없이 같은 state·callback·onboarding 흐름을 검증합니다. 운영 env에서 `kakao-mock`은 설치·업데이트 단계와 API 시작 단계에서 모두 거부됩니다.
+
+기존 서버 전환 시에는 기존 `/opt/pkpkdupr/.env`의 `DOMAIN`, DuckDNS 토큰, JWT, 관리자, `MYSQL_*` 값을 `pkpkdupr.env`로 그대로 옮깁니다. 특히 기존 `MYSQL_*`와 `APP_DATA_PATH=/opt/pkpkdupr/data`를 바꾸지 않아야 기존 `pkpkdupr_mysql-data` 볼륨과 업로드가 유지됩니다. 기존 `.env`는 확인이 끝날 때까지 보관합니다.
+
+## Compose와 인증서
+
+- `docker-compose.proxy.yml`: 외부 `443`, `3333`을 바인딩하는 DuckDNS SWAG와 공용 `pkpkdupr-gateway` 네트워크를 생성합니다.
+- `docker-compose.pkelo-certificate.yml`: 포트를 열지 않는 Cloudflare DNS-01 SWAG입니다. `pkelo.app` 인증서를 `/opt/pkpkdupr/data/pkelo-certs`에 갱신합니다.
+- `docker-compose.yml` + `docker-compose.pkpkdupr-gateway.yml`: 기존 서비스명과 `mysql-data` 볼륨을 유지하는 기본 앱입니다. 프록시에는 `pkpkdupr-web`, `pkpkdupr-api` 등의 고유 별칭으로 연결됩니다.
+- `docker-compose.pkelo.yml` + `docker-compose.pkelo-gateway.yml`: 새 MySQL 볼륨과 `data/uploads/pkelo/avatars`를 쓰는 `pkelo` 전용 앱입니다.
+
+주 SWAG 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`에 생성됩니다. `pkelo.app` SNI는 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`를 통해 읽기 전용으로 공유한 Cloudflare 인증서를 사용합니다. DuckDNS와 Cloudflare credential 파일만 스크립트가 `600` 권한으로 동기화합니다.
+
+## 설치·업데이트·롤백
 
 ```bash
-bash scripts/manual-deploy.sh \
-  --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe
+# 최초 설치 또는 인증서/SWAG 설정 복구: 두 앱을 함께 초기화
+bash scripts/install-server.sh
+
+# 이미지 배포: 기본값은 두 앱
+bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG>
+
+# 한 앱만 독립 배포·롤백
+bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkpkdupr
+bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkelo
 ```
+
+`--stack`은 대상 앱 컨테이너만 pull/recreate합니다. 공용 SWAG와 인증서 컨테이너는 기동·설정 갱신될 수 있지만 다른 앱의 web/API/MySQL/DB 서버는 재생성하지 않습니다. SQLite→MySQL 이관은 기존 앱에만 적용되므로 `--migrate-sqlite --stack pkelo`은 허용하지 않습니다.
+
+## 확인 경로
+
+두 도메인에서 각각 아래 경로를 확인합니다.
+
+- `https://<DOMAIN>/`
+- `https://<DOMAIN>:3333/api/health`
+- `https://<DOMAIN>:3333/api/ping`
+- `https://<DOMAIN>:3333/admin/`
+- `https://<DOMAIN>:3333/db/`
+
+`scripts/check-healthy.mjs`는 `HEALTHCHECK_APPS=pkpkdupr`, `pkelo`, `all`로 단일 또는 두 앱을 검사합니다. `/db/`는 HTML 본문에 `adminer`가 있고 `404 not found`가 없어야 통과합니다.
+
+## GitHub Actions
+
+`/Users/neiz/pkpkdupr/.github/workflows/deploy.yml`은 도메인 설정을 주입하지 않고 web/admin-web/api/db-server 이미지를 GHCR에 빌드·푸시만 합니다. 서버 반영은 운영자가 위 수동 명령으로 수행합니다.

@@ -59,6 +59,7 @@ import {
 } from "./RatingService";
 import { ScorePerformanceRatingService } from "./ScorePerformanceRatingService";
 import type { Match } from "@pkpkdupr/shared/match";
+import type { ExternalAuthProvider } from "./authConfig";
 
 const SALT_ROUNDS = 10;
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
@@ -605,6 +606,7 @@ export class AuthService {
   private createAccessTokenForPlayer(
     stored: StoredPlayerRecord,
     rememberMe = false,
+    authProvider: "password" | ExternalAuthProvider = "password",
   ): string {
     return createAccessToken(
       {
@@ -612,6 +614,7 @@ export class AuthService {
         isAdmin: stored.username === API_ADMIN_USERNAME,
         rememberMe,
         passwordFingerprint: createPasswordFingerprint(stored.passwordHash),
+        authProvider,
       },
       {
         expiresIn: rememberMe
@@ -643,16 +646,18 @@ export class AuthService {
     }
 
     const rememberMe = decoded.rememberMe === true;
+    const authProvider = decoded.authProvider ?? "password";
     return {
       payload: {
         ...decoded,
         isAdmin: stored.username === API_ADMIN_USERNAME,
         rememberMe,
+        authProvider,
       },
       player: toPublicPlayer(stored),
       isFirstLogin: this.shouldRequirePasswordChange(stored),
       refreshedAccessToken: rememberMe
-        ? this.createAccessTokenForPlayer(stored, true)
+        ? this.createAccessTokenForPlayer(stored, true, authProvider)
         : undefined,
     };
   }
@@ -835,6 +840,75 @@ export class AuthService {
       accessToken,
       isFirstLogin: this.shouldRequirePasswordChange(stored),
       isAdmin,
+    };
+  }
+
+  async issueExternalAccessToken(
+    playerId: string,
+    provider: ExternalAuthProvider,
+  ): Promise<{ accessToken: string; isFirstLogin: boolean }> {
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+    if (stored.status === "inactive") {
+      throw new Error("비활성 계정입니다. 관리자에게 문의해주세요.");
+    }
+    return {
+      accessToken: this.createAccessTokenForPlayer(stored, true, provider),
+      isFirstLogin: this.shouldRequirePasswordChange(stored),
+    };
+  }
+
+  async registerExternalPlayer(input: {
+    registrationTicketHash: string;
+    username: string;
+    gender: "M" | "F";
+    provider: ExternalAuthProvider;
+  }): Promise<{ accessToken: string; isFirstLogin: boolean }> {
+    const username = input.username.trim();
+    if (!username || username.length > 191) {
+      throw new Error("사용자명은 1~191자여야 합니다.");
+    }
+    if (username === API_ADMIN_USERNAME) {
+      throw new Error("사용할 수 없는 사용자명입니다.");
+    }
+
+    const now = new Date();
+    const player = createPlayer({ username, gender: input.gender });
+    const passwordHash = await bcrypt.hash(
+      `${randomUUID()}-${randomUUID()}`,
+      SALT_ROUNDS,
+    );
+    let created: StoredPlayerRecord;
+    try {
+      created = hydratePlayer(
+        await this.dbRequest<any>("/internal/auth/oauth-transactions/onboarding", {
+          method: "POST",
+          body: JSON.stringify({
+            registrationHash: input.registrationTicketHash,
+            now: now.toISOString(),
+            identityId: buildId("player-auth-identity"),
+            creationLogId: buildId("player-creation-log"),
+            player: {
+              ...player,
+              passwordHash,
+              isFirstLogin: false,
+            },
+          }),
+        }),
+      );
+    } catch (error) {
+      const message = (error as Error).message;
+      if (message.includes("USERNAME_CONFLICT")) {
+        throw new Error("중복된 사용자명입니다.");
+      }
+      throw error;
+    }
+
+    return {
+      accessToken: this.createAccessTokenForPlayer(created, true, input.provider),
+      isFirstLogin: false,
     };
   }
 

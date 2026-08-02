@@ -5,12 +5,13 @@ set -euo pipefail
 DEPLOY_ROOT="${PKPKDUPR_DEPLOY_PATH:-/opt/pkpkdupr}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-ENV_FILE="${DEPLOY_ROOT}/.env"
+SHARED_ENV_FILE="${DEPLOY_ROOT}/env/shared.env"
+PRIMARY_ENV_FILE="${DEPLOY_ROOT}/env/pkpkdupr.env"
 SOURCE_DB_PATH="${PKPKDUPR_SQLITE_SOURCE_PATH:-${DEPLOY_ROOT}/data/db/db.sqlite}"
 BACKUP_DIR="${DEPLOY_ROOT}/data/backups"
 
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "❌ .env 파일이 없습니다: ${ENV_FILE}" >&2
+if [[ ! -f "${SHARED_ENV_FILE}" || ! -f "${PRIMARY_ENV_FILE}" ]]; then
+  echo "❌ 분리된 pkpkdupr 운영 env 파일이 없습니다: ${DEPLOY_ROOT}/env/" >&2
   exit 1
 fi
 if [[ ! -f "${SOURCE_DB_PATH}" ]]; then
@@ -31,32 +32,38 @@ docker compose version >/dev/null
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
 
+compose_primary() {
+  docker compose --project-name pkpkdupr \
+    --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" \
+    -f docker-compose.yml "$@"
+}
+
 echo "⏸️  SQLite 최종 스냅샷을 위해 API와 기존 DB 서버를 중지합니다..."
-docker compose --env-file "${ENV_FILE}" stop api db-server || true
+compose_primary stop api db-server || true
 
 mkdir -p "${BACKUP_DIR}"
 BACKUP_PATH="${BACKUP_DIR}/db.sqlite-before-mysql-$(date +%Y%m%d%H%M%S)"
 cp -p "${SOURCE_DB_PATH}" "${BACKUP_PATH}"
 echo "✅ SQLite 백업 생성: ${BACKUP_PATH}"
 
-docker compose --env-file "${ENV_FILE}" pull mysql db-server
-docker compose --env-file "${ENV_FILE}" up -d mysql
+compose_primary pull mysql db-server
+compose_primary up -d mysql
 
 for _ in $(seq 1 60); do
-  if docker compose --env-file "${ENV_FILE}" exec -T mysql sh -ec \
+  if compose_primary exec -T mysql sh -ec \
     'mysqladmin ping -h localhost -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent' >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-if ! docker compose --env-file "${ENV_FILE}" exec -T mysql sh -ec \
+if ! compose_primary exec -T mysql sh -ec \
   'mysqladmin ping -h localhost -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent' >/dev/null 2>&1; then
   echo "❌ MySQL 준비 시간이 초과되었습니다." >&2
   exit 1
 fi
 
-docker compose --env-file "${ENV_FILE}" run --rm --no-deps \
+compose_primary run --rm --no-deps \
   -v "${BACKUP_PATH}:/legacy/db.sqlite:ro" \
   -e SQLITE_SOURCE_URL=file:/legacy/db.sqlite \
   db-server pnpm --filter @pkpkdupr/db-server exec tsx src/db/importSqlite.ts

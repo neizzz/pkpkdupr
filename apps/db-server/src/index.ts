@@ -31,6 +31,7 @@ import {
   type CreateMatchInput,
   type UpdateMatchMetadataInput,
 } from "./repositories/MatchRepository";
+import { AuthRepository } from "./repositories/AuthRepository";
 import {
   getDevMockUsernames,
   isDevMockDataEnabled,
@@ -48,6 +49,7 @@ const playerRatingChangeLogRepository = new PlayerRatingChangeLogRepository(db);
 const officialDuprAdjustmentLogRepository =
   new OfficialDuprAdjustmentLogRepository(db);
 const matchRepository = new MatchRepository(db, client);
+const authRepository = new AuthRepository(client);
 const testDataRepository = new TestDataRepository(
   db,
   client,
@@ -121,6 +123,65 @@ app.post("/internal/players/init-admin", async (req, res) => {
     res.json(player);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/oauth-transactions", async (req, res) => {
+  try {
+    const transaction = await authRepository.createOAuthTransaction({
+      ...req.body,
+      expiresAt: new Date(req.body.expiresAt),
+      createdAt: new Date(req.body.createdAt),
+    });
+    res.json(transaction);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/oauth-transactions/callback", async (req, res) => {
+  try {
+    const transaction = await authRepository.completeOAuthCallback({
+      ...req.body,
+      now: new Date(req.body.now),
+      expiresAt: new Date(req.body.expiresAt),
+    });
+    res.json(transaction);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/oauth-transactions/handoff", async (req, res) => {
+  try {
+    res.json(
+      await authRepository.consumeOAuthHandoff({
+        ...req.body,
+        now: new Date(req.body.now),
+      }),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/oauth-transactions/onboarding", async (req, res) => {
+  try {
+    const player = req.body.player;
+    res.json(
+      await authRepository.completeOAuthOnboarding({
+        ...req.body,
+        now: new Date(req.body.now),
+        player: {
+          ...player,
+          createdAt: new Date(player.createdAt),
+          updatedAt: new Date(player.updatedAt),
+        },
+      }),
+    );
+  } catch (error) {
+    const message = (error as Error).message;
+    res.status(message === "USERNAME_CONFLICT" ? 409 : 400).json({ error: message });
   }
 });
 

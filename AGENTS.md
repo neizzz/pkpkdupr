@@ -76,11 +76,13 @@ PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333
 ## 운영과 배포
 
 - GitHub Actions는 GHCR 이미지 빌드/푸시까지만 담당합니다. 서버 반영은 SSH 환경에서 `scripts/manual-deploy.sh --image-tag <tag>`로 실행합니다.
-- 운영 proxy는 SWAG이며, 템플릿 원본은 `infra/swag/site-confs/default.conf.template`입니다.
-- 운영 경로:
+- 운영 proxy는 하나의 SWAG이며, 템플릿 원본은 `infra/swag/site-confs/default.conf.template`입니다.
+- 운영 env는 `/opt/pkpkdupr/env/shared.env`, `pkpkdupr.env`, `pkelo.env`로 분리합니다. 두 앱 env는 각각 일반적인 `DOMAIN`, `JWT_SECRET`, `MYSQL_*`, `API_ADMIN_*` 이름을 사용하며 서로의 시크릿을 공유하지 않습니다.
+- `pkpkdupr.env`의 `DOMAIN`(기본 `pkpkdupr.duckdns.org`)은 기존 데이터·MySQL 볼륨을 유지하고, `pkelo.env`의 `DOMAIN`(기본 `pkelo.app`)은 별도 API/MySQL/업로드/JWT/관리자 계정을 가진 빈 앱 스택입니다.
+- 두 도메인의 운영 경로는 동일합니다.
   - Web: `https://<DOMAIN>/`
   - Admin/API/운영 도구: `https://<DOMAIN>:3333/{admin/,api/health,api/ping,db/}` (`/db/`는 Adminer)
-- 실제 서버 SWAG 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`이며, 배포 스크립트가 템플릿에서 생성합니다.
+- 주 SWAG는 DuckDNS DNS-01을, `pkelo-certificate`는 Cloudflare DNS-01 인증서를 갱신합니다. 실제 서버 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`와 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`이며 배포 스크립트가 생성합니다.
 - `/db/` Adminer는 HTML 응답이므로 상태 코드뿐 아니라 기대 텍스트와 `404 not found` 여부를 함께 확인합니다.
 
 ## 작업 및 커밋 규칙

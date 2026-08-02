@@ -10,6 +10,20 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
 import Login from "./pages/Login";
+import PkeloKakaoCallback from "./pages/PkeloKakaoCallback";
+import PkeloKakaoOnboarding from "./pages/PkeloKakaoOnboarding";
+import PkeloLogin from "./pages/PkeloLogin";
+
+const isPkeloAppHost = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return (
+    window.location.hostname === "pkelo.app" ||
+    (import.meta.env.DEV && window.location.hostname === "pkelo.localhost")
+  );
+};
 
 const KEYBOARD_INPUT_TYPES = new Set([
   "text",
@@ -54,6 +68,7 @@ const isKeyboardInputElement = (
 function AppRoutes() {
   const { isAuthenticated, isLoading, requiresPasswordChange } = useAuth();
   const authenticatedHome = requiresPasswordChange ? "/force-change-password" : "/";
+  const LoginPage = isPkeloAppHost() ? PkeloLogin : Login;
 
   if (isLoading) {
     return (
@@ -101,7 +116,27 @@ function AppRoutes() {
       <Route
         path="/login"
         element={
-          isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <Login />
+          isAuthenticated ? <Navigate to={authenticatedHome} replace /> : <LoginPage />
+        }
+      />
+      <Route
+        path="/login/kakao/callback"
+        element={
+          isPkeloAppHost() && !isAuthenticated ? (
+            <PkeloKakaoCallback />
+          ) : (
+            <Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />
+          )
+        }
+      />
+      <Route
+        path="/login/kakao/onboarding"
+        element={
+          isPkeloAppHost() && !isAuthenticated ? (
+            <PkeloKakaoOnboarding />
+          ) : (
+            <Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />
+          )
         }
       />
       <Route

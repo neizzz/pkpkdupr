@@ -132,6 +132,36 @@ const migrations = [
     id: "0000_mysql_initial_schema",
     statements: initialSchemaStatements,
   },
+  {
+    id: "0003_auth_identities_and_oauth_transactions",
+    statements: [
+      `CREATE TABLE player_auth_identities (
+        id VARCHAR(255) PRIMARY KEY,
+        player_id VARCHAR(255) NOT NULL,
+        provider VARCHAR(32) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY player_auth_identities_provider_subject_unique (provider, subject),
+        UNIQUE KEY player_auth_identities_player_provider_unique (player_id, provider)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE oauth_login_transactions (
+        id VARCHAR(255) PRIMARY KEY,
+        provider VARCHAR(32) NOT NULL,
+        state_hash VARCHAR(128) NOT NULL,
+        handoff_hash VARCHAR(128) NULL,
+        registration_hash VARCHAR(128) NULL,
+        provider_subject VARCHAR(255) NULL,
+        expires_at BIGINT NOT NULL,
+        state_consumed_at BIGINT NULL,
+        handoff_consumed_at BIGINT NULL,
+        registration_consumed_at BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY oauth_login_transactions_state_hash_unique (state_hash),
+        UNIQUE KEY oauth_login_transactions_handoff_hash_unique (handoff_hash),
+        UNIQUE KEY oauth_login_transactions_registration_hash_unique (registration_hash)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

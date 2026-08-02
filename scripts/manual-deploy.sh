@@ -7,7 +7,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 
 ROOT_DIR="${SOURCE_REPO_ROOT}"
-ENV_FILE="${DEPLOY_ROOT}/.env"
+ENV_DIR="${DEPLOY_ROOT}/env"
+SHARED_ENV_FILE="${ENV_DIR}/shared.env"
+PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
+PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
 UPDATE_SERVER_SCRIPT="${SOURCE_REPO_ROOT}/scripts/update-server.sh"
 MIGRATE_SQLITE_SCRIPT="${SOURCE_REPO_ROOT}/scripts/migrate-sqlite-to-mysql.sh"
 
@@ -15,13 +18,14 @@ IMAGE_TAG=""
 GHCR_USERNAME_ARG=""
 GHCR_TOKEN_ARG=""
 MIGRATE_SQLITE=false
+TARGET_STACK="all"
 
 usage() {
   cat <<'EOF'
 usage: bash scripts/manual-deploy.sh --image-tag <tag> [options]
 
 서버에 SSH 로그인한 뒤, 배포 서버에서 실행하세요.
-이 스크립트는 기존 .env를 수정하지 않고,
+이 스크립트는 분리된 env 파일을 수정하지 않고,
 필요 시 GHCR 로그인 정보만 export한 뒤 update-server.sh를 실행합니다.
 
 필수:
@@ -31,6 +35,7 @@ usage: bash scripts/manual-deploy.sh --image-tag <tag> [options]
   --ghcr-username <value>         update-server.sh용 GHCR_USERNAME export
   --ghcr-token <value>            update-server.sh용 GHCR_TOKEN export
   --migrate-sqlite                SQLite 백업·MySQL 이관 검증 후 배포
+  --stack <pkpkdupr|pkelo|all>    배포할 앱 스택 (기본: all)
   -h, --help                      도움말 출력
 
 예시:
@@ -70,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       MIGRATE_SQLITE=true
       shift
       ;;
+    --stack)
+      TARGET_STACK="${2:-}"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -89,10 +98,24 @@ if [[ -z "${IMAGE_TAG}" ]]; then
 fi
 
 require_file "${UPDATE_SERVER_SCRIPT}"
-require_file "${ENV_FILE}"
+require_file "${SHARED_ENV_FILE}"
+require_file "${PRIMARY_ENV_FILE}"
+require_file "${PKELO_ENV_FILE}"
 if [[ "${MIGRATE_SQLITE}" == true ]]; then
   require_file "${MIGRATE_SQLITE_SCRIPT}"
+  if [[ "${TARGET_STACK}" == "pkelo" ]]; then
+    echo "❌ --migrate-sqlite는 pkelo 단독 배포에 사용할 수 없습니다." >&2
+    exit 1
+  fi
 fi
+
+case "${TARGET_STACK}" in
+  pkpkdupr|pkelo|all) ;;
+  *)
+    echo "❌ --stack은 pkpkdupr, pkelo, all 중 하나여야 합니다." >&2
+    exit 1
+    ;;
+esac
 
 cd "${SOURCE_REPO_ROOT}"
 
@@ -117,6 +140,7 @@ fi
 
 echo "🚀 서버 배포 스크립트를 실행합니다."
 echo "   - IMAGE_TAG=${IMAGE_TAG}"
-echo "   - ENV_FILE=${ENV_FILE}"
+echo "   - TARGET_STACK=${TARGET_STACK}"
+echo "   - ENV_DIR=${ENV_DIR}"
 
-bash "${UPDATE_SERVER_SCRIPT}" "${IMAGE_TAG}"
+bash "${UPDATE_SERVER_SCRIPT}" "${IMAGE_TAG}" "${TARGET_STACK}"

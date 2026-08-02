@@ -1,0 +1,29 @@
+services:
+  web:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkpkdupr-web
+
+  admin-web:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkpkdupr-admin-web
+
+  api:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkpkdupr-api
+
+  adminer:
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkpkdupr-adminer
+
+networks:
+  pkpkdupr-gateway:
+    external: true
+    name: ${GATEWAY_NETWORK:-pkpkdupr-gateway}

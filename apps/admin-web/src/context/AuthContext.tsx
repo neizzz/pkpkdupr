@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const login = async (username: string, password: string) => {
-    const res = await fetch("/api/login", {
+    const res = await fetch("/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password, rememberMe: true }),

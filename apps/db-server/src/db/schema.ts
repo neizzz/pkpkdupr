@@ -45,6 +45,53 @@ export const players = mysqlTable("players", {
   updatedAt: unixTimestamp("updated_at").notNull(),
 });
 
+export const playerAuthIdentities = mysqlTable(
+  "player_auth_identities",
+  {
+    id: id("id").primaryKey(),
+    playerId: id("player_id").notNull(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    subject: varchar("subject", { length: 255 }).notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+  },
+  (table) => ({
+    providerSubjectUnique: uniqueIndex(
+      "player_auth_identities_provider_subject_unique",
+    ).on(table.provider, table.subject),
+    playerProviderUnique: uniqueIndex(
+      "player_auth_identities_player_provider_unique",
+    ).on(table.playerId, table.provider),
+  }),
+);
+
+export const oauthLoginTransactions = mysqlTable(
+  "oauth_login_transactions",
+  {
+    id: id("id").primaryKey(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    stateHash: varchar("state_hash", { length: 128 }).notNull(),
+    handoffHash: varchar("handoff_hash", { length: 128 }),
+    registrationHash: varchar("registration_hash", { length: 128 }),
+    providerSubject: varchar("provider_subject", { length: 255 }),
+    expiresAt: unixTimestamp("expires_at").notNull(),
+    stateConsumedAt: unixTimestamp("state_consumed_at"),
+    handoffConsumedAt: unixTimestamp("handoff_consumed_at"),
+    registrationConsumedAt: unixTimestamp("registration_consumed_at"),
+    createdAt: unixTimestamp("created_at").notNull(),
+  },
+  (table) => ({
+    stateHashUnique: uniqueIndex("oauth_login_transactions_state_hash_unique").on(
+      table.stateHash,
+    ),
+    handoffHashUnique: uniqueIndex(
+      "oauth_login_transactions_handoff_hash_unique",
+    ).on(table.handoffHash),
+    registrationHashUnique: uniqueIndex(
+      "oauth_login_transactions_registration_hash_unique",
+    ).on(table.registrationHash),
+  }),
+);
+
 export const playerCreationLogs = mysqlTable("player_creation_logs", {
   id: id("id").primaryKey(),
   playerId: id("player_id").notNull(),

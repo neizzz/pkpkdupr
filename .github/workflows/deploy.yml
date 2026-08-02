@@ -45,19 +45,6 @@ jobs:
           else
             echo "DEPLOY_PORT=22" >> "$GITHUB_ENV"
           fi
-          if [ -n "${{ secrets.PUBLIC_DOMAIN }}" ]; then
-            echo "TARGET_DOMAIN=${{ secrets.PUBLIC_DOMAIN }}" >> "$GITHUB_ENV"
-          else
-            echo "TARGET_DOMAIN=${{ secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
-          fi
-
-      - name: Validate domain settings for image build
-        run: |
-          if [ -z "${TARGET_DOMAIN}" ]; then
-            echo "PUBLIC_DOMAIN 또는 DEPLOY_HOST secret 중 하나는 필요합니다." >&2
-            echo "web 이미지는 VITE_API_BASE_URL 빌드 값이 필요하므로, 수동 반영만 하더라도 대상 domain/host 설정이 있어야 합니다." >&2
-            exit 1
-          fi
 
       - name: Use image tag as app version
         run: |
@@ -78,7 +65,6 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           build-args: |
-            VITE_API_BASE_URL=${{ secrets.PUBLIC_DOMAIN != '' && format('https://{0}:3333', secrets.PUBLIC_DOMAIN) || secrets.DEPLOY_HOST != '' && format('https://{0}:3333', secrets.DEPLOY_HOST) || '' }}
             VITE_APP_VERSION=${{ env.APP_VERSION }}
           push: true
           tags: |
@@ -127,7 +113,7 @@ jobs:
           - Admin Web: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-admin-web:${IMAGE_TAG}\`
           - API: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-api:${IMAGE_TAG}\`
           - DB Server: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkpkdupr-db-server:${IMAGE_TAG}\`
-          - 수동 배포 대상 도메인: \`${TARGET_DOMAIN}\`
+          - 도메인 설정: 서버 \`env/pkpkdupr.env\`, \`env/pkelo.env\` 및 \`env/shared.env\`
 
           ## 수동 배포 가이드
 
@@ -152,17 +138,29 @@ jobs:
           git pull
           \`\`\`
 
-          3. \`${DEPLOY_PATH}\`에서 배포를 실행합니다.
-             - 최초 설치 시에만 \`.env.example\`을 \`.env\`로 복사하고, 실제 운영 값(도메인, DuckDNS 토큰, JWT secret, 관리자 계정, MySQL 비밀번호)을 직접 설정합니다.
-             - \`scripts/manual-deploy.sh\`는 기존 \`${DEPLOY_PATH}/.env\`를 변경하지 않습니다.
-             - 최초 설치, 인증서/SWAG 설정 생성 또는 런타임 설정 복구가 필요하면 \`scripts/install-server.sh\`를 먼저 실행합니다.
+          3. \`${DEPLOY_PATH}\`에서 서버 env와 앱 스택을 준비합니다.
+             - 이 워크플로는 서버에 SSH 접속하거나 운영 시크릿을 주입하지 않습니다. 도메인, JWT, DB 비밀번호, DNS 토큰은 서버에만 보관합니다.
+             - 기존 서버 전환 시 기존 \`.env\`의 \`DOMAIN\`, \`DUCKDNSTOKEN\`, \`JWT_SECRET\`, \`API_ADMIN_*\`, \`MYSQL_*\`를 \`env/pkpkdupr.env\`로 그대로 옮깁니다. 기존 \`MYSQL_*\`와 \`APP_DATA_PATH=/opt/pkpkdupr/data\`를 바꾸면 기존 데이터를 읽지 못할 수 있습니다.
+             - \`env/pkelo.env\`에는 새 Cloudflare DNS 토큰, 기존 앱과 다른 JWT, 별도 관리자·MySQL 비밀번호를 설정합니다.
+             - \`scripts/manual-deploy.sh\`와 \`install-server.sh\`는 운영 env 파일을 수정하지 않습니다.
 
           \`\`\`bash
           cd "${DEPLOY_PATH}"
           chmod +x scripts/install-server.sh scripts/manual-deploy.sh scripts/update-server.sh
-          [ -f .env ] || cp .env.example .env
+          mkdir -p env
+          [ -f env/shared.env ] || cp env/shared.env.example env/shared.env
+          [ -f env/pkpkdupr.env ] || cp env/pkpkdupr.env.example env/pkpkdupr.env
+          [ -f env/pkelo.env ] || cp env/pkelo.env.example env/pkelo.env
+          chmod 600 env/*.env
 
-          # 최초 설치 또는 인증서/SWAG 설정 복구가 필요한 경우
+          # 각 파일의 placeholder를 실제 값으로 편집합니다.
+          # pkpkdupr.env: 기존 DuckDNS/JWT/관리자/MySQL 값 유지
+          # pkelo.env: DOMAIN=pkelo.app, CLOUDFLARE_DNS_API_TOKEN,
+          #            새 JWT_SECRET, 별도 관리자/MySQL 값
+          # 두 JWT_SECRET은 반드시 달라야 합니다.
+          ${EDITOR:-vi} env/shared.env env/pkpkdupr.env env/pkelo.env
+
+          # 최초 설치, 인증서/SWAG 설정 생성 또는 런타임 설정 복구
           bash scripts/install-server.sh
 
           # 일반 배포: 서버에 GHCR 로그인 상태가 이미 있는 경우
@@ -173,13 +171,17 @@ jobs:
             --image-tag '${IMAGE_TAG}' \\
             --ghcr-username '<GHCR_USERNAME>' \\
             --ghcr-token '<GHCR_TOKEN>'
+
+          # 특정 앱만 배포 또는 이전 이미지 tag로 롤백
+          bash scripts/manual-deploy.sh --image-tag '${IMAGE_TAG}' --stack pkelo
+          # bash scripts/manual-deploy.sh --image-tag '<PREVIOUS_IMAGE_TAG>' --stack pkpkdupr
           \`\`\`
 
           4. 배포 후 아래 URL로 정상 동작을 확인합니다.
 
-          - Web: \`https://${TARGET_DOMAIN}/\`
-          - API health: \`https://${TARGET_DOMAIN}:3333/api/health\`
-          - API ping: \`https://${TARGET_DOMAIN}:3333/api/ping\`
-          - Admin: \`https://${TARGET_DOMAIN}:3333/admin/\`
-          - Adminer (read-only viewer): \`https://${TARGET_DOMAIN}:3333/db/\`
+          - PkpkDupr Web: \`https://<DOMAIN>/\`
+          - PKELO Web: \`https://<PKELO_DOMAIN>/\`
+          - 두 도메인 API health: \`https://<DOMAIN>:3333/api/health\`
+          - 두 도메인 Admin: \`https://<DOMAIN>:3333/admin/\`
+          - 두 도메인 Adminer (read-only viewer): \`https://<DOMAIN>:3333/db/\`
           EOF

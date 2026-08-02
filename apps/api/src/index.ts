@@ -37,6 +37,12 @@ import {
   MatchRepository,
 } from "./repositories/MatchRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
+import { KakaoAuthService } from "./services/KakaoAuthService";
+import { PasswordAuthService } from "./services/PasswordAuthService";
+import {
+  isExternalUserAuthProvider,
+  resolveUserAuthProvider,
+} from "./services/authConfig";
 import { AutoApprovalService } from "./services/AutoApprovalService";
 import { buildPlayerRatingHistory } from "./services/PlayerRatingHistoryService";
 import {
@@ -74,14 +80,30 @@ const webOrigin =
     ? `https://${domain}`
     : `https://${domain}:${webPublicPort}`;
 const adminStackOrigin = `https://${domain}:${adminStackPort}`;
+const additionalAllowedOrigins = (process.env.CORS_ADDITIONAL_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const configuredDevelopmentOrigins = (process.env.DEV_CORS_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const localDevelopmentOrigins =
+  process.env.NODE_ENV === "production"
+    ? []
+    : configuredDevelopmentOrigins.length
+      ? configuredDevelopmentOrigins
+      : [
+          "http://localhost:8080",
+          "http://127.0.0.1:8080",
+          "http://localhost:3100",
+          "http://127.0.0.1:3100",
+        ];
 const allowedOrigins = new Set([
   webOrigin,
   adminStackOrigin,
-  "https://neiz-office.fedev.kakao.com",
-  "http://localhost:8080",
-  "http://127.0.0.1:8080",
-  "http://localhost:3100",
-  "http://127.0.0.1:3100",
+  ...localDevelopmentOrigins,
+  ...additionalAllowedOrigins,
 ]);
 
 app.use(
@@ -113,6 +135,11 @@ app.get("/api/ping", (_req, res) => {
 });
 
 const authService = new AuthService();
+const passwordAuthService = new PasswordAuthService(authService);
+const userAuthProvider = resolveUserAuthProvider();
+const kakaoAuthService = isExternalUserAuthProvider(userAuthProvider)
+  ? new KakaoAuthService(userAuthProvider, authService)
+  : null;
 const matchRepository = new MatchRepository();
 const autoApprovalService = new AutoApprovalService(matchRepository, authService);
 const AUTO_APPROVAL_INTERVAL_MS = 60_000;
@@ -640,13 +667,16 @@ const requireAdmin = async (
 
 app.post("/api/register", async (req, res) => {
   try {
+    if (userAuthProvider !== "password") {
+      return res.status(404).json({ error: "Kakao 로그인을 사용해주세요." });
+    }
     const { username, password, gender } = req.body;
     if (!username || !password || !gender) {
       return res
         .status(400)
         .json({ error: "username, password, gender는 필수입니다." });
     }
-    const player = await authService.register({ username, password, gender });
+    const player = await passwordAuthService.register({ username, password, gender });
     res.json(player);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -655,13 +685,16 @@ app.post("/api/register", async (req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
+    if (userAuthProvider !== "password") {
+      return res.status(404).json({ error: "Kakao 로그인을 사용해주세요." });
+    }
     const { username, password, rememberMe } = req.body;
     if (!username || !password) {
       return res
         .status(400)
         .json({ error: "username과 password는 필수입니다." });
     }
-    const result = await authService.login(
+    const result = await passwordAuthService.login(
       username,
       password,
       rememberMe === true,
@@ -669,6 +702,86 @@ app.post("/api/login", async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/admin/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ error: "username과 password는 필수입니다." });
+    }
+    res.json(await passwordAuthService.loginAdmin(username, password));
+  } catch (err) {
+    res.status(401).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/auth/kakao/login", async (_req, res) => {
+  if (!kakaoAuthService) {
+    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
+  }
+  try {
+    const { redirectUrl } = await kakaoAuthService.start();
+    res.redirect(302, redirectUrl);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/auth/kakao/callback", async (req, res) => {
+  if (!kakaoAuthService) {
+    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
+  }
+  try {
+    const redirectUrl = await kakaoAuthService.handleCallback({
+      state: typeof req.query.state === "string" ? req.query.state : undefined,
+      code: typeof req.query.code === "string" ? req.query.code : undefined,
+      mock: req.query.mock === "1",
+    });
+    res.setHeader("Referrer-Policy", "no-referrer");
+    res.redirect(302, redirectUrl);
+  } catch {
+    res.redirect(302, `${(process.env.KAKAO_WEB_ORIGIN ?? webOrigin).replace(/\/+$/, "")}/login?error=kakao_login_failed`);
+  }
+});
+
+app.post("/api/auth/kakao/exchange", async (req, res) => {
+  if (!kakaoAuthService) {
+    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
+  }
+  try {
+    const ticket = typeof req.body.ticket === "string" ? req.body.ticket : "";
+    res.json(await kakaoAuthService.exchange(ticket));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/api/auth/kakao/onboarding", async (req, res) => {
+  if (!kakaoAuthService) {
+    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
+  }
+  try {
+    const { registrationTicket, username, gender } = req.body;
+    if (
+      typeof registrationTicket !== "string" ||
+      typeof username !== "string" ||
+      (gender !== "M" && gender !== "F")
+    ) {
+      return res.status(400).json({ error: "사용자명과 성별을 입력해주세요." });
+    }
+    res.json(
+      await kakaoAuthService.completeOnboarding({
+        registrationTicket,
+        username,
+        gender,
+      }),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
   }
 });
 
@@ -686,6 +799,7 @@ app.get("/api/me", async (req, res) => {
       ...session.player,
       isFirstLogin: session.isFirstLogin,
       isAdmin: session.payload.isAdmin === true,
+      authProvider: session.payload.authProvider ?? "password",
       accessToken: session.refreshedAccessToken,
     });
   } catch {
@@ -1664,13 +1778,16 @@ app.post("/api/change-password", async (req, res) => {
     if (!decoded) {
       return;
     }
+    if ((decoded.authProvider ?? "password") !== "password") {
+      return res.status(403).json({ error: "Kakao 계정은 비밀번호를 변경할 수 없습니다." });
+    }
     const { currentPassword, newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
       return res
         .status(400)
         .json({ error: "비밀번호는 6자 이상이어야 합니다." });
     }
-    await authService.changePassword(
+    await passwordAuthService.changePassword(
       decoded.playerId,
       typeof currentPassword === "string" ? currentPassword : undefined,
       newPassword,
@@ -2113,7 +2230,8 @@ const startAutoApprovalScheduler = () => {
 };
 
 export const startServer = async () => {
-  await authService.initAdmin();
+  kakaoAuthService?.assertConfigured();
+  await passwordAuthService.initAdmin();
   startAutoApprovalScheduler();
   return (app as any).listen(PORT, () => {
     console.log(`🚀 API Server running on http://localhost:${PORT}`);
