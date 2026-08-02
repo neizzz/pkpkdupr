@@ -1,81 +1,22 @@
-# 배포 workflow 정리
+# PkpkDupr 이미지 빌드
 
-PkpkDupr 저장소의 GitHub Actions 배포 흐름은 현재 **이미지 빌드/푸시** 후 **서버에서 `scripts/manual-deploy.sh` 실행**하는 방식입니다.
+이 브랜치는 `pkpkdupr.duckdns.org` 앱 소스만 관리합니다.
+공용 SWAG, TLS 인증서, 두 도메인 라우팅, 운영 env와 서버 배포 스크립트는 `infra` 브랜치가 소유합니다.
 
-## 1. `build-and-push-images`
+## GitHub Actions
 
-파일: `/Users/neiz/pkpkdupr/.github/workflows/deploy.yml`
+기본 `main`의 `build-app-images` workflow를 수동 실행할 때 아래 입력값을 사용합니다.
 
-- 목적: GHCR에 배포용 이미지를 빌드하고 푸시합니다.
-- 수행 범위:
-  - web/admin-web/api/db-server 이미지 빌드
-  - GHCR push
-  - 배포 후 서버 실행용 `scripts/manual-deploy.sh` 기준 수동 반영 절차와 검증 URL summary 출력
-- 수행하지 않는 것:
-  - GitHub Actions runner에서 서버로 SSH 접속
-  - `ssh-keyscan`
-  - `scp`
-  - 원격 `update-server.sh` 실행
+| 입력 | 값 |
+| --- | --- |
+| `source_ref` | `pkpkdupr` |
+| `image_tag` | `pkpkdupr-<8자리 SHA>` |
+| `api_base_url` | `https://pkpkdupr.duckdns.org:3333` |
 
-### 필요한 설정
+workflow는 GHCR 이미지만 push하며 운영 시크릿을 읽지 않습니다.
 
-- `PUBLIC_DOMAIN` 또는 `DEPLOY_HOST` 중 하나
-  - web 이미지의 `VITE_API_BASE_URL` 빌드 값 계산에 필요
-- `DEPLOY_PORT` (선택, 기본값 `22`)
-
-## 현재 운영 원칙
-
-- GitHub Actions 안에서는 더 이상 `DEPLOY_SSH_KEY` 기반 자동 원격 반영을 수행하지 않습니다.
-- 서버 반영은 사람이 로컬 SSH 환경에서 직접 수행합니다.
-- 서버 접속 후 실제 배포 반영은 `scripts/manual-deploy.sh` 가 담당합니다.
-- 추후 자동화가 필요하면 SSH secret 복구가 아니라 별도 self-hosted runner 또는 서버 pull 기반 구조로 다시 설계합니다.
-
-## 현재 운영 구조와 확인 경로
-
-- 기본 웹은 `https://<DOMAIN>/`에서 제공됩니다.
-- 관리/운영 스택은 `https://<DOMAIN>:3333` 포트에서 제공합니다.
-  - Admin: `/admin/`
-  - API health: `/api/health`
-  - API ping: `/api/ping`
-  - Adminer (read-only viewer): `/db/`
-- 현재 저장소에는 별도 모니터링 서비스를 포함하지 않습니다. 모니터링은 New Relic 도입 시 별도로 구성합니다.
-
-## 서버에서 실행하는 배포 스크립트
-
-파일: `/Users/neiz/pkpkdupr/scripts/manual-deploy.sh`
-
-- 목적: SSH로 서버에 접속한 뒤, 기존 `.env`를 그대로 사용해 `update-server.sh`를 실행합니다.
-- 기본 동작:
-  - `/opt/pkpkdupr/.env` 파일이 이미 존재하는지 확인
-  - 필요 시 GHCR 로그인 정보 export 후 `scripts/update-server.sh <image_tag>` 실행
-  - 기존 `.env`는 수정하지 않음
-
-최초 설치 또는 인증서/SWAG 설정 생성·복구가 필요한 경우에는 일반 배포 전에
-`scripts/install-server.sh`를 실행합니다. `.env` 값 자체의 변경은 서버에서 별도로
-관리해야 합니다.
-
-서버 반영 순서:
+이미지 push 뒤에는 공용 infra checkout에서 해당 태그를 사용해 PkpkDupr 스택만 반영합니다.
 
 ```bash
-ssh -p <DEPLOY_PORT> <DEPLOY_USER>@<DEPLOY_HOST>
-cd /opt/pkpkdupr
-chmod +x scripts/manual-deploy.sh scripts/update-server.sh
-# 최초 SQLite -> MySQL 전환 시 (API/DB 쓰기를 잠시 중단)
-bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --migrate-sqlite
-
-# 이관 완료 이후 일반 배포
-bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG>
-```
-
-배포 스크립트는 web, admin-web, api, MySQL, db-server, Adminer를 기동하고
-위 운영 스택 URL을 확인합니다.
-
-기존 SQLite 데이터가 있으면 새 MySQL 스택을 서비스하기 전에
-`scripts/migrate-sqlite-to-mysql.sh`를 실행해 백업·이관·검증을 완료해야 합니다.
-
-예시:
-
-```bash
-bash scripts/manual-deploy.sh \
-  --image-tag 3c966ab54d52e9df7e350b0a8ac9d94f828e37fe
+bash scripts/manual-deploy.sh --image-tag '<pkpkdupr-tag>' --stack pkpkdupr
 ```
