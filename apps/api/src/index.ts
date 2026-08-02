@@ -71,7 +71,7 @@ const avatarUploadDir = process.env.AVATAR_UPLOAD_DIR
   : defaultAvatarUploadDir;
 const PROTECTED_ADMIN_USERNAME = process.env.API_ADMIN_USERNAME || "admin";
 const INITIAL_ADMIN_CREATED_PASSWORD = "123qwe";
-const domain = process.env.DOMAIN || "pkpkdupr.duckdns.org";
+const domain = process.env.DOMAIN || "pkelo.app";
 const webPublicPort = process.env.WEB_PUBLIC_PORT || "443";
 const adminStackPort =
   process.env.ADMIN_STACK_PORT || process.env.PROXY_PORT || "3333";

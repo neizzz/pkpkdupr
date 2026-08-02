@@ -32,7 +32,7 @@ services:
       CORS_ADDITIONAL_ORIGINS: ${CORS_ADDITIONAL_ORIGINS:-}
       AVATAR_UPLOAD_DIR: /app/data/uploads/avatars
     volumes:
-      - ${APP_DATA_PATH:-${PKPKDUPR_DEPLOY_PATH:-.}/data/pkelo}/uploads/avatars:/app/data/uploads/avatars
+      - ${APP_DATA_PATH:-./data/pkelo}/uploads/avatars:/app/data/uploads/avatars
     depends_on:
       pkelo-db-server:
         condition: service_healthy

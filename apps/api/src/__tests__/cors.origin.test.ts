@@ -56,11 +56,13 @@ describe("production CORS origin isolation", () => {
       "https://pkelo.app:3333",
     );
 
-    const crossDomainResponse = await request(app)
+    const rejectedOriginResponse = await request(app)
       .get("/api/health")
-      .set("Origin", "https://pkpkdupr.duckdns.org");
-    expect(crossDomainResponse.status).toBe(500);
-    expect(crossDomainResponse.headers["access-control-allow-origin"]).toBeUndefined();
+      .set("Origin", "https://untrusted.example");
+    expect(rejectedOriginResponse.status).toBe(500);
+    expect(
+      rejectedOriginResponse.headers["access-control-allow-origin"],
+    ).toBeUndefined();
 
     const localhostResponse = await request(app)
       .get("/api/health")

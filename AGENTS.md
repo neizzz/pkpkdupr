@@ -27,7 +27,7 @@ apps/admin-web (:3100) ─┼─> apps/api (:4000) ─internal HTTP─> apps/db-
 
 ```bash
 pnpm install
-pnpm dev                         # dev mock data와 전체 워크스페이스 실행
+pnpm dev                         # PKELO dev mock data와 전체 워크스페이스 실행
 pnpm dev:web                     # Vite web :8080
 pnpm dev:api                     # API :4000
 pnpm dev:admin                   # admin Vite :3100
@@ -39,12 +39,11 @@ pnpm build:api
 pnpm build:admin
 pnpm lint
 
-pnpm dev:db                     # MySQL :3306
-pnpm dev:db-browser             # Adminer :3301
-PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333 pnpm check:healthy
+pnpm dev:db                      # PKELO MySQL :3307
+pnpm dev:db-browser              # PKELO Adminer :3302
 ```
 
-- 루트 `pnpm dev`는 Docker MySQL을 준비한 뒤 `ENABLE_DEV_MOCK_DATA=true`와 `DB_HOST=127.0.0.1`을 사용합니다.
+- 루트 `pnpm dev`는 PKELO Docker MySQL을 준비한 뒤 `ENABLE_DEV_MOCK_DATA=true`와 `DB_HOST=127.0.0.1`을 사용합니다.
 - web Vite proxy는 `/api`, `/uploads`, `/db`를 각각 API 또는 Adminer 개발 도구로 연결합니다.
 - `apps/web/dist/`는 빌드 산출물이므로 커밋하지 않습니다.
 
@@ -75,15 +74,8 @@ PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333
 
 ## 운영과 배포
 
-- GitHub Actions는 GHCR 이미지 빌드/푸시까지만 담당합니다. 서버 반영은 SSH 환경에서 `scripts/manual-deploy.sh --image-tag <tag>`로 실행합니다.
-- 운영 proxy는 하나의 SWAG이며, 템플릿 원본은 `infra/swag/site-confs/default.conf.template`입니다.
-- 운영 env는 `/opt/pkpkdupr/env/shared.env`, `pkpkdupr.env`, `pkelo.env`로 분리합니다. 두 앱 env는 각각 일반적인 `DOMAIN`, `JWT_SECRET`, `MYSQL_*`, `API_ADMIN_*` 이름을 사용하며 서로의 시크릿을 공유하지 않습니다.
-- `pkpkdupr.env`의 `DOMAIN`(기본 `pkpkdupr.duckdns.org`)은 기존 데이터·MySQL 볼륨을 유지하고, `pkelo.env`의 `DOMAIN`(기본 `pkelo.app`)은 별도 API/MySQL/업로드/JWT/관리자 계정을 가진 빈 앱 스택입니다.
-- 두 도메인의 운영 경로는 동일합니다.
-  - Web: `https://<DOMAIN>/`
-  - Admin/API/운영 도구: `https://<DOMAIN>:3333/{admin/,api/health,api/ping,db/}` (`/db/`는 Adminer)
-- 주 SWAG는 DuckDNS DNS-01을, `pkelo-certificate`는 Cloudflare DNS-01 인증서를 갱신합니다. 실제 서버 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`와 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`이며 배포 스크립트가 생성합니다.
-- `/db/` Adminer는 HTML 응답이므로 상태 코드뿐 아니라 기대 텍스트와 `404 not found` 여부를 함께 확인합니다.
+- GitHub Actions는 PKELO GHCR 이미지 빌드/푸시까지만 담당합니다.
+- 공용 SWAG, 인증서, 두 도메인 라우팅과 서버 반영 스크립트는 `infra` 브랜치에서 관리합니다. 이 브랜치에는 운영 proxy 설정을 두지 않습니다.
 
 ## 작업 및 커밋 규칙
 
