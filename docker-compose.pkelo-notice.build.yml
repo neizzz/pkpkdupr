@@ -1,0 +1,7 @@
+services:
+  pkelo-notice-web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-}

@@ -1,0 +1,58 @@
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    server_name __PKELO_DOMAIN__;
+
+    include /config/nginx/pkelo-ssl.conf;
+
+    location / {
+        proxy_pass http://pkelo-notice-web:80;
+        include /config/nginx/proxy.conf;
+    }
+}
+
+server {
+    listen 3333 ssl;
+    listen [::]:3333 ssl;
+
+    server_name __PKELO_DOMAIN__;
+
+    include /config/nginx/pkelo-ssl.conf;
+
+    location = /api/runtime-notice {
+        add_header Access-Control-Allow-Origin "https://__PKELO_DOMAIN__" always;
+        add_header Cache-Control "no-store" always;
+        proxy_pass http://pkelo-notice-web:80/runtime/notice.json;
+        include /config/nginx/proxy.conf;
+    }
+
+    location = /api {
+        default_type application/json;
+        add_header Access-Control-Allow-Origin "https://__PKELO_DOMAIN__" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
+        add_header X-Pkelo-Notice "active" always;
+        return 503 '{"code":"PKELO_NOTICE_ACTIVE"}';
+    }
+
+    location ^~ /api/ {
+        default_type application/json;
+        add_header Access-Control-Allow-Origin "https://__PKELO_DOMAIN__" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type" always;
+        add_header X-Pkelo-Notice "active" always;
+
+        if ($request_method = OPTIONS) {
+            return 204;
+        }
+
+        return 503 '{"code":"PKELO_NOTICE_ACTIVE"}';
+    }
+
+    location / {
+        proxy_pass http://pkelo-notice-web:80;
+        include /config/nginx/proxy.conf;
+    }
+}

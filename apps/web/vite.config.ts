@@ -114,6 +114,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         importScripts: ["/cleanup-outdated-caches.js"],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
+        // 안내 상태는 :3333의 no-store endpoint에서만 읽어야 합니다.
+        globIgnores: ["**/runtime/notice.json"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [
           /^\/api\//,

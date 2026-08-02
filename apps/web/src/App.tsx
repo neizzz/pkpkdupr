@@ -7,6 +7,7 @@ import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import PwaUpdatePrompt from "./components/PwaUpdatePrompt";
 import { AppUpdateProvider } from "./context/AppUpdateContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { PkeloNoticeProvider } from "./context/PkeloNoticeContext";
 import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
 import Login from "./pages/Login";
@@ -231,14 +232,16 @@ function App() {
             : "h-full w-full max-w-[480px] overflow-hidden bg-white shadow-none min-[481px]:shadow-lg"
         }
       >
-        <AppUpdateProvider>
-          <AuthProvider>
-            <OfflineBanner />
-            <PwaInstallPrompt />
-            <PwaUpdatePrompt />
-            <AppRoutes />
-          </AuthProvider>
-        </AppUpdateProvider>
+        <PkeloNoticeProvider>
+          <AppUpdateProvider>
+            <AuthProvider>
+              <OfflineBanner />
+              <PwaInstallPrompt />
+              <PwaUpdatePrompt />
+              <AppRoutes />
+            </AuthProvider>
+          </AppUpdateProvider>
+        </PkeloNoticeProvider>
       </main>
     </div>
   );

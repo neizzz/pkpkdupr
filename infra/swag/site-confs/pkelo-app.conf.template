@@ -3,9 +3,9 @@ server {
     listen [::]:443 ssl;
     http2 on;
 
-    server_name __DOMAIN__;
+    server_name __PKELO_DOMAIN__;
 
-    include /config/nginx/ssl.conf;
+    include /config/nginx/pkelo-ssl.conf;
 
     client_max_body_size 10m;
 
@@ -37,8 +37,13 @@ server {
         return 404;
     }
 
+    location ^~ /auth/kakao/ {
+        proxy_pass http://pkelo-api:4000;
+        include /config/nginx/proxy.conf;
+    }
+
     location / {
-        proxy_pass http://pkpkdupr-web:80;
+        proxy_pass http://pkelo-web:80;
         include /config/nginx/proxy.conf;
     }
 }
@@ -47,11 +52,18 @@ server {
     listen 3333 ssl;
     listen [::]:3333 ssl;
 
-    server_name __DOMAIN__;
+    server_name __PKELO_DOMAIN__;
 
-    include /config/nginx/ssl.conf;
+    include /config/nginx/pkelo-ssl.conf;
 
     client_max_body_size 10m;
+
+    location = /api/runtime-notice {
+        add_header Access-Control-Allow-Origin "https://__PKELO_DOMAIN__" always;
+        add_header Cache-Control "no-store" always;
+        proxy_pass http://pkelo-web:80/runtime/notice.json;
+        include /config/nginx/proxy.conf;
+    }
 
     location = /admin {
         return 301 /admin/;
@@ -62,7 +74,7 @@ server {
     }
 
     location /admin/ {
-        proxy_pass http://pkpkdupr-admin-web:80;
+        proxy_pass http://pkelo-admin-web:80;
         include /config/nginx/proxy.conf;
     }
 
@@ -72,21 +84,17 @@ server {
 
     location /db/ {
         rewrite ^/db/(.*)$ /$1 break;
-        proxy_pass http://pkpkdupr-adminer:8080;
+        proxy_pass http://pkelo-adminer:8080;
         include /config/nginx/proxy.conf;
     }
 
     location /api/ {
-        proxy_pass http://pkpkdupr-api:4000;
+        proxy_pass http://pkelo-api:4000;
         include /config/nginx/proxy.conf;
     }
 
     location /uploads/ {
-        proxy_pass http://pkpkdupr-api:4000;
+        proxy_pass http://pkelo-api:4000;
         include /config/nginx/proxy.conf;
     }
 }
-
-# pkelo.app은 일반 서비스와 임시 안내 모드 중 하나를 /config/nginx/pkelo-mode.conf로
-# 원자적으로 생성해 include합니다. 이 파일은 site-confs 밖에 두어 SWAG glob에 중복되지 않습니다.
-include /config/nginx/pkelo-mode.conf;

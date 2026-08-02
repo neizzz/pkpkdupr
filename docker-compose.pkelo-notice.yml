@@ -1,0 +1,15 @@
+services:
+  pkelo-notice-web:
+    image: ${PKELO_NOTICE_IMAGE:-ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkpkdupr-web:${IMAGE_TAG:-latest}}
+    container_name: pkelo-notice-web-app
+    volumes:
+      - ${PKELO_NOTICE_DATA_PATH:-${PKPKDUPR_DEPLOY_PATH:-.}/data/pkelo-notice}/public:/usr/share/nginx/html/runtime:ro
+    networks:
+      pkpkdupr-gateway:
+        aliases:
+          - pkelo-notice-web
+
+networks:
+  pkpkdupr-gateway:
+    external: true
+    name: ${GATEWAY_NETWORK:-pkpkdupr-gateway}

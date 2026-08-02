@@ -9,11 +9,18 @@ ENV_DIR="${DEPLOY_ROOT}/env"
 SHARED_ENV_FILE="${ENV_DIR}/shared.env"
 PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
 PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
+NOTICE_ENV_FILE="${ENV_DIR}/pkelo-notice.env"
+NOTICE_ENV_EXAMPLE="${SOURCE_REPO_ROOT}/env/pkelo-notice.env.example"
 SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
 SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
+PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
+PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
 PKELO_CERT_ROOT="${DEPLOY_ROOT}/data/pkelo-certs"
+NOTICE_STATE_FILE="${DEPLOY_ROOT}/data/pkelo-notice/state.env"
+NOTICE_DATA_PATH="${DEPLOY_ROOT}/data/pkelo-notice"
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -86,6 +93,12 @@ compose_pkelo() {
     -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml -f docker-compose.pkelo.build.yml "$@"
 }
 
+compose_notice() {
+  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" docker compose --project-name pkelo-notice \
+    --env-file "${SHARED_ENV_FILE}" --env-file "${NOTICE_ENV_FILE}" \
+    -f docker-compose.pkelo-notice.yml -f docker-compose.pkelo-notice.build.yml "$@"
+}
+
 sync_duckdns_credentials() {
   local token="$1"
   local credentials_file="${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini"
@@ -104,14 +117,41 @@ sync_pkelo_cloudflare_credentials() {
   chmod 600 "${credentials_file}"
 }
 
-sync_proxy_site_configs() {
-  mkdir -p "$(dirname "${SWAG_TARGET}")"
+render_template() {
+  local template="$1" target="$2" temp_file
+  mkdir -p "$(dirname "${target}")"
+  temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
   sed \
     -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" \
     -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" \
-    "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
-  sed "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" \
-    "${PKELO_SSL_TEMPLATE}" > "${PKELO_SSL_TARGET}"
+    "${template}" > "${temp_file}"
+  chmod 644 "${temp_file}"
+  mv -f "${temp_file}" "${target}"
+}
+
+sync_proxy_site_configs() {
+  local pkelo_template="${PKELO_APP_TEMPLATE}"
+  if is_notice_enabled; then
+    pkelo_template="${PKELO_NOTICE_TEMPLATE}"
+  fi
+  render_template "${SWAG_TEMPLATE}" "${SWAG_TARGET}"
+  render_template "${pkelo_template}" "${PKELO_MODE_TARGET}"
+  render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
+}
+
+is_notice_enabled() {
+  [[ -f "${NOTICE_STATE_FILE}" ]] && [[ "$(read_env_value "${NOTICE_STATE_FILE}" PKELO_NOTICE_ENABLED)" == "true" ]]
+}
+
+ensure_notice_env() {
+  if [[ -f "${NOTICE_ENV_FILE}" ]]; then
+    return
+  fi
+  require_file "${NOTICE_ENV_EXAMPLE}"
+  umask 077
+  cp "${NOTICE_ENV_EXAMPLE}" "${NOTICE_ENV_FILE}"
+  chmod 600 "${NOTICE_ENV_FILE}"
+  echo "ℹ️ 기본 PKELO 안내 설정을 생성했습니다: ${NOTICE_ENV_FILE}"
 }
 
 resolve_environment() {
@@ -119,6 +159,8 @@ resolve_environment() {
   require_file "${PRIMARY_ENV_FILE}"
   require_file "${PKELO_ENV_FILE}"
   require_file "${SWAG_TEMPLATE}"
+  require_file "${PKELO_APP_TEMPLATE}"
+  require_file "${PKELO_NOTICE_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
 
   PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"
@@ -185,6 +227,13 @@ run_health_checks() {
   local primary_admin_url="https://${PRIMARY_DOMAIN}:${ADMIN_STACK_PORT}"
   local pkelo_web_url="https://${PKELO_DOMAIN}"
   local pkelo_admin_url="https://${PKELO_DOMAIN}:${ADMIN_STACK_PORT}"
+  local notice_health_args=()
+  if is_notice_enabled; then
+    local notice_message
+    notice_message="$(read_env_value "${NOTICE_ENV_FILE}" PKELO_NOTICE_MESSAGE)"
+    notice_message="${notice_message:-8월 오픈 예정}"
+    notice_health_args=(PKELO_NOTICE_EXPECTED_MESSAGE="${notice_message}")
+  fi
 
   for _ in $(seq 1 60); do
     case "${target}" in
@@ -195,7 +244,7 @@ run_health_checks() {
         if HEALTHCHECK_APPS=pkelo PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
         ;;
       all)
-        if HEALTHCHECK_APPS=all PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
+        if env "${notice_health_args[@]}" HEALTHCHECK_APPS=all PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
         ;;
     esac
     sleep 5
@@ -213,6 +262,7 @@ docker compose version >/dev/null
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
 resolve_environment
+ensure_notice_env
 
 mkdir -p \
   "${DEPLOY_ROOT}/data/uploads/avatars" \
@@ -228,14 +278,21 @@ compose_certificate up -d
 wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
 wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
 sync_proxy_site_configs
-compose_proxy restart proxy
+compose_proxy exec -T proxy nginx -t
+compose_proxy exec -T proxy nginx -s reload
 
 set_build_version
 echo "🚀 기존 앱 스택 배포 중..."
 compose_primary up -d --build
-echo "🚀 pkelo.app 스택 배포 중..."
-compose_pkelo up -d --build
-compose_proxy restart proxy
+if is_notice_enabled; then
+  echo "🚀 PKELO 안내 web을 유지·갱신 중..."
+  compose_notice up -d --build
+else
+  echo "🚀 pkelo.app 스택 배포 중..."
+  compose_pkelo up -d --build
+fi
+compose_proxy exec -T proxy nginx -t
+compose_proxy exec -T proxy nginx -s reload
 
 echo "🩺 두 도메인 HTTPS 응답 확인 중..."
 run_health_checks all

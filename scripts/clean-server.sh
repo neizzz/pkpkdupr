@@ -9,6 +9,8 @@ ENV_DIR="${DEPLOY_ROOT}/env"
 SHARED_ENV_FILE="${ENV_DIR}/shared.env"
 PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
 PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
+NOTICE_ENV_FILE="${ENV_DIR}/pkelo-notice.env"
+NOTICE_DATA_PATH="${DEPLOY_ROOT}/data/pkelo-notice"
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || { echo "❌ '$1' 명령이 필요합니다." >&2; exit 1; }
@@ -34,6 +36,12 @@ compose_pkelo() {
   docker compose --project-name pkelo --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
 }
 
+compose_notice() {
+  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" docker compose --project-name pkelo-notice \
+    --env-file "${SHARED_ENV_FILE}" --env-file "${NOTICE_ENV_FILE}" \
+    -f docker-compose.pkelo-notice.yml "$@"
+}
+
 require_command docker
 docker compose version >/dev/null
 require_file "${SHARED_ENV_FILE}"
@@ -46,11 +54,17 @@ echo "🧹 앱 컨테이너·orphan만 정리합니다. named volume, data, 이�
 
 compose_primary down --remove-orphans
 compose_pkelo down --remove-orphans
+if [[ -f "${NOTICE_ENV_FILE}" ]]; then
+  compose_notice down --remove-orphans
+fi
 compose_certificate down --remove-orphans
 compose_proxy down --remove-orphans
 
 echo "📦 현재 컨테이너 상태"
 compose_primary ps --all || true
 compose_pkelo ps --all || true
+if [[ -f "${NOTICE_ENV_FILE}" ]]; then
+  compose_notice ps --all || true
+fi
 compose_proxy ps --all || true
 echo "✅ 안전 청소가 완료되었습니다."

@@ -10,6 +10,7 @@ const pkpkduprAdminStackUrl =
   process.env.PKPKDUPR_SERVER_URL?.trim();
 const pkeloWebUrl = process.env.PKELO_WEB_URL?.trim();
 const pkeloAdminStackUrl = process.env.PKELO_ADMIN_STACK_URL?.trim();
+const pkeloNoticeExpectedMessage = process.env.PKELO_NOTICE_EXPECTED_MESSAGE?.trim();
 const requestedApps = (process.env.HEALTHCHECK_APPS?.trim() || "")
   .split(",")
   .map((value) => value.trim())
@@ -58,6 +59,11 @@ if (
   fail(
     "pkelo.app 검증에는 PKELO_WEB_URL과 PKELO_ADMIN_STACK_URL을 함께 설정해야 합니다.",
   );
+  process.exit();
+}
+
+if (pkeloNoticeExpectedMessage && !requestedAppSet.has("pkelo")) {
+  fail("PKELO_NOTICE_EXPECTED_MESSAGE는 pkelo 검증에서만 사용할 수 있습니다.");
   process.exit();
 }
 
@@ -138,7 +144,7 @@ const verifyPage = async (
   }
 };
 
-const checks = [
+const normalChecks = [
   {
     name: "API health",
     target: "admin",
@@ -187,6 +193,60 @@ const checks = [
   },
 ];
 
+const noticeChecks = [
+  {
+    name: "Notice state",
+    target: "admin",
+    path: "/api/runtime-notice",
+    verify: async (response) => {
+      if (response.status !== 200) {
+        throw new Error(`HTTP ${response.status} 응답`);
+      }
+      const body = await readJson(response);
+      if (body.enabled !== true) {
+        throw new Error(`enabled가 true가 아닙니다: ${JSON.stringify(body)}`);
+      }
+      if (
+        pkeloNoticeExpectedMessage &&
+        body.message !== pkeloNoticeExpectedMessage
+      ) {
+        throw new Error(
+          `안내 문구가 일치하지 않습니다: ${JSON.stringify(body.message)}`,
+        );
+      }
+    },
+  },
+  {
+    name: "Notice web",
+    target: "web",
+    path: "/",
+    verify: async (response) => verifyPage(response),
+  },
+  {
+    name: "Notice admin route",
+    target: "admin",
+    path: "/admin/",
+    verify: async (response) => verifyPage(response),
+  },
+  {
+    name: "Blocked API",
+    target: "admin",
+    path: "/api/health",
+    verify: async (response) => {
+      if (response.status !== 503) {
+        throw new Error(`HTTP ${response.status} 응답`);
+      }
+      if (response.headers.get("x-pkelo-notice")?.toLowerCase() !== "active") {
+        throw new Error("X-Pkelo-Notice: active 헤더가 없습니다.");
+      }
+      const body = await readJson(response);
+      if (body.code !== "PKELO_NOTICE_ACTIVE") {
+        throw new Error(`안내 API 응답이 아닙니다: ${JSON.stringify(body)}`);
+      }
+    },
+  },
+];
+
 const buildAppTargets = () => {
   const targets = [];
 
@@ -203,6 +263,7 @@ const buildAppTargets = () => {
       name: "pkelo.app",
       webBaseUrl: normalizeBaseUrl(pkeloWebUrl),
       adminStackBaseUrl: normalizeBaseUrl(pkeloAdminStackUrl),
+      noticeMode: Boolean(pkeloNoticeExpectedMessage),
     });
   }
 
@@ -226,6 +287,7 @@ const run = async () => {
       `🔎 ${appTarget.name} healthy check: web=${appTarget.webBaseUrl}, admin=${appTarget.adminStackBaseUrl}`,
     );
 
+    const checks = appTarget.noticeMode ? noticeChecks : normalChecks;
     for (const check of checks) {
       const baseUrl =
         check.target === "web"

@@ -9,13 +9,19 @@ ENV_DIR="${DEPLOY_ROOT}/env"
 SHARED_ENV_FILE="${ENV_DIR}/shared.env"
 PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
 PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
+NOTICE_ENV_FILE="${ENV_DIR}/pkelo-notice.env"
 IMAGE_TAG_INPUT="${1:-${IMAGE_TAG:-latest}}"
 TARGET_STACK="${2:-all}"
 SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
 SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
+PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
+PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
 PKELO_CERT_ROOT="${DEPLOY_ROOT}/data/pkelo-certs"
+NOTICE_DATA_PATH="${DEPLOY_ROOT}/data/pkelo-notice"
+NOTICE_STATE_FILE="${NOTICE_DATA_PATH}/state.env"
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || { echo "❌ '$1' 명령이 필요합니다." >&2; exit 1; }
@@ -44,10 +50,27 @@ sync_credentials() {
   chmod 600 "${DEPLOY_ROOT}/data/certs/dns-conf/duckdns.ini" "${PKELO_CERT_ROOT}/dns-conf/cloudflare.ini"
 }
 
+render_template() {
+  local template="$1" target="$2" temp_file
+  mkdir -p "$(dirname "${target}")"
+  temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
+  sed -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" "${template}" > "${temp_file}"
+  chmod 644 "${temp_file}"
+  mv -f "${temp_file}" "${target}"
+}
+
 sync_proxy_site_configs() {
-  mkdir -p "$(dirname "${SWAG_TARGET}")"
-  sed -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" "${SWAG_TEMPLATE}" > "${SWAG_TARGET}"
-  sed "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" "${PKELO_SSL_TEMPLATE}" > "${PKELO_SSL_TARGET}"
+  local pkelo_template="${PKELO_APP_TEMPLATE}"
+  if is_notice_enabled; then
+    pkelo_template="${PKELO_NOTICE_TEMPLATE}"
+  fi
+  render_template "${SWAG_TEMPLATE}" "${SWAG_TARGET}"
+  render_template "${pkelo_template}" "${PKELO_MODE_TARGET}"
+  render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
+}
+
+is_notice_enabled() {
+  [[ -f "${NOTICE_STATE_FILE}" ]] && [[ "$(read_env_value "${NOTICE_STATE_FILE}" PKELO_NOTICE_ENABLED)" == "true" ]]
 }
 
 wait_for_file() {
@@ -75,11 +98,19 @@ compose_pkelo() {
   docker compose --project-name pkelo --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
 }
 
+compose_notice() {
+  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" docker compose --project-name pkelo-notice \
+    --env-file "${SHARED_ENV_FILE}" --env-file "${NOTICE_ENV_FILE}" \
+    -f docker-compose.pkelo-notice.yml "$@"
+}
+
 resolve_environment() {
   require_file "${SHARED_ENV_FILE}"
   require_file "${PRIMARY_ENV_FILE}"
   require_file "${PKELO_ENV_FILE}"
   require_file "${SWAG_TEMPLATE}"
+  require_file "${PKELO_APP_TEMPLATE}"
+  require_file "${PKELO_NOTICE_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
   PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"; PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-pkpkdupr.duckdns.org}"
   PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"; PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
@@ -113,16 +144,24 @@ run_health_checks() {
   local target="$1"
   local primary_web_url="https://${PRIMARY_DOMAIN}" primary_admin_url="https://${PRIMARY_DOMAIN}:${ADMIN_STACK_PORT}"
   local pkelo_web_url="https://${PKELO_DOMAIN}" pkelo_admin_url="https://${PKELO_DOMAIN}:${ADMIN_STACK_PORT}"
+  local notice_health_args=()
+  if is_notice_enabled; then
+    require_file "${NOTICE_ENV_FILE}"
+    local notice_message
+    notice_message="$(read_env_value "${NOTICE_ENV_FILE}" PKELO_NOTICE_MESSAGE)"
+    notice_message="${notice_message:-8월 오픈 예정}"
+    notice_health_args=(PKELO_NOTICE_EXPECTED_MESSAGE="${notice_message}")
+  fi
   for _ in $(seq 1 60); do
     case "${target}" in
       pkpkdupr)
         if HEALTHCHECK_APPS=pkpkdupr PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
         ;;
       pkelo)
-        if HEALTHCHECK_APPS=pkelo PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
+        if env "${notice_health_args[@]}" HEALTHCHECK_APPS=pkelo PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
         ;;
       all)
-        if HEALTHCHECK_APPS=all PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
+        if env "${notice_health_args[@]}" HEALTHCHECK_APPS=all PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
         ;;
     esac
     sleep 5
@@ -163,17 +202,28 @@ case "${TARGET_STACK}" in
     compose_primary up -d web admin-web api mysql db-server adminer
     ;;
   pkelo)
-    compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
-    compose_pkelo up -d pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    if is_notice_enabled; then
+      compose_notice pull pkelo-notice-web
+      compose_notice up -d pkelo-notice-web
+    else
+      compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+      compose_pkelo up -d pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    fi
     ;;
   all)
     compose_primary pull web admin-web api mysql db-server adminer
-    compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
     compose_primary up -d web admin-web api mysql db-server adminer
-    compose_pkelo up -d pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    if is_notice_enabled; then
+      compose_notice pull pkelo-notice-web
+      compose_notice up -d pkelo-notice-web
+    else
+      compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+      compose_pkelo up -d pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+    fi
     ;;
 esac
 
-compose_proxy restart proxy
+compose_proxy exec -T proxy nginx -t
+compose_proxy exec -T proxy nginx -s reload
 run_health_checks "${TARGET_STACK}"
 echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG})"
