@@ -31,6 +31,7 @@ import {
   type CreateMatchInput,
   type UpdateMatchMetadataInput,
 } from "./repositories/MatchRepository";
+import { ClubRepository } from "./repositories/ClubRepository";
 import { AuthRepository } from "./repositories/AuthRepository";
 import {
   getDevMockUsernames,
@@ -49,6 +50,7 @@ const playerRatingChangeLogRepository = new PlayerRatingChangeLogRepository(db);
 const officialDuprAdjustmentLogRepository =
   new OfficialDuprAdjustmentLogRepository(db);
 const matchRepository = new MatchRepository(db, client);
+const clubRepository = new ClubRepository(db, client, matchRepository);
 const authRepository = new AuthRepository(client);
 const testDataRepository = new TestDataRepository(
   db,
@@ -62,6 +64,45 @@ app.use(express.json());
 
 const initSchema = async () => {
   await runMigrations();
+};
+
+const seedDevClubData = async () => {
+  const clubId = "Cdevclb1";
+  const ownerId = "Pdev0001";
+  const club = await clubRepository.findById(clubId);
+  if (!club) {
+    await clubRepository.createClub({
+      id: clubId,
+      name: "PKELO 개발 클럽",
+      description: "PKELO 개발과 테스트를 위한 클럽입니다.",
+      ownerPlayerId: ownerId,
+    });
+  }
+  await clubRepository.addMemberByPlayerQr(clubId, "Pdev0002");
+  await clubRepository.addMemberByPlayerQr(clubId, "Pdev0003");
+  const announcements = await clubRepository.listAnnouncements(clubId);
+  if (!announcements.length) {
+    await clubRepository.createAnnouncement({
+      clubId,
+      title: "개발 클럽 공지",
+      body: "클럽 탭 개발 데이터를 위한 안내 공지입니다.",
+      createdByPlayerId: ownerId,
+    });
+  }
+  const invite = await clubRepository.getOrCreateInvite(clubId);
+  await clubRepository.createJoinRequestByInvite(invite.token, "Pdev0004").catch(
+    () => undefined,
+  );
+  const session = await matchRepository.findSessionById("Sclub001");
+  if (!session) {
+    await matchRepository.createSession({
+      id: "Sclub001",
+      name: "개발 클럽 주말 세션",
+      date: new Date("2026-08-09T10:00:00+09:00"),
+      location: "Dev Club Court",
+      clubId,
+    });
+  }
 };
 
 app.get("/health", (_req, res) => {
@@ -257,6 +298,235 @@ app.patch("/internal/players/:id/dupr-state", async (req, res) => {
     res.json(player);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/by-player/:playerId", async (req, res) => {
+  try {
+    res.json(await clubRepository.findMyClubs(req.params.playerId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/:clubId/memberships/:playerId", async (req, res) => {
+  try {
+    const membership = await clubRepository.findMembership(
+      req.params.clubId,
+      req.params.playerId,
+    );
+    if (!membership) {
+      return res.status(404).json({ error: "클럽 멤버십을 찾을 수 없습니다." });
+    }
+    res.json(membership);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/:clubId", async (req, res) => {
+  try {
+    const club = await clubRepository.findById(req.params.clubId);
+    if (!club) return res.status(404).json({ error: "클럽을 찾을 수 없습니다." });
+    res.json(club);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/clubs", async (req, res) => {
+  try {
+    res.status(201).json(
+      await clubRepository.createClub({
+      id: req.body.id,
+      name: req.body.name,
+      description: req.body.description,
+      ownerPlayerId: req.body.ownerPlayerId,
+      }),
+    );
+  } catch (error) {
+    const message = (error as Error).message;
+    res.status(message.includes("Duplicate") || message.includes("duplicate") ? 409 : 400)
+      .json({ error: message });
+  }
+});
+
+app.get("/internal/clubs/:clubId/dashboard/:playerId", async (req, res) => {
+  try {
+    const dashboard = await clubRepository.getDashboard(
+      req.params.clubId,
+      req.params.playerId,
+    );
+    if (!dashboard) {
+      return res.status(404).json({ error: "클럽 대시보드를 찾을 수 없습니다." });
+    }
+    res.json(dashboard);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/clubs/invite-join-requests", async (req, res) => {
+  try {
+    res.status(201).json(
+      await clubRepository.createJoinRequestByInvite(
+        req.body.token,
+        req.body.playerId,
+      ),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post(
+  "/internal/clubs/:clubId/join-requests/:playerId/approve",
+  async (req, res) => {
+    try {
+      res.json(
+        await clubRepository.approveJoinRequest(
+          req.params.clubId,
+          req.params.playerId,
+        ),
+      );
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  },
+);
+
+app.delete(
+  "/internal/clubs/:clubId/join-requests/:playerId",
+  async (req, res) => {
+    try {
+      await clubRepository.rejectJoinRequest(req.params.clubId, req.params.playerId);
+      res.status(204).end();
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  },
+);
+
+app.post("/internal/clubs/:clubId/members/:playerId", async (req, res) => {
+  try {
+    res.json(
+      await clubRepository.addMemberByPlayerQr(
+        req.params.clubId,
+        req.params.playerId,
+      ),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/clubs/:clubId/members/:playerId/role", async (req, res) => {
+  try {
+    res.json(
+      await clubRepository.setMemberRole(
+        req.params.clubId,
+        req.params.playerId,
+        req.body.role,
+      ),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/clubs/:clubId/ownership-transfer", async (req, res) => {
+  try {
+    await clubRepository.transferOwnership(req.params.clubId, req.body.playerId);
+    res.status(204).end();
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/:clubId/invite", async (req, res) => {
+  try {
+    res.json(await clubRepository.getOrCreateInvite(req.params.clubId));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/clubs/:clubId/invite/rotate", async (req, res) => {
+  try {
+    res.json(await clubRepository.rotateInvite(req.params.clubId));
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/:clubId/members", async (req, res) => {
+  try {
+    res.json(await clubRepository.listMembers(req.params.clubId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/:clubId/join-requests", async (req, res) => {
+  try {
+    res.json(await clubRepository.listPendingRequests(req.params.clubId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/clubs/:clubId/announcements", async (req, res) => {
+  try {
+    res.json(await clubRepository.listAnnouncements(req.params.clubId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/clubs/:clubId/announcements", async (req, res) => {
+  try {
+    res.status(201).json(
+      await clubRepository.createAnnouncement({
+        clubId: req.params.clubId,
+        title: req.body.title,
+        body: req.body.body,
+        createdByPlayerId: req.body.createdByPlayerId,
+      }),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/club-announcements/:announcementId", async (req, res) => {
+  try {
+    const announcement = await clubRepository.findAnnouncement(req.params.announcementId);
+    if (!announcement) return res.status(404).json({ error: "공지를 찾을 수 없습니다." });
+    res.json(announcement);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/club-announcements/:announcementId", async (req, res) => {
+  try {
+    const announcement = await clubRepository.updateAnnouncement(
+      req.params.announcementId,
+      { title: req.body.title, body: req.body.body },
+    );
+    if (!announcement) return res.status(404).json({ error: "공지를 찾을 수 없습니다." });
+    res.json(announcement);
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.delete("/internal/club-announcements/:announcementId", async (req, res) => {
+  try {
+    await clubRepository.deleteAnnouncement(req.params.announcementId);
+    res.status(204).end();
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
   }
 });
 
@@ -696,6 +966,7 @@ const start = async () => {
   await initSchema();
   if (isDevMockDataEnabled()) {
     await testDataRepository.seedDevMockData();
+    await seedDevClubData();
     console.log(
       "[DB-SERVER] Dev mock data seeded",
       getDevMockUsernames()

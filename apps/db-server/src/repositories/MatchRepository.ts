@@ -212,6 +212,7 @@ export class MatchRepository {
       name: stored.name,
       date: toDate(stored.date),
       location: stored.location,
+      clubId: stored.clubId ?? undefined,
     };
   }
 
@@ -236,6 +237,7 @@ export class MatchRepository {
       name: stored.name,
       date: toDate(stored.date),
       location: stored.location,
+      clubId: stored.clubId ?? undefined,
       participantIds: participantRecords.map(
         (participant: typeof matchSessionParticipants.$inferSelect) =>
           participant.playerId,
@@ -1541,6 +1543,7 @@ export class MatchRepository {
             name: session.name,
             date: toDate(session.date),
             location: session.location,
+            clubId: session.clubId ?? undefined,
           }
         : undefined,
       status: match.status as Match["status"],
@@ -1614,6 +1617,7 @@ export class MatchRepository {
           name: match.session.name.trim(),
           date: match.session.date,
           location: match.session.location,
+          clubId: match.session.clubId,
           matchCount: 0,
           participants: [],
           latestCreatedAt: match.createdAt,
@@ -1704,6 +1708,7 @@ export class MatchRepository {
           name,
           date,
           location,
+          clubId: session.clubId ?? null,
           createdAt: now,
           updatedAt: now,
         });

@@ -46,17 +46,23 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
 
     if (isOpen) {
       setShouldRender(true);
-      setIsSheetTransitionEnabled(true);
+      // Mount the sheet below the viewport first, then start the transition on
+      // the following frame. Without this, a newly mounted sheet can paint at
+      // its final position before the browser observes the transition.
+      setIsSheetTransitionEnabled(false);
       setIsVisible(false);
 
       openAnimationFrameRef.current = window.requestAnimationFrame(() => {
-        setIsVisible(true);
-        openAnimationFrameRef.current = null;
+        openAnimationFrameRef.current = window.requestAnimationFrame(() => {
+          setIsSheetTransitionEnabled(true);
+          setIsVisible(true);
+          openAnimationFrameRef.current = null;
 
-        transitionTimeoutRef.current = window.setTimeout(() => {
-          setIsSheetTransitionEnabled(false);
-          transitionTimeoutRef.current = null;
-        }, TRANSITION_DURATION_MS);
+          transitionTimeoutRef.current = window.setTimeout(() => {
+            setIsSheetTransitionEnabled(false);
+            transitionTimeoutRef.current = null;
+          }, TRANSITION_DURATION_MS);
+        });
       });
 
       return undefined;
@@ -131,7 +137,10 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
                   ? "translate-y-0 duration-200 ease-out"
                   : "translate-y-[calc(100%+2rem)] duration-200 ease-in",
               ].join(" ")
-            : "",
+            : [
+                "transform-gpu",
+                isVisible ? "translate-y-0" : "translate-y-[calc(100%+2rem)]",
+              ].join(" "),
         ].join(" ")}
       >
         <div className="pointer-events-none absolute inset-x-0 -top-10 z-20 flex justify-end px-4">

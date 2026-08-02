@@ -32,10 +32,12 @@ import type {
   PlayerStatus,
 } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
+import type { ClubRole } from "@pkpkdupr/shared/club";
 import {
   DbRequestError,
   MatchRepository,
 } from "./repositories/MatchRepository";
+import { ClubRepository } from "./repositories/ClubRepository";
 import { AuthService, type AuthenticatedSession } from "./services/AuthService";
 import { KakaoAuthService } from "./services/KakaoAuthService";
 import { PasswordAuthService } from "./services/PasswordAuthService";
@@ -141,6 +143,7 @@ const kakaoAuthService = isExternalUserAuthProvider(userAuthProvider)
   ? new KakaoAuthService(userAuthProvider, authService)
   : null;
 const matchRepository = new MatchRepository();
+const clubRepository = new ClubRepository();
 const autoApprovalService = new AutoApprovalService(matchRepository, authService);
 const AUTO_APPROVAL_INTERVAL_MS = 60_000;
 let autoApprovalInterval: ReturnType<typeof setInterval> | undefined;
@@ -664,6 +667,352 @@ const requireAdmin = async (
   }
   next();
 };
+
+const normalizeClubName = (value: unknown) => {
+  if (typeof value !== "string") {
+    throw new Error("클럽 이름을 입력해주세요.");
+  }
+  const name = value.trim();
+  if (!name || name.length > 120) {
+    throw new Error("클럽 이름은 1~120자여야 합니다.");
+  }
+  return name;
+};
+
+const normalizeClubDescription = (value: unknown) => {
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (typeof value !== "string") {
+    throw new Error("클럽 소개를 확인해주세요.");
+  }
+  const description = value.trim();
+  if (description.length > 500) {
+    throw new Error("클럽 소개는 500자 이하여야 합니다.");
+  }
+  return description;
+};
+
+const normalizeAnnouncementInput = (value: unknown) => {
+  const input = value as { title?: unknown; body?: unknown };
+  const title = typeof input?.title === "string" ? input.title.trim() : "";
+  const body = typeof input?.body === "string" ? input.body.trim() : "";
+  if (!title || title.length > 160) {
+    throw new Error("공지 제목은 1~160자여야 합니다.");
+  }
+  if (!body || body.length > 4000) {
+    throw new Error("공지 내용은 1~4000자여야 합니다.");
+  }
+  return { title, body };
+};
+
+const getClubAccess = async (
+  clubId: string,
+  playerId: string,
+  res: express.Response,
+  minimumRole: "member" | "manager" | "owner" = "member",
+) => {
+  if (!isEntityId(clubId, "club")) {
+    res.status(400).json({ error: "유효한 클럽 ID가 필요합니다." });
+    return null;
+  }
+  const membership = await clubRepository.findMembership(clubId, playerId);
+  if (!membership) {
+    res.status(403).json({ error: "클럽 멤버 권한이 필요합니다." });
+    return null;
+  }
+  const isManager = membership.role === "owner" || membership.role === "manager";
+  if (
+    (minimumRole === "manager" && !isManager) ||
+    (minimumRole === "owner" && membership.role !== "owner")
+  ) {
+    res.status(403).json({ error: "클럽 운영 권한이 필요합니다." });
+    return null;
+  }
+  return membership;
+};
+
+app.get("/api/clubs", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    res.json(await clubRepository.findMyClubs(decoded.playerId));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/clubs", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    res.status(201).json(
+      await clubRepository.createClub(
+        normalizeClubName(req.body?.name),
+        normalizeClubDescription(req.body?.description),
+        decoded.playerId,
+      ),
+    );
+  } catch (err) {
+    const status = err instanceof DbRequestError && err.status === 409 ? 409 : 400;
+    res.status(status).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/api/clubs/:clubId/dashboard", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    const access = await getClubAccess(req.params.clubId, decoded.playerId, res);
+    if (!access) return;
+    const dashboard = await clubRepository.getDashboard(
+      req.params.clubId,
+      decoded.playerId,
+    );
+    if (!dashboard) return res.status(404).json({ error: "클럽을 찾을 수 없습니다." });
+    res.json(dashboard);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/club-invites/join-requests", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    const token =
+      typeof req.body?.token === "string"
+        ? req.body.token.trim()
+        : typeof req.body?.payload === "string"
+          ? req.body.payload.trim()
+          : "";
+    if (!token) return res.status(400).json({ error: "클럽 QR이 필요합니다." });
+    res.status(201).json(
+      await clubRepository.requestJoinByInvite(token, decoded.playerId),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.get("/api/clubs/:clubId/invite", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    res.json(await clubRepository.getInvite(req.params.clubId));
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/clubs/:clubId/invite/rotate", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    res.json(await clubRepository.rotateInvite(req.params.clubId));
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/clubs/:clubId/player-qr-members", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    const payload = req.body?.payload;
+    if (typeof payload !== "string" || !payload.trim()) {
+      return res.status(400).json({ error: "플레이어 QR이 필요합니다." });
+    }
+    const result = await authService.verifyPlayerQrToken(payload);
+    res.status(201).json(
+      await clubRepository.addMemberByPlayerQr(
+        req.params.clubId,
+        result.player.id,
+      ),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post(
+  "/api/clubs/:clubId/join-requests/:playerId/approve",
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) return;
+      if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+        return;
+      }
+      res.json(
+        await clubRepository.approveJoinRequest(
+          req.params.clubId,
+          req.params.playerId,
+        ),
+      );
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+app.delete(
+  "/api/clubs/:clubId/join-requests/:playerId",
+  async (req, res) => {
+    try {
+      const decoded = await getAuthPayload(req, res);
+      if (!decoded) return;
+      if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+        return;
+      }
+      await clubRepository.rejectJoinRequest(req.params.clubId, req.params.playerId);
+      res.status(204).end();
+    } catch (err) {
+      res.status(400).json({ error: (err as Error).message });
+    }
+  },
+);
+
+app.patch("/api/clubs/:clubId/members/:playerId/role", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "owner"))) {
+      return;
+    }
+    const role = req.body?.role;
+    if (role !== "manager" && role !== "member") {
+      return res.status(400).json({ error: "운영진 또는 멤버 역할만 지정할 수 있습니다." });
+    }
+    res.json(
+      await clubRepository.setMemberRole(
+        req.params.clubId,
+        req.params.playerId,
+        role as Exclude<ClubRole, "owner">,
+      ),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/clubs/:clubId/ownership-transfer", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "owner"))) {
+      return;
+    }
+    if (typeof req.body?.playerId !== "string" || !req.body.playerId) {
+      return res.status(400).json({ error: "새 클럽장을 선택해주세요." });
+    }
+    await clubRepository.transferOwnership(req.params.clubId, req.body.playerId);
+    res.status(204).end();
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/clubs/:clubId/announcements", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    const input = normalizeAnnouncementInput(req.body);
+    res.status(201).json(
+      await clubRepository.createAnnouncement(req.params.clubId, {
+        ...input,
+        createdByPlayerId: decoded.playerId,
+      }),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.patch("/api/club-announcements/:announcementId", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    const announcement = await clubRepository.findAnnouncement(req.params.announcementId);
+    if (!announcement) return res.status(404).json({ error: "공지를 찾을 수 없습니다." });
+    if (!(await getClubAccess(announcement.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    res.json(
+      await clubRepository.updateAnnouncement(
+        req.params.announcementId,
+        normalizeAnnouncementInput(req.body),
+      ),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.delete("/api/club-announcements/:announcementId", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    const announcement = await clubRepository.findAnnouncement(req.params.announcementId);
+    if (!announcement) return res.status(404).json({ error: "공지를 찾을 수 없습니다." });
+    if (!(await getClubAccess(announcement.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    await clubRepository.deleteAnnouncement(req.params.announcementId);
+    res.status(204).end();
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/clubs/:clubId/sessions", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+      return;
+    }
+    const session = normalizeMatchSession(req.body as MatchSessionRequest);
+    if (!session) return res.status(400).json({ error: "세션 정보가 필요합니다." });
+    const rawPlayerIds: unknown[] = Array.isArray(req.body?.playerIds)
+      ? req.body.playerIds
+      : [];
+    const requestedPlayerIds = [
+      ...new Set(
+        rawPlayerIds.filter(
+          (value): value is string => typeof value === "string",
+        ),
+      ),
+    ];
+    const members = await clubRepository.listMembers(req.params.clubId);
+    const memberIds = new Set(members.map((member) => member.id));
+    if (requestedPlayerIds.some((playerId) => !memberIds.has(playerId))) {
+      return res.status(400).json({ error: "클럽 활성 멤버만 세션에 등록할 수 있습니다." });
+    }
+    const created = await matchRepository.createSession({
+      ...session,
+      clubId: req.params.clubId,
+    });
+    const managed = requestedPlayerIds.length
+      ? await matchRepository.replaceSessionParticipants(created.id, requestedPlayerIds)
+      : await matchRepository.findSessionById(created.id);
+    res.status(201).json(managed ?? created);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
 
 app.post("/api/register", async (req, res) => {
   try {

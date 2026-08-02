@@ -28,6 +28,7 @@ import {
   IoTennisball,
   IoTennisballOutline,
 } from "react-icons/io5";
+import { TbAffiliate } from "react-icons/tb";
 import AppSettingsSheetBody from "@/components/AppSettingsSheetBody";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import BottomSheet from "@/components/BottomSheet";
@@ -50,25 +51,29 @@ import { buildApiUrl } from "@/lib/api";
 import Matches from "@/pages/Matches";
 import Members from "@/pages/Members";
 import Me from "@/pages/Me";
+import Affiliations from "@/pages/Affiliations";
 
-const TAB_KEYS: TabKey[] = ["match", "members", "me"];
+const TAB_KEYS: TabKey[] = ["match", "members", "affiliations", "me"];
 const DEFAULT_THEME_COLOR = "#f8f9fa";
 const DIMMED_THEME_COLOR = "#aeaeaf";
 const TAB_THEME_COLOR_MAP: Record<TabKey, string> = {
   match: DEFAULT_THEME_COLOR,
   members: DEFAULT_THEME_COLOR,
+  affiliations: DEFAULT_THEME_COLOR,
   me: DEFAULT_THEME_COLOR,
 };
 
 const emptyDepthStacks = (): TabDepthStacks => ({
   match: [],
   members: [],
+  affiliations: [],
   me: [],
 });
 
 const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
   match: false,
   members: false,
+  affiliations: false,
   me: true,
 });
 
@@ -137,6 +142,7 @@ const BottomNav: React.FC = () => {
   const depthEntriesRef = useRef<Record<TabKey, TabDepthEntry[]>>({
     match: [],
     members: [],
+    affiliations: [],
     me: [],
   });
   const scrollPositionsRef = useRef<Record<string, number>>({});
@@ -171,6 +177,7 @@ const BottomNav: React.FC = () => {
     setDepthStacks({
       match: depthEntriesRef.current.match.map((entry) => entry.id),
       members: depthEntriesRef.current.members.map((entry) => entry.id),
+      affiliations: depthEntriesRef.current.affiliations.map((entry) => entry.id),
       me: depthEntriesRef.current.me.map((entry) => entry.id),
     });
   }, []);
@@ -1066,7 +1073,7 @@ const BottomNav: React.FC = () => {
           <Tabs.ListContainer className="mr-[5.07rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-3 gap-1 rounded-full shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid grid-cols-4 gap-0.5 rounded-full shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
               <Tabs.Tab
                 id="match"
@@ -1081,7 +1088,7 @@ const BottomNav: React.FC = () => {
                   ) : (
                     <IoTennisballOutline className="text-lg" />
                   )}
-                  <span className="text-[13.2px] leading-none">Matches</span>
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">Matches</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1098,7 +1105,20 @@ const BottomNav: React.FC = () => {
                   ) : (
                     <IoPeopleOutline className="text-lg" />
                   )}
-                  <span className="text-[13.2px] leading-none">Members</span>
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">Members</span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab
+                id="affiliations"
+                onPointerDownCapture={() =>
+                  handleActiveTabPointerDown("affiliations")
+                }
+                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+              >
+                <div className="flex flex-col items-center gap-1 py-1.5">
+                  <TbAffiliate className="text-lg" />
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">클럽</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1113,7 +1133,7 @@ const BottomNav: React.FC = () => {
                   ) : (
                     <IoPersonCircleOutline className="text-lg" />
                   )}
-                  <span className="text-[13.2px] leading-none">Me</span>
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">Me</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1169,6 +1189,13 @@ const BottomNav: React.FC = () => {
             className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Members />
+          </Tabs.Panel>
+          <Tabs.Panel
+            id="affiliations"
+            shouldForceMount={visitedTabs.affiliations}
+            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
+          >
+            <Affiliations />
           </Tabs.Panel>
           <Tabs.Panel
             id="me"

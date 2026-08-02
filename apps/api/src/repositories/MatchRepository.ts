@@ -52,6 +52,7 @@ const hydrateSession = (record: any): Session | undefined => {
       typeof record.session.location === "string" && record.session.location.trim()
         ? record.session.location.trim()
         : "Court TBD",
+    clubId: typeof record.session.clubId === "string" ? record.session.clubId : undefined,
   };
 };
 
@@ -60,13 +61,15 @@ const hydrateStandaloneSession = (record: any): Session => ({
   name: record.name,
   date: new Date(record.date),
   location: record.location,
+  clubId: typeof record.clubId === "string" ? record.clubId : undefined,
 });
 
-const hydrateManagedSession = (record: any): ManagedMatchSession => ({
+export const hydrateManagedSession = (record: any): ManagedMatchSession => ({
   id: record.id,
   name: record.name,
   date: new Date(record.date),
   location: record.location,
+  clubId: typeof record.clubId === "string" ? record.clubId : undefined,
   participantIds: record.participantIds ?? [],
   matchCount: Number(record.matchCount ?? 0),
   createdAt: new Date(record.createdAt),
@@ -84,7 +87,7 @@ const hydrateRatingChangeLog = (record: any): PlayerRatingChangeLog => ({
   createdAt: new Date(record.createdAt),
 });
 
-const hydrateMatch = (record: any): Match => ({
+export const hydrateMatch = (record: any): Match => ({
   ...record,
   mode: (record.mode as MatchMode | undefined) ?? DEFAULT_MATCH_MODE,
   source: record.source ?? "player_created",
@@ -142,6 +145,7 @@ const hydrateSessionSummary = (record: any): MatchSessionSummary => ({
     typeof record.location === "string" && record.location.trim()
       ? record.location.trim()
       : "Court TBD",
+  clubId: typeof record.clubId === "string" ? record.clubId : undefined,
   status: record.status === "completed" ? "completed" : "created",
   matchCount: record.matchCount,
   participants: (record.participants ?? []).map((participant: any) => ({

@@ -2,6 +2,7 @@ import {
   boolean,
   customType,
   int,
+  index,
   mysqlTable,
   text,
   uniqueIndex,
@@ -157,6 +158,7 @@ export const matchSessions = mysqlTable(
     name: varchar("name", { length: 255 }).notNull(),
     date: unixTimestamp("date").notNull(),
     location: varchar("location", { length: 255 }).notNull(),
+    clubId: id("club_id"),
     createdAt: unixTimestamp("created_at").notNull(),
     updatedAt: unixTimestamp("updated_at").notNull(),
   },
@@ -165,6 +167,92 @@ export const matchSessions = mysqlTable(
       table.name,
       table.date,
     ),
+  }),
+);
+
+export const clubs = mysqlTable(
+  "clubs",
+  {
+    id: id("id").primaryKey(),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: varchar("description", { length: 500 }).notNull(),
+    createdByPlayerId: id("created_by_player_id").notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+    updatedAt: unixTimestamp("updated_at").notNull(),
+  },
+  (table) => ({
+    nameUnique: uniqueIndex("clubs_name_unique").on(table.name),
+  }),
+);
+
+export const clubMemberships = mysqlTable(
+  "club_memberships",
+  {
+    id: id("id").primaryKey(),
+    clubId: id("club_id").notNull(),
+    playerId: id("player_id").notNull(),
+    role: varchar("role", { length: 16 }).notNull(),
+    joinedAt: unixTimestamp("joined_at").notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+    updatedAt: unixTimestamp("updated_at").notNull(),
+  },
+  (table) => ({
+    clubPlayerUnique: uniqueIndex("club_memberships_club_player_unique").on(
+      table.clubId,
+      table.playerId,
+    ),
+    playerIndex: index("club_memberships_player_id_idx").on(table.playerId),
+  }),
+);
+
+export const clubJoinRequests = mysqlTable(
+  "club_join_requests",
+  {
+    id: id("id").primaryKey(),
+    clubId: id("club_id").notNull(),
+    playerId: id("player_id").notNull(),
+    requestedAt: unixTimestamp("requested_at").notNull(),
+  },
+  (table) => ({
+    clubPlayerUnique: uniqueIndex("club_join_requests_club_player_unique").on(
+      table.clubId,
+      table.playerId,
+    ),
+    clubIndex: index("club_join_requests_club_id_idx").on(table.clubId),
+  }),
+);
+
+export const clubAnnouncements = mysqlTable(
+  "club_announcements",
+  {
+    id: id("id").primaryKey(),
+    clubId: id("club_id").notNull(),
+    title: varchar("title", { length: 160 }).notNull(),
+    body: text("body").notNull(),
+    createdByPlayerId: id("created_by_player_id").notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+    updatedAt: unixTimestamp("updated_at").notNull(),
+  },
+  (table) => ({
+    clubCreatedAtIndex: index("club_announcements_club_created_at_idx").on(
+      table.clubId,
+      table.createdAt,
+    ),
+  }),
+);
+
+export const clubInvites = mysqlTable(
+  "club_invites",
+  {
+    id: id("id").primaryKey(),
+    clubId: id("club_id").notNull(),
+    token: varchar("token", { length: 128 }).notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+    revokedAt: unixTimestamp("revoked_at"),
+  },
+  (table) => ({
+    tokenUnique: uniqueIndex("club_invites_token_unique").on(table.token),
+    clubIndex: index("club_invites_club_id_idx").on(table.clubId),
   }),
 );
 

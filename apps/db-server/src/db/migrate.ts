@@ -133,6 +133,65 @@ const migrations = [
     statements: initialSchemaStatements,
   },
   {
+    id: "0001_clubs",
+    statements: [
+      `ALTER TABLE match_sessions ADD COLUMN club_id VARCHAR(255) NULL`,
+      `CREATE INDEX match_sessions_club_id_idx ON match_sessions (club_id)`,
+      `CREATE TABLE clubs (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        created_by_player_id VARCHAR(255) NOT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        UNIQUE KEY clubs_name_unique (name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE club_memberships (
+        id VARCHAR(255) PRIMARY KEY,
+        club_id VARCHAR(255) NOT NULL,
+        player_id VARCHAR(255) NOT NULL,
+        role VARCHAR(16) NOT NULL,
+        joined_at BIGINT NOT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        UNIQUE KEY club_memberships_club_player_unique (club_id, player_id),
+        INDEX club_memberships_player_id_idx (player_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE club_join_requests (
+        id VARCHAR(255) PRIMARY KEY,
+        club_id VARCHAR(255) NOT NULL,
+        player_id VARCHAR(255) NOT NULL,
+        requested_at BIGINT NOT NULL,
+        UNIQUE KEY club_join_requests_club_player_unique (club_id, player_id),
+        INDEX club_join_requests_club_id_idx (club_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE club_announcements (
+        id VARCHAR(255) PRIMARY KEY,
+        club_id VARCHAR(255) NOT NULL,
+        title VARCHAR(160) NOT NULL,
+        body TEXT NOT NULL,
+        created_by_player_id VARCHAR(255) NOT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        INDEX club_announcements_club_created_at_idx (club_id, created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE club_invites (
+        id VARCHAR(255) PRIMARY KEY,
+        club_id VARCHAR(255) NOT NULL,
+        token VARCHAR(128) NOT NULL,
+        created_at BIGINT NOT NULL,
+        revoked_at BIGINT NULL,
+        UNIQUE KEY club_invites_token_unique (token),
+        INDEX club_invites_club_id_idx (club_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
+  {
+    id: "0002_club_description",
+    statements: [
+      `ALTER TABLE clubs ADD COLUMN description VARCHAR(500) NOT NULL DEFAULT '' AFTER name`,
+    ],
+  },
+  {
     id: "0003_auth_identities_and_oauth_transactions",
     statements: [
       `CREATE TABLE player_auth_identities (
