@@ -312,7 +312,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   return (
     <>
       <Drawer.Body className="flex flex-col gap-3 px-3 pb-4">
-        <h2 className="bs-text-head sticky top-0 z-10 -mx-3 shrink-0 bg-white px-3 pt-3 pb-0 text-center text-pkpk-main-font">
+        <h2 className="bs-text-head sticky top-0 z-10 -mx-3 shrink-0 bg-white px-3 pt-3 pb-0 text-left text-pkpk-main-font">
           매치 생성
         </h2>
         {isQrScannerOpen ? (

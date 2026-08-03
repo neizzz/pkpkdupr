@@ -69,7 +69,7 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
 
   return (
     <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto pb-2">
-      <h2 className="bs-text-head text-center text-pkpk-main-font">
+      <h2 className="bs-text-head text-left text-pkpk-main-font">
         상태메시지 수정
       </h2>
 

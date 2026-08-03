@@ -12,7 +12,9 @@ const AvatarUploadConfirmSheetBody: React.FC<
   AvatarUploadConfirmSheetBodyProps
 > = ({ previewUrl, name, isSaving, onConfirm, onCancel }) => (
   <div className="flex flex-col items-center gap-5 pb-2 text-center">
-    <h2 className="bs-text-head text-pkpk-main-font">프로필 사진 확인</h2>
+    <h2 className="bs-text-head self-stretch text-left text-pkpk-main-font">
+      프로필 사진 확인
+    </h2>
     <img
       src={previewUrl}
       alt={`${name} 프로필 사진 미리보기`}

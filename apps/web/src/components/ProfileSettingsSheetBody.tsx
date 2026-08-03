@@ -18,7 +18,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-5">
-      <h2 className="bs-text-head text-center text-pkpk-main-font">설정</h2>
+      <h2 className="bs-text-head text-left text-pkpk-main-font">설정</h2>
 
       <PasswordChangeForm
         title="패스워드 변경"
