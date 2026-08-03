@@ -13,7 +13,7 @@ const TabPanelEmptyState: React.FC<TabPanelEmptyStateProps> = ({
   tone = "default",
   children,
 }) => (
-  <div className="flex min-h-[240px] flex-1 items-center justify-center px-6 py-12 text-center">
+  <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-12 text-center">
     <div className="flex w-full flex-col items-center gap-3">
       {message ? (
         <p

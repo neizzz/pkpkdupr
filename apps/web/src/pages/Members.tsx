@@ -570,39 +570,40 @@ const Members: React.FC = () => {
 
   return (
     <>
-      <TabPanelHeader
-        title="Players"
-        showGradientExtension={false}
-        onHeaderElementChange={setHeaderElement}
-      >
-        <button
-          type="button"
-          className="flex h-9 items-center gap-1.5 rounded-full pl-1 pr-0 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80"
-          onClick={openMyProfile}
+      <div className="flex h-full min-h-full flex-col">
+        <TabPanelHeader
+          title="Players"
+          showGradientExtension={false}
+          onHeaderElementChange={setHeaderElement}
         >
-          <Avatar
-            size="xs"
-            avatarUrl={player?.avatarUrl}
-            name={player?.username}
-          />
-          <span>내 프로필</span>
-          <IoChevronForward
-            aria-hidden="true"
-            className="-mr-1.5 size-4 text-pkpk-primary-font/70"
-          />
-        </button>
-      </TabPanelHeader>
-      <div className="tab-panel-header-content flex min-h-full bg-white">
-        <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
-          <div>
-            {notice ? (
-              <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
-                {notice}
-              </p>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            className="flex h-9 items-center gap-1.5 rounded-full pl-1 pr-0 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80"
+            onClick={openMyProfile}
+          >
+            <Avatar
+              size="xs"
+              avatarUrl={player?.avatarUrl}
+              name={player?.username}
+            />
+            <span>내 프로필</span>
+            <IoChevronForward
+              aria-hidden="true"
+              className="-mr-1.5 size-4 text-pkpk-primary-font/70"
+            />
+          </button>
+        </TabPanelHeader>
+        <div className="tab-panel-header-content flex min-h-0 flex-1 bg-white">
+          <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
+            <div>
+              {notice ? (
+                <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
+                  {notice}
+                </p>
+              ) : null}
+            </div>
 
-          <div className="flex flex-1 flex-col">
+            <div className="flex flex-1 flex-col">
             {isMemberListLoading ? (
               <MemberListSkeleton headerElement={headerElement} />
             ) : error ? (
@@ -691,6 +692,7 @@ const Members: React.FC = () => {
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>

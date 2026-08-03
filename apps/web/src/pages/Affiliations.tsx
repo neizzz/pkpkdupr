@@ -419,56 +419,45 @@ const Affiliations: React.FC = () => {
   };
 
   return (
-    <div className="min-h-full">
+    <div className="flex h-full min-h-full flex-col">
       <TabPanelHeader title="Clubs">
-        <div className="flex items-center gap-1.5">
-          <Button
-            isIconOnly
-            aria-label="클럽 QR 스캔"
-            variant="secondary"
-            className="size-9 rounded-full !bg-white !text-pkpk-secondary-bg shadow-sm hover:!bg-white/90"
-            isDisabled={!isOnline}
-            onPress={() => setScannerTarget("invite")}
-          >
-            <IoScanOutline className="size-5" />
-          </Button>
-          <button
-            type="button"
-            className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!isOnline}
-            onClick={() => setIsCreateOpen(true)}
-          >
-            + 클럽 만들기
-          </button>
-        </div>
+        <button
+          type="button"
+          className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!isOnline}
+          onClick={() => setIsCreateOpen(true)}
+        >
+          + 클럽 만들기
+        </button>
       </TabPanelHeader>
 
-      {isLoading ? (
-        <TabPanelStatus isLoading ariaLabel="클럽을 불러오는 중" message="클럽을 불러오는 중이에요." />
-      ) : error && !activeClubs.length ? (
-        <TabPanelStatus tone="error" message={error} />
-      ) : !activeClubs.length ? (
-        <TabPanelEmptyState message="클럽을 만들거나 주변 클럽에 가입해보세요.">
-          <Button
-            variant="secondary"
-            className="mt-2 rounded-full px-4 font-semibold text-pkpk-primary-bg"
-            isDisabled={!isOnline}
-            onPress={() => setScannerTarget("invite")}
-          >
-            <IoScanOutline className="mr-1 size-4" />
-            클럽 QR 스캔
-          </Button>
-          {pendingClubs.length ? (
-            <div className="mt-3 w-full max-w-sm rounded-2xl border border-pkpk-primary-bg/15 bg-white px-4 py-3 text-left">
-              <p className="text-sm font-bold text-pkpk-main-font">가입 요청 대기</p>
-              <p className="mt-1 text-sm text-pkpk-sub-font">
-                {pendingClubs.map((item) => item.club.name).join(", ")}
-              </p>
-            </div>
-          ) : null}
-        </TabPanelEmptyState>
-      ) : (
-        <div className="space-y-5 p-3 pb-7">
+      <div className="flex min-h-0 flex-1 flex-col">
+        {isLoading ? (
+          <TabPanelStatus isLoading ariaLabel="클럽을 불러오는 중" message="클럽을 불러오는 중이에요." />
+        ) : error && !activeClubs.length ? (
+          <TabPanelStatus tone="error" message={error} />
+        ) : !activeClubs.length ? (
+          <TabPanelEmptyState message="클럽을 만들거나 주변 클럽에 가입해보세요.">
+            <Button
+              variant="secondary"
+              className="mt-2 rounded-full px-4 font-semibold text-pkpk-primary-bg"
+              isDisabled={!isOnline}
+              onPress={() => setScannerTarget("invite")}
+            >
+              <IoScanOutline className="mr-1 size-4" />
+              클럽 QR 스캔
+            </Button>
+            {pendingClubs.length ? (
+              <div className="mt-3 w-full max-w-sm rounded-2xl border border-pkpk-primary-bg/15 bg-white px-4 py-3 text-left">
+                <p className="text-sm font-bold text-pkpk-main-font">가입 요청 대기</p>
+                <p className="mt-1 text-sm text-pkpk-sub-font">
+                  {pendingClubs.map((item) => item.club.name).join(", ")}
+                </p>
+              </div>
+            ) : null}
+          </TabPanelEmptyState>
+        ) : (
+          <div className="space-y-5 p-3 pb-7">
           <div className="-mx-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="flex w-max gap-2">
               {activeClubs.map((item) => (
@@ -569,8 +558,9 @@ const Affiliations: React.FC = () => {
               ) : null}
             </>
           )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       <BottomSheet
         isOpen={isCreateOpen}
