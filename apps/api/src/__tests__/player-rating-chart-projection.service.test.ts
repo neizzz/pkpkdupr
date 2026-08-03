@@ -48,6 +48,26 @@ describe("buildPlayerRatingChartProjection", () => {
     );
   });
 
+  it("같은 날 완료된 매치 뒤에도 오늘의 현재 레이팅 지점을 추가한다", () => {
+    const history: PlayerRatingHistory = {
+      singles: [
+        { rating: 3.4, createdAt: dayBefore(0.5), source: "match" },
+      ],
+      doubles: [],
+    };
+
+    const projection = buildPlayerRatingChartProjection(history, now).singles;
+
+    expect(projection).toEqual([
+      expect.objectContaining({ rating: 3.4, source: "match" }),
+      expect.objectContaining({
+        rating: 3.4,
+        source: "current",
+        createdAt: now,
+      }),
+    ]);
+  });
+
   it("직선 추세에서는 불필요한 내부 변곡점을 저장하지 않는다", () => {
     const history: PlayerRatingHistory = {
       singles: Array.from({ length: 12 }, (_, index) => ({

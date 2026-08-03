@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CategoryScale,
   Chart as ChartJS,
   type ChartData,
   type ChartOptions,
@@ -16,7 +15,6 @@ import { Line } from "react-chartjs-2";
 import type { MemberProfileRatingHistoryPoint } from "@/components/MemberProfile";
 
 ChartJS.register(
-  CategoryScale,
   Filler,
   LinearScale,
   LineElement,
@@ -70,6 +68,10 @@ const formatDate = (value: string) => {
 };
 
 const accentColor = "#eaff19"; // --color-pkpk-accent-bg
+const CHART_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+const VISUAL_MERGE_X_PX = 16;
+const VISUAL_MERGE_Y_PX = 6;
+const CHART_PLOT_HEIGHT_PX = 102;
 
 const createAreaGradient = (context: ScriptableContext<"line">) => {
   const { chart } = context;
@@ -89,6 +91,7 @@ const createAreaGradient = (context: ScriptableContext<"line">) => {
 
 const createChartDecorationPlugin = (
   pointIndexes: Set<number>,
+  dateLabels: Map<number, string>,
 ): Plugin<"line"> => ({
   id: "ratingHistoryChartDecorations",
   afterDatasetDraw(chart, args) {
@@ -163,6 +166,21 @@ const createChartDecorationPlugin = (
       ctx.lineTo(point.x, chartArea.bottom);
       ctx.stroke();
     }
+
+    ctx.fillStyle = accentColor;
+    ctx.font = "600 11px sans-serif";
+    ctx.textBaseline = "top";
+    for (const [index, dateLabel] of dateLabels) {
+      const point = points[index];
+      if (!point) continue;
+
+      ctx.textAlign = point.x < chartArea.left + 24
+        ? "left"
+        : point.x > chartArea.right - 24
+          ? "right"
+          : "center";
+      ctx.fillText(dateLabel, point.x, chartArea.bottom + 8);
+    }
     ctx.restore();
   },
 });
@@ -178,41 +196,138 @@ const getLabeledPointIndexes = (values: number[]) => {
   return new Set([values.indexOf(maximum), values.indexOf(minimum)]);
 };
 
+const getPointTimestamp = (point: MemberProfileRatingHistoryPoint) => {
+  const timestamp = new Date(point.createdAt).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+/**
+ * 원본 projection은 보존하되, 실제 렌더 영역에서 거의 같은 좌표를 차지하는
+ * 인접점은 최신 지점으로 합친다. 단독 최고/최저점은 차트 의미를 위해 유지한다.
+ */
+const collapseVisuallyOverlappingPoints = (
+  history: MemberProfileRatingHistoryPoint[],
+  chartWidth: number,
+): MemberProfileRatingHistoryPoint[] => {
+  if (history.length < 2 || chartWidth <= 0) return history;
+
+  const values = history.map((point) => point.rating);
+  const maximum = Math.max(...values);
+  const minimum = Math.min(...values);
+  const ratingRange = Math.max(maximum - minimum, 0.01) * 1.24;
+  const isOnlyExtremum = (index: number) => {
+    if (maximum === minimum) return false;
+    const rating = history[index]?.rating;
+    if (rating !== maximum && rating !== minimum) return false;
+    return values.filter((value) => value === rating).length === 1;
+  };
+
+  const collapsed: Array<{ point: MemberProfileRatingHistoryPoint; index: number }> = [];
+  for (const [index, point] of history.entries()) {
+    const previous = collapsed[collapsed.length - 1];
+    if (!previous) {
+      collapsed.push({ point, index });
+      continue;
+    }
+
+    const horizontalDistance =
+      (Math.abs(getPointTimestamp(point) - getPointTimestamp(previous.point)) /
+        CHART_WINDOW_MS) *
+      chartWidth;
+    const verticalDistance =
+      (Math.abs(point.rating - previous.point.rating) / ratingRange) *
+      CHART_PLOT_HEIGHT_PX;
+    const overlapsVisually =
+      horizontalDistance <= VISUAL_MERGE_X_PX &&
+      verticalDistance <= VISUAL_MERGE_Y_PX;
+
+    if (
+      overlapsVisually &&
+      !isOnlyExtremum(previous.index) &&
+      !isOnlyExtremum(index)
+    ) {
+      collapsed[collapsed.length - 1] = { point, index };
+    } else {
+      collapsed.push({ point, index });
+    }
+  }
+
+  return collapsed.map(({ point }) => point);
+};
+
 const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
   history,
   label,
 }) => {
   const [isEntered, setIsEntered] = useState(false);
+  const [chartWidth, setChartWidth] = useState(0);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntered(true));
     return () => window.cancelAnimationFrame(frameId);
   }, []);
 
+  useEffect(() => {
+    const element = chartContainerRef.current;
+    if (!element) return;
+
+    const updateWidth = () => {
+      const nextWidth = element.getBoundingClientRect().width;
+      setChartWidth((currentWidth) =>
+        Math.abs(currentWidth - nextWidth) < 1 ? currentWidth : nextWidth,
+      );
+    };
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const chartNow = useMemo(() => new Date(), [history]);
+
   const historyWithToday = useMemo(() => {
     const latestPoint = history[history.length - 1];
-    if (!latestPoint || isToday(latestPoint.createdAt)) return history;
+    if (
+      !latestPoint ||
+      (latestPoint.source === "current" && isToday(latestPoint.createdAt))
+    ) {
+      return history;
+    }
 
     return [
       ...history,
       {
         rating: latestPoint.rating,
-        createdAt: new Date().toISOString(),
+        createdAt: chartNow.toISOString(),
         source: "current" as const,
       },
     ];
-  }, [history]);
+  }, [chartNow, history]);
+  const chartWindowEnd = useMemo(
+    () => Math.max(
+      chartNow.getTime(),
+      ...historyWithToday.map(getPointTimestamp),
+    ),
+    [chartNow, historyWithToday],
+  );
+  const visibleHistory = useMemo(
+    () => collapseVisuallyOverlappingPoints(historyWithToday, chartWidth),
+    [chartWidth, historyWithToday],
+  );
   const values = useMemo(
-    () => historyWithToday.map((point) => point.rating),
-    [historyWithToday],
+    () => visibleHistory.map((point) => point.rating),
+    [visibleHistory],
   );
   const displayHistory = useMemo(
     () =>
-      historyWithToday.length === 1
-        ? [null, historyWithToday[0]]
-        : historyWithToday,
-    [historyWithToday],
+      visibleHistory.length === 1
+        ? [null, visibleHistory[0]]
+        : visibleHistory,
+    [visibleHistory],
   );
-  const valueOffset = historyWithToday.length === 1 ? 1 : 0;
+  const valueOffset = visibleHistory.length === 1 ? 1 : 0;
   const dateLabelIndexes = useMemo(
     () =>
       new Set(
@@ -220,22 +335,28 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
       ),
     [valueOffset, values],
   );
+  const dateLabels = useMemo(() => {
+    const labels = new Map<number, string>();
+    for (const index of dateLabelIndexes) {
+      const point = displayHistory[index];
+      if (point) labels.set(index, formatDate(point.createdAt));
+    }
+    return labels;
+  }, [dateLabelIndexes, displayHistory]);
   const chartDecorationPlugin = useMemo(
-    () => createChartDecorationPlugin(dateLabelIndexes),
-    [dateLabelIndexes],
-  );
-  const labels = useMemo(
-    () => displayHistory.map((point) => point?.createdAt ?? ""),
-    [displayHistory],
+    () => createChartDecorationPlugin(dateLabelIndexes, dateLabels),
+    [dateLabelIndexes, dateLabels],
   );
   const chartValues = useMemo(
-    () => displayHistory.map((point) => point?.rating ?? null),
-    [displayHistory],
+    () => displayHistory.map((point) => ({
+      x: point ? getPointTimestamp(point) : chartWindowEnd - CHART_WINDOW_MS,
+      y: point?.rating ?? null,
+    })),
+    [chartWindowEnd, displayHistory],
   );
 
-  const data = useMemo<ChartData<"line">>(
+  const data = useMemo<ChartData<"line", Array<{ x: number; y: number | null }>>>(
     () => ({
-      labels,
       datasets: [
         {
           data: chartValues,
@@ -255,7 +376,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
         },
       ],
     }),
-    [chartValues, dateLabelIndexes, displayHistory, labels],
+    [chartValues, dateLabelIndexes],
   );
 
   const options = useMemo<ChartOptions<"line">>(
@@ -264,7 +385,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
       maintainAspectRatio: false,
       animation: false,
       layout: {
-        padding: { top: 18, right: 8, bottom: 0, left: 4 },
+        padding: { top: 18, right: 8, bottom: 20, left: 4 },
       },
       plugins: {
         legend: { display: false },
@@ -286,6 +407,9 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
       },
       scales: {
         x: {
+          type: "linear",
+          min: chartWindowEnd - CHART_WINDOW_MS,
+          max: chartWindowEnd,
           reverse: false,
           border: { display: false },
           grid: {
@@ -293,22 +417,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
             drawTicks: false,
           },
           ticks: {
-            autoSkip: false,
-            color: accentColor,
-            font: (context) => ({
-              size: 11,
-              weight: isToday(displayHistory[context.index]?.createdAt ?? "")
-                ? 700
-                : 600,
-            }),
-            maxRotation: 0,
-            minRotation: 0,
-            padding: 8,
-            callback: (_value, index) => {
-              const point = displayHistory[index];
-              if (!dateLabelIndexes.has(index) || !point) return "";
-              return formatDate(point.createdAt);
-            },
+            display: false,
           },
         },
         y: {
@@ -317,7 +426,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
         },
       },
     }),
-    [dateLabelIndexes, displayHistory],
+    [chartWindowEnd, dateLabelIndexes, displayHistory],
   );
 
   if (history.length === 0) {
@@ -330,6 +439,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
 
   return (
     <div
+      ref={chartContainerRef}
       className="mt-2 h-36 min-w-0"
       style={{
         opacity: isEntered ? 1 : 0,
