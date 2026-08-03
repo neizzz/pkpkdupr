@@ -83,7 +83,8 @@ export default defineConfig({
       manifest: {
         name: "PKELO",
         short_name: "PKELO",
-        description: "Pickleball Rating match and member app",
+        description:
+          "피켈로(PKELO)는 플레이어 합의 방식으로 레이팅을 기록하고, 교류하며, 함께 성장하는 피클볼 라이프 앱입니다.",
         id: "/",
         lang: "ko",
         start_url: "/",
