@@ -5,13 +5,10 @@
 
 ## GitHub Actions
 
-기본 `main`의 `build-app-images` workflow를 수동 실행할 때 아래 입력값을 사용합니다.
+`build-app-images` workflow를 수동 실행할 때 브랜치로 `pkpkdupr`를 선택하고,
+`image_tag`에 PkpkDupr를 구분할 수 있는 고유 태그를 입력합니다.
 
-| 입력 | 값 |
-| --- | --- |
-| `source_ref` | `pkpkdupr` |
-| `image_tag` | `pkpkdupr-<8자리 SHA>` |
-| `api_base_url` | `https://pkpkdupr.duckdns.org:3333` |
+선택한 브랜치의 소스가 빌드되며, 태그는 이미지 식별에만 사용합니다. API 주소는 운영 브라우저 호스트에서 런타임으로 계산하므로 별도 입력하지 않습니다.
 
 workflow는 GHCR 이미지만 push하며 운영 시크릿을 읽지 않습니다.
 
