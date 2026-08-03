@@ -623,11 +623,10 @@ const Affiliations: React.FC = () => {
         {scannerTarget ? (
           <ClubQrScannerSheetBody
             key={scannerTarget}
-            title={scannerTarget === "invite" ? "클럽 QR 스캔" : "멤버 QR 스캔"}
-            description={
+            successMessage={
               scannerTarget === "invite"
-                ? "클럽 QR을 스캔하면 가입 요청을 보낼 수 있어요."
-                : "플레이어 QR을 스캔하면 즉시 클럽 멤버로 추가돼요."
+                ? "클럽 가입 요청을 보냈어요."
+                : "클럽 멤버로 추가했어요."
             }
             onScanned={
               scannerTarget === "invite" ? handleInviteScan : handlePlayerScan
