@@ -9,7 +9,10 @@ import type {
 } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
 import { generateEntityId } from "@pkpkdupr/shared/entityId";
-import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
+import type {
+  PlayerRatingChangeLog,
+  PlayerRatingHistory,
+} from "@pkpkdupr/shared/player";
 
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
 
@@ -31,6 +34,11 @@ export interface TimestampUnitAudit {
     completedMatchCount: number;
     latestLegacyMatchStartsAt: number;
   }>;
+}
+
+export interface PlayerRatingChartProjection {
+  history: PlayerRatingHistory;
+  generatedAt: Date;
 }
 
 const toDateOrNull = (value: string | Date | null | undefined) =>
@@ -85,6 +93,21 @@ const hydrateRatingChangeLog = (record: any): PlayerRatingChangeLog => ({
   nextRating: record.nextRating,
   delta: record.delta,
   createdAt: new Date(record.createdAt),
+});
+
+const hydrateRatingHistory = (record: any): PlayerRatingHistory => ({
+  singles: (record?.singles ?? []).flatMap((point: any) => {
+    const createdAt = new Date(point.createdAt);
+    return Number.isFinite(point.rating) && !Number.isNaN(createdAt.getTime())
+      ? [{ rating: point.rating, source: point.source, createdAt }]
+      : [];
+  }),
+  doubles: (record?.doubles ?? []).flatMap((point: any) => {
+    const createdAt = new Date(point.createdAt);
+    return Number.isFinite(point.rating) && !Number.isNaN(createdAt.getTime())
+      ? [{ rating: point.rating, source: point.source, createdAt }]
+      : [];
+  }),
 });
 
 export const hydrateMatch = (record: any): Match => ({
@@ -454,6 +477,46 @@ export class MatchRepository {
       `/internal/player-rating-change-logs/by-player/${playerId}`,
     );
     return (records ?? []).map(hydrateRatingChangeLog);
+  }
+
+  async getPlayerRatingChartProjection(
+    playerId: string,
+  ): Promise<PlayerRatingChartProjection | null> {
+    try {
+      const record = await this.dbRequest<any>(
+        `/internal/player-rating-chart-projections/${encodeURIComponent(playerId)}`,
+      );
+      const generatedAt = new Date(record.generatedAt);
+      if (Number.isNaN(generatedAt.getTime())) {
+        throw new Error("평점 차트 projection 생성 시각이 유효하지 않습니다.");
+      }
+      return {
+        history: hydrateRatingHistory(record.history),
+        generatedAt,
+      };
+    } catch (error) {
+      if (error instanceof DbRequestError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async replacePlayerRatingChartProjection(
+    playerId: string,
+    projection: PlayerRatingChartProjection,
+  ): Promise<PlayerRatingChartProjection> {
+    const record = await this.dbRequest<any>(
+      `/internal/player-rating-chart-projections/${encodeURIComponent(playerId)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(projection),
+      },
+    );
+    return {
+      history: hydrateRatingHistory(record.history),
+      generatedAt: new Date(record.generatedAt),
+    };
   }
 
   /** 특정 플레이어의 경기 이력 조회 */

@@ -46,7 +46,11 @@ import {
   resolveUserAuthProvider,
 } from "./services/authConfig";
 import { AutoApprovalService } from "./services/AutoApprovalService";
-import { buildPlayerRatingHistory } from "./services/PlayerRatingHistoryService";
+import {
+  attachMatchRatingChanges,
+  PlayerRatingChartProjectionService,
+} from "./services/PlayerRatingChartProjectionService";
+import { buildPlayerProfileSummary } from "./services/PlayerProfileSummaryService";
 import {
   buildCourtSchedule,
   findCourtScheduleConflicts,
@@ -144,6 +148,11 @@ const kakaoAuthService = isExternalUserAuthProvider(userAuthProvider)
   : null;
 const matchRepository = new MatchRepository();
 const clubRepository = new ClubRepository();
+const playerRatingChartProjectionService =
+  new PlayerRatingChartProjectionService(matchRepository, authService);
+authService.setPlayerRatingChartProjectionRefresher(
+  playerRatingChartProjectionService,
+);
 const autoApprovalService = new AutoApprovalService(matchRepository, authService);
 const AUTO_APPROVAL_INTERVAL_MS = 60_000;
 let autoApprovalInterval: ReturnType<typeof setInterval> | undefined;
@@ -1177,6 +1186,25 @@ app.get("/api/players", async (req, res) => {
   }
 });
 
+app.get("/api/players/:playerId/profile-summary", async (req, res) => {
+  try {
+    if (!(await getAuthPayload(req, res))) {
+      return;
+    }
+
+    const playerId = req.params.playerId;
+    const [result, ratingChangeLogs, projection] = await Promise.all([
+      matchRepository.findByPlayerId(playerId, 0, 10_000),
+      matchRepository.getPlayerRatingChangeLogs(playerId),
+      playerRatingChartProjectionService.getOrRebuild(playerId),
+    ]);
+    const matches = attachMatchRatingChanges(result.matches, ratingChangeLogs);
+    res.json(buildPlayerProfileSummary(matches, playerId, projection.history));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 app.get("/api/player-qr-token", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -1235,38 +1263,14 @@ app.get("/api/matches", async (req, res) => {
       : await matchRepository.findAll(page, limit);
 
     if (playerId) {
-      const [ratingChangeLogs, player] = await Promise.all([
-        matchRepository.getPlayerRatingChangeLogs(playerId),
-        authService.getPlayerById(playerId),
-      ]);
-
-      const logsByMatch = new Map<string, typeof ratingChangeLogs>();
-      for (const log of ratingChangeLogs) {
-        if (log.source !== "match_completed") continue;
-        const matchId = log.sourceLogId
-          .replace(/^match-completed-/, "")
-          .replace(/-[^-]+$/, "");
-        const existing = logsByMatch.get(matchId) ?? [];
-        existing.push(log);
-        logsByMatch.set(matchId, existing);
-      }
-
-      result.matches = result.matches.map((match) => ({
-        ...match,
-        ratingChanges: logsByMatch.get(match.id) ?? [],
-      }));
-
-      const ratingAdjustmentLogs = ratingChangeLogs.filter(
-        (log) => log.source === "official_adjustment_recalculation",
-      );
-      const ratingHistory = buildPlayerRatingHistory(
-        result.matches,
+      const ratingChangeLogs = await matchRepository.getPlayerRatingChangeLogs(
         playerId,
-        player?.duprRating,
+      );
+      result.matches = attachMatchRatingChanges(
+        result.matches,
         ratingChangeLogs,
       );
-
-      return res.json({ ...result, ratingAdjustmentLogs, ratingHistory });
+      return res.json(result);
     }
 
     res.json(result);

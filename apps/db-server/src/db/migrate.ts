@@ -221,6 +221,26 @@ const migrations = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
+  {
+    id: "0004_player_rating_chart_projection",
+    statements: [
+      `CREATE TABLE player_rating_chart_projections (
+        player_id VARCHAR(255) PRIMARY KEY,
+        generated_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+      `CREATE TABLE player_rating_chart_points (
+        id VARCHAR(255) PRIMARY KEY,
+        player_id VARCHAR(255) NOT NULL,
+        category VARCHAR(16) NOT NULL,
+        rating DOUBLE NOT NULL,
+        source VARCHAR(16) NOT NULL,
+        point_at BIGINT NOT NULL,
+        generated_at BIGINT NOT NULL,
+        INDEX player_rating_chart_points_player_category_point_at_idx
+          (player_id, category, point_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

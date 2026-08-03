@@ -20,6 +20,10 @@ import {
   type CreatePlayerRatingChangeLogInput,
 } from "./repositories/PlayerRatingChangeLogRepository";
 import {
+  PlayerRatingChartProjectionRepository,
+  type PlayerRatingChartProjection,
+} from "./repositories/PlayerRatingChartProjectionRepository";
+import {
   OfficialDuprAdjustmentLogRepository,
   type CreateOfficialDuprAdjustmentLogInput,
 } from "./repositories/OfficialDuprAdjustmentLogRepository";
@@ -47,6 +51,8 @@ const playerRepository = new PlayerRepository(db);
 const playerCreationLogRepository = new PlayerCreationLogRepository(db);
 const playerStatusChangeLogRepository = new PlayerStatusChangeLogRepository(db);
 const playerRatingChangeLogRepository = new PlayerRatingChangeLogRepository(db);
+const playerRatingChartProjectionRepository =
+  new PlayerRatingChartProjectionRepository(client);
 const officialDuprAdjustmentLogRepository =
   new OfficialDuprAdjustmentLogRepository(db);
 const matchRepository = new MatchRepository(db, client);
@@ -942,6 +948,52 @@ app.put("/internal/player-rating-change-logs/match-completed", async (req, res) 
     res.status(500).json({ error: (error as Error).message });
   }
 });
+
+app.get(
+  "/internal/player-rating-chart-projections/:playerId",
+  async (req, res) => {
+    try {
+      const projection = await playerRatingChartProjectionRepository.findByPlayerId(
+        req.params.playerId,
+      );
+      if (!projection) {
+        return res.status(404).json({ error: "평점 차트 projection을 찾을 수 없습니다." });
+      }
+      res.json(projection);
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  },
+);
+
+app.put(
+  "/internal/player-rating-chart-projections/:playerId",
+  async (req, res) => {
+    try {
+      const projection = req.body as Partial<PlayerRatingChartProjection>;
+      if (!projection.history || !Array.isArray(projection.history.singles) || !Array.isArray(projection.history.doubles)) {
+        return res.status(400).json({ error: "평점 차트 projection 이력이 필요합니다." });
+      }
+
+      const generatedAt = projection.generatedAt
+        ? new Date(projection.generatedAt)
+        : new Date();
+      if (Number.isNaN(generatedAt.getTime())) {
+        return res.status(400).json({ error: "유효한 projection 생성 시각이 필요합니다." });
+      }
+
+      res.json(
+        await playerRatingChartProjectionRepository.replace(
+          req.params.playerId,
+          projection.history,
+          generatedAt,
+        ),
+      );
+    } catch (error) {
+      res.status(500).json({ error: (error as Error).message });
+    }
+  },
+);
 
 app.get("/internal/official-dupr-adjustment-logs", async (_req, res) => {
   try {

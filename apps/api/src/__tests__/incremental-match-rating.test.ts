@@ -165,6 +165,8 @@ describe("incremental match rating", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const service = new AuthService(ratingService);
+    const rebuildPlayers = vi.fn().mockResolvedValue(undefined);
+    service.setPlayerRatingChartProjectionRefresher({ rebuildPlayers });
     const result = await service.applyMatchResultToRatings(match);
 
     expect(replayMatch).toHaveBeenCalledWith(
@@ -185,6 +187,7 @@ describe("incremental match rating", () => {
       `match-completed-${match.id}-${completedAt.getTime()}`,
       `match-completed-${match.id}-${completedAt.getTime()}`,
     ]);
+    expect(rebuildPlayers).toHaveBeenCalledWith(["winner", "loser"]);
     expect(
       fetchMock.mock.calls.some(([input]) =>
         String(input).endsWith("/internal/matches?page=0&limit=10000"),
