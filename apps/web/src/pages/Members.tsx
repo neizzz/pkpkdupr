@@ -18,7 +18,9 @@ import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
 import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
-import TabPanelHeader from "@/components/TabPanelHeader";
+import TabPanelHeader, {
+  TabPanelHeaderGradientExtension,
+} from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
@@ -28,10 +30,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
 import MyProfile from "@/pages/Me";
-import {
-  formatRating,
-  getCompositeDoublesRating,
-} from "@/utils/dupr";
+import { formatRating, getCompositeDoublesRating } from "@/utils/dupr";
 import {
   buildProfileMatchList,
   buildRecentProfileMatches,
@@ -53,21 +52,33 @@ type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
 };
 
-const MemberListSkeleton: React.FC = () => (
-  <div role="status" aria-label="멤버 목록 로딩 중">
-    {Array.from({ length: 6 }, (_, index) => (
-      <div
-        key={index}
-        className="relative flex w-full items-center gap-3 px-3 py-3"
-      >
-        <SkeletonBlock className="size-12 shrink-0 rounded-full" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <SkeletonBlock className="h-5 w-28" />
-          <SkeletonBlock className="h-3 w-36" />
+const MemberListSkeleton: React.FC<{
+  headerElement: HTMLDivElement | null;
+}> = ({ headerElement }) => (
+  <div role="status" aria-label="멤버 목록 로딩 중" className="px-3 pt-3">
+    <TabPanelHeaderGradientExtension
+      headerElement={headerElement}
+      className="z-0"
+    />
+    <div className="relative z-10 overflow-hidden rounded-3xl bg-white">
+      {Array.from({ length: 6 }, (_, index) => (
+        <div
+          key={index}
+          className={`relative flex w-full items-center gap-3 px-4 py-3 ${
+            index < 5
+              ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
+              : ""
+          }`}
+        >
+          <SkeletonBlock className="size-12 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <SkeletonBlock className="h-5 w-28" />
+            <SkeletonBlock className="h-3 w-36" />
+          </div>
+          <SkeletonBlock className="h-5 w-10" />
         </div>
-        <SkeletonBlock className="h-5 w-10" />
-      </div>
-    ))}
+      ))}
+    </div>
   </div>
 );
 
@@ -124,6 +135,9 @@ const Members: React.FC = () => {
     registerPullToRefresh,
   } = useTabNavigation();
   const [members, setMembers] = useState<MemberListPlayerInfo[]>([]);
+  const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -144,8 +158,10 @@ const Members: React.FC = () => {
     useState(false);
   const [isMemberMatchHistoryRequested, setIsMemberMatchHistoryRequested] =
     useState(false);
-  const [isSelectedMemberMatchHistoryLoading, setIsSelectedMemberMatchHistoryLoading] =
-    useState(false);
+  const [
+    isSelectedMemberMatchHistoryLoading,
+    setIsSelectedMemberMatchHistoryLoading,
+  ] = useState(false);
   const [selectedMemberMatchHistoryPage, setSelectedMemberMatchHistoryPage] =
     useState(0);
   const [selectedMemberMatchHistoryTotal, setSelectedMemberMatchHistoryTotal] =
@@ -304,7 +320,10 @@ const Members: React.FC = () => {
         setSelectedMemberMatches((current) => {
           if (!append) return data.matches;
           const ids = new Set(current.map((match) => match.id));
-          return [...current, ...data.matches.filter((match) => !ids.has(match.id))];
+          return [
+            ...current,
+            ...data.matches.filter((match) => !ids.has(match.id)),
+          ];
         });
         setSelectedMemberMatchHistoryPage(page + 1);
         setSelectedMemberMatchHistoryTotal(data.total);
@@ -365,15 +384,18 @@ const Members: React.FC = () => {
     restoreScrollTop("members");
   }, [restoreScrollTop]);
 
-  const handleMemberProfileUpdated = useCallback((updatedPlayer: PlayerInfo) => {
-    setMembers((currentMembers) =>
-      currentMembers.map((member) =>
-        member.id === updatedPlayer.id
-          ? { ...member, ...updatedPlayer }
-          : member,
-      ),
-    );
-  }, []);
+  const handleMemberProfileUpdated = useCallback(
+    (updatedPlayer: PlayerInfo) => {
+      setMembers((currentMembers) =>
+        currentMembers.map((member) =>
+          member.id === updatedPlayer.id
+            ? { ...member, ...updatedPlayer }
+            : member,
+        ),
+      );
+    },
+    [],
+  );
 
   const openMyProfile = () => {
     saveScrollPosition("members");
@@ -526,7 +548,11 @@ const Members: React.FC = () => {
         const leftRating = getCompositeDoublesRating(left.duprRating);
         const rightRating = getCompositeDoublesRating(right.duprRating);
 
-        if (leftRating != null && rightRating != null && leftRating !== rightRating) {
+        if (
+          leftRating != null &&
+          rightRating != null &&
+          leftRating !== rightRating
+        ) {
           return rightRating - leftRating;
         }
         if (leftRating != null) return -1;
@@ -544,10 +570,14 @@ const Members: React.FC = () => {
 
   return (
     <>
-      <TabPanelHeader title="Players">
+      <TabPanelHeader
+        title="Players"
+        showGradientExtension={false}
+        onHeaderElementChange={setHeaderElement}
+      >
         <button
           type="button"
-          className="flex h-9 items-center gap-1.5 rounded-full px-1 text-sm font-semibold text-pkpk-main-font transition-opacity hover:opacity-70"
+          className="flex h-9 items-center gap-1.5 rounded-full pl-1 pr-0 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80"
           onClick={openMyProfile}
         >
           <Avatar
@@ -556,10 +586,13 @@ const Members: React.FC = () => {
             name={player?.username}
           />
           <span>내 프로필</span>
-          <IoChevronForward aria-hidden="true" className="size-4 text-pkpk-sub-font" />
+          <IoChevronForward
+            aria-hidden="true"
+            className="-mr-1.5 size-4 text-pkpk-primary-font/70"
+          />
         </button>
       </TabPanelHeader>
-      <div className="flex min-h-full">
+      <div className="tab-panel-header-content flex min-h-full bg-white">
         <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
           <div>
             {notice ? (
@@ -571,78 +604,91 @@ const Members: React.FC = () => {
 
           <div className="flex flex-1 flex-col">
             {isMemberListLoading ? (
-              <MemberListSkeleton />
+              <MemberListSkeleton headerElement={headerElement} />
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
             ) : sortedMembers.length === 0 ? (
               <TabPanelStatus message="현재 표시할 멤버가 없어요." />
             ) : (
               <div>
-                {sortedMembers.map((member, index) => {
-                  const doublesRating = getCompositeDoublesRating(
-                    member.duprRating,
-                  );
+                <TabPanelHeaderGradientExtension
+                  headerElement={headerElement}
+                  className="z-0"
+                />
+                <div className="relative z-10 overflow-hidden rounded-3xl bg-white mx-1.5 mt-1">
+                  {sortedMembers.map((member, index) => {
+                    const doublesRating = getCompositeDoublesRating(
+                      member.duprRating,
+                    );
 
-                  return (
-                    <div
-                      key={member.id}
-                      className={`relative flex w-full min-w-0 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-pkpk-accent-bg/30 active:bg-amber-50 ${
-                        index < sortedMembers.length - 1
-                          ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
-                          : ""
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => openMemberProfile(member.id)}
-                        className="absolute inset-0 z-0"
-                        aria-label={`${member.username ?? "멤버"} 프로필 보기`}
-                      />
-                      <div className="relative z-10 flex min-w-0 flex-1 items-center gap-4 pointer-events-none">
-                        <Avatar
-                          size="md"
-                          avatarUrl={member.avatarUrl}
-                          name={member.username}
+                    return (
+                      <div
+                        key={member.id}
+                        className={`relative flex w-full min-w-0 items-center gap-3 px-2.5 py-3 text-left transition-colors hover:bg-pkpk-accent-bg/30 active:bg-amber-50 ${
+                          index < sortedMembers.length - 1
+                            ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
+                            : ""
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => openMemberProfile(member.id)}
+                          className="absolute inset-0 z-0"
+                          aria-label={`${member.username ?? "멤버"} 프로필 보기`}
                         />
-                        <div className="flex min-w-0 flex-1 flex-col gap-1 self-start pt-1">
-                          <p className="truncate text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold text-pkpk-main-font">
-                            {member.username}
-                          </p>
-                          {member.statusMessage || member.affiliations?.length ? (
-                            <div className="pointer-events-auto">
-                              <PlayerProfileMeta
-                                affiliations={member.affiliations}
-                                statusMessage={member.statusMessage}
-                                statusMessageBackgroundColor={
-                                  member.statusMessageBackgroundColor
-                                }
-                                isMe={member.id === player?.id}
-                                onSetPrimary={(name) =>
-                                  void setMemberPrimaryAffiliation(member, name)
-                                }
-                              />
-                            </div>
-                          ) : null}
-                          <p className="truncate text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
-                            {formatLastPlayedAt(member.lastPlayedAt)}
-                          </p>
+                        <div className="relative z-10 flex min-w-0 flex-1 items-center gap-4 pointer-events-none">
+                          <Avatar
+                            size="md"
+                            avatarUrl={member.avatarUrl}
+                            name={member.username}
+                          />
+                          <div className="flex min-w-0 flex-1 flex-col gap-1 self-start pt-1">
+                            <p className="truncate text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold text-pkpk-main-font">
+                              {member.username}
+                            </p>
+                            {member.statusMessage ||
+                            member.affiliations?.length ? (
+                              <div className="pointer-events-auto">
+                                <PlayerProfileMeta
+                                  affiliations={member.affiliations}
+                                  statusMessage={member.statusMessage}
+                                  statusMessageBackgroundColor={
+                                    member.statusMessageBackgroundColor
+                                  }
+                                  isMe={member.id === player?.id}
+                                  onSetPrimary={(name) =>
+                                    void setMemberPrimaryAffiliation(
+                                      member,
+                                      name,
+                                    )
+                                  }
+                                />
+                              </div>
+                            ) : null}
+                            <p className="truncate text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+                              {formatLastPlayedAt(member.lastPlayedAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2 pointer-events-none">
+                          <span
+                            className={`text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold tabular-nums ${
+                              doublesRating == null
+                                ? "text-pkpk-detail-font"
+                                : "text-pkpk-dupr-font"
+                            }`}
+                          >
+                            {formatRating(doublesRating)}
+                          </span>
+                          <IoChevronForward
+                            aria-hidden="true"
+                            className="size-5 text-pkpk-sub-font"
+                          />
                         </div>
                       </div>
-                      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2 pointer-events-none">
-                        <span
-                          className={`text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold tabular-nums ${
-                            doublesRating == null
-                              ? "text-pkpk-detail-font"
-                              : "text-pkpk-dupr-font"
-                          }`}
-                        >
-                          {formatRating(doublesRating)}
-                        </span>
-                        <IoChevronForward aria-hidden="true" className="size-5 text-pkpk-sub-font" />
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -696,7 +742,8 @@ const Members: React.FC = () => {
             selectedMemberMatches.length < selectedMemberMatchHistoryTotal
           }
           isLoadingMore={
-            isSelectedMemberMatchHistoryLoading && selectedMemberMatches.length > 0
+            isSelectedMemberMatchHistoryLoading &&
+            selectedMemberMatches.length > 0
           }
           onLoadMore={() =>
             selectedMemberId
@@ -721,7 +768,9 @@ const Members: React.FC = () => {
           match={selectedMemberProfileMatch}
           currentPlayerId={player?.id}
           onExited={completeMemberProfileMatchDetailClose}
-          onScrollContainerChange={registerMemberProfileMatchDetailScrollContainer}
+          onScrollContainerChange={
+            registerMemberProfileMatchDetailScrollContainer
+          }
           layer={70}
         />
       ) : null}

@@ -426,7 +426,7 @@ const Affiliations: React.FC = () => {
             isIconOnly
             aria-label="클럽 QR 스캔"
             variant="secondary"
-            className="size-9 rounded-full"
+            className="size-9 rounded-full !bg-white !text-pkpk-secondary-bg shadow-sm hover:!bg-white/90"
             isDisabled={!isOnline}
             onPress={() => setScannerTarget("invite")}
           >
@@ -434,7 +434,7 @@ const Affiliations: React.FC = () => {
           </Button>
           <button
             type="button"
-            className="h-9 px-1 text-sm font-semibold text-pkpk-primary-bg transition-opacity hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!isOnline}
             onClick={() => setIsCreateOpen(true)}
           >

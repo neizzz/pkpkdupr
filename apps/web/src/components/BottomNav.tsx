@@ -48,7 +48,7 @@ import Members from "@/pages/Members";
 import Affiliations from "@/pages/Affiliations";
 
 const TAB_KEYS: TabKey[] = ["match", "members", "affiliations", "me"];
-const DEFAULT_THEME_COLOR = "#f8f9fa";
+const DEFAULT_THEME_COLOR = "#8b1e77";
 const DIMMED_THEME_COLOR = "#aeaeaf";
 const TAB_THEME_COLOR_MAP: Record<TabKey, string> = {
   match: DEFAULT_THEME_COLOR,
@@ -1060,7 +1060,7 @@ const BottomNav: React.FC = () => {
           <Tabs.ListContainer className="global-plus-menu-tab-spacer min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-2 gap-0.5 rounded-full bg-pkpk-primary-bg/10 shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid grid-cols-2 gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
               <Tabs.Tab
                 id="members"
@@ -1102,7 +1102,7 @@ const BottomNav: React.FC = () => {
 
         <div
           ref={scrollContainerRef}
-          className="app-tab-panel-scroll-area relative flex-1"
+          className="app-tab-panel-scroll-area relative z-0 flex-1"
           onTouchMove={handlePullTouchMove}
           onTouchEnd={handlePullTouchEnd}
           onTouchCancel={() => resetPullToRefresh()}
@@ -1138,7 +1138,7 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
+            className="min-h-full bg-white p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
@@ -1157,7 +1157,9 @@ const BottomNav: React.FC = () => {
 
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(5.5rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] bg-gradient-to-t from-white via-white/100 to-transparent"
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(6.333rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] bg-gradient-to-t ${
+            selectedTab === "members" ? "from-white" : "from-pkpk-bg"
+          } to-transparent`}
         />
 
         <BottomSheet

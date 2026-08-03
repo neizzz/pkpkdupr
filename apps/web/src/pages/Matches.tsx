@@ -791,7 +791,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
             } as React.CSSProperties
           }
         >
-          <Switch.Content className="-mx-2 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-pkpk-accent-font touch-manipulation">
+          <Switch.Content className="-ml-2 mr-0 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-pkpk-accent-font touch-manipulation">
             <Switch.Control>
               <Switch.Thumb />
             </Switch.Control>
