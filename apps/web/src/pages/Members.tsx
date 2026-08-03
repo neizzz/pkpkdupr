@@ -615,7 +615,7 @@ const Members: React.FC = () => {
                   headerElement={headerElement}
                   className="z-0"
                 />
-                <div className="relative z-10 overflow-hidden rounded-3xl bg-white mx-1.5 mt-1">
+                <div className="relative z-10 overflow-hidden rounded-3xl bg-white mx-1.5 mt-1 pt-1">
                   {sortedMembers.map((member, index) => {
                     const doublesRating = getCompositeDoublesRating(
                       member.duprRating,
