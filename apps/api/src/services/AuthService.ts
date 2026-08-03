@@ -512,11 +512,27 @@ const hasStoredDuprStateChange = (
   hasDuprChange(buildDuprDelta(nextState.rating, previousState.rating)) ||
   hasDuprMetricChange(nextState.metrics, previousState.metrics);
 
+type PlayerRatingChartProjectionRefresher = {
+  rebuildPlayers(playerIds: Iterable<string>): Promise<void>;
+};
+
 export class AuthService {
+  private playerRatingChartProjectionRefresher?: PlayerRatingChartProjectionRefresher;
+
   constructor(
     private readonly ratingService: RatingServiceContract =
       new ScorePerformanceRatingService(),
   ) {}
+
+  setPlayerRatingChartProjectionRefresher(
+    refresher: PlayerRatingChartProjectionRefresher,
+  ) {
+    this.playerRatingChartProjectionRefresher = refresher;
+  }
+
+  private async refreshPlayerRatingChartProjections(playerIds: Iterable<string>) {
+    await this.playerRatingChartProjectionRefresher?.rebuildPlayers(playerIds);
+  }
 
   private shouldRequirePasswordChange(
     stored: Pick<StoredPlayerRecord, "username" | "isFirstLogin">,
@@ -1847,6 +1863,11 @@ export class AuthService {
         }),
       ),
     );
+    await this.refreshPlayerRatingChartProjections(
+      recalculation.perMatchChanges.flatMap((change) =>
+        change.players.map((player) => player.playerId),
+      ),
+    );
     const recalculated = await this.getStoredPlayerById(stored.id);
 
     return {
@@ -1902,6 +1923,14 @@ export class AuthService {
         )
       : [];
 
+    await this.refreshPlayerRatingChartProjections(
+      perMatchLogs.length > 0
+        ? perMatchLogs.map((log) => log.playerId)
+        : ratingChangeLogs.length > 0
+          ? ratingChangeLogs.map((log) => log.playerId)
+          : impacts.map((impact) => impact.playerId),
+    );
+
     return {
       ratingChangeLogs,
       perMatchLogs,
@@ -1927,6 +1956,9 @@ export class AuthService {
       )
     ).map(hydratePlayerRatingChangeLog);
     if (existingLogs.length > 0) {
+      await this.refreshPlayerRatingChartProjections(
+        existingLogs.map((log) => log.playerId),
+      );
       return {
         ratingChangeLogs: existingLogs,
         changedPlayerCount: existingLogs.filter((log) =>
@@ -2034,6 +2066,10 @@ export class AuthService {
           createdAt: match.completedAt!,
         }),
       ),
+    );
+
+    await this.refreshPlayerRatingChartProjections(
+      ratingChangeLogs.map((log) => log.playerId),
     );
 
     return {

@@ -1,7 +1,9 @@
 import {
   boolean,
   customType,
+  double,
   int,
+  index,
   mysqlTable,
   text,
   uniqueIndex,
@@ -74,6 +76,37 @@ export const playerRatingChangeLogs = mysqlTable("player_rating_change_logs", {
   deltaJson: text("delta_json").notNull(),
   createdAt: unixTimestamp("created_at").notNull(),
 });
+
+/**
+ * 프로필 차트 전용 materialized view입니다. 원본 평점 로그는
+ * playerRatingChangeLogs에 유지하고, 이 테이블은 최대 90일의 압축된 지점만
+ * 보관합니다.
+ */
+export const playerRatingChartProjections = mysqlTable(
+  "player_rating_chart_projections",
+  {
+    playerId: id("player_id").primaryKey(),
+    generatedAt: unixTimestamp("generated_at").notNull(),
+  },
+);
+
+export const playerRatingChartPoints = mysqlTable(
+  "player_rating_chart_points",
+  {
+    id: id("id").primaryKey(),
+    playerId: id("player_id").notNull(),
+    category: varchar("category", { length: 16 }).notNull(),
+    rating: double("rating").notNull(),
+    source: varchar("source", { length: 16 }).notNull(),
+    pointAt: unixTimestamp("point_at").notNull(),
+    generatedAt: unixTimestamp("generated_at").notNull(),
+  },
+  (table) => ({
+    playerCategoryPointIndex: index(
+      "player_rating_chart_points_player_category_point_at_idx",
+    ).on(table.playerId, table.category, table.pointAt),
+  }),
+);
 
 export const matches = mysqlTable("matches", {
   id: id("id").primaryKey(),

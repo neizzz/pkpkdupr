@@ -8,6 +8,7 @@ import {
   AuthService,
   type AuthenticatedSession,
 } from "../services/AuthService";
+import { PlayerRatingChartProjectionService } from "../services/PlayerRatingChartProjectionService";
 
 const now = new Date("2026-07-14T10:00:00.000Z");
 const player: Player = {
@@ -319,17 +320,8 @@ describe("GET /api/matches", () => {
     expect(response.body.matches).toHaveLength(1);
     expect(response.body.matches[0].ratingChanges).toHaveLength(1);
     expect(response.body.matches[0].ratingChanges[0].id).toBe("log-001");
-    expect(response.body.ratingAdjustmentLogs).toEqual([
-      expect.objectContaining({ id: "adjustment-001" }),
-    ]);
-    expect(response.body.ratingHistory).toEqual({
-      singles: [
-        expect.objectContaining({ rating: 3.2, source: "current" }),
-      ],
-      doubles: [
-        expect.objectContaining({ rating: 3, source: "current" }),
-      ],
-    });
+    expect(response.body.ratingAdjustmentLogs).toBeUndefined();
+    expect(response.body.ratingHistory).toBeUndefined();
   });
 
   it("playerId 없이 요청하면 ratingChanges를 포함하지 않는다", async () => {
@@ -344,6 +336,81 @@ describe("GET /api/matches", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.matches[0].ratingChanges).toBeUndefined();
+  });
+});
+
+describe("GET /api/players/:playerId/profile-summary", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(session);
+    vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("압축된 평점 projection과 프로필 요약만 반환한다", async () => {
+    const completedMatch: Match = {
+      ...match,
+      status: "completed",
+      scores: [{ scoreA: 11, scoreB: 8 }],
+      completedAt: now,
+    };
+    const ratingChangeLog: PlayerRatingChangeLog = {
+      id: "log-summary-001",
+      playerId: player.id,
+      source: "match_completed",
+      sourceLogId: `match-completed-${completedMatch.id}-${now.getTime()}`,
+      previousRating: { singles: 3, doubles: 3 },
+      nextRating: { singles: 3.1, doubles: 3 },
+      delta: { singles: 0.1, doubles: 0 },
+      createdAt: now,
+    };
+    vi.spyOn(MatchRepository.prototype, "findByPlayerId").mockResolvedValue({
+      matches: [completedMatch],
+      total: 1,
+    });
+    vi.spyOn(
+      MatchRepository.prototype,
+      "getPlayerRatingChangeLogs",
+    ).mockResolvedValue([ratingChangeLog]);
+    vi.spyOn(
+      PlayerRatingChartProjectionService.prototype,
+      "getOrRebuild",
+    ).mockResolvedValue({
+      history: {
+        singles: [
+          { rating: 3.1, source: "current", createdAt: now },
+        ],
+        doubles: [],
+      },
+      generatedAt: now,
+    });
+
+    const response = await request(app)
+      .get(`/api/players/${player.id}/profile-summary`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      matchStats: {
+        singles: { matchWins: 1, matchLosses: 0, setWins: 1, setLosses: 0 },
+      },
+      ratingDelta: {
+        singles: { last7Days: 0.1, last30Days: 0.1 },
+      },
+      ratingHistory: {
+        singles: [expect.objectContaining({ rating: 3.1, source: "current" })],
+      },
+    });
+    expect(response.body.recentMatches).toHaveLength(1);
+    expect(response.body).not.toHaveProperty("matches");
   });
 });
 

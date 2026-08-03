@@ -4,6 +4,7 @@ import type {
   Match as SharedMatch,
   MatchSessionSummary,
   MatchStatus,
+  MatchTopLevelType,
 } from "@pkpkdupr/shared/match";
 import {
   getMatchTopLevelType,
@@ -65,6 +66,24 @@ export interface MatchListResponse {
   ratingAdjustmentLogs?: PlayerRatingChangeLog[];
   /** API가 공식 DUPR 보정을 분배해 만든 프로필 차트 전용 이력. */
   ratingHistory?: PlayerRatingHistory;
+}
+
+export interface PlayerProfileSummaryResponse {
+  matchStats: Record<
+    MatchTopLevelType,
+    {
+      matchWins: number;
+      matchLosses: number;
+      setWins: number;
+      setLosses: number;
+    }
+  >;
+  ratingDelta: Record<
+    MatchTopLevelType,
+    { last7Days: number; last30Days: number }
+  >;
+  ratingHistory: PlayerRatingHistory;
+  recentMatches: MatchInfo[];
 }
 
 interface MatchProps {

@@ -7,7 +7,11 @@ import React, {
 } from "react";
 import { IoChevronForward } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
-import type { MatchInfo, MatchListResponse } from "@/components/Match";
+import type {
+  MatchInfo,
+  MatchListResponse,
+  PlayerProfileSummaryResponse,
+} from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
@@ -28,10 +32,8 @@ import {
   getCompositeDoublesRating,
 } from "@/utils/dupr";
 import {
-  buildMatchStats,
   buildProfileMatchList,
   buildRecentProfileMatches,
-  buildRatingDelta,
   buildRatingHistory,
   createEmptyMatchStats,
   createEmptyRatingDelta,
@@ -43,6 +45,7 @@ const OFFLINE_FALLBACK_MESSAGE =
   "최신 정보를 불러오지 못해 저장된 멤버 목록을 표시합니다.";
 
 const noop = () => {};
+const MEMBER_MATCH_HISTORY_PAGE_SIZE = 20;
 
 type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
@@ -138,6 +141,12 @@ const Members: React.FC = () => {
     useState(false);
   const [isMemberMatchHistoryRequested, setIsMemberMatchHistoryRequested] =
     useState(false);
+  const [isSelectedMemberMatchHistoryLoading, setIsSelectedMemberMatchHistoryLoading] =
+    useState(false);
+  const [selectedMemberMatchHistoryPage, setSelectedMemberMatchHistoryPage] =
+    useState(0);
+  const [selectedMemberMatchHistoryTotal, setSelectedMemberMatchHistoryTotal] =
+    useState(0);
   const [selectedMemberProfileMatch, setSelectedMemberProfileMatch] =
     useState<MatchInfo | null>(null);
   const isMemberListLoading = useMinimumLoading(isLoading);
@@ -234,12 +243,10 @@ const Members: React.FC = () => {
       }
 
       try {
-        const searchParams = new URLSearchParams({
-          playerId: memberId,
-          limit: "1000",
-        });
         const res = await fetch(
-          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          buildApiUrl(
+            `/api/players/${encodeURIComponent(memberId)}/profile-summary`,
+          ),
           { headers: { Authorization: `Bearer ${token}` } },
         );
 
@@ -247,13 +254,13 @@ const Members: React.FC = () => {
           throw new Error("매치 목록을 불러오지 못했습니다.");
         }
 
-        const data = (await res.json()) as MatchListResponse;
-        setSelectedMemberMatchStats(buildMatchStats(data.matches, memberId));
-        setSelectedMemberRatingDelta(buildRatingDelta(data.matches, memberId));
-        setSelectedMemberMatches(data.matches);
-        setSelectedMemberRatingHistory(
-          buildRatingHistory(data.ratingHistory),
-        );
+        const data = (await res.json()) as PlayerProfileSummaryResponse;
+        setSelectedMemberMatchStats(data.matchStats);
+        setSelectedMemberRatingDelta(data.ratingDelta);
+        setSelectedMemberMatches(data.recentMatches);
+        setSelectedMemberRatingHistory(buildRatingHistory(data.ratingHistory));
+        setSelectedMemberMatchHistoryPage(0);
+        setSelectedMemberMatchHistoryTotal(0);
       } catch (err) {
         if (!preserveVisibleData) {
           setSelectedMemberMatchStats(createEmptyMatchStats());
@@ -268,6 +275,38 @@ const Members: React.FC = () => {
         if (!preserveVisibleData) {
           setIsSelectedMemberStatsLoading(false);
         }
+      }
+    },
+    [token],
+  );
+
+  const loadSelectedMemberMatchHistory = useCallback(
+    async (memberId: string, page: number, append = false) => {
+      if (!token) return;
+
+      setIsSelectedMemberMatchHistoryLoading(true);
+      try {
+        const searchParams = new URLSearchParams({
+          playerId: memberId,
+          page: String(page),
+          limit: String(MEMBER_MATCH_HISTORY_PAGE_SIZE),
+        });
+        const res = await fetch(
+          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!res.ok) throw new Error("매치 목록을 불러오지 못했습니다.");
+
+        const data = (await res.json()) as MatchListResponse;
+        setSelectedMemberMatches((current) => {
+          if (!append) return data.matches;
+          const ids = new Set(current.map((match) => match.id));
+          return [...current, ...data.matches.filter((match) => !ids.has(match.id))];
+        });
+        setSelectedMemberMatchHistoryPage(page + 1);
+        setSelectedMemberMatchHistoryTotal(data.total);
+      } finally {
+        setIsSelectedMemberMatchHistoryLoading(false);
       }
     },
     [token],
@@ -420,7 +459,7 @@ const Members: React.FC = () => {
   );
 
   const openMemberMatchHistory = () => {
-    if (!memberMatchHistoryDepthId) return;
+    if (!memberMatchHistoryDepthId || !selectedMemberId) return;
 
     saveScrollPosition("members");
     pushDepth("members", {
@@ -429,6 +468,7 @@ const Members: React.FC = () => {
       onClose: noop,
     });
     setIsMemberMatchHistoryRequested(true);
+    void loadSelectedMemberMatchHistory(selectedMemberId, 0);
     window.requestAnimationFrame(() => scrollToTop("auto"));
   };
 
@@ -594,7 +634,22 @@ const Members: React.FC = () => {
           isActive={selectedTab === "members"}
           tabKey="members"
           matches={selectedMemberProfileMatches}
-          isLoading={isSelectedMemberStatsLoading}
+          isLoading={isSelectedMemberMatchHistoryLoading}
+          hasMore={
+            selectedMemberMatches.length < selectedMemberMatchHistoryTotal
+          }
+          isLoadingMore={
+            isSelectedMemberMatchHistoryLoading && selectedMemberMatches.length > 0
+          }
+          onLoadMore={() =>
+            selectedMemberId
+              ? void loadSelectedMemberMatchHistory(
+                  selectedMemberId,
+                  selectedMemberMatchHistoryPage,
+                  true,
+                )
+              : undefined
+          }
           onPressMatch={openMemberProfileMatchDetail}
           onExited={completeMemberMatchHistoryClose}
           onScrollContainerChange={registerMemberMatchHistoryScrollContainer}

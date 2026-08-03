@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@heroui/react";
 import { IoSettingsOutline } from "react-icons/io5";
 import BottomSheet from "@/components/BottomSheet";
-import type { MatchInfo, MatchListResponse } from "@/components/Match";
+import type {
+  MatchInfo,
+  MatchListResponse,
+  PlayerProfileSummaryResponse,
+} from "@/components/Match";
 import MemberProfile from "@/components/MemberProfile";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
@@ -13,10 +17,8 @@ import { useTabNavigation } from "@/context/TabNavigationContext";
 import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
 import {
-  buildMatchStats,
   buildProfileMatchList,
   buildRecentProfileMatches,
-  buildRatingDelta,
   buildRatingHistory,
   createEmptyMatchStats,
   createEmptyRatingDelta,
@@ -25,6 +27,7 @@ import {
 
 const noop = () => {};
 const MATCH_HISTORY_DEPTH_ID = "me-match-history";
+const MATCH_HISTORY_PAGE_SIZE = 20;
 
 const Me: React.FC = () => {
   const { player, token, refreshMe } = useAuth();
@@ -46,6 +49,9 @@ const Me: React.FC = () => {
   const [profileMatches, setProfileMatches] = useState<MatchInfo[]>([]);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
   const [isMatchHistoryRequested, setIsMatchHistoryRequested] = useState(false);
+  const [isMatchHistoryLoading, setIsMatchHistoryLoading] = useState(false);
+  const [matchHistoryPage, setMatchHistoryPage] = useState(0);
+  const [matchHistoryTotal, setMatchHistoryTotal] = useState(0);
   const [selectedProfileMatch, setSelectedProfileMatch] =
     useState<MatchInfo | null>(null);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
@@ -77,12 +83,8 @@ const Me: React.FC = () => {
       }
 
       try {
-        const searchParams = new URLSearchParams({
-          playerId,
-          limit: "1000",
-        });
         const res = await fetch(
-          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          buildApiUrl(`/api/players/${encodeURIComponent(playerId)}/profile-summary`),
           {
             headers: { Authorization: `Bearer ${token}` },
             signal,
@@ -93,15 +95,15 @@ const Me: React.FC = () => {
           throw new Error("매치 목록을 불러오지 못했습니다.");
         }
 
-        const data = (await res.json()) as MatchListResponse;
+        const data = (await res.json()) as PlayerProfileSummaryResponse;
 
         if (!signal.aborted) {
-          setMatchStats(buildMatchStats(data.matches, playerId));
-          setRatingDelta(buildRatingDelta(data.matches, playerId));
-          setProfileMatches(data.matches);
-          setRatingHistory(
-            buildRatingHistory(data.ratingHistory),
-          );
+          setMatchStats(data.matchStats);
+          setRatingDelta(data.ratingDelta);
+          setProfileMatches(data.recentMatches);
+          setRatingHistory(buildRatingHistory(data.ratingHistory));
+          setMatchHistoryPage(0);
+          setMatchHistoryTotal(0);
           lastSuccessfulLoadAtRef.current = Date.now();
         }
       } catch {
@@ -118,6 +120,38 @@ const Me: React.FC = () => {
         if (!signal.aborted && !preserveVisibleData) {
           setIsMatchStatsLoading(false);
         }
+      }
+  },
+    [playerId, token],
+  );
+
+  const loadMatchHistory = useCallback(
+    async (page: number, append = false) => {
+      if (!token || !playerId) return;
+
+      setIsMatchHistoryLoading(true);
+      try {
+        const searchParams = new URLSearchParams({
+          playerId,
+          page: String(page),
+          limit: String(MATCH_HISTORY_PAGE_SIZE),
+        });
+        const res = await fetch(
+          buildApiUrl(`/api/matches?${searchParams.toString()}`),
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+        if (!res.ok) throw new Error("매치 목록을 불러오지 못했습니다.");
+
+        const data = (await res.json()) as MatchListResponse;
+        setProfileMatches((current) => {
+          if (!append) return data.matches;
+          const ids = new Set(current.map((match) => match.id));
+          return [...current, ...data.matches.filter((match) => !ids.has(match.id))];
+        });
+        setMatchHistoryPage(page + 1);
+        setMatchHistoryTotal(data.total);
+      } finally {
+        setIsMatchHistoryLoading(false);
       }
     },
     [playerId, token],
@@ -227,6 +261,7 @@ const Me: React.FC = () => {
       onClose: noop,
     });
     setIsMatchHistoryRequested(true);
+    void loadMatchHistory(0);
     window.requestAnimationFrame(() => scrollToTop("auto"));
   };
 
@@ -286,7 +321,10 @@ const Me: React.FC = () => {
         isActive={selectedTab === "me"}
         tabKey="me"
         matches={profileMatchList}
-        isLoading={isMatchStatsLoading}
+        isLoading={isMatchHistoryLoading}
+        hasMore={profileMatches.length < matchHistoryTotal}
+        isLoadingMore={isMatchHistoryLoading && profileMatches.length > 0}
+        onLoadMore={() => void loadMatchHistory(matchHistoryPage, true)}
         onPressMatch={openProfileMatchDetail}
         onExited={completeMatchHistoryClose}
         onScrollContainerChange={registerMatchHistoryScrollContainer}

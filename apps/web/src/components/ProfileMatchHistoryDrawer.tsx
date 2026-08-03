@@ -1,4 +1,5 @@
 import React from "react";
+import { Button, Spinner } from "@heroui/react";
 import type { MatchInfo } from "@/components/Match";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import ProfileMatchList, {
@@ -13,6 +14,9 @@ interface ProfileMatchHistoryDrawerProps {
   tabKey: TabKey;
   matches: ProfileMatchListItem[];
   isLoading?: boolean;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
   onPressMatch: (match: MatchInfo) => void;
   onExited: () => void;
   onScrollContainerChange: (element: HTMLDivElement | null) => void;
@@ -25,6 +29,9 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
   tabKey,
   matches,
   isLoading = false,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
   onPressMatch,
   onExited,
   onScrollContainerChange,
@@ -53,6 +60,19 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
           emptyMessage="완료된 매치가 없어요."
           onPressMatch={onPressMatch}
         />
+        {hasMore ? (
+          <div className="flex justify-center pt-3 pb-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              isDisabled={isLoadingMore}
+              onPress={onLoadMore}
+            >
+              {isLoadingMore ? <Spinner size="sm" /> : "더 보기"}
+            </Button>
+          </div>
+        ) : null}
       </div>
     </div>
   </RightDrawer>

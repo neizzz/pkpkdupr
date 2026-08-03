@@ -170,17 +170,12 @@ const createChartDecorationPlugin = (
 const getLabeledPointIndexes = (values: number[]) => {
   if (values.length === 0) return new Set<number>();
 
-  const currentIndex = values.length - 1;
   const maximum = Math.max(...values);
   const minimum = Math.min(...values);
-  const indexes = new Set([currentIndex]);
-
-  if (maximum !== minimum) {
-    indexes.add(values.indexOf(maximum));
-    indexes.add(values.indexOf(minimum));
-  }
-
-  return indexes;
+  // 데이터 라벨과 점 표시는 최고/최저점만 유지한다. projection의 양끝점과
+  // 중간 변곡점은 선의 모양만 전달해 모바일 화면이 과밀해지지 않게 한다.
+  if (maximum === minimum) return new Set([values.length - 1]);
+  return new Set([values.indexOf(maximum), values.indexOf(minimum)]);
 };
 
 const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
