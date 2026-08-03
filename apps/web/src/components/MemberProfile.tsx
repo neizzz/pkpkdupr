@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Spinner } from "@heroui/react";
+import { Spinner, Tabs } from "@heroui/react";
 import type { PlayerAffiliation } from "@pkpkdupr/shared/player";
 import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
 import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
@@ -377,37 +377,44 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               Rating
             </h3>
 
-            <div
-              role="tablist"
-              aria-label="Rating type"
-              className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-white/10"
+            <Tabs
+              selectedKey={expandedType ?? "doubles"}
+              onSelectionChange={(key) =>
+                handleCardClick(String(key) as MatchTopLevelType)
+              }
+              className="mt-1.5"
             >
-              {duprItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.type}
-                    type="button"
-                    role="tab"
-                    aria-selected={expandedType === item.type}
-                    onClick={() => handleCardClick(item.type)}
-                    className={`min-w-0 rounded-lg px-3 py-3 text-left transition-colors ${
-                      expandedType === item.type
-                        ? "bg-white/25"
-                        : "bg-transparent opacity-80 hover:bg-white/15"
-                    }`}
-                  >
-                    <p className="text-[clamp(1.3rem,6cqw,1.8rem)] font-bold leading-none text-pkpk-secondary-font">
-                      {item.rating}
-                    </p>
-                    <p className="mt-1 flex items-center gap-1 text-[clamp(0.6875rem,3cqw,0.9rem)] font-medium text-pkpk-secondary-font/70">
-                      <Icon className="size-3" />
-                      {item.label}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
+              <Tabs.List
+                aria-label="Rating type"
+                className="grid grid-cols-2 gap-1 !rounded-xl !bg-white/10 !p-0"
+              >
+                {duprItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Tabs.Tab
+                      key={item.type}
+                      id={item.type}
+                      className={`relative !h-auto !min-w-0 !w-full !justify-start !rounded-lg px-3 py-3 !text-left transition-colors ${
+                        expandedType === item.type
+                          ? ""
+                          : "bg-transparent opacity-80 hover:bg-white/15"
+                      }`}
+                    >
+                      <div className="relative z-10 w-full">
+                        <p className="text-[clamp(1.3rem,6cqw,1.8rem)] font-bold leading-none text-pkpk-secondary-font">
+                          {item.rating}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1 text-[clamp(0.6875rem,3cqw,0.9rem)] font-medium text-pkpk-secondary-font/70">
+                          <Icon className="size-3" />
+                          {item.label}
+                        </p>
+                      </div>
+                      <Tabs.Indicator className="pointer-events-none !z-0 !rounded-lg !bg-white/25 !shadow-none" />
+                    </Tabs.Tab>
+                  );
+                })}
+              </Tabs.List>
+            </Tabs>
 
             {isProfileStatsLoading ? (
               <>
