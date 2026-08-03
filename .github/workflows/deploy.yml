@@ -3,17 +3,9 @@ name: build-app-images
 on:
   workflow_dispatch:
     inputs:
-      source_ref:
-        description: "빌드할 앱 소스 ref입니다. 비워두면 실행한 ref를 사용합니다."
-        required: false
-        type: string
       image_tag:
         description: "GHCR 이미지 태그입니다. 앱별 고유 태그를 입력하세요."
         required: true
-        type: string
-      api_base_url:
-        description: "웹에 빌드할 API base URL입니다. 런타임 호스트 계산을 쓰면 비워둡니다."
-        required: false
         type: string
 
 env:
@@ -32,7 +24,6 @@ jobs:
       - name: Checkout application source
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_ref != '' && inputs.source_ref || github.sha }}
           fetch-tags: true
 
       - name: Resolve image metadata
@@ -53,7 +44,6 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           build-args: |
-            VITE_API_BASE_URL=${{ inputs.api_base_url }}
             VITE_APP_VERSION=${{ env.APP_VERSION }}
           push: true
           tags: |

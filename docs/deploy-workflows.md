@@ -5,8 +5,10 @@
 
 ## GitHub Actions
 
-`build-app-images` workflow를 수동 실행할 때 PKELO는 `source_ref`와 `api_base_url`을 비우고,
-`image_tag`에 `pkelo-<8자리 SHA>` 형식의 고유 태그를 입력합니다. workflow는 서버에 접속하거나 운영 시크릿을 읽지 않습니다.
+`build-app-images` workflow를 수동 실행할 때 브랜치로 `main`을 선택하고,
+`image_tag`에 PKELO을 구분할 수 있는 고유 태그를 입력합니다. workflow는 서버에 접속하거나 운영 시크릿을 읽지 않습니다.
+
+선택한 브랜치의 소스가 빌드되며, 태그는 이미지 식별에만 사용합니다. API 주소는 운영 브라우저 호스트에서 런타임으로 계산하므로 별도 입력하지 않습니다.
 
 이미지 push 뒤에는 공용 infra checkout에서 해당 태그를 사용해 PKELO 스택만 반영합니다.
 
