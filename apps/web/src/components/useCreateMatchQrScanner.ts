@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import type { VerifyPlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import { buildApiUrl } from "@/lib/api";
+import { triggerHapticFeedback } from "@/lib/haptics";
 import {
   getCameraErrorMessage,
   normalizeMatchMember,
@@ -183,6 +184,7 @@ const useCreateMatchQrScanner = ({
             }
 
             lastScannedPayloadRef.current = payload;
+            triggerHapticFeedback(40);
             controls.stop();
             scannerControlsRef.current = null;
             void verifyScannedQrPayload(payload);

@@ -47,6 +47,7 @@ import {
 } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
+import { triggerHapticFeedback } from "@/lib/haptics";
 import Matches from "@/pages/Matches";
 import Members from "@/pages/Members";
 import Me from "@/pages/Me";
@@ -155,6 +156,7 @@ const BottomNav: React.FC = () => {
     lastY: number;
   } | null>(null);
   const pullDistanceRef = useRef(0);
+  const isPullToRefreshArmedRef = useRef(false);
   const isPullGestureActiveRef = useRef(false);
   const pullGestureAxisRef = useRef<"undecided" | "vertical" | "horizontal">(
     "undecided",
@@ -760,6 +762,7 @@ const BottomNav: React.FC = () => {
     (status: PullToRefreshStatus = "idle") => {
       pullStartRef.current = null;
       pullDistanceRef.current = 0;
+      isPullToRefreshArmedRef.current = false;
       isPullGestureActiveRef.current = false;
       pullGestureAxisRef.current = "undecided";
       if (scrollContainerRef.current) {
@@ -845,6 +848,7 @@ const BottomNav: React.FC = () => {
         lastY: touch.clientY,
       };
       pullDistanceRef.current = 0;
+      isPullToRefreshArmedRef.current = false;
       isPullGestureActiveRef.current = false;
       pullGestureAxisRef.current = "undecided";
     };
@@ -925,6 +929,11 @@ const BottomNav: React.FC = () => {
         PULL_TO_REFRESH_THRESHOLD * 1.25,
       );
       pullDistanceRef.current = distance;
+      const isArmed = distance >= PULL_TO_REFRESH_THRESHOLD;
+      if (isArmed && !isPullToRefreshArmedRef.current) {
+        triggerHapticFeedback(15);
+      }
+      isPullToRefreshArmedRef.current = isArmed;
       if (distance > 0) {
         isPullGestureActiveRef.current = true;
         if (scrollContainerRef.current) {
@@ -935,7 +944,7 @@ const BottomNav: React.FC = () => {
       setPullToRefreshStatus(
         distance === 0
           ? "idle"
-          : distance >= PULL_TO_REFRESH_THRESHOLD
+          : isArmed
             ? "armed"
             : "pulling",
       );
