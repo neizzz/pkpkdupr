@@ -55,27 +55,32 @@ type MemberListPlayerInfo = PlayerInfo & {
 const MemberListSkeleton: React.FC<{
   headerElement: HTMLDivElement | null;
 }> = ({ headerElement }) => (
-  <div role="status" aria-label="멤버 목록 로딩 중" className="px-3 pt-3">
+  <div role="status" aria-label="멤버 목록 로딩 중">
     <TabPanelHeaderGradientExtension
       headerElement={headerElement}
       className="z-0"
     />
-    <div className="relative z-10 overflow-hidden rounded-3xl bg-white">
+    <div className="relative z-10 mx-1.5 mt-1 overflow-hidden rounded-3xl bg-white pt-1">
       {Array.from({ length: 6 }, (_, index) => (
         <div
           key={index}
-          className={`relative flex w-full items-center gap-3 px-4 py-3 ${
+          className={`relative flex w-full min-w-0 items-center gap-3 px-2.5 py-3 ${
             index < 5
               ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
               : ""
           }`}
         >
-          <SkeletonBlock className="size-12 shrink-0 rounded-full" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <SkeletonBlock className="h-5 w-28" />
-            <SkeletonBlock className="h-3 w-36" />
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <SkeletonBlock className="h-18 w-18 shrink-0 rounded-full" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1 self-start pt-1">
+              <SkeletonBlock className="h-5 w-28" />
+              <SkeletonBlock className="h-3 w-36" />
+            </div>
           </div>
-          <SkeletonBlock className="h-5 w-10" />
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <SkeletonBlock className="h-5 w-10" />
+            <span aria-hidden="true" className="size-5" />
+          </div>
         </div>
       ))}
     </div>
