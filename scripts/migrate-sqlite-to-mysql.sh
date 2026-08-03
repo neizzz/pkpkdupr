@@ -51,14 +51,14 @@ compose_primary up -d mysql
 
 for _ in $(seq 1 60); do
   if compose_primary exec -T mysql sh -ec \
-    'mysqladmin ping -h localhost -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent' >/dev/null 2>&1; then
+    'mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent' >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
 if ! compose_primary exec -T mysql sh -ec \
-  'mysqladmin ping -h localhost -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent' >/dev/null 2>&1; then
+  'mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p"${MYSQL_ROOT_PASSWORD}" --silent' >/dev/null 2>&1; then
   echo "❌ MySQL 준비 시간이 초과되었습니다." >&2
   exit 1
 fi
