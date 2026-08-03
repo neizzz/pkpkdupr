@@ -21,14 +21,10 @@ import {
   IoLogOutOutline,
   IoPeople,
   IoPeopleOutline,
-  IoPersonCircle,
-  IoPersonCircleOutline,
   IoQrCodeSharp,
   IoSettingsOutline,
-  IoTennisball,
-  IoTennisballOutline,
 } from "react-icons/io5";
-import { TbAffiliate } from "react-icons/tb";
+import { TbAffiliate, TbAffiliateFilled } from "react-icons/tb";
 import AppSettingsSheetBody from "@/components/AppSettingsSheetBody";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import BottomSheet from "@/components/BottomSheet";
@@ -48,9 +44,7 @@ import {
 } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
-import Matches from "@/pages/Matches";
 import Members from "@/pages/Members";
-import Me from "@/pages/Me";
 import Affiliations from "@/pages/Affiliations";
 
 const TAB_KEYS: TabKey[] = ["match", "members", "affiliations", "me"];
@@ -72,9 +66,9 @@ const emptyDepthStacks = (): TabDepthStacks => ({
 
 const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
   match: false,
-  members: false,
+  members: true,
   affiliations: false,
-  me: true,
+  me: false,
 });
 
 const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
@@ -107,20 +101,19 @@ const isTabDepthHistoryState = (
 const BottomNav: React.FC = () => {
   const { token, logout } = useAuth();
   const isOnline = useOnlineStatus();
-  const [selectedTab, setSelectedTab] = useState<TabKey>("me");
+  const [selectedTab, setSelectedTab] = useState<TabKey>("members");
   const [visitedTabs, setVisitedTabs] =
     useState<Record<TabKey, boolean>>(initiallyVisitedTabs);
   const [depthStacks, setDepthStacks] =
     useState<TabDepthStacks>(emptyDepthStacks);
   const [isGlobalMenuOpen, setIsGlobalMenuOpen] = useState(false);
-  const [globalMenuTabKey, setGlobalMenuTabKey] = useState<TabKey>("me");
+  const [globalMenuTabKey, setGlobalMenuTabKey] = useState<TabKey>("members");
   const [isQrOpen, setIsQrOpen] = useState(false);
-  const [qrTabKey, setQrTabKey] = useState<TabKey>("me");
+  const [qrTabKey, setQrTabKey] = useState<TabKey>("members");
   const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
-  const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("me");
+  const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("members");
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
-  const [appSettingsTabKey, setAppSettingsTabKey] = useState<TabKey>("me");
-  const [matchesReloadKey, setMatchesReloadKey] = useState(0);
+  const [appSettingsTabKey, setAppSettingsTabKey] = useState<TabKey>("members");
   const [pullDistance, setPullDistance] = useState(0);
   const [pullToRefreshStatus, setPullToRefreshStatus] =
     useState<PullToRefreshStatus>("idle");
@@ -681,14 +674,8 @@ const BottomNav: React.FC = () => {
 
   const handleCreateMatch = () => {
     isCreateMatchQrScannerOpenRef.current = false;
-    setMatchesReloadKey((prev) => prev + 1);
-    if (
-      !closeDepth(createMatchTabKey, "create-match-sheet", () =>
-        selectTab("match"),
-      )
-    ) {
+    if (!closeDepth(createMatchTabKey, "create-match-sheet")) {
       setIsCreateMatchOpen(false);
-      selectTab("match");
     }
   };
 
@@ -1070,28 +1057,11 @@ const BottomNav: React.FC = () => {
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
         <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-3">
-          <Tabs.ListContainer className="mr-[5.07rem] min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
+          <Tabs.ListContainer className="global-plus-menu-tab-spacer min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-4 gap-0.5 rounded-full shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid grid-cols-2 gap-0.5 rounded-full bg-pkpk-primary-bg/10 shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
-              <Tabs.Tab
-                id="match"
-                onPointerDownCapture={() =>
-                  handleActiveTabPointerDown("match")
-                }
-                className="min-h-[3.2rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
-              >
-                <div className="flex flex-col items-center gap-1 py-1.5">
-                  {selectedTab === "match" ? (
-                    <IoTennisball className="text-lg" />
-                  ) : (
-                    <IoTennisballOutline className="text-lg" />
-                  )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">Matches</span>
-                </div>
-                <Tabs.Indicator />
-              </Tabs.Tab>
               <Tabs.Tab
                 id="members"
                 onPointerDownCapture={() =>
@@ -1105,7 +1075,7 @@ const BottomNav: React.FC = () => {
                   ) : (
                     <IoPeopleOutline className="text-lg" />
                   )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">Members</span>
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">플레이어</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1117,23 +1087,12 @@ const BottomNav: React.FC = () => {
                 className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
-                  <TbAffiliate className="text-lg" />
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">클럽</span>
-                </div>
-                <Tabs.Indicator />
-              </Tabs.Tab>
-              <Tabs.Tab
-                id="me"
-                onPointerDownCapture={() => handleActiveTabPointerDown("me")}
-                className="min-h-[3.2rem] w-full first:rounded-l-full last:rounded-r-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
-              >
-                <div className="flex flex-col items-center gap-1 py-1.5">
-                  {selectedTab === "me" ? (
-                    <IoPersonCircle className="text-lg" />
+                  {selectedTab === "affiliations" ? (
+                    <TbAffiliateFilled className="text-lg" />
                   ) : (
-                    <IoPersonCircleOutline className="text-lg" />
+                    <TbAffiliate className="text-lg" />
                   )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">Me</span>
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">클럽</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1177,13 +1136,6 @@ const BottomNav: React.FC = () => {
             </div>
           ) : null}
           <Tabs.Panel
-            id="match"
-            shouldForceMount={visitedTabs.match}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
-          >
-            <Matches reloadKey={matchesReloadKey} />
-          </Tabs.Panel>
-          <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
             className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
@@ -1196,13 +1148,6 @@ const BottomNav: React.FC = () => {
             className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Affiliations />
-          </Tabs.Panel>
-          <Tabs.Panel
-            id="me"
-            shouldForceMount={visitedTabs.me}
-            className="min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
-          >
-            <Me />
           </Tabs.Panel>
           {/* <div
             aria-hidden="true"
@@ -1270,17 +1215,16 @@ const BottomNav: React.FC = () => {
                   <Button
                     isIconOnly
                     aria-label="Global plus menu"
-                    className={`h-[4.32rem] w-[4.32rem] shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors ${
+                    className={`global-plus-menu-trigger shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors ${
                       isGlobalMenuVisible
                         ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
                         : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
                     }`}
                   >
                     <IoAdd
-                      className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
+                      className={`global-plus-menu-trigger-icon shrink-0 transition-transform duration-200 ${
                         isGlobalMenuVisible ? "rotate-45" : "rotate-0"
                       }`}
-                      style={{ width: "33.6px", height: "33.6px" }}
                     />
                   </Button>
                   <Dropdown.Popover

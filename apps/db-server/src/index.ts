@@ -73,42 +73,99 @@ const initSchema = async () => {
 };
 
 const seedDevClubData = async () => {
-  const clubId = "Cdevclb1";
-  const ownerId = "Pdev0001";
-  const club = await clubRepository.findById(clubId);
-  if (!club) {
-    await clubRepository.createClub({
-      id: clubId,
+  const devClubs = [
+    {
+      id: "Cdevclb1",
       name: "PKELO 개발 클럽",
       description: "PKELO 개발과 테스트를 위한 클럽입니다.",
-      ownerPlayerId: ownerId,
-    });
+      ownerPlayerId: "Pdev0001",
+      memberPlayerIds: ["Pdev0002", "Pdev0003", "Pdev0004"],
+      managerPlayerIds: ["Pdev0002"],
+      announcement: {
+        title: "개발 클럽 공지",
+        body: "이번 주말 개발 클럽 세션이 예정되어 있습니다.",
+      },
+      session: {
+        id: "Sclub001",
+        name: "개발 클럽 주말 세션",
+        date: new Date("2026-08-09T10:00:00+09:00"),
+        location: "Dev Club Court",
+      },
+    },
+    {
+      id: "Cdevclb2",
+      name: "주말 랠리 클럽",
+      description: "주말마다 함께 랠리와 게임을 즐기는 클럽입니다.",
+      ownerPlayerId: "Pdev0005",
+      memberPlayerIds: ["Pdev0003", "Pdev0006", "Pdev0007"],
+      managerPlayerIds: ["Pdev0006"],
+      announcement: {
+        title: "토요 오픈 플레이",
+        body: "이번 토요일 오전 오픈 플레이 참가자를 모집합니다.",
+      },
+      session: {
+        id: "Sclub002",
+        name: "주말 랠리 오픈 플레이",
+        date: new Date("2026-08-16T10:00:00+09:00"),
+        location: "Weekend Rally Court",
+      },
+    },
+    {
+      id: "Cdevclb3",
+      name: "새벽 피클볼 클럽",
+      description: "출근 전 상쾌하게 피클볼을 즐기는 새벽 클럽입니다.",
+      ownerPlayerId: "Pdev0008",
+      memberPlayerIds: ["Pdev0001", "Pdev0002", "Pdev0004", "Pdev0006"],
+      managerPlayerIds: ["Pdev0001"],
+      announcement: {
+        title: "새벽 세션 안내",
+        body: "다음 주 수요일 새벽 세션의 코트를 확인해주세요.",
+      },
+      session: {
+        id: "Sclub003",
+        name: "새벽 피클볼 세션",
+        date: new Date("2026-08-12T06:30:00+09:00"),
+        location: "Morning Pickleball Court",
+      },
+    },
+  ];
+
+  for (const devClub of devClubs) {
+    const club = await clubRepository.findById(devClub.id);
+    if (!club) {
+      await clubRepository.createClub(devClub);
+    }
+
+    for (const playerId of devClub.memberPlayerIds) {
+      await clubRepository.addMemberByPlayerQr(devClub.id, playerId);
+    }
+    for (const playerId of devClub.managerPlayerIds) {
+      await clubRepository.setMemberRole(devClub.id, playerId, "manager");
+    }
+
+    const announcements = await clubRepository.listAnnouncements(devClub.id);
+    if (!announcements.length) {
+      await clubRepository.createAnnouncement({
+        clubId: devClub.id,
+        ...devClub.announcement,
+        createdByPlayerId: devClub.ownerPlayerId,
+      });
+    }
+
+    const session = await matchRepository.findSessionById(devClub.session.id);
+    if (!session) {
+      await matchRepository.createSession({
+        ...devClub.session,
+        clubId: devClub.id,
+      });
+    }
   }
-  await clubRepository.addMemberByPlayerQr(clubId, "Pdev0002");
-  await clubRepository.addMemberByPlayerQr(clubId, "Pdev0003");
-  const announcements = await clubRepository.listAnnouncements(clubId);
-  if (!announcements.length) {
-    await clubRepository.createAnnouncement({
-      clubId,
-      title: "개발 클럽 공지",
-      body: "클럽 탭 개발 데이터를 위한 안내 공지입니다.",
-      createdByPlayerId: ownerId,
-    });
-  }
-  const invite = await clubRepository.getOrCreateInvite(clubId);
+
+  const weekendClub = devClubs[1];
+  const invite = await clubRepository.getOrCreateInvite(weekendClub.id);
   await clubRepository.createJoinRequestByInvite(invite.token, "Pdev0004").catch(
     () => undefined,
   );
-  const session = await matchRepository.findSessionById("Sclub001");
-  if (!session) {
-    await matchRepository.createSession({
-      id: "Sclub001",
-      name: "개발 클럽 주말 세션",
-      date: new Date("2026-08-09T10:00:00+09:00"),
-      location: "Dev Club Court",
-      clubId,
-    });
-  }
 };
 
 app.get("/health", (_req, res) => {

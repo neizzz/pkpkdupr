@@ -27,6 +27,17 @@
   --app-shell-height: 100vh;
   --app-keyboard-offset: 0px;
   --safe-bottom: max(12px, env(safe-area-inset-bottom));
+  /* 480px부터 기존 최대 크기(4.32rem)보다 10% 크게 유지한다. */
+  --global-plus-menu-trigger-size: clamp(
+    4.2768rem,
+    calc(4.752vw + 3.3264rem),
+    4.752rem
+  );
+  --global-plus-menu-tab-spacer: clamp(
+    5.0268rem,
+    calc(4.752vw + 4.0764rem),
+    5.502rem
+  );
 }
 
 @supports (height: 100svh) {
@@ -222,6 +233,20 @@
 
 .global-plus-menu-popover {
   transform-origin: bottom right;
+}
+
+.global-plus-menu-trigger {
+  width: var(--global-plus-menu-trigger-size);
+  height: var(--global-plus-menu-trigger-size);
+}
+
+.global-plus-menu-trigger-icon {
+  width: 48.6111%;
+  height: 48.6111%;
+}
+
+.global-plus-menu-tab-spacer {
+  margin-right: var(--global-plus-menu-tab-spacer);
 }
 
 .global-plus-menu-popover[data-entering="true"] {

@@ -19,12 +19,12 @@ import {
   IoScanOutline,
   IoShieldCheckmarkOutline,
 } from "react-icons/io5";
-import { TbAffiliate } from "react-icons/tb";
 import QrCode from "react-qr-code";
 import BottomSheet from "@/components/BottomSheet";
 import ClubQrScannerSheetBody from "@/components/ClubQrScannerSheetBody";
 import RightDrawer from "@/components/RightDrawer";
 import TabPanelHeader from "@/components/TabPanelHeader";
+import TabPanelEmptyState from "@/components/TabPanelEmptyState";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
@@ -420,7 +420,7 @@ const Affiliations: React.FC = () => {
 
   return (
     <div className="min-h-full">
-      <TabPanelHeader title="클럽">
+      <TabPanelHeader title="Clubs">
         <div className="flex items-center gap-1.5">
           <Button
             isIconOnly
@@ -432,13 +432,14 @@ const Affiliations: React.FC = () => {
           >
             <IoScanOutline className="size-5" />
           </Button>
-          <Button
-            className="h-9 rounded-full bg-pkpk-primary-bg px-3 text-sm font-semibold text-white"
-            isDisabled={!isOnline}
-            onPress={() => setIsCreateOpen(true)}
+          <button
+            type="button"
+            className="h-9 px-1 text-sm font-semibold text-pkpk-primary-bg transition-opacity hover:opacity-70 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!isOnline}
+            onClick={() => setIsCreateOpen(true)}
           >
             + 클럽 만들기
-          </Button>
+          </button>
         </div>
       </TabPanelHeader>
 
@@ -447,16 +448,10 @@ const Affiliations: React.FC = () => {
       ) : error && !activeClubs.length ? (
         <TabPanelStatus tone="error" message={error} />
       ) : !activeClubs.length ? (
-        <div className="flex min-h-[calc(var(--app-shell-height)-10rem)] flex-col items-center justify-center px-6 text-center">
-          <div className="mb-5 flex size-20 items-center justify-center rounded-3xl bg-pkpk-session-bg text-pkpk-primary-bg">
-            <TbAffiliate className="size-11" />
-          </div>
-          <p className="text-base font-semibold leading-7 text-pkpk-main-font">
-            클럽을 만들거나 주변 클럽에 가입해보세요.
-          </p>
+        <TabPanelEmptyState message="클럽을 만들거나 주변 클럽에 가입해보세요.">
           <Button
             variant="secondary"
-            className="mt-5 rounded-full px-4 font-semibold text-pkpk-primary-bg"
+            className="mt-2 rounded-full px-4 font-semibold text-pkpk-primary-bg"
             isDisabled={!isOnline}
             onPress={() => setScannerTarget("invite")}
           >
@@ -464,14 +459,14 @@ const Affiliations: React.FC = () => {
             클럽 QR 스캔
           </Button>
           {pendingClubs.length ? (
-            <div className="mt-6 w-full max-w-sm rounded-2xl border border-pkpk-primary-bg/15 bg-white px-4 py-3 text-left">
+            <div className="mt-3 w-full max-w-sm rounded-2xl border border-pkpk-primary-bg/15 bg-white px-4 py-3 text-left">
               <p className="text-sm font-bold text-pkpk-main-font">가입 요청 대기</p>
               <p className="mt-1 text-sm text-pkpk-sub-font">
                 {pendingClubs.map((item) => item.club.name).join(", ")}
               </p>
             </div>
           ) : null}
-        </div>
+        </TabPanelEmptyState>
       ) : (
         <div className="space-y-5 p-3 pb-7">
           <div className="-mx-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

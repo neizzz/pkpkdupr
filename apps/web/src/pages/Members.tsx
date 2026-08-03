@@ -27,6 +27,7 @@ import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
 import { isTabRefreshDue } from "@/lib/tabRefresh";
+import MyProfile from "@/pages/Me";
 import {
   formatRating,
   getCompositeDoublesRating,
@@ -46,6 +47,7 @@ const OFFLINE_FALLBACK_MESSAGE =
 
 const noop = () => {};
 const MEMBER_MATCH_HISTORY_PAGE_SIZE = 20;
+const MY_PROFILE_DEPTH_ID = "my-profile";
 
 type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
@@ -125,6 +127,7 @@ const Members: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isMyProfileRequested, setIsMyProfileRequested] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedMemberMatchStats, setSelectedMemberMatchStats] = useState(
     createEmptyMatchStats,
@@ -372,6 +375,31 @@ const Members: React.FC = () => {
     );
   }, []);
 
+  const openMyProfile = () => {
+    saveScrollPosition("members");
+    pushDepth("members", {
+      id: MY_PROFILE_DEPTH_ID,
+      kind: "member-profile",
+      onClose: noop,
+    });
+    setIsMyProfileRequested(true);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+  };
+
+  const completeMyProfileClose = useCallback(() => {
+    setIsMyProfileRequested(false);
+    restoreScrollTop("members");
+  }, [restoreScrollTop]);
+
+  const isMyProfileDrawerOpen =
+    isMyProfileRequested && depthStacks.members.includes(MY_PROFILE_DEPTH_ID);
+  const registerMyProfileScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      registerScrollContainer("members", MY_PROFILE_DEPTH_ID, element);
+    },
+    [registerScrollContainer],
+  );
+
   const setMemberPrimaryAffiliation = async (
     member: MemberListPlayerInfo,
     affiliationName: string,
@@ -516,7 +544,21 @@ const Members: React.FC = () => {
 
   return (
     <>
-      <TabPanelHeader title="Members" />
+      <TabPanelHeader title="Players">
+        <button
+          type="button"
+          className="flex h-9 items-center gap-1.5 rounded-full px-1 text-sm font-semibold text-pkpk-main-font transition-opacity hover:opacity-70"
+          onClick={openMyProfile}
+        >
+          <Avatar
+            size="xs"
+            avatarUrl={player?.avatarUrl}
+            name={player?.username}
+          />
+          <span>내 프로필</span>
+          <IoChevronForward aria-hidden="true" className="size-4 text-pkpk-sub-font" />
+        </button>
+      </TabPanelHeader>
       <div className="flex min-h-full">
         <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
           <div>
@@ -606,6 +648,21 @@ const Members: React.FC = () => {
           </div>
         </div>
       </div>
+      {isMyProfileRequested ? (
+        <RightDrawer
+          isOpen={isMyProfileDrawerOpen}
+          isActive={selectedTab === "members"}
+          ariaLabel="내 프로필"
+          onExited={completeMyProfileClose}
+          onScrollContainerChange={registerMyProfileScrollContainer}
+        >
+          <MyProfile
+            tabKey="members"
+            isActive={isMyProfileDrawerOpen && selectedTab === "members"}
+            onProfileUpdated={handleMemberProfileUpdated}
+          />
+        </RightDrawer>
+      ) : null}
       {selectedMember && memberDepthId ? (
         <RightDrawer
           isOpen={isMemberDrawerOpen}

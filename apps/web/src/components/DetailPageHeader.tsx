@@ -7,12 +7,14 @@ interface DetailPageHeaderProps {
   title: string;
   tabKey?: TabKey;
   backgroundClassName?: string;
+  rightContent?: React.ReactNode;
 }
 
 const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   title,
   tabKey,
   backgroundClassName = "bg-pkpk-bg",
+  rightContent,
 }) => {
   const { depthStacks, selectedTab } = useTabNavigation();
   const targetTabKey = tabKey ?? selectedTab;
@@ -51,6 +53,9 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
           className="absolute left-0 !bg-transparent !text-pkpk-secondary-bg shadow-none hover:!bg-transparent"
         />
         <h2 className="text-2xl font-bold text-pkpk-secondary-bg">{title}</h2>
+        {rightContent ? (
+          <div className="absolute right-3 flex items-center">{rightContent}</div>
+        ) : null}
       </div>
     </div>
   );
