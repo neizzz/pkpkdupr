@@ -29,16 +29,6 @@ const MIN_SIGNIFICANT_CHART_DEVIATION = 0.0005;
 const isValidPoint = (point: PlayerRatingHistoryPoint) =>
   Number.isFinite(point.rating) && !Number.isNaN(point.createdAt.getTime());
 
-const isSameKoreanDate = (left: Date, right: Date) => {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return formatter.format(left) === formatter.format(right);
-};
-
 const clonePoint = (
   point: PlayerRatingHistoryPoint,
   overrides: Partial<PlayerRatingHistoryPoint> = {},
@@ -111,7 +101,9 @@ export const buildPlayerRatingChartProjection = (
       ];
 
       const latest = timeline.at(-1);
-      if (latest && !isSameKoreanDate(latest.createdAt, now)) {
+      // 같은 날 완료된 매치가 있어도, 해당 시점보다 현재가 늦으면 오늘의
+      // 현재 레이팅 지점을 끝점으로 추가한다.
+      if (latest && latest.createdAt.getTime() < now.getTime()) {
         timeline.push(
           clonePoint(latest, { createdAt: now, source: "current" }),
         );
