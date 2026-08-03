@@ -811,7 +811,7 @@ interface RatingHistoryFixture {
   nextDoubles: number;
 }
 
-const TEST_ACCOUNT_USERNAME = "test";
+const DEV_LOGIN_PLAYER_ID = "P0neq35z";
 
 const mockPlayerRatingChangeLogs: MockRatingChangeLog[] = [
   {
@@ -903,9 +903,9 @@ const additionalTestRatingFixtures: TestRatingHistoryFixture[] = [
   },
 ];
 
-const namedTestAccountRatingFixtures: RatingHistoryFixture[] = [
+const devLoginRatingFixtures: RatingHistoryFixture[] = [
   {
-    matchId: "Mhist001",
+    matchId: "Mdevr001",
     playedAt: new Date("2026-07-16T19:10:00+09:00"),
     scoreA: 11,
     scoreB: 8,
@@ -913,7 +913,7 @@ const namedTestAccountRatingFixtures: RatingHistoryFixture[] = [
     nextDoubles: 3.022,
   },
   {
-    matchId: "Mhist002",
+    matchId: "Mdevr002",
     playedAt: new Date("2026-07-17T19:20:00+09:00"),
     scoreA: 8,
     scoreB: 11,
@@ -921,7 +921,7 @@ const namedTestAccountRatingFixtures: RatingHistoryFixture[] = [
     nextDoubles: 2.987,
   },
   {
-    matchId: "Mhist003",
+    matchId: "Mdevr003",
     playedAt: new Date("2026-07-18T19:00:00+09:00"),
     scoreA: 11,
     scoreB: 9,
@@ -929,7 +929,7 @@ const namedTestAccountRatingFixtures: RatingHistoryFixture[] = [
     nextDoubles: 3.041,
   },
   {
-    matchId: "Mhist004",
+    matchId: "Mdevr004",
     playedAt: new Date("2026-07-19T19:10:00+09:00"),
     scoreA: 9,
     scoreB: 11,
@@ -937,12 +937,37 @@ const namedTestAccountRatingFixtures: RatingHistoryFixture[] = [
     nextDoubles: 3.012,
   },
   {
-    matchId: "Mhist005",
+    matchId: "Mdevr005",
     playedAt: new Date("2026-07-23T19:20:00+09:00"),
     scoreA: 11,
     scoreB: 7,
     previousDoubles: 3.012,
     nextDoubles: 3,
+  },
+  // P0neq35z 로그인 계정에서 최저/최고점 라벨을 모두 확인할 수 있는 구간이다.
+  {
+    matchId: "Mdevr006",
+    playedAt: new Date("2026-07-24T19:10:00+09:00"),
+    scoreA: 7,
+    scoreB: 11,
+    previousDoubles: 3,
+    nextDoubles: 2.8,
+  },
+  {
+    matchId: "Mdevr007",
+    playedAt: new Date("2026-07-26T19:20:00+09:00"),
+    scoreA: 11,
+    scoreB: 9,
+    previousDoubles: 2.8,
+    nextDoubles: 3,
+  },
+  {
+    matchId: "Mdevr008",
+    playedAt: new Date("2026-07-30T19:00:00+09:00"),
+    scoreA: 11,
+    scoreB: 8,
+    previousDoubles: 3,
+    nextDoubles: 3.2,
   },
 ];
 
@@ -1080,7 +1105,7 @@ export class TestDataRepository {
     }
 
     await this.seedAdditionalTestRatingHistory();
-    await this.seedNamedTestAccountRatingHistory();
+    await this.seedDevLoginRatingHistory();
   }
 
   private resolveDevPlayerId(id: string) {
@@ -1167,20 +1192,20 @@ export class TestDataRepository {
     }
   }
 
-  private async seedNamedTestAccountRatingHistory() {
-    const testAccount = await this.playerRepository.findByUsername(
-      TEST_ACCOUNT_USERNAME,
+  private async seedDevLoginRatingHistory() {
+    const devLoginAccount = await this.playerRepository.findById(
+      DEV_LOGIN_PLAYER_ID,
     );
-    if (!testAccount) return;
+    if (!devLoginAccount) return;
 
-    for (const fixture of namedTestAccountRatingFixtures) {
-      await this.seedRatingHistoryMatch(testAccount.id, fixture);
+    for (const fixture of devLoginRatingFixtures) {
+      await this.seedRatingHistoryMatch(devLoginAccount.id, fixture);
     }
 
-    const latestFixture = namedTestAccountRatingFixtures.at(-1);
+    const latestFixture = devLoginRatingFixtures.at(-1);
     if (!latestFixture) return;
 
-    await this.playerRepository.updateDuprState(testAccount.id, {
+    await this.playerRepository.updateDuprState(devLoginAccount.id, {
       rating: {
         singles: 3.038,
         doubles: latestFixture.nextDoubles,
@@ -1189,6 +1214,18 @@ export class TestDataRepository {
         singles: { confidence: 1, accuracy: null },
         doubles: { confidence: 1, accuracy: null },
       },
+    });
+    await this.invalidateRatingChartProjection(devLoginAccount.id);
+  }
+
+  private async invalidateRatingChartProjection(playerId: string) {
+    await this.client.execute({
+      sql: "DELETE FROM player_rating_chart_points WHERE player_id = ?",
+      args: [playerId],
+    });
+    await this.client.execute({
+      sql: "DELETE FROM player_rating_chart_projections WHERE player_id = ?",
+      args: [playerId],
     });
   }
 
