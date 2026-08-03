@@ -23,8 +23,6 @@ jobs:
     steps:
       - name: Checkout application source
         uses: actions/checkout@v4
-        with:
-          fetch-tags: true
 
       - name: Resolve image metadata
         run: |
