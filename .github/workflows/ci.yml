@@ -34,14 +34,12 @@ jobs:
           corepack prepare pnpm@11.7.0 --activate
 
       - name: Docker Compose config
-        run: docker compose -f docker-compose.yml -f docker-compose.build.yml config
+        run: docker compose -f docker-compose.pkelo.yml -f docker-compose.pkelo.build.yml config
 
       - name: Check scripts syntax
         run: |
-          bash -n scripts/install-server.sh
-          bash -n scripts/update-server.sh
-          bash -n scripts/upsert-env.sh
-          node --check scripts/check-healthy.mjs
+          bash -n scripts/dev-pkelo-db.sh
+          bash -n scripts/dev-pkelo.sh
 
       - name: Docker build
-        run: docker compose -f docker-compose.yml -f docker-compose.build.yml build web admin-web api db-server
+        run: docker compose -f docker-compose.pkelo.yml -f docker-compose.pkelo.build.yml build pkelo-web pkelo-admin-web pkelo-api pkelo-db-server
