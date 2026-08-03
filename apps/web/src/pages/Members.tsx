@@ -83,19 +83,15 @@ const formatLastPlayedAt = (lastPlayedAt: string | null) => {
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
-  const week = 7 * day;
 
-  if (elapsedMs < minute) return "방금 전 플레이";
+  if (elapsedMs < 15 * minute) return "방금 전 플레이";
   if (elapsedMs < hour) {
     return `${Math.floor(elapsedMs / minute)}분전 마지막 플레이`;
   }
   if (elapsedMs < day) {
     return `${Math.floor(elapsedMs / hour)}시간전 마지막 플레이`;
   }
-  if (elapsedMs < week) {
-    return `${Math.floor(elapsedMs / day)}일전 마지막 플레이`;
-  }
-  return `${Math.floor(elapsedMs / week)}주 전 마지막 플레이`;
+  return `${Math.floor(elapsedMs / day)}일전 마지막 플레이`;
 };
 
 const readCachedMembers = (): MemberListPlayerInfo[] | null => {
