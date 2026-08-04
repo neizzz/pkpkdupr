@@ -17,6 +17,7 @@ interface ProfileMatchHistoryDrawerProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  onPullToRefresh?: () => Promise<void>;
   onPressMatch: (match: MatchInfo) => void;
   onExited: () => void;
   onScrollContainerChange: (element: HTMLDivElement | null) => void;
@@ -32,6 +33,7 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  onPullToRefresh,
   onPressMatch,
   onExited,
   onScrollContainerChange,
@@ -43,6 +45,7 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
     ariaLabel="전체 매치"
     onExited={onExited}
     onScrollContainerChange={onScrollContainerChange}
+    onPullToRefresh={onPullToRefresh}
     layer={layer}
     className="!bg-white"
   >

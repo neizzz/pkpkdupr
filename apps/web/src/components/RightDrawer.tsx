@@ -7,13 +7,33 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import PullToRefreshIndicator from "@/components/PullToRefreshIndicator";
+import {
+  PULL_TO_REFRESH_THRESHOLD,
+  usePullToRefresh,
+} from "@/hooks/usePullToRefresh";
 
 const TRANSITION_DURATION_MS = 150;
 
 const RightDrawerScrollContext = createContext<HTMLDivElement | null>(null);
+const RightDrawerPullToRefreshContext = createContext<
+  ((handler: (() => Promise<void>) | null) => void) | null
+>(null);
 
 export const useRightDrawerScrollContainer = () =>
   useContext(RightDrawerScrollContext);
+
+export const useRegisterRightDrawerPullToRefresh = (
+  handler: (() => Promise<void>) | null,
+) => {
+  const register = useContext(RightDrawerPullToRefreshContext);
+
+  useEffect(() => {
+    if (!register) return undefined;
+    register(handler);
+    return () => register(null);
+  }, [handler, register]);
+};
 
 interface RightDrawerProps {
   isOpen: boolean;
@@ -22,6 +42,7 @@ interface RightDrawerProps {
   children: React.ReactNode;
   onExited?: () => void;
   onScrollContainerChange?: (element: HTMLDivElement | null) => void;
+  onPullToRefresh?: () => Promise<void>;
   layer?: number;
   className?: string;
 }
@@ -33,6 +54,7 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
   children,
   onExited,
   onScrollContainerChange,
+  onPullToRefresh,
   layer = 50,
   className,
 }) => {
@@ -41,6 +63,9 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
   const [isTransitionEnabled, setIsTransitionEnabled] = useState(false);
   const [scrollContainer, setScrollContainer] =
     useState<HTMLDivElement | null>(null);
+  const [registeredPullToRefresh, setRegisteredPullToRefresh] = useState<
+    (() => Promise<void>) | null
+  >(null);
   const animationFrameRef = useRef<number | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
   const onExitedRef = useRef(onExited);
@@ -118,6 +143,18 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
     },
     [onScrollContainerChange],
   );
+  const registerPullToRefreshHandler = useCallback(
+    (handler: (() => Promise<void>) | null) => {
+      setRegisteredPullToRefresh(() => handler);
+    },
+    [],
+  );
+  const refreshHandler = registeredPullToRefresh ?? onPullToRefresh;
+  const { distance, status } = usePullToRefresh({
+    container: scrollContainer,
+    onRefresh: refreshHandler ?? undefined,
+    isEnabled: isOpen && isActive,
+  });
 
   if (!shouldRender || typeof document === "undefined") {
     return null;
@@ -146,13 +183,24 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
           role="dialog"
           aria-modal="true"
           aria-label={ariaLabel}
-          className={`app-right-drawer-scroll-area ${
+          className={`app-right-drawer-scroll-area relative ${
             isOpen && isActive ? "pointer-events-auto" : "pointer-events-none"
           } h-[calc(var(--app-shell-height)-var(--app-keyboard-offset))] w-full bg-pkpk-bg pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl ${transformClassName} ${className ?? ""}`}
         >
-          <RightDrawerScrollContext.Provider value={scrollContainer}>
-            {children}
-          </RightDrawerScrollContext.Provider>
+          {refreshHandler ? (
+            <PullToRefreshIndicator
+              distance={distance}
+              status={status}
+              threshold={PULL_TO_REFRESH_THRESHOLD}
+            />
+          ) : null}
+          <RightDrawerPullToRefreshContext.Provider
+            value={registerPullToRefreshHandler}
+          >
+            <RightDrawerScrollContext.Provider value={scrollContainer}>
+              {children}
+            </RightDrawerScrollContext.Provider>
+          </RightDrawerPullToRefreshContext.Provider>
         </section>
       </div>
     </div>,
