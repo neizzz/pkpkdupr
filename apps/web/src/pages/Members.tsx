@@ -613,6 +613,12 @@ const Members: React.FC = () => {
           ariaLabel="멤버 프로필"
           onExited={completeMemberProfileClose}
           onScrollContainerChange={registerMemberScrollContainer}
+          onPullToRefresh={async () => {
+            await loadMembers(true, true);
+            if (selectedMemberId) {
+              await loadSelectedMemberMatchStats(selectedMemberId, true, true);
+            }
+          }}
         >
           <MemberProfile
             player={selectedMember}
@@ -649,6 +655,11 @@ const Members: React.FC = () => {
                   true,
                 )
               : undefined
+          }
+          onPullToRefresh={() =>
+            selectedMemberId
+              ? loadSelectedMemberMatchHistory(selectedMemberId, 0)
+              : Promise.resolve()
           }
           onPressMatch={openMemberProfileMatchDetail}
           onExited={completeMemberMatchHistoryClose}

@@ -325,6 +325,7 @@ const Me: React.FC = () => {
         hasMore={profileMatches.length < matchHistoryTotal}
         isLoadingMore={isMatchHistoryLoading && profileMatches.length > 0}
         onLoadMore={() => void loadMatchHistory(matchHistoryPage, true)}
+        onPullToRefresh={() => loadMatchHistory(0)}
         onPressMatch={openProfileMatchDetail}
         onExited={completeMatchHistoryClose}
         onScrollContainerChange={registerMatchHistoryScrollContainer}
