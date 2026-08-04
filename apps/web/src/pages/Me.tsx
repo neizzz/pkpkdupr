@@ -12,6 +12,7 @@ import MemberProfile from "@/components/MemberProfile";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
 import ProfileSettingsSheetBody from "@/components/ProfileSettingsSheetBody";
+import { useRegisterRightDrawerPullToRefresh } from "@/components/RightDrawer";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
 import { type TabKey, useTabNavigation } from "@/context/TabNavigationContext";
@@ -165,6 +166,13 @@ const MyProfile: React.FC<MyProfileProps> = ({
     },
     [playerId, token],
   );
+
+  const refreshProfile = useCallback(async () => {
+    const abortController = new AbortController();
+    await loadMatchStats(abortController.signal, true, true);
+  }, [loadMatchStats]);
+
+  useRegisterRightDrawerPullToRefresh(refreshProfile);
 
   useEffect(() => {
     if (!isActive) {
@@ -328,6 +336,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
         hasMore={profileMatches.length < matchHistoryTotal}
         isLoadingMore={isMatchHistoryLoading && profileMatches.length > 0}
         onLoadMore={() => void loadMatchHistory(matchHistoryPage, true)}
+        onPullToRefresh={() => loadMatchHistory(0)}
         onPressMatch={openProfileMatchDetail}
         onExited={completeMatchHistoryClose}
         onScrollContainerChange={registerMatchHistoryScrollContainer}
