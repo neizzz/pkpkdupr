@@ -140,34 +140,41 @@ resolve_environment() {
   done
 }
 
-run_health_checks() {
-  local target="$1"
-  local primary_web_url="https://${PRIMARY_DOMAIN}" primary_admin_url="https://${PRIMARY_DOMAIN}:${ADMIN_STACK_PORT}"
-  local pkelo_web_url="https://${PKELO_DOMAIN}" pkelo_admin_url="https://${PKELO_DOMAIN}:${ADMIN_STACK_PORT}"
-  local notice_health_args=()
-  if is_notice_enabled; then
-    require_file "${NOTICE_ENV_FILE}"
-    local notice_message
-    notice_message="$(read_env_value "${NOTICE_ENV_FILE}" PKELO_NOTICE_MESSAGE)"
-    notice_message="${notice_message:-8월 오픈 예정}"
-    notice_health_args=(PKELO_NOTICE_EXPECTED_MESSAGE="${notice_message}")
-  fi
-  for _ in $(seq 1 60); do
-    case "${target}" in
-      pkpkdupr)
-        if HEALTHCHECK_APPS=pkpkdupr PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
-        ;;
-      pkelo)
-        if env "${notice_health_args[@]}" HEALTHCHECK_APPS=pkelo PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
-        ;;
-      all)
-        if env "${notice_health_args[@]}" HEALTHCHECK_APPS=all PKPKDUPR_WEB_URL="${primary_web_url}" PKPKDUPR_ADMIN_STACK_URL="${primary_admin_url}" PKELO_WEB_URL="${pkelo_web_url}" PKELO_ADMIN_STACK_URL="${pkelo_admin_url}" node scripts/check-healthy.mjs; then return 0; fi
-        ;;
-    esac
-    sleep 5
+assert_services_running() {
+  local compose_function="$1"
+  shift
+  local service
+  for service in "$@"; do
+    if ! "$compose_function" ps --status running --services | awk -v expected="${service}" '$0 == expected { found = 1 } END { exit !found }'; then
+      echo "❌ ${service} 컨테이너가 running 상태가 아닙니다." >&2
+      "$compose_function" ps "${service}" >&2 || true
+      exit 1
+    fi
   done
-  echo "❌ ${target} HTTPS health check가 준비 시간 내에 통과하지 못했습니다." >&2
-  exit 1
+}
+
+assert_target_services_running() {
+  local target="$1"
+  case "${target}" in
+    pkpkdupr)
+      assert_services_running compose_primary web admin-web api mysql db-server adminer
+      ;;
+    pkelo)
+      if is_notice_enabled; then
+        assert_services_running compose_notice pkelo-notice-web
+      else
+        assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+      fi
+      ;;
+    all)
+      assert_services_running compose_primary web admin-web api mysql db-server adminer
+      if is_notice_enabled; then
+        assert_services_running compose_notice pkelo-notice-web
+      else
+        assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+      fi
+      ;;
+  esac
 }
 
 case "${TARGET_STACK}" in
@@ -177,7 +184,6 @@ esac
 
 require_command docker
 require_command sed
-require_command node
 docker compose version >/dev/null
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
@@ -225,5 +231,5 @@ esac
 
 compose_proxy exec -T proxy nginx -t
 compose_proxy exec -T proxy nginx -s reload
-run_health_checks "${TARGET_STACK}"
-echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG})"
+assert_target_services_running "${TARGET_STACK}"
+echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG}, 컨테이너 기동 상태 확인 완료)"

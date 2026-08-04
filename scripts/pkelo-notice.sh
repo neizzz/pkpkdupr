@@ -281,53 +281,17 @@ sync_and_reload_proxy() {
   rm -rf "${backup_dir}"
 }
 
-wait_for_notice_web() {
-  for _ in $(seq 1 30); do
-    if compose_notice exec -T pkelo-notice-web sh -ec \
-      'wget -qO- http://127.0.0.1/runtime/notice.json >/dev/null' >/dev/null 2>&1; then
-      return 0
+assert_services_running() {
+  local compose_function="$1"
+  shift
+  local service
+  for service in "$@"; do
+    if ! "$compose_function" ps --status running --services | awk -v expected="${service}" '$0 == expected { found = 1 } END { exit !found }'; then
+      echo "❌ ${service} 컨테이너가 running 상태가 아닙니다." >&2
+      "$compose_function" ps "${service}" >&2 || true
+      return 1
     fi
-    sleep 1
   done
-  echo "❌ PKELO 안내 web이 준비되지 않았습니다." >&2
-  return 1
-}
-
-wait_for_pkelo_api() {
-  for _ in $(seq 1 60); do
-    if compose_pkelo exec -T pkelo-api node -e \
-      "fetch('http://127.0.0.1:4000/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-  echo "❌ PKELO API가 준비되지 않았습니다." >&2
-  return 1
-}
-
-run_health_checks() {
-  local mode="$1"
-  local web_url="https://${PKELO_DOMAIN}"
-  local admin_url="https://${PKELO_DOMAIN}:${ADMIN_STACK_PORT}"
-  local health_args=(
-    HEALTHCHECK_APPS=pkelo
-    PKELO_WEB_URL="${web_url}"
-    PKELO_ADMIN_STACK_URL="${admin_url}"
-  )
-
-  if [[ "${mode}" == "notice" ]]; then
-    health_args+=(PKELO_NOTICE_EXPECTED_MESSAGE="${NOTICE_MESSAGE}")
-  fi
-
-  for _ in $(seq 1 30); do
-    if env "${health_args[@]}" node scripts/check-healthy.mjs; then
-      return 0
-    fi
-    sleep 2
-  done
-
-  echo "❌ PKELO ${mode} HTTPS 검증이 준비 시간 내에 통과하지 못했습니다." >&2
-  return 1
 }
 
 enable_notice() {
@@ -339,14 +303,14 @@ enable_notice() {
       return
     fi
     compose_notice up -d pkelo-notice-web
-    wait_for_notice_web
+    assert_services_running compose_notice pkelo-notice-web
     echo "✅ PKELO 안내 문구를 갱신했습니다."
     return
   fi
 
   if [[ "${DRY_RUN}" == true ]]; then
     cat <<'EOF'
-[dry-run] 1. pkelo-notice-web을 기동하고 준비를 확인합니다.
+[dry-run] 1. pkelo-notice-web을 기동하고 컨테이너 상태를 확인합니다.
 [dry-run] 2. 안내 SWAG 설정을 생성·nginx -t·graceful reload 합니다.
 [dry-run] 3. 성공 후 PKELO web/admin/API/db-server/MySQL/Adminer를 중지합니다.
 EOF
@@ -354,7 +318,7 @@ EOF
   fi
 
   compose_notice up -d pkelo-notice-web
-  wait_for_notice_web
+  assert_services_running compose_notice pkelo-notice-web
   write_notice_state
 
   if ! sync_and_reload_proxy; then
@@ -365,7 +329,7 @@ EOF
 
   compose_pkelo stop \
     pkelo-web pkelo-admin-web pkelo-api pkelo-adminer pkelo-db-server pkelo-mysql
-  run_health_checks notice
+  assert_services_running compose_notice pkelo-notice-web
   echo "✅ PKELO 안내 모드를 활성화했습니다: ${NOTICE_MESSAGE}"
 }
 
@@ -386,7 +350,7 @@ EOF
 
   compose_pkelo up -d \
     pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
-  wait_for_pkelo_api
+  assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
   clear_notice_state
 
   if ! sync_and_reload_proxy; then
@@ -395,7 +359,7 @@ EOF
   fi
 
   compose_notice stop pkelo-notice-web || true
-  run_health_checks normal
+  assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
   echo "✅ PKELO 일반 서비스를 복구했습니다."
 }
 
@@ -450,7 +414,6 @@ if [[ "${ACTION}" != "enable" && ( "${HAS_NOTICE_TITLE_OVERRIDE}" == true || "${
 fi
 
 require_command docker
-require_command node
 require_command sed
 require_command awk
 docker compose version >/dev/null

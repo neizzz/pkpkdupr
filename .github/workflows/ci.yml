@@ -41,7 +41,7 @@ jobs:
           bash -n scripts/install-server.sh
           bash -n scripts/update-server.sh
           bash -n scripts/upsert-env.sh
-          node --check scripts/check-healthy.mjs
+          bash -n scripts/pkelo-notice.sh
 
       - name: Docker build
         run: docker compose -f docker-compose.yml -f docker-compose.build.yml build web admin-web api db-server

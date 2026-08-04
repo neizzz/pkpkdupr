@@ -67,17 +67,58 @@ bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkelo
 
 `--stack`은 대상 앱 컨테이너만 pull/recreate합니다. 공용 SWAG와 인증서 컨테이너는 기동·설정 갱신될 수 있지만 다른 앱의 web/API/MySQL/DB 서버는 재생성하지 않습니다. SQLite→MySQL 이관은 기존 앱에만 적용되므로 `--migrate-sqlite --stack pkelo`은 허용하지 않습니다.
 
-## 확인 경로
+## 배포 성공 기준과 New Relic
 
-두 도메인에서 각각 아래 경로를 확인합니다.
+수동 배포 스크립트는 대상 Docker Compose 서비스가 `running` 상태인지 확인한 뒤 종료합니다. 호스트 Node.js나 배포 스크립트의 외부 HTTPS 재시도는 사용하지 않습니다. 공개 가용성·응답 내용·TLS 상태는 New Relic에서 확인합니다.
 
-- `https://<DOMAIN>/`
-- `https://<DOMAIN>:3333/api/health`
-- `https://<DOMAIN>:3333/api/ping`
-- `https://<DOMAIN>:3333/admin/`
-- `https://<DOMAIN>:3333/db/`
+### pkpkdupr APM
 
-`scripts/check-healthy.mjs`는 `HEALTHCHECK_APPS=pkpkdupr`, `pkelo`, `all`로 단일 또는 두 앱을 검사합니다. `/db/`는 HTML 본문에 `adminer`가 있고 `404 not found`가 없어야 통과합니다.
+`/opt/pkpkdupr/env/pkpkdupr.env`에만 아래 값을 설정합니다. key 값은 Git이나 쉘 인자에 넣지 않습니다.
+
+```dotenv
+NEW_RELIC_ENABLED=true
+NEW_RELIC_LICENSE_KEY=<new-relic-license-key>
+# EU collector 계정에서만 설정
+# NEW_RELIC_HOST=collector.eu01.nr-data.net
+```
+
+배포 후 New Relic APM에 `pkpkdupr-api`, `pkpkdupr-db-server`가 각각 보고되어야 합니다.
+
+### pkpkdupr Synthetics
+
+New Relic UI에서 TLS 검증을 켠 공개 위치 3곳, 5분 주기의 monitor 5개를 수동으로 생성합니다.
+
+- Simple Browser: `https://pkpkdupr.duckdns.org/`
+- Scripted API: `https://pkpkdupr.duckdns.org:3333/api/health` — HTTP 200, JSON `status: "ok"`
+- Scripted API: `https://pkpkdupr.duckdns.org:3333/api/ping` — HTTP 200, JSON `message: "pong"`
+- Simple Browser: `https://pkpkdupr.duckdns.org:3333/admin/`
+- Simple Browser: `https://pkpkdupr.duckdns.org:3333/db/` — 응답 본문 `adminer`
+
+두 Scripted API monitor에는 각각 아래 스크립트를 사용합니다. New Relic UI의 API test editor에서 URL만 바꾸지 말고 응답 본문 assertion까지 함께 설정합니다.
+
+```js
+const assert = require("assert");
+
+$http.get("https://pkpkdupr.duckdns.org:3333/api/health", (error, response, body) => {
+  assert.ifError(error);
+  assert.strictEqual(response.statusCode, 200);
+  const payload = typeof body === "string" ? JSON.parse(body) : body;
+  assert.strictEqual(payload.status, "ok");
+});
+```
+
+```js
+const assert = require("assert");
+
+$http.get("https://pkpkdupr.duckdns.org:3333/api/ping", (error, response, body) => {
+  assert.ifError(error);
+  assert.strictEqual(response.statusCode, 200);
+  const payload = typeof body === "string" ? JSON.parse(body) : body;
+  assert.strictEqual(payload.message, "pong");
+});
+```
+
+`pkpkdupr-production` Alert policy에 위 monitor를 연결합니다. 외부 notification destination은 만들지 않고 New Relic Issue만 생성합니다. 공개 위치에서 `:3333` 포트가 접근 가능해야 합니다.
 
 ## GitHub Actions
 

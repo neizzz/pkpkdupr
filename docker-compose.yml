@@ -27,6 +27,12 @@ services:
       USER_AUTH_PROVIDER: ${USER_AUTH_PROVIDER:-password}
       CORS_ADDITIONAL_ORIGINS: ${CORS_ADDITIONAL_ORIGINS:-}
       AVATAR_UPLOAD_DIR: /app/data/uploads/avatars
+      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED:-false}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: pkpkdupr-api
+      NEW_RELIC_NO_CONFIG_FILE: "true"
+      NEW_RELIC_LOG: stdout
+      NEW_RELIC_HOST: ${NEW_RELIC_HOST:-collector.newrelic.com}
     volumes:
       - ${APP_DATA_PATH:-${PKPKDUPR_DEPLOY_PATH:-.}/data}/uploads/avatars:/app/data/uploads/avatars
     depends_on:
@@ -73,6 +79,12 @@ services:
       DB_NAME: ${MYSQL_DATABASE:-pkpkdupr}
       DB_USER: ${MYSQL_USER:-pkpkdupr}
       DB_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED:-false}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: pkpkdupr-db-server
+      NEW_RELIC_NO_CONFIG_FILE: "true"
+      NEW_RELIC_LOG: stdout
+      NEW_RELIC_HOST: ${NEW_RELIC_HOST:-collector.newrelic.com}
     depends_on:
       mysql:
         condition: service_healthy
