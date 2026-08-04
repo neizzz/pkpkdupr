@@ -21,4 +21,6 @@ RUN pnpm --filter @pkpkdupr/api build
 
 EXPOSE 4000
 
-CMD ["pnpm", "--filter", "@pkpkdupr/api", "exec", "tsx", "src/index.ts"]
+WORKDIR /app/apps/api
+
+CMD ["node", "--experimental-loader", "newrelic/esm-loader.mjs", "-r", "newrelic", "../../dist/apps/api/src/index.js"]

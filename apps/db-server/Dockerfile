@@ -21,4 +21,6 @@ RUN pnpm --filter @pkpkdupr/db-server build
 
 EXPOSE 5001
 
-CMD ["pnpm", "--filter", "@pkpkdupr/db-server", "exec", "tsx", "src/index.ts"]
+WORKDIR /app/apps/db-server
+
+CMD ["node", "--experimental-loader", "newrelic/esm-loader.mjs", "-r", "newrelic", "../../dist/apps/db-server/src/index.js"]
