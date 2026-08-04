@@ -868,6 +868,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           ariaLabel="세션 상세"
           onExited={completeSessionDetailClose}
           onScrollContainerChange={registerSessionScrollContainer}
+          onPullToRefresh={() =>
+            loadSessionMatches(selectedSession, true, true)
+          }
         >
           {sessionDrawerContent}
         </RightDrawer>
@@ -879,6 +882,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
           ariaLabel="매치 상세"
           onExited={completeMatchDetailClose}
           onScrollContainerChange={registerMatchScrollContainer}
+          onPullToRefresh={() => loadMatchDetail(selectedMatchId)}
           layer={60}
         >
           {matchDrawerContent}
