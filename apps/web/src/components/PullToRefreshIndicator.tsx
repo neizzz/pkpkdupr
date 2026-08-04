@@ -25,8 +25,8 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
   const isArmed = status === "armed";
   const translateY =
     status === "refreshing" || status === "error"
-      ? 90
-      : -54 + progress * 144;
+      ? 117
+      : -70.2 + progress * 187.2;
   return (
     <div
       aria-hidden={!isVisible}
@@ -50,18 +50,21 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
               ? "새로고침 중"
               : "새로고침"
         }
-        className={`flex size-9 items-center justify-center rounded-full border shadow-sm backdrop-blur transition-transform ${
+        className={`flex size-[46.8px] items-center justify-center rounded-full border shadow-sm backdrop-blur transition-transform ${
           isArmed
             ? "scale-110 border-[#409eff] bg-[#409eff]"
             : "border-sky-100/90 bg-white/90"
         }`}
       >
         {isArmed ? (
-          <IoCheckmark aria-hidden="true" className="size-5 text-white" />
+          <IoCheckmark
+            aria-hidden="true"
+            className="size-[26px] text-white"
+          />
         ) : (
           <span
             aria-hidden="true"
-            className={`size-4 rounded-full border-2 border-sky-100 border-t-[#409eff] ${
+            className={`size-[20.8px] rounded-full border-2 border-sky-100 border-t-[#409eff] ${
               isRefreshing ? "animate-spin" : ""
             }`}
             style={
