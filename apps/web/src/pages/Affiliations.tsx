@@ -644,6 +644,9 @@ const Affiliations: React.FC = () => {
         ariaLabel="클럽 운영진 관리"
         layer={40}
         onExited={() => setManagementError(null)}
+        onPullToRefresh={async () => {
+          await Promise.all([loadDashboard(), loadInvite()]);
+        }}
       >
         <div className="min-h-full p-3">
           <div className="sticky top-0 z-10 -mx-3 mb-4 flex h-12 items-center justify-between border-b border-border bg-pkpk-bg px-4">
