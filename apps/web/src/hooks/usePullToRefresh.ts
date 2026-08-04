@@ -1,0 +1,223 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PullToRefreshStatus } from "@/components/PullToRefreshIndicator";
+import { triggerHapticFeedback } from "@/lib/haptics";
+
+export const PULL_TO_REFRESH_THRESHOLD = 129.6;
+export const PULL_TO_REFRESH_BASE_RESISTANCE = 0.75;
+export const PULL_TO_REFRESH_MIN_RESISTANCE = 0.6;
+
+const PULL_GESTURE_DIRECTION_THRESHOLD = 8;
+
+interface UsePullToRefreshParams {
+  container: HTMLElement | null;
+  onRefresh?: () => Promise<void>;
+  isEnabled?: boolean;
+}
+
+export const usePullToRefresh = ({
+  container,
+  onRefresh,
+  isEnabled = true,
+}: UsePullToRefreshParams) => {
+  const [distance, setDistance] = useState(0);
+  const [status, setStatus] = useState<PullToRefreshStatus>("idle");
+  const startRef = useRef<{
+    identifier: number;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+  } | null>(null);
+  const distanceRef = useRef(0);
+  const isArmedRef = useRef(false);
+  const isRefreshingRef = useRef(false);
+  const isGestureActiveRef = useRef(false);
+  const axisRef = useRef<"undecided" | "vertical" | "horizontal">(
+    "undecided",
+  );
+  const resetTimeoutRef = useRef<number | null>(null);
+  const handlerRef = useRef(onRefresh);
+
+  useEffect(() => {
+    handlerRef.current = onRefresh;
+  }, [onRefresh]);
+
+  const reset = useCallback(
+    (nextStatus: PullToRefreshStatus = "idle") => {
+      startRef.current = null;
+      distanceRef.current = 0;
+      isArmedRef.current = false;
+      isGestureActiveRef.current = false;
+      axisRef.current = "undecided";
+      container?.style.removeProperty("overflow");
+      setDistance(0);
+      setStatus(nextStatus);
+    },
+    [container],
+  );
+
+  const updateDistance = useCallback(
+    (touch: Touch) => {
+      const start = startRef.current;
+      if (!start || isRefreshingRef.current) return false;
+
+      if (axisRef.current !== "vertical") {
+        const totalDeltaX = touch.clientX - start.startX;
+        const totalDeltaY = touch.clientY - start.startY;
+        if (
+          Math.max(Math.abs(totalDeltaX), Math.abs(totalDeltaY)) <
+          PULL_GESTURE_DIRECTION_THRESHOLD
+        ) {
+          return true;
+        }
+
+        if (Math.abs(totalDeltaX) > Math.abs(totalDeltaY)) {
+          axisRef.current = "horizontal";
+          reset();
+          return false;
+        }
+
+        axisRef.current = "vertical";
+      }
+
+      const deltaY = touch.clientY - start.lastY;
+      startRef.current = { ...start, lastX: touch.clientX, lastY: touch.clientY };
+      const progress = Math.min(distanceRef.current / PULL_TO_REFRESH_THRESHOLD, 1);
+      const resistance =
+        PULL_TO_REFRESH_BASE_RESISTANCE -
+        (PULL_TO_REFRESH_BASE_RESISTANCE - PULL_TO_REFRESH_MIN_RESISTANCE) *
+          progress;
+      const adjustedDeltaY =
+        deltaY > 0 ? deltaY * resistance : deltaY * PULL_TO_REFRESH_BASE_RESISTANCE;
+      const nextDistance = Math.min(
+        Math.max(0, distanceRef.current + adjustedDeltaY),
+        PULL_TO_REFRESH_THRESHOLD * 1.25,
+      );
+
+      distanceRef.current = nextDistance;
+      const isArmed = nextDistance >= PULL_TO_REFRESH_THRESHOLD;
+      if (isArmed && !isArmedRef.current) triggerHapticFeedback(15);
+      isArmedRef.current = isArmed;
+      if (nextDistance > 0) {
+        isGestureActiveRef.current = true;
+        container?.style.setProperty("overflow", "hidden");
+      }
+      setDistance(nextDistance);
+      setStatus(nextDistance === 0 ? "idle" : isArmed ? "armed" : "pulling");
+      return true;
+    },
+    [container, reset],
+  );
+
+  useEffect(() => {
+    if (!container || !isEnabled || !onRefresh) {
+      reset();
+      return undefined;
+    }
+
+    const handleTouchStart = (event: TouchEvent) => {
+      if (
+        event.touches.length !== 1 ||
+        isRefreshingRef.current ||
+        container.scrollTop > 0
+      ) {
+        return;
+      }
+
+      const touch = event.touches[0];
+      startRef.current = {
+        identifier: touch.identifier,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
+        lastY: touch.clientY,
+      };
+      distanceRef.current = 0;
+      isArmedRef.current = false;
+      isGestureActiveRef.current = false;
+      axisRef.current = "undecided";
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const start = startRef.current;
+      if (!start) return;
+      if (event.touches.length !== 1) {
+        reset();
+        return;
+      }
+
+      const touch = Array.from(event.touches).find(
+        (candidate) => candidate.identifier === start.identifier,
+      );
+      if (!touch || !updateDistance(touch)) return;
+      if (isGestureActiveRef.current && event.cancelable) event.preventDefault();
+    };
+
+    const handleTouchEnd = (event: TouchEvent) => {
+      const start = startRef.current;
+      if (!start) return;
+      const touch = Array.from(event.changedTouches).find(
+        (candidate) => candidate.identifier === start.identifier,
+      );
+      if (!touch || !updateDistance(touch) || !isArmedRef.current) {
+        reset();
+        return;
+      }
+
+      startRef.current = null;
+      distanceRef.current = 0;
+      isGestureActiveRef.current = false;
+      container.style.removeProperty("overflow");
+      setDistance(0);
+      isRefreshingRef.current = true;
+      setStatus("refreshing");
+
+      const refresh = handlerRef.current;
+      if (!refresh) {
+        isRefreshingRef.current = false;
+        reset();
+        return;
+      }
+
+      void (async () => {
+        let delay = 350;
+        try {
+          await refresh();
+          setStatus("refreshing");
+        } catch {
+          delay = 1600;
+          setStatus("error");
+        } finally {
+          resetTimeoutRef.current = window.setTimeout(() => {
+            isRefreshingRef.current = false;
+            reset();
+          }, delay);
+        }
+      })();
+    };
+
+    const handleTouchCancel = () => reset();
+
+    container.addEventListener("touchstart", handleTouchStart, { passive: false });
+    container.addEventListener("touchmove", handleTouchMove, { passive: false });
+    container.addEventListener("touchend", handleTouchEnd, { passive: false });
+    container.addEventListener("touchcancel", handleTouchCancel, {
+      passive: false,
+    });
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+      container.removeEventListener("touchcancel", handleTouchCancel);
+    };
+  }, [container, isEnabled, onRefresh, reset, updateDistance]);
+
+  useEffect(
+    () => () => {
+      if (resetTimeoutRef.current !== null) window.clearTimeout(resetTimeoutRef.current);
+    },
+    [],
+  );
+
+  return { distance, status };
+};

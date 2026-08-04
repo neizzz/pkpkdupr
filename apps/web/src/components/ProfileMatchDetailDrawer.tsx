@@ -135,6 +135,9 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
       ariaLabel="매치 상세"
       onExited={onExited}
       onScrollContainerChange={onScrollContainerChange}
+      onPullToRefresh={() =>
+        match ? loadMatchDetail(match.id) : Promise.resolve()
+      }
       layer={layer}
     >
       {content}

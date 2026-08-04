@@ -46,6 +46,11 @@ import {
   type PullToRefreshHandler,
 } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import {
+  PULL_TO_REFRESH_BASE_RESISTANCE,
+  PULL_TO_REFRESH_MIN_RESISTANCE,
+  PULL_TO_REFRESH_THRESHOLD,
+} from "@/hooks/usePullToRefresh";
 import { buildApiUrl } from "@/lib/api";
 import { triggerHapticFeedback } from "@/lib/haptics";
 import Matches from "@/pages/Matches";
@@ -74,9 +79,6 @@ const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
 });
 
 const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
-const PULL_TO_REFRESH_THRESHOLD = 129.6;
-const PULL_TO_REFRESH_BASE_RESISTANCE = 0.75;
-const PULL_TO_REFRESH_MIN_RESISTANCE = 0.6;
 const PULL_TO_REFRESH_SLOW_REQUEST_MS = 8_000;
 const PULL_GESTURE_DIRECTION_THRESHOLD = 8;
 
