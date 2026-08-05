@@ -9,6 +9,7 @@ interface AvatarProps {
   name?: string;
   size?: "xs" | "session" | "sm" | "md" | "lg";
   className?: string;
+  fallbackIconClassName?: string;
   onEditClick?: () => void;
 }
 
@@ -46,6 +47,7 @@ const Avatar: React.FC<AvatarProps> = ({
   name,
   size = "md",
   className,
+  fallbackIconClassName,
   onEditClick,
 }) => {
   const resolvedAvatarUrl = resolveAssetUrl(avatarUrl);
@@ -67,7 +69,11 @@ const Avatar: React.FC<AvatarProps> = ({
         />
       ) : null}
       <HeroUiAvatar.Fallback className="flex items-center justify-center rounded-full bg-gray-100 text-pkpk-sub-bg shadow-inner">
-        <IoPerson className={iconSizeMap[size]} />
+        <IoPerson
+          className={[iconSizeMap[size], fallbackIconClassName]
+            .filter(Boolean)
+            .join(" ")}
+        />
       </HeroUiAvatar.Fallback>
     </HeroUiAvatar>
   );
