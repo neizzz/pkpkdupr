@@ -18,13 +18,14 @@ import {
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import type { PlayerRatingChangeLog } from "@pkpkdupr/shared/player";
+import BottomSheet from "@/components/BottomSheet";
 import Match, { type MatchInfo } from "@/components/Match";
 import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import SkeletonBlock from "@/components/SkeletonBlock";
-import type { TabKey } from "@/context/TabNavigationContext";
+import { type TabKey, useTabNavigation } from "@/context/TabNavigationContext";
 import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { formatRating } from "@/utils/dupr";
 
@@ -244,13 +245,14 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   const [scoreRows, setScoreRows] = useState(() => [createEmptyScoreRow()]);
   const [resultError, setResultError] = useState<string | null>(null);
   const isSectionsLoading = useMinimumLoading(isLoading);
-  const [isResultFormOpen, setIsResultFormOpen] = useState(false);
+  const [isResultSheetOpen, setIsResultSheetOpen] = useState(false);
   const [isRejectConfirmationOpen, setIsRejectConfirmationOpen] =
     useState(false);
   const [isAutoApprovalTooltipOpen, setIsAutoApprovalTooltipOpen] =
     useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const lastAutoApprovalRefreshAtRef = useRef(0);
+  const { closeDepth, pushDepth, selectedTab } = useTabNavigation();
   const isMyMatch = match.teams.some((team) =>
     team.players.some((teamPlayer) => teamPlayer.id === currentPlayerId),
   );
@@ -297,8 +299,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     isOnline &&
     !!onRejectResult;
   const resultActionLabel = hasResultScores ? "결과 수정" : "결과 입력";
-  const shouldShowResultForm =
-    canSubmitResult && (!hasResultScores || isResultFormOpen);
+  const resultSheetDepthId = `match-result-sheet:${match.id}`;
   const maxScoreCount = getMaxScoreCountForMatchMode(match.mode);
   const canAddScoreRow = scoreRows.length < maxScoreCount;
   const totalPoints = useMemo(
@@ -339,7 +340,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
         : [createEmptyScoreRow()],
     );
     setResultError(null);
-    setIsResultFormOpen(false);
+    setIsResultSheetOpen(false);
   }, [match.id, match.scores]);
 
   useEffect(() => {
@@ -377,6 +378,33 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     );
   };
 
+  const openResultSheet = () => {
+    if (!canSubmitResult) return;
+
+    pushDepth(tabKey, {
+      id: resultSheetDepthId,
+      kind: "bottom-sheet",
+      onClose: () => setIsResultSheetOpen(false),
+    });
+    setResultError(null);
+    setIsResultSheetOpen(true);
+  };
+
+  const closeResultSheet = () => {
+    if (!closeDepth(tabKey, resultSheetDepthId)) {
+      setIsResultSheetOpen(false);
+    }
+  };
+
+  const handleResultSheetOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      openResultSheet();
+      return;
+    }
+
+    closeResultSheet();
+  };
+
   const handleSubmitResult = async () => {
     if (!onSubmitResult) return;
 
@@ -407,6 +435,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
       validateMatchScoresForMode(match.mode, scores);
       setResultError(null);
       await onSubmitResult(match.id, scores);
+      closeResultSheet();
     } catch (err) {
       setResultError(
         err instanceof Error ? err.message : "결과를 입력하지 못했어요.",
@@ -576,92 +605,13 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                   size="sm"
                   variant="secondary"
                   className="rounded-2xl text-[#409eff]"
-                  onPress={() => setIsResultFormOpen((value) => !value)}
+                  onPress={openResultSheet}
                 >
-                  {isResultFormOpen
-                    ? "닫기"
-                    : hasResultScores
-                      ? "수정"
-                      : "결과 입력"}
+                  {hasResultScores ? "수정" : "결과 입력"}
                 </Button>
               </div>
             ) : null}
             </section>
-
-            {shouldShowResultForm ? (
-            <Card className="rounded-xl border border-pkpk-sub-bg/30 bg-white p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">
-                {hasResultScores ? "Edit Result" : "Result"}
-              </p>
-              <p className="mt-1 text-xs text-[#888]">
-                {match.mode === "single-game"
-                  ? "단판은 스코어 1개만 입력할 수 있어요."
-                  : "2선승은 2개 또는 3개 스코어를 입력할 수 있어요."}
-              </p>
-              <div className="mt-2 flex flex-col gap-2">
-                {scoreRows.map((row, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <span className="w-10 shrink-0 text-xs font-semibold text-[#888]">
-                      G{index + 1}
-                    </span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      value={row.scoreA}
-                      onChange={(event) =>
-                        updateScoreRow(index, "scoreA", event.target.value)
-                      }
-                      className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-pkpk-sub-font outline-none"
-                      placeholder="점수"
-                    />
-                    <span className="text-sm font-semibold text-[#888]">:</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      value={row.scoreB}
-                      onChange={(event) =>
-                        updateScoreRow(index, "scoreB", event.target.value)
-                      }
-                      className="app-mobile-input min-w-0 flex-1 rounded-xl border border-border px-3 py-2 text-base font-semibold text-pkpk-sub-font outline-none"
-                      placeholder="점수"
-                    />
-                  </div>
-                ))}
-              </div>
-              {resultError ? (
-                <p className="mt-2 text-xs font-medium text-red-500">
-                  {resultError}
-                </p>
-              ) : null}
-              <div className="mt-3 flex justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="rounded-2xl text-[#409eff]"
-                  onPress={() => {
-                    setScoreRows((rows) =>
-                      rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
-                        ? rows
-                        : [...rows, createEmptyScoreRow()],
-                    );
-                  }}
-                  isDisabled={isSubmittingResult || !canAddScoreRow}
-                >
-                  {match.mode === "single-game" ? "단판" : "세트 추가"}
-                </Button>
-                <Button
-                  size="sm"
-                  className="rounded-2xl bg-[#409eff] font-semibold text-white"
-                  onPress={() => void handleSubmitResult()}
-                  isDisabled={isSubmittingResult}
-                >
-                  {resultActionLabel}
-                </Button>
-              </div>
-            </Card>
-            ) : null}
 
             <section>
             <p
@@ -931,13 +881,111 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             ) : null}
             </section>
 
-            {!shouldShowResultForm && resultError ? (
+            {!isResultSheetOpen && resultError ? (
             <p className="text-xs font-medium text-red-500">{resultError}</p>
             ) : null}
 
           </div>
         </div>
       </div>
+      <BottomSheet
+        isOpen={isResultSheetOpen}
+        isActive={selectedTab === tabKey}
+        onOpenChange={handleResultSheetOpenChange}
+        ariaLabel={hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
+        className="px-5 pt-6"
+        layer={80}
+      >
+        <div className="flex flex-col gap-5">
+          <h2 className="bs-text-head text-pkpk-main-font">
+            {hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
+          </h2>
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-end gap-2">
+              <span aria-hidden="true" />
+              {match.teams.map((team, teamIndex) => (
+                <div key={team.id} className="min-w-0">
+                  <p className="bs-text-caption font-semibold text-pkpk-sub-font">
+                    {teamIndex === 0 ? "A팀" : "B팀"}
+                  </p>
+                  <p
+                    className="truncate text-xs text-pkpk-sub-font"
+                    title={team.players.map((player) => player.username).join(" · ")}
+                  >
+                    {team.players.map((player) => player.username).join(" · ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {scoreRows.map((row, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-2"
+              >
+                <span className="text-xs font-semibold text-[#888]">
+                  G{index + 1}
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={row.scoreA}
+                  onChange={(event) =>
+                    updateScoreRow(index, "scoreA", event.target.value)
+                  }
+                  className="app-mobile-input min-w-0 w-full rounded-xl border border-border px-3 py-2 text-center text-base font-semibold text-pkpk-sub-font outline-none"
+                  placeholder="점수"
+                  aria-label={`G${index + 1} A팀 점수`}
+                />
+                <span className="text-center text-sm font-semibold text-[#888]">
+                  :
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={row.scoreB}
+                  onChange={(event) =>
+                    updateScoreRow(index, "scoreB", event.target.value)
+                  }
+                  className="app-mobile-input min-w-0 w-full rounded-xl border border-border px-3 py-2 text-center text-base font-semibold text-pkpk-sub-font outline-none"
+                  placeholder="점수"
+                  aria-label={`G${index + 1} B팀 점수`}
+                />
+              </div>
+            ))}
+          </div>
+          {resultError ? (
+            <p className="text-xs font-medium text-red-500">{resultError}</p>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            {match.mode === "best-of-3" ? (
+              <Button
+                className="app-action-button rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
+                onPress={() => {
+                  setScoreRows((rows) =>
+                    rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
+                      ? rows
+                      : [...rows, createEmptyScoreRow()],
+                  );
+                }}
+                isDisabled={isSubmittingResult || !canAddScoreRow}
+              >
+                세트 추가
+              </Button>
+            ) : null}
+            <Button
+              className={`app-action-button rounded-2xl bg-[#409eff] font-semibold text-white ${
+                match.mode === "single-game" ? "col-span-2" : ""
+              }`}
+              onPress={() => void handleSubmitResult()}
+              isDisabled={isSubmittingResult}
+            >
+              {isSubmittingResult ? "입력 중..." : resultActionLabel}
+            </Button>
+          </div>
+        </div>
+      </BottomSheet>
     </div>
   );
 };
