@@ -9,6 +9,7 @@ import Match, {
 import SessionCard from "@/components/SessionCard";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelStatus from "@/components/TabPanelStatus";
+import type { TabKey } from "@/context/TabNavigationContext";
 import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 
 interface SessionDetailProps {
@@ -19,6 +20,7 @@ interface SessionDetailProps {
   error: string | null;
   onRetry: () => void;
   onPressMatch: (match: MatchInfo) => void;
+  tabKey?: TabKey;
 }
 
 const SessionMatchListSkeleton: React.FC = () => (
@@ -56,6 +58,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   error,
   onRetry,
   onPressMatch,
+  tabKey = "match",
 }) => {
   const sessionId = session.id;
   const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
@@ -74,7 +77,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 
   return (
     <div className="min-h-full">
-      <DetailPageHeader title="Session Detail" tabKey="match" />
+      <DetailPageHeader title="Session Detail" tabKey={tabKey} />
       <div className="p-2">
         <div className="mx-auto flex w-full flex-col gap-3">
           <SessionCard

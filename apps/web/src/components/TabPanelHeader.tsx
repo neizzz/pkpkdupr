@@ -3,6 +3,7 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
 interface TabPanelHeaderProps {
   title: string;
   children?: React.ReactNode;
+  footer?: React.ReactNode;
   showGradientExtension?: boolean;
   onHeaderElementChange?: (element: HTMLDivElement | null) => void;
 }
@@ -108,6 +109,7 @@ export const TabPanelHeaderGradientExtension: React.FC<
 const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
   title,
   children,
+  footer,
   showGradientExtension = true,
   onHeaderElementChange,
 }) => {
@@ -189,14 +191,17 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
           className="tab-panel-header-gradient-base pointer-events-none absolute inset-x-0 top-0 h-full"
         />
         <div
-          className={`relative z-10 flex min-h-12 items-center justify-between border-b px-4 transition-colors ${
-            isScrolled ? "border-white/20" : "border-transparent"
+          className={`relative z-10 transition-colors ${
+            isScrolled ? "border-b border-white/20" : ""
           }`}
         >
-          <h2 className="text-[28.8px] font-bold text-pkpk-primary-font">
-            {title}
-          </h2>
-          {children}
+          <div className="flex min-h-12 items-center justify-between px-4">
+            <h2 className="text-[28.8px] font-bold text-pkpk-primary-font">
+              {title}
+            </h2>
+            {children}
+          </div>
+          {footer ? <div className="px-4 pb-2">{footer}</div> : null}
         </div>
       </div>
       {showGradientExtension ? (

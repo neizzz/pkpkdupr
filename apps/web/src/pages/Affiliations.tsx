@@ -8,6 +8,8 @@ import type {
   ClubRankingEntry,
 } from "@pkpkdupr/shared/club";
 import type { Match, ManagedMatchSession } from "@pkpkdupr/shared/match";
+import { PiRankingLight } from "react-icons/pi";
+import { TbAffiliate } from "react-icons/tb";
 import {
   IoCalendarOutline,
   IoChevronForward,
@@ -22,8 +24,16 @@ import {
 import QrCode from "react-qr-code";
 import BottomSheet from "@/components/BottomSheet";
 import ClubQrScannerSheetBody from "@/components/ClubQrScannerSheetBody";
+import type {
+  MatchInfo,
+  MatchSessionSummaryInfo,
+} from "@/components/Match";
+import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import RightDrawer from "@/components/RightDrawer";
-import TabPanelHeader from "@/components/TabPanelHeader";
+import SessionDetail from "@/components/SessionDetail";
+import TabPanelHeader, {
+  TabPanelHeaderGradientExtension,
+} from "@/components/TabPanelHeader";
 import TabPanelEmptyState from "@/components/TabPanelEmptyState";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
@@ -35,14 +45,22 @@ type ClubListItem = { club: Club; membership: ClubMembership };
 type ScannerTarget = "invite" | "player" | null;
 type RankingCategory = "singles" | "doubles";
 
-const formatDateTime = (value: Date) =>
-  new Intl.DateTimeFormat("ko-KR", {
-    month: "numeric",
-    day: "numeric",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(value);
+const noop = () => {};
+
+const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
+  month: "numeric",
+  day: "numeric",
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+const formatDateTime = (value: Date | string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "일정 미정"
+    : dateTimeFormatter.format(date);
+};
 
 const getMatchName = (match: Match) =>
   match.name ||
@@ -67,12 +85,24 @@ const SectionTitle: React.FC<{
 const Affiliations: React.FC = () => {
   const { token, player } = useAuth();
   const isOnline = useOnlineStatus();
-  const { registerPullToRefresh, selectedTab } = useTabNavigation();
+  const {
+    depthStacks,
+    pushDepth,
+    registerPullToRefresh,
+    registerScrollContainer,
+    restoreScrollTop,
+    saveScrollPosition,
+    scrollToTop,
+    selectedTab,
+  } = useTabNavigation();
   const [clubs, setClubs] = useState<ClubListItem[]>([]);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<ClubDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
+  const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [clubName, setClubName] = useState("");
@@ -89,6 +119,14 @@ const Affiliations: React.FC = () => {
   const [sessionName, setSessionName] = useState("");
   const [sessionLocation, setSessionLocation] = useState("");
   const [sessionDate, setSessionDate] = useState("");
+  const [selectedSession, setSelectedSession] =
+    useState<MatchSessionSummaryInfo | null>(null);
+  const [selectedSessionMatches, setSelectedSessionMatches] = useState<
+    MatchInfo[]
+  >([]);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -327,6 +365,119 @@ const Affiliations: React.FC = () => {
     setSelectedClubId(clubId);
   };
 
+  const loadSessionMatches = useCallback(
+    async (session: MatchSessionSummaryInfo) => {
+      setIsLoadingSession(true);
+      setSessionError(null);
+      try {
+        setSelectedSessionMatches(
+          await request<MatchInfo[]>(
+            `/api/match-sessions/${encodeURIComponent(session.id)}/matches`,
+          ),
+        );
+      } catch (loadError) {
+        setSessionError(
+          loadError instanceof Error
+            ? loadError.message
+            : "세션 경기를 불러오지 못했어요.",
+        );
+      } finally {
+        setIsLoadingSession(false);
+      }
+    },
+    [request],
+  );
+
+  const openMatchDetail = useCallback(
+    (match: MatchInfo) => {
+      saveScrollPosition("affiliations");
+      pushDepth("affiliations", {
+        id: `club-match-detail:${match.id}`,
+        kind: "match-detail",
+        onClose: noop,
+      });
+      setSelectedMatch(match);
+      window.requestAnimationFrame(() => scrollToTop("auto"));
+    },
+    [pushDepth, saveScrollPosition, scrollToTop],
+  );
+
+  const openSessionDetail = useCallback(
+    (session: ManagedMatchSession) => {
+      if (!dashboard) return;
+
+      const sessionDetail: MatchSessionSummaryInfo = {
+        id: session.id,
+        name: session.name,
+        date: new Date(session.date).toISOString(),
+        location: session.location,
+        clubId: session.clubId,
+        status: "created",
+        matchCount: session.matchCount,
+        participants: dashboard.members
+          .filter((member) => session.participantIds.includes(member.id))
+          .map((member) => ({
+            id: member.id,
+            username: member.username,
+            avatarUrl: member.avatarUrl,
+          })),
+        latestCreatedAt: new Date(session.updatedAt).toISOString(),
+      };
+
+      saveScrollPosition("affiliations");
+      pushDepth("affiliations", {
+        id: `club-session-detail:${session.id}`,
+        kind: "session-detail",
+        onClose: noop,
+      });
+      setSelectedSession(sessionDetail);
+      setSelectedSessionMatches([]);
+      setSessionError(null);
+      window.requestAnimationFrame(() => scrollToTop("auto"));
+      void loadSessionMatches(sessionDetail);
+    },
+    [dashboard, loadSessionMatches, pushDepth, saveScrollPosition, scrollToTop],
+  );
+
+  const completeSessionDetailClose = useCallback(() => {
+    setSelectedSession(null);
+    setSelectedSessionMatches([]);
+    setSessionError(null);
+    restoreScrollTop("affiliations");
+  }, [restoreScrollTop]);
+
+  const completeMatchDetailClose = useCallback(() => {
+    setSelectedMatch(null);
+    restoreScrollTop("affiliations");
+  }, [restoreScrollTop]);
+
+  const sessionDepthId = selectedSession
+    ? `club-session-detail:${selectedSession.id}`
+    : null;
+  const matchDepthId = selectedMatch
+    ? `club-match-detail:${selectedMatch.id}`
+    : null;
+  const isSessionDrawerOpen =
+    !!sessionDepthId && depthStacks.affiliations.includes(sessionDepthId);
+  const isMatchDrawerOpen =
+    !!matchDepthId && depthStacks.affiliations.includes(matchDepthId);
+
+  const registerSessionScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!sessionDepthId) return;
+      registerScrollContainer("affiliations", sessionDepthId, element);
+    },
+    [registerScrollContainer, sessionDepthId],
+  );
+
+  const registerMatchScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!matchDepthId) return;
+      registerScrollContainer("affiliations", matchDepthId, element);
+    },
+    [matchDepthId, registerScrollContainer],
+  );
+
   const renderSchedule = () => {
     if (!dashboard) return null;
     const sessions = dashboard.upcomingSessions.slice(0, 2);
@@ -343,8 +494,10 @@ const Affiliations: React.FC = () => {
     return (
       <div className="space-y-2">
         {sessions.map((session: ManagedMatchSession) => (
-          <div
+          <button
             key={session.id}
+            type="button"
+            onClick={() => openSessionDetail(session)}
             className="flex items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3"
           >
             <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
@@ -361,11 +514,14 @@ const Affiliations: React.FC = () => {
             <span className="shrink-0 rounded-full bg-pkpk-accent-bg px-2 py-1 text-[11px] font-bold text-pkpk-dark">
               세션
             </span>
-          </div>
+            <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
+          </button>
         ))}
         {standaloneMatches.map((match) => (
-          <div
+          <button
             key={match.id}
+            type="button"
+            onClick={() => openMatchDetail(match as unknown as MatchInfo)}
             className="flex items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3"
           >
             <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
@@ -379,7 +535,8 @@ const Affiliations: React.FC = () => {
                 {formatDateTime(match.matchStartsAt)} · {match.location}
               </p>
             </div>
-          </div>
+            <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
+          </button>
         ))}
       </div>
     );
@@ -420,7 +577,34 @@ const Affiliations: React.FC = () => {
 
   return (
     <div className="flex h-full min-h-full flex-col">
-      <TabPanelHeader title="Clubs">
+      <TabPanelHeader
+        title="Clubs"
+        showGradientExtension={false}
+        onHeaderElementChange={setHeaderElement}
+        footer={
+          activeClubs.length ? (
+            <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex w-max gap-1">
+                {activeClubs.map((item) => (
+                  <button
+                    key={item.club.id}
+                    type="button"
+                    onClick={() => selectClub(item.club.id)}
+                    className={`flex items-center gap-1 rounded-xl border px-2 py-1 text-xs font-bold transition-colors ${
+                      item.club.id === selectedClubId
+                        ? "border-pkpk-primary-bg bg-pkpk-primary-bg text-white shadow-sm"
+                        : "border-border bg-white text-pkpk-sub-font"
+                    }`}
+                  >
+                    <TbAffiliate aria-hidden="true" className="size-3.5" />
+                    <span className="max-w-24 truncate">{item.club.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null
+        }
+      >
         <button
           type="button"
           className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
@@ -431,7 +615,7 @@ const Affiliations: React.FC = () => {
         </button>
       </TabPanelHeader>
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
         {isLoading ? (
           <TabPanelStatus isLoading ariaLabel="클럽을 불러오는 중" message="클럽을 불러오는 중이에요." />
         ) : error && !activeClubs.length ? (
@@ -457,107 +641,99 @@ const Affiliations: React.FC = () => {
             ) : null}
           </TabPanelEmptyState>
         ) : (
-          <div className="space-y-5 p-3 pb-7">
-          <div className="-mx-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="flex w-max gap-2">
-              {activeClubs.map((item) => (
-                <button
-                  key={item.club.id}
-                  type="button"
-                  onClick={() => selectClub(item.club.id)}
-                  className={`rounded-2xl border px-4 py-2.5 text-sm font-bold transition-colors ${
-                    item.club.id === selectedClubId
-                      ? "border-pkpk-primary-bg bg-pkpk-primary-bg text-white shadow-sm"
-                      : "border-border bg-white text-pkpk-sub-font"
-                  }`}
-                >
-                  {item.club.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {error ? (
-            <div className="rounded-2xl border border-error/20 bg-white px-4 py-3 text-sm font-medium text-error">
-              {error}
-            </div>
-          ) : null}
-
-          {isDashboardLoading || !dashboard ? (
-            <TabPanelStatus isLoading ariaLabel="클럽 정보를 불러오는 중" message="클럽 정보를 불러오는 중이에요." />
-          ) : (
-            <>
-              <section className="space-y-3">
-                <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="다가오는 경기 & 세션" />
-                {renderSchedule()}
-              </section>
-
-              <section className="space-y-3">
-                <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
-                {dashboard.announcements.length ? (
-                  <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
-                    {dashboard.announcements.slice(0, 3).map((announcement) => (
-                      <div key={announcement.id} className="flex gap-3 px-4 py-3">
-                        <IoMegaphoneOutline className="mt-0.5 size-4 shrink-0 text-pkpk-primary-bg" />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-pkpk-main-font">
-                            {announcement.title}
-                          </p>
-                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-pkpk-sub-font">
-                            {announcement.body}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+          <div className="mx-auto w-full min-h-full shrink-0">
+            <TabPanelHeaderGradientExtension
+              headerElement={headerElement}
+              className="z-0"
+            />
+            <div className="relative z-10 mx-1.5 mt-1 overflow-hidden rounded-3xl bg-white pt-1">
+              <div className="space-y-3 pb-[calc(7rem+var(--safe-bottom))]">
+                {error ? (
+                  <div className="rounded-3xl border border-error/20 bg-white px-4 py-3 text-sm font-medium text-error">
+                    {error}
                   </div>
+                ) : null}
+
+                {isDashboardLoading || !dashboard ? (
+                  <TabPanelStatus isLoading ariaLabel="클럽 정보를 불러오는 중" message="클럽 정보를 불러오는 중이에요." />
                 ) : (
-                  <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
-                    등록된 공지가 없어요.
-                  </p>
+                  <>
+                    <section className="space-y-3 rounded-3xl border-x border-b border-border bg-white p-3">
+                      <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="다가오는 경기 & 세션" />
+                      {renderSchedule()}
+                    </section>
+
+                    <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
+                      <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
+                      {dashboard.announcements.length ? (
+                        <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
+                          {dashboard.announcements.slice(0, 3).map((announcement) => (
+                            <div key={announcement.id} className="flex gap-3 px-4 py-3">
+                              <IoMegaphoneOutline className="mt-0.5 size-4 shrink-0 text-pkpk-primary-bg" />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-semibold text-pkpk-main-font">
+                                  {announcement.title}
+                                </p>
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-pkpk-sub-font">
+                                  {announcement.body}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
+                          등록된 공지가 없어요.
+                        </p>
+                      )}
+                    </section>
+
+                    <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
+                      <SectionTitle
+                        icon={<PiRankingLight className="size-5" />}
+                        title="랭킹"
+                      />
+                      <div className="grid grid-cols-2 rounded-xl bg-pkpk-session-bg p-1">
+                        {(["singles", "doubles"] as RankingCategory[]).map((category) => (
+                          <button
+                            key={category}
+                            type="button"
+                            onClick={() => setRankingCategory(category)}
+                            className={`rounded-lg py-2 text-sm font-bold transition-colors ${
+                              rankingCategory === category
+                                ? "bg-white text-pkpk-primary-bg shadow-sm"
+                                : "text-pkpk-sub-font"
+                            }`}
+                          >
+                            {category === "singles" ? "싱글" : "복식"}
+                          </button>
+                        ))}
+                      </div>
+                      {renderRankings(dashboard.rankings[rankingCategory])}
+                    </section>
+
+                    {isManager ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsManagementOpen(true)}
+                        className="flex w-full items-center gap-3 rounded-3xl border border-pkpk-primary-bg/15 bg-pkpk-session-bg px-4 py-4 text-left"
+                      >
+                        <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-pkpk-primary-bg shadow-sm">
+                          <IoShieldCheckmarkOutline className="size-6" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-bold text-pkpk-main-font">운영진 관리</span>
+                          <span className="mt-0.5 block text-xs text-pkpk-sub-font">
+                            가입 요청, 공지, 세션, 멤버 권한을 관리해요.
+                          </span>
+                        </span>
+                        <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
+                      </button>
+                    ) : null}
+                  </>
                 )}
-              </section>
-
-              <section className="space-y-3">
-                <SectionTitle title="랭킹" />
-                <div className="grid grid-cols-2 rounded-xl bg-pkpk-session-bg p-1">
-                  {(["singles", "doubles"] as RankingCategory[]).map((category) => (
-                    <button
-                      key={category}
-                      type="button"
-                      onClick={() => setRankingCategory(category)}
-                      className={`rounded-lg py-2 text-sm font-bold transition-colors ${
-                        rankingCategory === category
-                          ? "bg-white text-pkpk-primary-bg shadow-sm"
-                          : "text-pkpk-sub-font"
-                      }`}
-                    >
-                      {category === "singles" ? "싱글" : "복식"}
-                    </button>
-                  ))}
-                </div>
-                {renderRankings(dashboard.rankings[rankingCategory])}
-              </section>
-
-              {isManager ? (
-                <button
-                  type="button"
-                  onClick={() => setIsManagementOpen(true)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-pkpk-primary-bg/15 bg-pkpk-session-bg px-4 py-4 text-left"
-                >
-                  <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-pkpk-primary-bg shadow-sm">
-                    <IoShieldCheckmarkOutline className="size-6" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-bold text-pkpk-main-font">운영진 관리</span>
-                    <span className="mt-0.5 block text-xs text-pkpk-sub-font">
-                      가입 요청, 공지, 세션, 멤버 권한을 관리해요.
-                    </span>
-                  </span>
-                  <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
-                </button>
-              ) : null}
-            </>
-          )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -847,6 +1023,42 @@ const Affiliations: React.FC = () => {
           ) : null}
         </div>
       </RightDrawer>
+
+      {selectedSession && sessionDepthId ? (
+        <RightDrawer
+          isOpen={isSessionDrawerOpen}
+          isActive={selectedTab === "affiliations"}
+          ariaLabel="세션 상세"
+          onExited={completeSessionDetailClose}
+          onScrollContainerChange={registerSessionScrollContainer}
+          onPullToRefresh={() => loadSessionMatches(selectedSession)}
+          layer={60}
+        >
+          <SessionDetail
+            session={selectedSession}
+            matches={selectedSessionMatches}
+            currentPlayerId={player?.id}
+            isLoading={isLoadingSession}
+            error={sessionError}
+            onRetry={() => void loadSessionMatches(selectedSession)}
+            onPressMatch={openMatchDetail}
+            tabKey="affiliations"
+          />
+        </RightDrawer>
+      ) : null}
+
+      {selectedMatch && matchDepthId ? (
+        <ProfileMatchDetailDrawer
+          isOpen={isMatchDrawerOpen}
+          isActive={selectedTab === "affiliations"}
+          tabKey="affiliations"
+          match={selectedMatch}
+          currentPlayerId={player?.id}
+          onExited={completeMatchDetailClose}
+          onScrollContainerChange={registerMatchScrollContainer}
+          layer={70}
+        />
+      ) : null}
     </div>
   );
 };
