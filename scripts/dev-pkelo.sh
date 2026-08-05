@@ -36,7 +36,7 @@ export DB_NAME="${MYSQL_DATABASE}"
 export DB_USER="${MYSQL_USER}"
 export DB_PASSWORD="${MYSQL_PASSWORD}"
 export AVATAR_UPLOAD_DIR="${ROOT_DIR}/data/pkelo-dev/uploads/avatars"
-export DEV_CORS_ORIGINS="http://pkelo.localhost:8081,http://pkelo.localhost:3101"
+export DEV_CORS_ORIGINS="http://pkelo.localhost:8081,http://localhost:8081,http://127.0.0.1:8081,http://pkelo.localhost:3101"
 
 mkdir -p "${AVATAR_UPLOAD_DIR}"
 bash scripts/dev-pkelo-db.sh browser
