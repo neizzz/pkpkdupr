@@ -1333,7 +1333,6 @@ const BottomNav: React.FC = () => {
           isActive={appSettingsTabKey === selectedTab}
           onOpenChange={handleAppSettingsOpenChange}
           ariaLabel="앱 설정"
-          className="px-5 pt-6"
         >
           <AppSettingsSheetBody />
         </BottomSheet>

@@ -14,7 +14,29 @@ interface BottomSheetProps {
   layer?: number;
 }
 
-const BottomSheet: React.FC<BottomSheetProps> = ({
+interface BottomSheetBodyProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+const BottomSheetBody: React.FC<BottomSheetBodyProps> = ({
+  children,
+  className,
+}) => (
+  <div
+    className={["flex flex-col gap-4", className]
+      .filter(Boolean)
+      .join(" ")}
+  >
+    {children}
+  </div>
+);
+
+type BottomSheetComponent = React.FC<BottomSheetProps> & {
+  Body: typeof BottomSheetBody;
+};
+
+const BottomSheet: BottomSheetComponent = ({
   isOpen,
   onOpenChange,
   ariaLabel,
@@ -154,7 +176,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
           role="dialog"
           aria-label={ariaLabel}
           className={[
-            "app-bottom-sheet-surface relative w-full rounded-t-3xl bg-white pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl",
+            "app-bottom-sheet-surface relative w-full rounded-t-3xl bg-white px-4 pt-5 pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl",
             className,
           ]
             .filter(Boolean)
@@ -168,5 +190,7 @@ const BottomSheet: React.FC<BottomSheetProps> = ({
     document.body,
   );
 };
+
+BottomSheet.Body = BottomSheetBody;
 
 export default BottomSheet;

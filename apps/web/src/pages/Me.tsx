@@ -347,7 +347,6 @@ const Me: React.FC = () => {
         isActive={selectedTab === "me"}
         onOpenChange={handleSettingsOpenChange}
         ariaLabel="설정"
-        className="px-5 pt-6"
       >
         <ProfileSettingsSheetBody />
       </BottomSheet>
