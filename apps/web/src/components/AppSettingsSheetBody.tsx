@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@heroui/react";
 import { useAppUpdate } from "@/context/AppUpdateContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import BottomSheet from "./BottomSheet";
 
 const AppSettingsSheetBody: React.FC = () => {
   const isOnline = useOnlineStatus();
@@ -44,7 +45,7 @@ const AppSettingsSheetBody: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <BottomSheet.Body>
       <h2 className="bs-text-head text-left text-pkpk-main-font">앱 설정</h2>
 
       {(message || error) && (
@@ -97,7 +98,7 @@ const AppSettingsSheetBody: React.FC = () => {
           </div>
         </div>
       </section>
-    </div>
+    </BottomSheet.Body>
   );
 };
 

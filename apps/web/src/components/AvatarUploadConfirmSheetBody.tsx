@@ -1,4 +1,5 @@
 import React from "react";
+import BottomSheet from "./BottomSheet";
 
 interface AvatarUploadConfirmSheetBodyProps {
   previewUrl: string;
@@ -11,7 +12,7 @@ interface AvatarUploadConfirmSheetBodyProps {
 const AvatarUploadConfirmSheetBody: React.FC<
   AvatarUploadConfirmSheetBodyProps
 > = ({ previewUrl, name, isSaving, onConfirm, onCancel }) => (
-  <div className="flex flex-col items-center gap-5 pb-2 text-center">
+  <BottomSheet.Body className="items-center text-center">
     <h2 className="bs-text-head self-stretch text-left text-pkpk-main-font">
       프로필 사진 확인
     </h2>
@@ -41,7 +42,7 @@ const AvatarUploadConfirmSheetBody: React.FC<
         {isSaving ? "적용 중..." : "적용"}
       </button>
     </div>
-  </div>
+  </BottomSheet.Body>
 );
 
 export default AvatarUploadConfirmSheetBody;

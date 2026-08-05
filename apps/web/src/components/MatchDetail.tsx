@@ -895,10 +895,10 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
         isActive={selectedTab === tabKey}
         onOpenChange={handleResultSheetOpenChange}
         ariaLabel={hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
-        className="px-5 pt-6 [container-type:inline-size]"
+        className="[container-type:inline-size]"
         layer={80}
       >
-        <div className="flex flex-col gap-5">
+        <BottomSheet.Body>
           <h2 className="bs-text-head text-pkpk-main-font">
             {hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
           </h2>
@@ -1000,7 +1000,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
               {isSubmittingResult ? "입력 중..." : resultActionLabel}
             </Button>
           </div>
-        </div>
+        </BottomSheet.Body>
       </BottomSheet>
     </div>
   );

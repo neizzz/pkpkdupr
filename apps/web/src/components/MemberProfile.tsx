@@ -533,7 +533,6 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
         isActive
         onOpenChange={handleAvatarConfirmOpenChange}
         ariaLabel="프로필 사진 확인"
-        className="px-5 pt-6"
       >
         {avatarPreviewUrl ? (
           <AvatarUploadConfirmSheetBody
@@ -552,7 +551,6 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
         isActive
         onOpenChange={handleStatusEditorOpenChange}
         ariaLabel="상태메시지 수정"
-        className="px-5 pt-6"
       >
         <StatusMessageEditSheetBody
           key={`${displayedPlayer?.id ?? "unknown"}-${isStatusEditorOpen}`}

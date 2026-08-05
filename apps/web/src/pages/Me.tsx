@@ -358,7 +358,6 @@ const MyProfile: React.FC<MyProfileProps> = ({
         isActive={isActive}
         onOpenChange={handleSettingsOpenChange}
         ariaLabel="설정"
-        className="px-5 pt-6"
       >
         <ProfileSettingsSheetBody />
       </BottomSheet>

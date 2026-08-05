@@ -743,11 +743,10 @@ const Affiliations: React.FC = () => {
         isActive={selectedTab === "affiliations"}
         onOpenChange={setIsCreateOpen}
         ariaLabel="클럽 만들기"
-        className="px-5 pt-6"
       >
-        <div className="flex flex-col gap-4 pb-4">
+        <BottomSheet.Body>
           <div>
-            <h2 className="text-xl font-bold text-pkpk-main-font">클럽 만들기</h2>
+            <h2 className="bs-text-head text-pkpk-main-font">클럽 만들기</h2>
             <p className="mt-1 text-sm text-pkpk-sub-font">
               만든 분은 바로 클럽장이 됩니다.
             </p>
@@ -787,7 +786,7 @@ const Affiliations: React.FC = () => {
           >
             {isCreating ? "만드는 중..." : "클럽 만들기"}
           </Button>
-        </div>
+        </BottomSheet.Body>
       </BottomSheet>
 
       <BottomSheet

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { PLAYER_STATUS_MESSAGE_MAX_LENGTH } from "@pkpkdupr/shared/player";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { getStatusMessageColors } from "@/utils/statusMessage";
+import BottomSheet from "./BottomSheet";
 import BottomSheetSection from "./BottomSheetSection";
 
 interface StatusMessageEditSheetBodyProps {
@@ -68,7 +69,7 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
   };
 
   return (
-    <div className="flex max-h-[75vh] flex-col gap-5 overflow-y-auto pb-2">
+    <BottomSheet.Body className="max-h-[75vh] overflow-y-auto">
       <h2 className="bs-text-head text-left text-pkpk-main-font">
         상태메시지 수정
       </h2>
@@ -140,7 +141,7 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
       >
         {isSaving ? "저장 중..." : "저장"}
       </button>
-    </div>
+    </BottomSheet.Body>
   );
 };
 

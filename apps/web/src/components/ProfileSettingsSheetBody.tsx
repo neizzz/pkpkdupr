@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import PasswordChangeForm from "@/components/PasswordChangeForm";
 import { useAuth } from "@/context/AuthContext";
 import { PASSWORD_CHANGED_LOGIN_NOTICE } from "@/lib/authMessages";
+import BottomSheet from "./BottomSheet";
 
 const ProfileSettingsSheetBody: React.FC = () => {
   const { logout, player } = useAuth();
@@ -17,7 +18,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <BottomSheet.Body>
       <h2 className="bs-text-head text-left text-pkpk-main-font">설정</h2>
 
       {player?.authProvider === "password" || !player?.authProvider ? (
@@ -30,7 +31,7 @@ const ProfileSettingsSheetBody: React.FC = () => {
           카카오 로그인 계정은 비밀번호를 변경할 수 없습니다.
         </p>
       )}
-    </div>
+    </BottomSheet.Body>
   );
 };
 
