@@ -34,5 +34,8 @@ Thumbs.db
 # Debug
 npm-debug.log*
 
+# Local snapshots
+/tmp/
+
 # Qwen Code project state (local only)
 .qwen/
