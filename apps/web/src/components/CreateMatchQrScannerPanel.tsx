@@ -34,7 +34,7 @@ const CreateMatchQrScannerPanel: React.FC<CreateMatchQrScannerPanelProps> = ({
   onConfirm,
   onClose,
 }) => (
-  <div className="mt-6 flex flex-col gap-4">
+  <div className="flex flex-col gap-4">
     <div className="flex flex-col gap-2">
       <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
       {teamGrid}

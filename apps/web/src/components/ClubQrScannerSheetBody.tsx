@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
 import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
+import BottomSheet from "./BottomSheet";
 import { getCameraErrorMessage } from "./CreateMatchDrawerBody.utils";
 
 interface ClubQrScannerSheetBodyProps {
@@ -117,7 +118,10 @@ const ClubQrScannerSheetBody: React.FC<ClubQrScannerSheetBodyProps> = ({
   };
 
   return (
-    <div className="mt-6 flex flex-col gap-4 px-3 pb-4">
+    <BottomSheet.Body>
+      <h2 className="bs-text-head text-left text-pkpk-main-font">
+        QR코드 스캔
+      </h2>
       <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-border bg-slate-950">
         {scannerStatus === "scanning" ? (
           <div className="absolute inset-0">
@@ -204,7 +208,7 @@ const ClubQrScannerSheetBody: React.FC<ClubQrScannerSheetBodyProps> = ({
           </Button>
         ) : null}
       </div>
-    </div>
+    </BottomSheet.Body>
   );
 };
 
