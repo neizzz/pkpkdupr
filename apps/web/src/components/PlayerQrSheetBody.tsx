@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@heroui/react";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import QrCode from "react-qr-code";
+import BottomSheet from "./BottomSheet";
 
 interface PlayerQrSheetBodyProps {
   qrToken: PlayerQrTokenResponse | null;
@@ -28,7 +29,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
   const canRefresh = !isQrLoading && (!qrToken || qrRemainingSeconds <= 60);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-4 pb-6 pt-6 text-center">
+    <BottomSheet.Body className="items-center justify-center text-center">
       <h2 className="bs-text-head self-stretch text-left text-pkpk-main-font">
         QR 코드
       </h2>
@@ -79,7 +80,7 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
           {isQrLoading ? "갱신 중..." : "새로고침"}
         </Button>
       )}
-    </div>
+    </BottomSheet.Body>
   );
 };
 

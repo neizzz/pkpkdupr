@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button, Drawer } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type { MatchMode } from "@pkpkdupr/shared/match";
 import { rememberRecentInputValue } from "@pkpkdupr/shared/recentInputHistory";
@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
+import BottomSheet from "./BottomSheet";
 import CreateMatchTeamGrid from "./CreateMatchTeamGrid";
 import BottomSheetSection from "./BottomSheetSection";
 import HoldToConfirmButton from "./HoldToConfirmButton";
@@ -311,9 +312,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   return (
     <>
-      <Drawer.Body className="flex flex-col gap-3 px-3 pb-4">
-        <h2 className="bs-text-head sticky top-0 z-10 -mx-3 shrink-0 bg-white px-3 pt-3 pb-0 text-left text-pkpk-main-font">
-          매치 생성
+      <BottomSheet.Body className="min-w-0 pb-4">
+        <h2 className="bs-text-head sticky top-0 z-10 -mx-4 shrink-0 bg-white px-4 text-left text-pkpk-main-font">
+          {isQrScannerOpen ? "QR코드 스캔" : "매치 생성"}
         </h2>
         {isQrScannerOpen ? (
           <CreateMatchQrScannerPanel
@@ -495,10 +496,10 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             </BottomSheetSection>
           </>
         )}
-      </Drawer.Body>
+      </BottomSheet.Body>
       {!isQrScannerOpen ? (
         <>
-          <Drawer.Footer className="flex flex-col gap-2 px-5 pt-2">
+          <div className="flex flex-col gap-2">
             {createMatchError ? (
               <p className="bs-text-body text-error">{createMatchError}</p>
             ) : null}
@@ -524,7 +525,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                     : "길게 눌러 매치생성"}
               </HoldToConfirmButton>
             </div>
-          </Drawer.Footer>
+          </div>
         </>
       ) : null}
     </>
