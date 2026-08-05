@@ -34,6 +34,7 @@ import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
 import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
+import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import PullToRefreshIndicator, {
   type PullToRefreshStatus,
 } from "@/components/PullToRefreshIndicator";
@@ -81,6 +82,22 @@ const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
 const HISTORY_DEPTH_STATE_KEY = "__pkpkduprTabDepth";
 const PULL_TO_REFRESH_SLOW_REQUEST_MS = 8_000;
 const PULL_GESTURE_DIRECTION_THRESHOLD = 8;
+const DEEP_LINK_MATCH_ID_PARAM = "matchId";
+
+const getDeepLinkMatchId = () => {
+  if (typeof window === "undefined") return null;
+
+  const matchId = new URLSearchParams(window.location.search)
+    .get(DEEP_LINK_MATCH_ID_PARAM)
+    ?.trim();
+  return matchId || null;
+};
+
+const getUrlWithoutDeepLinkMatchId = () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(DEEP_LINK_MATCH_ID_PARAM);
+  return `${url.pathname}${url.search}${url.hash}`;
+};
 
 interface TabDepthHistoryState {
   [HISTORY_DEPTH_STATE_KEY]: true;
@@ -103,7 +120,7 @@ const isTabDepthHistoryState = (
 };
 
 const BottomNav: React.FC = () => {
-  const { token, logout } = useAuth();
+  const { token, logout, player } = useAuth();
   const isOnline = useOnlineStatus();
   const [selectedTab, setSelectedTab] = useState<TabKey>("me");
   const [visitedTabs, setVisitedTabs] =
@@ -119,11 +136,17 @@ const BottomNav: React.FC = () => {
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [appSettingsTabKey, setAppSettingsTabKey] = useState<TabKey>("me");
   const [matchesReloadKey, setMatchesReloadKey] = useState(0);
+  const [deepLinkMatchId, setDeepLinkMatchId] = useState<string | null>(
+    getDeepLinkMatchId,
+  );
+  const [deepLinkMatchTabKey, setDeepLinkMatchTabKey] =
+    useState<TabKey>("me");
   const [pullDistance, setPullDistance] = useState(0);
   const [pullToRefreshStatus, setPullToRefreshStatus] =
     useState<PullToRefreshStatus>("idle");
   const [isPullRefreshSlow, setIsPullRefreshSlow] = useState(false);
   const isCreateMatchQrScannerOpenRef = useRef(false);
+  const handledDeepLinkMatchIdRef = useRef<string | null>(null);
   const [qrToken, setQrToken] = useState<PlayerQrTokenResponse | null>(null);
   const [isQrLoading, setIsQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -409,6 +432,64 @@ const BottomNav: React.FC = () => {
     },
     [selectTab],
   );
+
+  const clearDeepLinkMatchIdFromUrl = useCallback((matchId: string) => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(DEEP_LINK_MATCH_ID_PARAM) !== matchId) return;
+
+    url.searchParams.delete(DEEP_LINK_MATCH_ID_PARAM);
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, []);
+
+  useEffect(() => {
+    if (
+      !deepLinkMatchId ||
+      handledDeepLinkMatchIdRef.current === deepLinkMatchId
+    ) {
+      return;
+    }
+
+    const targetMatchId = deepLinkMatchId;
+    const targetTabKey = selectedTabRef.current;
+    const depthId = `deep-link-match-detail:${targetMatchId}`;
+    const linkedUrl = window.location.href;
+
+    // Keep a clean history entry underneath the drawer. The depth entry then
+    // retains the shareable URL, so closing it with the app back button or the
+    // browser back gesture removes matchId instead of reopening the drawer.
+    window.history.replaceState(
+      window.history.state,
+      "",
+      getUrlWithoutDeepLinkMatchId(),
+    );
+
+    handledDeepLinkMatchIdRef.current = targetMatchId;
+    setDeepLinkMatchTabKey(targetTabKey);
+    saveScrollPosition(targetTabKey);
+    pushDepth(targetTabKey, {
+      id: depthId,
+      kind: "match-detail",
+      onClose: () => {
+        handledDeepLinkMatchIdRef.current = null;
+        clearDeepLinkMatchIdFromUrl(targetMatchId);
+        setDeepLinkMatchId((current) =>
+          current === targetMatchId ? null : current,
+        );
+        restoreScrollTop(targetTabKey);
+      },
+    });
+    window.history.replaceState(window.history.state, "", linkedUrl);
+  }, [
+    clearDeepLinkMatchIdFromUrl,
+    deepLinkMatchId,
+    pushDepth,
+    restoreScrollTop,
+    saveScrollPosition,
+  ]);
 
   // Capture the pre-selection tab before HeroUI handles the press so moving to
   // a tab cannot be mistaken for a re-tap.
@@ -734,6 +815,24 @@ const BottomNav: React.FC = () => {
     qrTabKey,
     selectedTab,
   ]);
+
+  const deepLinkMatchDepthId = deepLinkMatchId
+    ? `deep-link-match-detail:${deepLinkMatchId}`
+    : null;
+  const isDeepLinkMatchDrawerOpen =
+    !!deepLinkMatchDepthId &&
+    depthStacks[deepLinkMatchTabKey].includes(deepLinkMatchDepthId);
+  const registerDeepLinkMatchScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!deepLinkMatchDepthId) return;
+      registerScrollContainer(
+        deepLinkMatchTabKey,
+        deepLinkMatchDepthId,
+        element,
+      );
+    },
+    [deepLinkMatchDepthId, deepLinkMatchTabKey, registerScrollContainer],
+  );
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -1239,6 +1338,19 @@ const BottomNav: React.FC = () => {
           <AppSettingsSheetBody />
         </BottomSheet>
       </Tabs>
+      {deepLinkMatchId && deepLinkMatchDepthId ? (
+        <ProfileMatchDetailDrawer
+          isOpen={isDeepLinkMatchDrawerOpen}
+          isActive={deepLinkMatchTabKey === selectedTab}
+          tabKey={deepLinkMatchTabKey}
+          match={null}
+          matchId={deepLinkMatchId}
+          currentPlayerId={player?.id}
+          onExited={() => undefined}
+          onScrollContainerChange={registerDeepLinkMatchScrollContainer}
+          layer={70}
+        />
+      ) : null}
       {typeof document !== "undefined"
         ? createPortal(
             <div

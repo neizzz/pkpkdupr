@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@heroui/react";
+import type { MatchScore } from "@pkpkdupr/shared/match";
 import type { MatchInfo } from "@/components/Match";
 import MatchDetail, {
   MatchDetailSkeleton,
@@ -16,7 +17,8 @@ interface ProfileMatchDetailDrawerProps {
   isOpen: boolean;
   isActive: boolean;
   tabKey: TabKey;
-  match: MatchInfo | null;
+  match?: MatchInfo | null;
+  matchId?: string;
   currentPlayerId?: string;
   onExited: () => void;
   onScrollContainerChange: (element: HTMLDivElement | null) => void;
@@ -28,6 +30,7 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
   isActive,
   tabKey,
   match,
+  matchId,
   currentPlayerId,
   onExited,
   onScrollContainerChange,
@@ -35,14 +38,25 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
 }) => {
   const { token } = useAuth();
   const isOnline = useOnlineStatus();
-  const [displayedMatch, setDisplayedMatch] = useState<MatchInfo | null>(match);
+  const [displayedMatch, setDisplayedMatch] = useState<MatchInfo | null>(
+    match ?? null,
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmittingResult, setIsSubmittingResult] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const targetMatchId = match?.id ?? matchId ?? null;
 
   const loadMatchDetail = useCallback(
     async (matchId: string) => {
-      if (!token || !isOnline) return;
+      if (!token) {
+        setError("로그인이 필요합니다.");
+        return;
+      }
+      if (!isOnline) {
+        setError("온라인 연결이 필요합니다.");
+        return;
+      }
 
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
@@ -77,16 +91,51 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
     [isOnline, token],
   );
 
+  const handleSubmitResult = useCallback(
+    async (matchId: string, scores: MatchScore[]) => {
+      if (!token) throw new Error("로그인이 필요해요.");
+      if (!isOnline) {
+        throw new Error(
+          "오프라인에서는 결과를 입력할 수 없습니다. 온라인 연결이 필요합니다.",
+        );
+      }
+
+      try {
+        setIsSubmittingResult(true);
+        const res = await fetch(buildApiUrl(`/api/matches/${matchId}/result`), {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ scores }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "결과를 입력하지 못했어요.");
+        }
+
+        setDisplayedMatch((await res.json()) as MatchInfo);
+        await loadMatchDetail(matchId);
+      } finally {
+        setIsSubmittingResult(false);
+      }
+    },
+    [isOnline, loadMatchDetail, token],
+  );
+
   useEffect(() => {
     requestIdRef.current += 1;
-    setDisplayedMatch(match);
+    setDisplayedMatch(match ?? null);
     setError(null);
     setIsLoading(false);
 
-    if (isOpen && match) {
-      void loadMatchDetail(match.id);
+    if (isOpen && targetMatchId) {
+      void loadMatchDetail(targetMatchId);
     }
-  }, [isOpen, loadMatchDetail, match]);
+  }, [isOpen, loadMatchDetail, match, targetMatchId]);
+
+  const retryMatchId = displayedMatch?.id ?? targetMatchId;
 
   let content: React.ReactNode;
   if (displayedMatch) {
@@ -95,11 +144,11 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
         {error ? (
           <div className="px-2 pt-2">
             <TabPanelStatus message={error} tone="error" />
-            {isOnline && match ? (
+            {isOnline && retryMatchId ? (
               <Button
                 type="button"
                 className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-pkpk-primary-font hover:bg-pkpk-primary-bg/90"
-                onPress={() => void loadMatchDetail(match.id)}
+                onPress={() => void loadMatchDetail(retryMatchId)}
               >
                 다시 시도
               </Button>
@@ -110,9 +159,12 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
           match={displayedMatch}
           tabKey={tabKey}
           currentPlayerId={currentPlayerId}
+          onSubmitResult={handleSubmitResult}
           onAutoApprovalDue={() => {
             void loadMatchDetail(displayedMatch.id);
           }}
+          isOnline={isOnline}
+          isSubmittingResult={isSubmittingResult}
           isLoading={isLoading}
         />
       </>
@@ -123,7 +175,21 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
     content = (
       <div className="min-h-full">
         <DetailPageHeader title="Match Detail" tabKey={tabKey} />
-        <TabPanelStatus message="매치를 불러오지 못했습니다." tone="error" />
+        <TabPanelStatus
+          message={error ?? "매치를 불러오지 못했습니다."}
+          tone="error"
+        />
+        {isOnline && retryMatchId ? (
+          <div className="px-2 pt-2">
+            <Button
+              type="button"
+              className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-pkpk-primary-font hover:bg-pkpk-primary-bg/90"
+              onPress={() => void loadMatchDetail(retryMatchId)}
+            >
+              다시 시도
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -136,7 +202,7 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
       onExited={onExited}
       onScrollContainerChange={onScrollContainerChange}
       onPullToRefresh={() =>
-        match ? loadMatchDetail(match.id) : Promise.resolve()
+        targetMatchId ? loadMatchDetail(targetMatchId) : Promise.resolve()
       }
       layer={layer}
     >

@@ -25,6 +25,7 @@ import DetailPageHeader from "@/components/DetailPageHeader";
 import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
 import SkeletonBlock from "@/components/SkeletonBlock";
+import UserChip from "@/components/UserChip";
 import { type TabKey, useTabNavigation } from "@/context/TabNavigationContext";
 import { useMinimumLoading } from "@/hooks/useMinimumLoading";
 import { formatRating } from "@/utils/dupr";
@@ -60,6 +61,7 @@ const formatDateTime = (value: string) =>
 
 const createEmptyScoreRow = () => ({ scoreA: "", scoreB: "" });
 const SCORE_TABLE_SET_COUNT = 3;
+const resultTeamChipWidthClass = "w-[clamp(6.6rem,35.2cqw,11rem)]";
 
 const formatAutoApprovalRemaining = (remainingMs: number) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -893,7 +895,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
         isActive={selectedTab === tabKey}
         onOpenChange={handleResultSheetOpenChange}
         ariaLabel={hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
-        className="px-5 pt-6"
+        className="px-5 pt-6 [container-type:inline-size]"
         layer={80}
       >
         <div className="flex flex-col gap-5">
@@ -904,17 +906,26 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-end gap-2">
               <span aria-hidden="true" />
               {match.teams.map((team, teamIndex) => (
-                <div key={team.id} className="min-w-0">
-                  <p className="bs-text-caption font-semibold text-pkpk-sub-font">
-                    {teamIndex === 0 ? "A팀" : "B팀"}
-                  </p>
-                  <p
-                    className="truncate text-xs text-pkpk-sub-font"
-                    title={team.players.map((player) => player.username).join(" · ")}
-                  >
-                    {team.players.map((player) => player.username).join(" · ")}
-                  </p>
-                </div>
+                <React.Fragment key={team.id}>
+                  {teamIndex === 1 ? <span aria-hidden="true" /> : null}
+                  <div className="flex min-w-0 flex-col items-center gap-1">
+                    <p className="w-full text-center bs-text-caption font-semibold text-pkpk-sub-font">
+                      {teamIndex === 0 ? "A팀" : "B팀"}
+                    </p>
+                    <div className="flex w-full flex-col items-center gap-1">
+                      {team.players.map((player) => (
+                        <UserChip
+                          key={player.id}
+                          player={player}
+                          isMe={player.id === currentPlayerId}
+                          size="match"
+                          chipWidthClass={resultTeamChipWidthClass}
+                          isMirrored={teamIndex === 1}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </React.Fragment>
               ))}
             </div>
             {scoreRows.map((row, index) => (
@@ -923,7 +934,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-2"
               >
                 <span className="text-xs font-semibold text-[#888]">
-                  G{index + 1}
+                  Set {index + 1}
                 </span>
                 <input
                   type="number"
@@ -958,10 +969,10 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           {resultError ? (
             <p className="text-xs font-medium text-red-500">{resultError}</p>
           ) : null}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="mt-2 grid grid-cols-2 gap-2">
             {match.mode === "best-of-3" ? (
               <Button
-                className="app-action-button rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
+                className="app-action-button col-span-2 rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
                 onPress={() => {
                   setScoreRows((rows) =>
                     rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
@@ -975,9 +986,14 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
               </Button>
             ) : null}
             <Button
-              className={`app-action-button rounded-2xl bg-[#409eff] font-semibold text-white ${
-                match.mode === "single-game" ? "col-span-2" : ""
-              }`}
+              className="app-action-button w-full rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
+              onPress={closeResultSheet}
+              isDisabled={isSubmittingResult}
+            >
+              취소
+            </Button>
+            <Button
+              className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white"
               onPress={() => void handleSubmitResult()}
               isDisabled={isSubmittingResult}
             >

@@ -1,5 +1,5 @@
 import React from "react";
-import { Chip } from "@heroui/react";
+import { Badge, Chip } from "@heroui/react";
 import type { Player } from "@pkpkdupr/shared/player";
 import { IoClose } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
@@ -78,23 +78,40 @@ const UserChip: React.FC<UserChipProps> = ({
               }
             : undefined
         }
-        className={`relative ${isMatchSize ? "h-[clamp(2rem,10cqw,2.75rem)]" : "h-6"} min-w-0 max-w-full overflow-hidden rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? `w-full ${isMirrored ? "pl-2" : "pr-2"}` : `${resolvedChipWidthClass} ${isMirrored ? "pl-3" : "pr-3"}`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+        className={`relative ${isMatchSize ? "h-[clamp(2rem,10cqw,2.75rem)]" : "h-6"} min-w-0 max-w-full ${isMe ? "overflow-visible" : "overflow-hidden"} rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? `w-full ${isMirrored ? "pl-2" : "pr-2"}` : `${resolvedChipWidthClass} ${isMirrored ? "pl-3" : "pr-3"}`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
       >
         <div
           className={`flex w-full min-w-0 max-w-full items-center gap-1 ${
             isMirrored ? "flex-row-reverse" : ""
           }`}
         >
-          <Avatar
-            size="xs"
-            avatarUrl={player.avatarUrl}
-            name={player.username}
-            className={`bg-white/80 ${genderAvatarClass} ${
-              isMatchSize
-                ? "h-[clamp(2rem,10cqw,2.75rem)] w-[clamp(2rem,10cqw,2.75rem)]"
-                : ""
-            }`}
-          />
+          <Badge.Anchor className="shrink-0">
+            <Avatar
+              size="xs"
+              avatarUrl={player.avatarUrl}
+              name={player.username}
+              className={`bg-white/80 ${genderAvatarClass} ${
+                isMatchSize
+                  ? "h-[clamp(2rem,10cqw,2.75rem)] w-[clamp(2rem,10cqw,2.75rem)]"
+                  : ""
+              }`}
+            />
+            {isMe ? (
+              <Badge
+                variant="primary"
+                size="sm"
+                placement={isMirrored ? "top-right" : "top-left"}
+                className="pointer-events-none z-10 !bg-pkpk-secondary-bg !text-pkpk-secondary-font shadow-sm"
+                style={{
+                  transform: isMirrored
+                    ? "translate(10.5%, -10.5%)"
+                    : "translate(-10.5%, -10.5%)",
+                }}
+              >
+                나
+              </Badge>
+            ) : null}
+          </Badge.Anchor>
           <span
             className={`min-w-0 truncate ${
               isMatchSize
