@@ -9,6 +9,7 @@ interface UserChipProps {
   onRemove?: () => void;
   removeLabel?: string;
   isMe?: boolean;
+  isMeBadgeOffsetX?: number;
   size?: "default" | "match";
   chipWidthClass?: string;
   isMirrored?: boolean;
@@ -25,6 +26,7 @@ const UserChip: React.FC<UserChipProps> = ({
   onRemove,
   removeLabel,
   isMe = false,
+  isMeBadgeOffsetX,
   size = "default",
   chipWidthClass,
   isMirrored = false,
@@ -46,6 +48,10 @@ const UserChip: React.FC<UserChipProps> = ({
   const shouldReserveRemoveSlot = !!onRemove || reserveRemoveSlot;
   const canPress = isPressable && !isDisabled && !!onPress;
   const isMatchSize = size === "match";
+  const resolvedIsMeBadgeOffsetX =
+    isMeBadgeOffsetX ?? (isMatchSize ? 10.5 : 40);
+  const resolvedIsMeBadgeOffsetY = isMatchSize ? 10.5 : 20.5;
+  const isMeBadgeScale = isMatchSize ? 1.2 : 1;
   const resolvedChipWidthClass =
     chipWidthClass ??
     (isMatchSize
@@ -90,6 +96,11 @@ const UserChip: React.FC<UserChipProps> = ({
               size="xs"
               avatarUrl={player.avatarUrl}
               name={player.username}
+              fallbackIconClassName={
+                isMatchSize
+                  ? "text-[clamp(1.25rem,6cqw,1.375rem)]"
+                  : undefined
+              }
               className={`bg-white/80 ${genderAvatarClass} ${
                 isMatchSize
                   ? "h-[clamp(2rem,10cqw,2.75rem)] w-[clamp(2rem,10cqw,2.75rem)]"
@@ -101,14 +112,14 @@ const UserChip: React.FC<UserChipProps> = ({
                 variant="primary"
                 size="sm"
                 placement={isMirrored ? "top-right" : "top-left"}
-                className="pointer-events-none z-10 !bg-pkpk-secondary-bg !text-pkpk-secondary-font shadow-sm"
+                className="pointer-events-none z-10 !bg-pkpk-secondary-bg !text-pkpk-secondary-font !leading-none shadow-sm"
                 style={{
                   transform: isMirrored
-                    ? "translate(10.5%, -10.5%)"
-                    : "translate(-10.5%, -10.5%)",
+                    ? `translate(${resolvedIsMeBadgeOffsetX}%, -${resolvedIsMeBadgeOffsetY}%) scale(${isMeBadgeScale})`
+                    : `translate(-${resolvedIsMeBadgeOffsetX}%, -${resolvedIsMeBadgeOffsetY}%) scale(${isMeBadgeScale})`,
                 }}
               >
-                나
+                <span className="relative top-px block">나</span>
               </Badge>
             ) : null}
           </Badge.Anchor>

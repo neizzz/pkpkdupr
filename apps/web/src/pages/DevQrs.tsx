@@ -4,7 +4,39 @@ import type {
   DevPlayerQrToken,
   DevPlayerQrTokenListResponse,
 } from "@pkpkdupr/shared/qr";
+import type { Player } from "@pkpkdupr/shared/player";
+import CreateMatchTeamGrid from "@/components/CreateMatchTeamGrid";
+import type { MatchTeams } from "@/components/CreateMatchDrawerBody.utils";
+import UserChip from "@/components/UserChip";
 import { buildApiUrl } from "@/lib/api";
+
+const devUserChipPreviewPlayers = {
+  me: {
+    username: "김피클",
+    gender: "M",
+  },
+  longName: {
+    username: "피클볼플레이어이름이긴사용자",
+    gender: "F",
+  },
+} satisfies Record<string, Pick<Player, "username" | "avatarUrl" | "gender">>;
+
+const devCreateMatchPreviewTeams = [
+  [
+    {
+      id: "dev-current-player",
+      ...devUserChipPreviewPlayers.me,
+    },
+  ],
+  [
+    {
+      id: "dev-long-name-player",
+      ...devUserChipPreviewPlayers.longName,
+    },
+  ],
+] satisfies MatchTeams;
+
+const noop = () => {};
 
 const getGenderLabel = (gender: DevPlayerQrToken["player"]["gender"]) =>
   gender === "M" ? "남자" : "여자";
@@ -60,6 +92,106 @@ const DevQrSection: React.FC<{
       {tokens.map((token) => (
         <DevQrCard key={token.player.id} token={token} />
       ))}
+    </div>
+  </section>
+);
+
+const DevUserChipPreview: React.FC = () => (
+  <section className="mt-6 rounded-3xl border border-border bg-white p-4">
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <h2 className="text-base font-bold text-pkpk-sub-font">
+          UserChip Preview
+        </h2>
+        <p className="mt-1 text-sm text-pkpk-sub-font">
+          크기, 좌우 배치, 긴 이름과 ‘나’ 배지 위치를 비교합니다.
+        </p>
+      </div>
+      <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
+        Dev Only
+      </span>
+    </div>
+
+    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="rounded-2xl bg-pkpk-bg p-3">
+        <p className="text-xs font-semibold text-pkpk-sub-font">
+          default · 왼쪽
+        </p>
+        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+          높이 24px · 너비 72–120px · ‘나’ x축 40% / y축 -20.5%
+        </p>
+        <div className="mt-2">
+          <UserChip player={devUserChipPreviewPlayers.me} isMe />
+        </div>
+      </div>
+      <div className="rounded-2xl bg-pkpk-bg p-3">
+        <p className="text-xs font-semibold text-pkpk-sub-font">
+          default · 오른쪽
+        </p>
+        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+          높이 24px · 너비 72–120px · ‘나’ x축 40% / y축 -20.5%
+        </p>
+        <div className="mt-2 flex justify-end">
+          <UserChip
+            player={devUserChipPreviewPlayers.longName}
+            isMe
+            isMirrored
+          />
+        </div>
+      </div>
+      <div className="rounded-2xl bg-pkpk-bg p-3">
+        <p className="text-xs font-semibold text-pkpk-sub-font">
+          match · 왼쪽
+        </p>
+        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+          높이 32–44px · 너비 96–160px · ‘나’ 120%
+        </p>
+        <div className="mt-2">
+          <UserChip
+            player={devUserChipPreviewPlayers.me}
+            isMe
+            size="match"
+          />
+        </div>
+      </div>
+      <div className="rounded-2xl bg-pkpk-bg p-3">
+        <p className="text-xs font-semibold text-pkpk-sub-font">
+          match · 오른쪽
+        </p>
+        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+          높이 32–44px · 너비 96–160px · ‘나’ 120%
+        </p>
+        <div className="mt-2 flex justify-end">
+          <UserChip
+            player={devUserChipPreviewPlayers.longName}
+            isMe
+            size="match"
+            isMirrored
+          />
+        </div>
+      </div>
+      <div className="rounded-2xl bg-pkpk-bg p-3 sm:col-span-2">
+        <p className="text-xs font-semibold text-pkpk-sub-font">
+          매치 생성 · default · ‘나’ 배지 x축 40% / y축 -20.5%
+        </p>
+        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+          실제 CreateMatchTeamGrid · 높이 24px · 너비 72–120px
+        </p>
+        <div className="mt-2 flex justify-center">
+          <div className="w-[calc(100%+38px)] max-w-[480px] rounded-t-3xl bg-white px-3 pb-4">
+            <CreateMatchTeamGrid
+              previewTeams={devCreateMatchPreviewTeams}
+              teams={devCreateMatchPreviewTeams}
+              selectedMatchType={null}
+              selectedSwapMemberId={null}
+              currentPlayerMemberId="dev-current-player"
+              interactive
+              onRemoveMember={noop}
+              onPressMember={noop}
+            />
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 );
@@ -144,6 +276,8 @@ const DevQrs: React.FC = () => {
             매치 멤버 추가 테스트용 영구 QR입니다.
           </p>
         </header>
+
+        <DevUserChipPreview />
 
         {isLoading ? (
           <div className="mt-8 rounded-3xl bg-white p-6 text-center text-sm text-pkpk-sub-font">
