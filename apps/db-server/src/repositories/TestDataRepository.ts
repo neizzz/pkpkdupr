@@ -48,6 +48,7 @@ const devMatchIdByLegacyId: Record<string, string> = {
   "dev-session-scheduled-001": "Mdev0008",
   "dev-session-scheduled-002": "Mdev0009",
   "dev-session-scheduled-003": "Mdev0010",
+  "dev-match-result-input-006": "Mdev0011",
   "dev-match-missing-opponent-004": "Mdev0006",
   "dev-match-without-players-005": "Mdev0007",
 };
@@ -249,6 +250,21 @@ const mockMatches = [
     resultSubmittedAt: null,
     createdAt: new Date("2026-06-06T13:20:00+09:00"),
     updatedAt: new Date("2026-06-06T13:20:00+09:00"),
+  },
+  {
+    id: "dev-match-result-input-006",
+    name: "결과 입력 데모 매치",
+    type: "singles",
+    source: "player_created",
+    creatorPlayerId: "dev-player-alice",
+    status: "created",
+    location: "Dev Result Court",
+    matchStartsAt: new Date("2026-08-06T19:00:00+09:00"),
+    completedAt: null,
+    resultSubmittedByPlayerId: null,
+    resultSubmittedAt: null,
+    createdAt: new Date("2026-08-05T09:00:00+09:00"),
+    updatedAt: new Date("2026-08-05T09:00:00+09:00"),
   },
   {
     id: "dev-session-open-play-001",
@@ -526,6 +542,18 @@ const mockMatchParticipants = [
     matchId: "dev-match-ladder-002",
     teamIndex: 1,
     playerId: "dev-player-hugo",
+  },
+  {
+    id: "dev-match-result-input-006-team-0-alice",
+    matchId: "dev-match-result-input-006",
+    teamIndex: 0,
+    playerId: "dev-player-alice",
+  },
+  {
+    id: "dev-match-result-input-006-team-1-gabe",
+    matchId: "dev-match-result-input-006",
+    teamIndex: 1,
+    playerId: "dev-player-gabe",
   },
   {
     id: "dev-session-open-play-001-team-0-alice",
