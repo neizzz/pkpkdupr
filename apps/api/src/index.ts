@@ -36,7 +36,11 @@ import {
   DbRequestError,
   MatchRepository,
 } from "./repositories/MatchRepository";
-import { AuthService, type AuthenticatedSession } from "./services/AuthService";
+import {
+  AuthService,
+  InvalidAccessTokenError,
+  type AuthenticatedSession,
+} from "./services/AuthService";
 import { AutoApprovalService } from "./services/AutoApprovalService";
 import {
   attachMatchRatingChanges,
@@ -682,14 +686,17 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.get("/api/me", async (req, res) => {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
+
+  if (!token) {
+    return res.status(401).json({
+      error: "로그인이 필요합니다.",
+      code: "SESSION_INVALID",
+    });
+  }
+
   try {
-    const header = req.headers.authorization;
-    const token = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-
-    if (!token) {
-      return res.json({});
-    }
-
     const session = await authService.authenticateAccessToken(token);
     res.json({
       ...session.player,
@@ -697,8 +704,19 @@ app.get("/api/me", async (req, res) => {
       isAdmin: session.payload.isAdmin === true,
       accessToken: session.refreshedAccessToken,
     });
-  } catch {
-    res.json({});
+  } catch (error) {
+    if (error instanceof InvalidAccessTokenError) {
+      return res.status(401).json({
+        error: "세션이 만료되었거나 유효하지 않습니다.",
+        code: "SESSION_INVALID",
+      });
+    }
+
+    console.error("[AUTH] Failed to verify session", error);
+    res.status(503).json({
+      error: "세션을 일시적으로 확인하지 못했습니다.",
+      code: "SESSION_UNAVAILABLE",
+    });
   }
 });
 

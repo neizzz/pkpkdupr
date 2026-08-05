@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type {
   PlayerAffiliation,
   PublicPlayerDupr,
@@ -63,6 +70,18 @@ type CachedAuthState = {
   requiresPasswordChange: boolean;
 };
 
+type SessionFetchResult =
+  | { status: "authenticated"; player: PlayerInfo }
+  | { status: "invalid" }
+  | { status: "unavailable" };
+
+type MeErrorResponse = {
+  code?: string;
+};
+
+const SESSION_RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
+const SESSION_RETRY_INTERVAL_MS = 30_000;
+
 const isOnline = () =>
   typeof navigator === "undefined" ? true : navigator.onLine;
 
@@ -104,82 +123,185 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (storedToken) {
-      setToken(storedToken);
-      void fetchMe(storedToken).finally(() => {
-        setIsLoading(false);
-      });
-    } else {
-      setIsLoading(false);
+  const retryTimeoutRef = useRef<number | null>(null);
+  const retryAttemptRef = useRef(0);
+  const sessionValidationInFlightRef = useRef(false);
+  const activeTokenRef = useRef<string | null>(null);
+  const hasSessionProfileRef = useRef(false);
+  const sessionValidationRef = useRef<
+    ((accessToken?: string) => Promise<void>) | null
+  >(null);
+
+  const clearSessionRetry = useCallback((resetAttempt = true) => {
+    if (retryTimeoutRef.current !== null) {
+      window.clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    if (resetAttempt) {
+      retryAttemptRef.current = 0;
     }
   }, []);
 
-  const fetchMe = async (accessToken: string) => {
-    const useCachedAuthState = () => {
-      const cachedAuthState = readCachedAuthState();
-      if (cachedAuthState) {
-        setPlayer(cachedAuthState.player);
-        setRequiresPasswordChange(cachedAuthState.requiresPasswordChange);
-        return cachedAuthState;
-      }
+  const clearSession = useCallback(() => {
+    clearSessionRetry();
+    activeTokenRef.current = null;
+    hasSessionProfileRef.current = false;
+    clearStoredAuthState();
+    setToken(null);
+    setPlayer(null);
+    setRequiresPasswordChange(false);
+  }, [clearSessionRetry]);
+
+  const restoreCachedAuthState = useCallback(() => {
+    const cachedAuthState = readCachedAuthState();
+    if (!cachedAuthState) {
       return null;
+    }
+
+    hasSessionProfileRef.current = true;
+    setPlayer(cachedAuthState.player);
+    setRequiresPasswordChange(cachedAuthState.requiresPasswordChange);
+    return cachedAuthState;
+  }, []);
+
+  const fetchMe = useCallback(
+    async (accessToken: string): Promise<SessionFetchResult> => {
+      const isCurrentSession = () => activeTokenRef.current === accessToken;
+
+      try {
+        const res = await fetch(buildApiUrl("/api/me"), {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as MeResponse;
+          if (!data.id) {
+            // 새 web 번들이 먼저 반영되어 이전 API의 빈 200 응답을 받더라도
+            // 세션을 지우지 않고 배포 완료를 기다립니다.
+            restoreCachedAuthState();
+            return { status: "unavailable" };
+          }
+
+          if (!isCurrentSession()) {
+            return { status: "unavailable" };
+          }
+
+          const {
+            accessToken: refreshedAccessToken,
+            isFirstLogin,
+            ...playerInfo
+          } = data;
+          const nextRequiresPasswordChange =
+            shouldRequirePasswordChange(isFirstLogin);
+
+          if (refreshedAccessToken) {
+            localStorage.setItem(TOKEN_STORAGE_KEY, refreshedAccessToken);
+            activeTokenRef.current = refreshedAccessToken;
+            setToken(refreshedAccessToken);
+          }
+          hasSessionProfileRef.current = true;
+          setPlayer(playerInfo);
+          setRequiresPasswordChange(nextRequiresPasswordChange);
+          persistAuthState(playerInfo, nextRequiresPasswordChange);
+          return { status: "authenticated", player: playerInfo };
+        }
+
+        const errorData = (await res.json().catch(() => ({}))) as MeErrorResponse;
+        if (res.status === 401 || errorData.code === "SESSION_INVALID") {
+          if (isCurrentSession()) {
+            clearSession();
+          }
+          return { status: "invalid" };
+        }
+
+        restoreCachedAuthState();
+        return { status: "unavailable" };
+      } catch {
+        console.error("Failed to fetch user info");
+        restoreCachedAuthState();
+        return { status: "unavailable" };
+      }
+    },
+    [clearSession, restoreCachedAuthState],
+  );
+
+  const validateSession = useCallback(
+    async (requestedToken?: string) => {
+      const accessToken = requestedToken ?? activeTokenRef.current;
+      if (
+        !accessToken ||
+        activeTokenRef.current !== accessToken ||
+        sessionValidationInFlightRef.current
+      ) {
+        return;
+      }
+
+      clearSessionRetry(false);
+      sessionValidationInFlightRef.current = true;
+      const result = await fetchMe(accessToken);
+      sessionValidationInFlightRef.current = false;
+
+      if (result.status === "authenticated" || result.status === "invalid") {
+        clearSessionRetry();
+        setIsLoading(false);
+        return;
+      }
+
+      if (activeTokenRef.current !== accessToken) {
+        return;
+      }
+
+      if (!hasSessionProfileRef.current) {
+        setIsLoading(true);
+      }
+
+      const retryDelay =
+        SESSION_RETRY_DELAYS_MS[retryAttemptRef.current] ??
+        SESSION_RETRY_INTERVAL_MS;
+      retryAttemptRef.current += 1;
+      retryTimeoutRef.current = window.setTimeout(() => {
+        retryTimeoutRef.current = null;
+        void sessionValidationRef.current?.();
+      }, retryDelay);
+    },
+    [clearSessionRetry, fetchMe],
+  );
+
+  sessionValidationRef.current = validateSession;
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
+    }
+
+    activeTokenRef.current = storedToken;
+    setToken(storedToken);
+    const cachedAuthState = restoreCachedAuthState();
+    setIsLoading(!cachedAuthState);
+    void validateSession(storedToken);
+
+    const validateWhenActive = () => {
+      void sessionValidationRef.current?.();
+    };
+    const validateWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        validateWhenActive();
+      }
     };
 
-    try {
-      const res = await fetch(buildApiUrl("/api/me"), {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data = (await res.json()) as MeResponse;
-        if (!data.id) {
-          throw new Error("Empty /api/me response");
-        }
-        const {
-          accessToken: refreshedAccessToken,
-          isFirstLogin,
-          ...playerInfo
-        } = data;
-        const nextRequiresPasswordChange =
-          shouldRequirePasswordChange(isFirstLogin);
+    window.addEventListener("online", validateWhenActive);
+    window.addEventListener("focus", validateWhenActive);
+    document.addEventListener("visibilitychange", validateWhenVisible);
 
-        if (refreshedAccessToken) {
-          localStorage.setItem(TOKEN_STORAGE_KEY, refreshedAccessToken);
-          setToken(refreshedAccessToken);
-        }
-        setPlayer(playerInfo);
-        setRequiresPasswordChange(nextRequiresPasswordChange);
-        persistAuthState(playerInfo, nextRequiresPasswordChange);
-        return playerInfo;
-      }
-
-      if (!isOnline()) {
-        const cachedAuthState = useCachedAuthState();
-        if (cachedAuthState) {
-          return cachedAuthState.player;
-        }
-      }
-
-      clearStoredAuthState();
-      setToken(null);
-      setPlayer(null);
-      setRequiresPasswordChange(false);
-    } catch {
-      console.error("Failed to fetch user info");
-      if (!isOnline()) {
-        const cachedAuthState = useCachedAuthState();
-        if (cachedAuthState) {
-          return cachedAuthState.player;
-        }
-      }
-      clearStoredAuthState();
-      setToken(null);
-      setPlayer(null);
-      setRequiresPasswordChange(false);
-    }
-    return null;
-  };
+    return () => {
+      clearSessionRetry();
+      window.removeEventListener("online", validateWhenActive);
+      window.removeEventListener("focus", validateWhenActive);
+      document.removeEventListener("visibilitychange", validateWhenVisible);
+    };
+  }, [clearSessionRetry, restoreCachedAuthState, validateSession]);
 
   const login = async (
     username: string,
@@ -202,11 +324,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(errorData.error || "로그인 실패");
     }
     const data = (await res.json()) as LoginResponse;
+    clearSessionRetry();
+    activeTokenRef.current = data.accessToken;
     localStorage.setItem(TOKEN_STORAGE_KEY, data.accessToken);
     setToken(data.accessToken);
     setRequiresPasswordChange(shouldRequirePasswordChange(data.isFirstLogin));
     setIsLoading(true);
-    await fetchMe(data.accessToken);
+    const result = await fetchMe(data.accessToken);
+
+    if (result.status === "unavailable") {
+      if (!hasSessionProfileRef.current) {
+        setIsLoading(true);
+      }
+      void sessionValidationRef.current?.();
+      return;
+    }
+
     setIsLoading(false);
   };
 
@@ -319,19 +452,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error("로그인이 필요합니다.");
     }
 
-    const refreshedPlayer = await fetchMe(token);
-    if (!refreshedPlayer) {
+    const result = await fetchMe(token);
+    if (result.status !== "authenticated") {
       throw new Error("내 정보를 새로고침하지 못했습니다.");
     }
 
-    return refreshedPlayer;
+    return result.player;
   };
 
   const logout = () => {
-    clearStoredAuthState();
-    setToken(null);
-    setPlayer(null);
-    setRequiresPasswordChange(false);
+    clearSession();
   };
 
   return (

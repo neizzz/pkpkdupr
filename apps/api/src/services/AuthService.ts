@@ -89,6 +89,17 @@ export interface AuthenticatedSession {
   refreshedAccessToken?: string;
 }
 
+/**
+ * 세션 자체가 더 이상 유효하지 않은 경우에만 사용합니다. DB 연결 같은
+ * 일시적인 인프라 오류와 구분해 클라이언트가 저장된 세션을 보존할 수 있게 합니다.
+ */
+export class InvalidAccessTokenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidAccessTokenError";
+  }
+}
+
 export interface AdminPlayer extends Player {
   duprMetrics: PlayerDuprMetrics;
 }
@@ -642,20 +653,24 @@ export class AuthService {
   ): Promise<AuthenticatedSession> {
     const decoded = decodeToken(accessToken);
     if (!decoded?.playerId) {
-      throw new Error("유효하지 않거나 만료된 토큰입니다.");
+      throw new InvalidAccessTokenError("유효하지 않거나 만료된 토큰입니다.");
     }
 
     const stored = await this.getStoredPlayerById(decoded.playerId);
     if (!stored) {
-      throw new Error("사용자를 찾을 수 없습니다.");
+      throw new InvalidAccessTokenError("사용자를 찾을 수 없습니다.");
     }
     if (stored.status === "inactive") {
-      throw new Error("비활성 계정입니다. 관리자에게 문의해주세요.");
+      throw new InvalidAccessTokenError(
+        "비활성 계정입니다. 관리자에게 문의해주세요.",
+      );
     }
 
     const expectedFingerprint = createPasswordFingerprint(stored.passwordHash);
     if (decoded.passwordFingerprint !== expectedFingerprint) {
-      throw new Error("비밀번호가 변경되어 다시 로그인해야 합니다.");
+      throw new InvalidAccessTokenError(
+        "비밀번호가 변경되어 다시 로그인해야 합니다.",
+      );
     }
 
     const rememberMe = decoded.rememberMe === true;
