@@ -553,10 +553,10 @@ const Members: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => openMemberProfile(member.id)}
-                        className="absolute inset-0 z-0"
+                        className="absolute inset-0 z-10"
                         aria-label={`${member.username ?? "멤버"} 프로필 보기`}
                       />
-                      <div className="relative z-10 flex min-w-0 flex-1 items-center gap-4 pointer-events-none">
+                      <div className="relative z-0 flex min-w-0 flex-1 items-center gap-4 pointer-events-none">
                         <Avatar
                           size="md"
                           avatarUrl={member.avatarUrl}
@@ -567,7 +567,7 @@ const Members: React.FC = () => {
                             {member.username}
                           </p>
                           {member.statusMessage || member.affiliations?.length ? (
-                            <div className="pointer-events-auto">
+                            <div className="relative z-20 pointer-events-auto">
                               <PlayerProfileMeta
                                 affiliations={member.affiliations}
                                 statusMessage={member.statusMessage}
@@ -586,7 +586,7 @@ const Members: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2 pointer-events-none">
+                      <div className="relative z-0 ml-auto flex shrink-0 items-center gap-2 pointer-events-none">
                         <span
                           className={`text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold tabular-nums ${
                             doublesRating == null
