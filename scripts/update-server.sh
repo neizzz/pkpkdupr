@@ -108,6 +108,8 @@ resolve_shared_environment() {
   require_file "${SHARED_ENV_FILE}"
   ADMIN_STACK_PORT="$(read_env_value "${SHARED_ENV_FILE}" ADMIN_STACK_PORT)"
   ADMIN_STACK_PORT="${ADMIN_STACK_PORT:-3333}"
+  GATEWAY_NETWORK="$(read_env_value "${SHARED_ENV_FILE}" GATEWAY_NETWORK)"
+  GATEWAY_NETWORK="${GATEWAY_NETWORK:-pkpkdupr-gateway}"
 }
 
 resolve_primary_environment() {
@@ -173,6 +175,26 @@ resolve_environment() {
   esac
 }
 
+ensure_gateway_network() {
+  if docker network inspect "${GATEWAY_NETWORK}" >/dev/null 2>&1; then
+    return
+  fi
+
+  if docker network create \
+    --driver bridge \
+    --label com.docker.compose.project=pkpkdupr \
+    --label com.docker.compose.network=pkpkdupr-gateway \
+    "${GATEWAY_NETWORK}" >/dev/null; then
+    echo "ℹ️ 공용 gateway network를 생성했습니다: ${GATEWAY_NETWORK}"
+    return
+  fi
+
+  docker network inspect "${GATEWAY_NETWORK}" >/dev/null 2>&1 || {
+    echo "❌ 공용 gateway network를 생성할 수 없습니다: ${GATEWAY_NETWORK}" >&2
+    exit 1
+  }
+}
+
 assert_services_running() {
   local compose_function="$1"
   shift
@@ -222,6 +244,10 @@ cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
 export IMAGE_TAG="${IMAGE_TAG_INPUT}"
 resolve_environment
+
+if [[ "${TARGET_STACK}" != "all" ]]; then
+  ensure_gateway_network
+fi
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin

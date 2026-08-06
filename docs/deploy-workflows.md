@@ -65,7 +65,7 @@ bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkpkdupr
 bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkelo
 ```
 
-`--stack pkpkdupr`와 `--stack pkelo`는 대상 앱의 env와 Compose 서비스만 사용합니다. 반대편 앱의 env·credential 및 공용 인증서·SWAG 설정은 읽거나 갱신하지 않습니다. 공용 SWAG·인증서 초기화 또는 설정 복구는 `install-server.sh`나 `--stack all`에서만 수행합니다. SQLite→MySQL 이관은 기존 앱에만 적용되므로 `--migrate-sqlite --stack pkelo`은 허용하지 않습니다.
+`--stack pkpkdupr`와 `--stack pkelo`는 대상 앱의 env와 Compose 서비스만 사용합니다. 반대편 앱의 env·credential 및 공용 인증서·SWAG 설정은 읽거나 갱신하지 않습니다. 단, 공용 gateway network가 없으면 대상 컨테이너 연결을 위해 같은 이름의 bridge network만 생성합니다. 공용 SWAG·인증서 초기화 또는 설정 복구는 `install-server.sh`나 `--stack all`에서만 수행합니다. SQLite→MySQL 이관은 기존 앱에만 적용되므로 `--migrate-sqlite --stack pkelo`은 허용하지 않습니다.
 
 ## 배포 성공 기준과 New Relic
 
