@@ -368,7 +368,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
           </div>
 
-          <div className="h-[28rem] rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg px-4 pt-4 pb-2">
+          <div className="rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
             <h3
               className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold text-pkpk-secondary-font ${
                 showDetailHeader ? "pl-2" : ""
@@ -397,7 +397,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                       className={`relative !h-auto !min-w-0 !w-full !justify-start !rounded-lg px-3 py-3 !text-left transition-colors ${
                         expandedType === item.type
                           ? ""
-                          : "bg-transparent opacity-80 hover:bg-white/15"
+                          : "bg-transparent opacity-80"
                       }`}
                     >
                       <div className="relative z-10 w-full">
