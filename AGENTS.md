@@ -41,7 +41,6 @@ pnpm lint
 
 pnpm dev:db                     # MySQL :3306
 pnpm dev:db-browser             # Adminer :3301
-PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333 pnpm check:healthy
 ```
 
 - 루트 `pnpm dev`는 Docker MySQL을 준비한 뒤 `ENABLE_DEV_MOCK_DATA=true`와 `DB_HOST=127.0.0.1`을 사용합니다.
@@ -75,13 +74,9 @@ PKPKDUPR_WEB_URL=https://<DOMAIN> PKPKDUPR_ADMIN_STACK_URL=https://<DOMAIN>:3333
 
 ## 운영과 배포
 
-- GitHub Actions는 GHCR 이미지 빌드/푸시까지만 담당합니다. 서버 반영은 SSH 환경에서 `scripts/manual-deploy.sh --image-tag <tag>`로 실행합니다.
-- 운영 proxy는 SWAG이며, 템플릿 원본은 `infra/swag/site-confs/default.conf.template`입니다.
-- 운영 경로:
-  - Web: `https://<DOMAIN>/`
-  - Admin/API/운영 도구: `https://<DOMAIN>:3333/{admin/,api/health,api/ping,db/}` (`/db/`는 Adminer)
-- 실제 서버 SWAG 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`이며, 배포 스크립트가 템플릿에서 생성합니다.
-- `/db/` Adminer는 HTML 응답이므로 상태 코드뿐 아니라 기대 텍스트와 `404 not found` 여부를 함께 확인합니다.
+- GitHub Actions는 GHCR 이미지 빌드/푸시만 담당합니다.
+- 서버 반영, SWAG/TLS 및 운영 env 관리는 `/opt/pkpkdupr`의 `infra` 브랜치 checkout에서 수행합니다. 이 앱 소스 브랜치의 `scripts/`에는 서버 배포 스크립트를 두지 않습니다.
+- 운영 배포 명령과 대상 스택 선택은 `infra` 브랜치의 `docs/deploy-workflows.md`를 기준으로 합니다.
 
 ## 작업 및 커밋 규칙
 

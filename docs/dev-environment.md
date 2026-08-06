@@ -51,7 +51,10 @@ Vite는 `/api`, `/uploads`, `/db`를 각각 API 또는 Adminer 개발 서비스�
 운영 전환은 쓰기 중단 중에 수행합니다. 이관 명령은 원본 SQLite를 변경하지 않으며 대상 MySQL이 비어 있지 않으면 실패합니다.
 
 ```bash
-# 운영 서버에서: SQLite 백업 생성, MySQL 준비, 데이터 이관 및 검증
+# 운영 서버의 infra checkout에서: SQLite 백업 생성, MySQL 준비, 데이터 이관 및 검증
+cd /opt/pkpkdupr
+git switch infra
+git pull --ff-only origin infra
 PKPKDUPR_DEPLOY_PATH=/opt/pkpkdupr \
   bash scripts/migrate-sqlite-to-mysql.sh
 

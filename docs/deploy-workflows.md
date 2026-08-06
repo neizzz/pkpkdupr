@@ -12,8 +12,11 @@
 
 workflow는 GHCR 이미지만 push하며 운영 시크릿을 읽지 않습니다.
 
-이미지 push 뒤에는 공용 infra checkout에서 해당 태그를 사용해 PkpkDupr 스택만 반영합니다.
+이미지 push 뒤에는 서버의 공용 infra checkout에서 해당 태그를 사용해 PkpkDupr 스택만 반영합니다.
 
 ```bash
+cd /opt/pkpkdupr
+git switch infra
+git pull --ff-only origin infra
 bash scripts/manual-deploy.sh --image-tag '<pkpkdupr-tag>' --stack pkpkdupr
 ```
