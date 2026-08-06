@@ -51,7 +51,9 @@ const UserChip: React.FC<UserChipProps> = ({
   const resolvedIsMeBadgeOffsetX =
     isMeBadgeOffsetX ?? (isMatchSize ? 10.5 : 40);
   const resolvedIsMeBadgeOffsetY = isMatchSize ? 10.5 : 20.5;
-  const isMeBadgeScale = isMatchSize ? 1.2 : 1;
+  const isMeBadgeScale = isMatchSize
+    ? "var(--match-user-chip-me-badge-scale)"
+    : 1;
   const resolvedChipWidthClass =
     chipWidthClass ??
     (isMatchSize
@@ -112,7 +114,9 @@ const UserChip: React.FC<UserChipProps> = ({
                 variant="primary"
                 size="sm"
                 placement={isMirrored ? "top-right" : "top-left"}
-                className="pointer-events-none z-10 !bg-pkpk-secondary-bg !text-pkpk-secondary-font !leading-none shadow-sm"
+                className={`pointer-events-none z-10 !bg-pkpk-secondary-bg !text-pkpk-secondary-font !leading-none shadow-sm ${
+                  isMatchSize ? "match-user-chip-me-badge" : ""
+                }`}
                 style={{
                   transform: isMirrored
                     ? `translate(${resolvedIsMeBadgeOffsetX}%, -${resolvedIsMeBadgeOffsetY}%) scale(${isMeBadgeScale})`

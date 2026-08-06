@@ -218,6 +218,17 @@
   .back-button-icon {
     color: var(--color-pkpk-primary-bg);
   }
+
+  .match-user-chip-me-badge {
+    --match-user-chip-me-badge-scale: 1.2;
+  }
+
+  /* Match UserChip의 avatar가 최소 2rem로 축소되는 지점이다. */
+  @container (max-width: 20rem) {
+    .match-user-chip-me-badge {
+      --match-user-chip-me-badge-scale: 0.96;
+    }
+  }
 }
 
 .global-plus-menu-popover {
