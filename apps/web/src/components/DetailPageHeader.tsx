@@ -50,7 +50,9 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
           tabKey={targetTabKey}
           className="absolute left-0 !bg-transparent !text-pkpk-secondary-bg shadow-none hover:!bg-transparent"
         />
-        <h2 className="text-2xl font-bold text-pkpk-secondary-bg">{title}</h2>
+        {!isRightDrawerPage ? (
+          <h2 className="text-2xl font-bold text-pkpk-secondary-bg">{title}</h2>
+        ) : null}
       </div>
     </div>
   );
