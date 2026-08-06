@@ -12,7 +12,6 @@ import {
 import { IoInformationCircleOutline } from "react-icons/io5";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import {
-  getMaxScoreCountForMatchMode,
   getMatchTopLevelType,
   MATCH_RESULT_MAX_SCORE_COUNT,
   validateMatchScoresForMode,
@@ -62,6 +61,46 @@ const formatDateTime = (value: string) =>
 const createEmptyScoreRow = () => ({ scoreA: "", scoreB: "" });
 const SCORE_TABLE_SET_COUNT = 3;
 const resultTeamChipWidthClass = "w-[clamp(6.6rem,35.2cqw,11rem)]";
+
+type ScoreRow = ReturnType<typeof createEmptyScoreRow>;
+
+const createScoreRows = (
+  mode: MatchInfo["mode"],
+  scores?: MatchScore[],
+): ScoreRow[] => {
+  if (mode === "best-of-3") {
+    return Array.from({ length: MATCH_RESULT_MAX_SCORE_COUNT }, (_, index) => {
+      const score = scores?.[index];
+      return score
+        ? { scoreA: String(score.scoreA), scoreB: String(score.scoreB) }
+        : createEmptyScoreRow();
+    });
+  }
+
+  return scores?.length
+    ? scores.map((score) => ({
+        scoreA: String(score.scoreA),
+        scoreB: String(score.scoreB),
+      }))
+    : [createEmptyScoreRow()];
+};
+
+const getScoreRowWinner = (row: ScoreRow): 0 | 1 | null => {
+  const scoreA = Number(row.scoreA);
+  const scoreB = Number(row.scoreB);
+
+  if (
+    !Number.isInteger(scoreA) ||
+    !Number.isInteger(scoreB) ||
+    scoreA < 0 ||
+    scoreB < 0 ||
+    scoreA === scoreB
+  ) {
+    return null;
+  }
+
+  return scoreA > scoreB ? 0 : 1;
+};
 
 const formatAutoApprovalRemaining = (remainingMs: number) => {
   const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
@@ -244,7 +283,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
   isRejectingResult = false,
   isLoading = false,
 }) => {
-  const [scoreRows, setScoreRows] = useState(() => [createEmptyScoreRow()]);
+  const [scoreRows, setScoreRows] = useState(() =>
+    createScoreRows(match.mode, match.scores),
+  );
   const [resultError, setResultError] = useState<string | null>(null);
   const isSectionsLoading = useMinimumLoading(isLoading);
   const [isResultSheetOpen, setIsResultSheetOpen] = useState(false);
@@ -302,8 +343,16 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     !!onRejectResult;
   const resultActionLabel = hasResultScores ? "결과 수정" : "결과 입력";
   const resultSheetDepthId = `match-result-sheet:${match.id}`;
-  const maxScoreCount = getMaxScoreCountForMatchMode(match.mode);
-  const canAddScoreRow = scoreRows.length < maxScoreCount;
+  const isBestOfThree = match.mode === "best-of-3";
+  const firstTwoSetWinners = scoreRows.slice(0, 2).map(getScoreRowWinner);
+  const isThirdSetEnabled =
+    isBestOfThree &&
+    firstTwoSetWinners.length === 2 &&
+    firstTwoSetWinners[0] !== null &&
+    firstTwoSetWinners[1] !== null &&
+    firstTwoSetWinners[0] !== firstTwoSetWinners[1];
+  const submittedScoreRows =
+    isBestOfThree && !isThirdSetEnabled ? scoreRows.slice(0, 2) : scoreRows;
   const totalPoints = useMemo(
     () =>
       (match.scores ?? []).reduce<[number, number]>(
@@ -333,17 +382,10 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     match.status === "completed" && (match.ratingChanges?.length ?? 0) > 0;
 
   useEffect(() => {
-    setScoreRows(
-      match.scores?.length
-        ? match.scores.map((score) => ({
-            scoreA: String(score.scoreA),
-            scoreB: String(score.scoreB),
-          }))
-        : [createEmptyScoreRow()],
-    );
+    setScoreRows(createScoreRows(match.mode, match.scores));
     setResultError(null);
     setIsResultSheetOpen(false);
-  }, [match.id, match.scores]);
+  }, [match.id, match.mode, match.scores]);
 
   useEffect(() => {
     if (!hasAutoApprovalTimer) return;
@@ -411,13 +453,13 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     if (!onSubmitResult) return;
 
     try {
-      if (scoreRows.length > MATCH_RESULT_MAX_SCORE_COUNT) {
+      if (submittedScoreRows.length > MATCH_RESULT_MAX_SCORE_COUNT) {
         throw new Error(
           `스코어는 최대 ${MATCH_RESULT_MAX_SCORE_COUNT}개까지 입력할 수 있어요.`,
         );
       }
 
-      const scores = scoreRows.map((row, index) => {
+      const scores = submittedScoreRows.map((row, index) => {
         const scoreA = Number(row.scoreA);
         const scoreB = Number(row.scoreB);
 
@@ -899,7 +941,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           <h2 className="bs-text-head text-pkpk-main-font">
             {hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
           </h2>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col">
             <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-end gap-2">
               <span aria-hidden="true" />
               {match.teams.map((team, teamIndex) => (
@@ -925,63 +967,70 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 </React.Fragment>
               ))}
             </div>
-            {scoreRows.map((row, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-2"
-              >
-                <span className="text-xs font-semibold text-[#888]">
-                  Set {index + 1}
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={row.scoreA}
-                  onChange={(event) =>
-                    updateScoreRow(index, "scoreA", event.target.value)
-                  }
-                  className="app-mobile-input min-w-0 w-full rounded-xl border border-border px-3 py-2 text-center text-base font-semibold text-pkpk-sub-font outline-none"
-                  placeholder="점수"
-                  aria-label={`G${index + 1} A팀 점수`}
-                />
-                <span className="text-center text-sm font-semibold text-[#888]">
-                  :
-                </span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={row.scoreB}
-                  onChange={(event) =>
-                    updateScoreRow(index, "scoreB", event.target.value)
-                  }
-                  className="app-mobile-input min-w-0 w-full rounded-xl border border-border px-3 py-2 text-center text-base font-semibold text-pkpk-sub-font outline-none"
-                  placeholder="점수"
-                  aria-label={`G${index + 1} B팀 점수`}
-                />
-              </div>
-            ))}
+            <div className="mt-[1.2rem] flex flex-col gap-[0.84rem]">
+              {scoreRows.map((row, index) => {
+                const isThirdSet = isBestOfThree && index === 2;
+                const isSetDisabled = isThirdSet && !isThirdSetEnabled;
+
+                return (
+                  <div
+                    key={index}
+                    aria-disabled={isSetDisabled}
+                    className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-2"
+                  >
+                    <span
+                      className={`text-xs font-semibold ${
+                        isSetDisabled
+                          ? "text-pkpk-detail-font"
+                          : "text-[#888]"
+                      }`}
+                    >
+                      Set {index + 1}
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={row.scoreA}
+                      onChange={(event) =>
+                        updateScoreRow(index, "scoreA", event.target.value)
+                      }
+                      disabled={isSetDisabled}
+                      className="app-mobile-input min-w-0 w-full rounded-xl border border-border px-3 py-2 text-center text-base font-semibold text-pkpk-sub-font outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-pkpk-detail-font"
+                      placeholder="점수"
+                      aria-label={`G${index + 1} A팀 점수`}
+                    />
+                    <span
+                      className={`text-center text-sm font-semibold ${
+                        isSetDisabled
+                          ? "text-pkpk-detail-font"
+                          : "text-[#888]"
+                      }`}
+                    >
+                      :
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={row.scoreB}
+                      onChange={(event) =>
+                        updateScoreRow(index, "scoreB", event.target.value)
+                      }
+                      disabled={isSetDisabled}
+                      className="app-mobile-input min-w-0 w-full rounded-xl border border-border px-3 py-2 text-center text-base font-semibold text-pkpk-sub-font outline-none disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-pkpk-detail-font"
+                      placeholder="점수"
+                      aria-label={`G${index + 1} B팀 점수`}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
           {resultError ? (
             <p className="text-xs font-medium text-red-500">{resultError}</p>
           ) : null}
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {match.mode === "best-of-3" ? (
-              <Button
-                className="app-action-button col-span-2 rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
-                onPress={() => {
-                  setScoreRows((rows) =>
-                    rows.length >= MATCH_RESULT_MAX_SCORE_COUNT
-                      ? rows
-                      : [...rows, createEmptyScoreRow()],
-                  );
-                }}
-                isDisabled={isSubmittingResult || !canAddScoreRow}
-              >
-                세트 추가
-              </Button>
-            ) : null}
             <Button
               className="app-action-button w-full rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
               onPress={closeResultSheet}
