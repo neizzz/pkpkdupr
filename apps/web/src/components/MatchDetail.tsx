@@ -520,9 +520,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           >
             <section>
             <p
-              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-dark"
             >
-              Score
+              스코어
             </p>
             <div className="mt-1.5 overflow-hidden rounded-xl border border-pkpk-sub-bg/30 bg-pkpk-primary-bg/5">
               <table className="w-full table-fixed border-collapse text-sm text-pkpk-sub-font">
@@ -617,9 +617,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
             <section>
             <p
-              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-dark"
             >
-              Rating Change
+              평점 변동
             </p>
             <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
               {hasRatingChanges ? (
@@ -675,12 +675,62 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             </section>
 
             <section>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
               <p
-                className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+                className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-dark"
               >
-                Approval
+                합의
               </p>
+              {hasAutoApprovalTimer ? (
+                <div className="flex shrink-0 items-center gap-1 rounded-full bg-pkpk-secondary-bg/8 px-2 py-1 text-xs font-semibold tabular-nums text-pkpk-secondary-bg">
+                  <span>
+                    {autoApprovalRemainingMs > 0
+                      ? `자동 합의까지 ${formatAutoApprovalRemaining(autoApprovalRemainingMs)}`
+                      : "자동 합의 처리 중..."}
+                  </span>
+                  <TooltipRoot
+                    isOpen={isAutoApprovalTooltipOpen}
+                    onOpenChange={setIsAutoApprovalTooltipOpen}
+                    delay={0}
+                    closeDelay={0}
+                  >
+                    <TooltipTrigger
+                      aria-label="자동 합의 안내 보기"
+                      className="shrink-0 text-pkpk-secondary-bg/70 transition-colors hover:text-pkpk-secondary-bg"
+                      onClick={() =>
+                        setIsAutoApprovalTooltipOpen((isOpen) => !isOpen)
+                      }
+                    >
+                      <IoInformationCircleOutline className="size-4" />
+                    </TooltipTrigger>
+                    <TooltipContent
+                      placement="top"
+                      shouldFlip
+                      containerPadding={8}
+                      showArrow
+                      className="w-64 rounded-2xl bg-white p-3 text-left text-pkpk-main-font shadow-xl ring-1 ring-black/10"
+                      style={{ "--overlay": "#fff" } as React.CSSProperties}
+                    >
+                      <TooltipArrow />
+                      <p className="font-semibold">자동 합의 안내</p>
+                      <p className="mt-1 text-xs leading-5 text-pkpk-sub-font">
+                        거부 없이 합의 대기 상태가 유지되면 정해진 시간 뒤에
+                        결과와 평점이 자동 합의·확정됩니다.
+                      </p>
+                      <ul className="mt-2 space-y-1 text-xs leading-5 text-pkpk-sub-font">
+                        <li>
+                          경기 시작 전 또는 1시간 이내 입력: 2시간 이후 자동
+                          합의
+                        </li>
+                        <li>
+                          시작 후 1~4시간 이내 입력: 8시간 이후 자동 합의
+                        </li>
+                        <li>시작 후 4시간 초과 입력: 24시간 이후 자동 합의</li>
+                      </ul>
+                    </TooltipContent>
+                  </TooltipRoot>
+                </div>
+              ) : null}
             </div>
             <Card className="mt-1.5 rounded-xl border border-pkpk-sub-bg/30 bg-white/95 p-3">
               {match.teams
@@ -734,59 +784,6 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                     </React.Fragment>
                   );
                 })}
-              {hasAutoApprovalTimer ? (
-                <>
-                  <Separator className="-mx-3 w-[calc(100%+1.5rem)]" />
-                  <div className="flex items-center justify-center gap-1 text-sm font-semibold text-pkpk-main-font">
-                    <span>
-                      {autoApprovalRemainingMs > 0
-                        ? `자동 합의까지 ${formatAutoApprovalRemaining(autoApprovalRemainingMs)}`
-                        : "자동 합의 처리 중..."}
-                    </span>
-                    <TooltipRoot
-                      isOpen={isAutoApprovalTooltipOpen}
-                      onOpenChange={setIsAutoApprovalTooltipOpen}
-                      delay={0}
-                      closeDelay={0}
-                    >
-                      <TooltipTrigger
-                        aria-label="자동 합의 안내 보기"
-                        className="shrink-0 text-pkpk-sub-font transition-colors hover:text-pkpk-main-font"
-                        onClick={() =>
-                          setIsAutoApprovalTooltipOpen((isOpen) => !isOpen)
-                        }
-                      >
-                        <IoInformationCircleOutline className="size-4" />
-                      </TooltipTrigger>
-                      <TooltipContent
-                        placement="top"
-                        shouldFlip
-                        containerPadding={8}
-                        showArrow
-                        className="w-64 rounded-2xl bg-white p-3 text-left text-pkpk-main-font shadow-xl ring-1 ring-black/10"
-                        style={{ "--overlay": "#fff" } as React.CSSProperties}
-                      >
-                        <TooltipArrow />
-                        <p className="font-semibold">자동 합의 안내</p>
-                        <p className="mt-1 text-xs leading-5 text-pkpk-sub-font">
-                          거부 없이 합의 대기 상태가 유지되면 정해진 시간 뒤에
-                          결과와 평점이 자동 합의·확정됩니다.
-                        </p>
-                        <ul className="mt-2 space-y-1 text-xs leading-5 text-pkpk-sub-font">
-                          <li>
-                            경기 시작 전 또는 1시간 이내 입력: 2시간 이후 자동
-                            합의
-                          </li>
-                          <li>
-                            시작 후 1~4시간 이내 입력: 8시간 이후 자동 합의
-                          </li>
-                          <li>시작 후 4시간 초과 입력: 24시간 이후 자동 합의</li>
-                        </ul>
-                      </TooltipContent>
-                    </TooltipRoot>
-                  </div>
-                </>
-              ) : null}
             </Card>
             {canApproveResult || canCancelApproval || canRejectResult ? (
               <div className="mt-3 flex justify-end gap-2">
