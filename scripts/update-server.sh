@@ -104,40 +104,73 @@ compose_notice() {
     -f docker-compose.pkelo-notice.yml "$@"
 }
 
-resolve_environment() {
+resolve_shared_environment() {
   require_file "${SHARED_ENV_FILE}"
+  ADMIN_STACK_PORT="$(read_env_value "${SHARED_ENV_FILE}" ADMIN_STACK_PORT)"
+  ADMIN_STACK_PORT="${ADMIN_STACK_PORT:-3333}"
+}
+
+resolve_primary_environment() {
   require_file "${PRIMARY_ENV_FILE}"
-  require_file "${PKELO_ENV_FILE}"
-  require_file "${SWAG_TEMPLATE}"
-  require_file "${PKELO_APP_TEMPLATE}"
-  require_file "${PKELO_NOTICE_TEMPLATE}"
-  require_file "${PKELO_SSL_TEMPLATE}"
-  PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"; PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-pkpkdupr.duckdns.org}"
-  PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"; PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
-  ADMIN_STACK_PORT="$(read_env_value "${SHARED_ENV_FILE}" ADMIN_STACK_PORT)"; ADMIN_STACK_PORT="${ADMIN_STACK_PORT:-3333}"
+  PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"
+  PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-pkpkdupr.duckdns.org}"
   PRIMARY_DUCKDNS_TOKEN="$(read_env_value "${PRIMARY_ENV_FILE}" DUCKDNSTOKEN)"
-  PKELO_CLOUDFLARE_TOKEN="$(read_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN)"
   PRIMARY_JWT_SECRET="$(read_env_value "${PRIMARY_ENV_FILE}" JWT_SECRET)"
-  PKELO_JWT_SECRET="$(read_env_value "${PKELO_ENV_FILE}" JWT_SECRET)"
-  PRIMARY_USER_AUTH_PROVIDER="$(read_env_value "${PRIMARY_ENV_FILE}" USER_AUTH_PROVIDER)"; PRIMARY_USER_AUTH_PROVIDER="${PRIMARY_USER_AUTH_PROVIDER:-password}"
-  PKELO_USER_AUTH_PROVIDER="$(read_env_value "${PKELO_ENV_FILE}" USER_AUTH_PROVIDER)"; PKELO_USER_AUTH_PROVIDER="${PKELO_USER_AUTH_PROVIDER:-kakao}"
+  PRIMARY_USER_AUTH_PROVIDER="$(read_env_value "${PRIMARY_ENV_FILE}" USER_AUTH_PROVIDER)"
+  PRIMARY_USER_AUTH_PROVIDER="${PRIMARY_USER_AUTH_PROVIDER:-password}"
   require_env_value "${PRIMARY_ENV_FILE}" DUCKDNSTOKEN "${PRIMARY_DUCKDNS_TOKEN}"
-  require_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN "${PKELO_CLOUDFLARE_TOKEN}"
   require_env_value "${PRIMARY_ENV_FILE}" JWT_SECRET "${PRIMARY_JWT_SECRET}"
-  require_env_value "${PKELO_ENV_FILE}" JWT_SECRET "${PKELO_JWT_SECRET}"
-  local env_file key
-  for env_file in "${PRIMARY_ENV_FILE}" "${PKELO_ENV_FILE}"; do
-    for key in API_ADMIN_PASSWORD MYSQL_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_VIEWER_PASSWORD; do
-      require_env_value "${env_file}" "${key}" "$(read_env_value "${env_file}" "${key}")"
-    done
+  local key
+  for key in API_ADMIN_PASSWORD MYSQL_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_VIEWER_PASSWORD; do
+    require_env_value "${PRIMARY_ENV_FILE}" "${key}" "$(read_env_value "${PRIMARY_ENV_FILE}" "${key}")"
   done
-  [[ "${PRIMARY_JWT_SECRET}" != "${PKELO_JWT_SECRET}" ]] || { echo "❌ 두 앱의 JWT_SECRET은 서로 달라야 합니다." >&2; exit 1; }
   [[ "${PRIMARY_USER_AUTH_PROVIDER}" == "password" ]] || { echo "❌ ${PRIMARY_ENV_FILE}의 USER_AUTH_PROVIDER는 password여야 합니다." >&2; exit 1; }
+}
+
+resolve_pkelo_environment() {
+  require_file "${PKELO_ENV_FILE}"
+  PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"
+  PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
+  PKELO_CLOUDFLARE_TOKEN="$(read_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN)"
+  PKELO_JWT_SECRET="$(read_env_value "${PKELO_ENV_FILE}" JWT_SECRET)"
+  PKELO_USER_AUTH_PROVIDER="$(read_env_value "${PKELO_ENV_FILE}" USER_AUTH_PROVIDER)"
+  PKELO_USER_AUTH_PROVIDER="${PKELO_USER_AUTH_PROVIDER:-kakao}"
+  require_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN "${PKELO_CLOUDFLARE_TOKEN}"
+  require_env_value "${PKELO_ENV_FILE}" JWT_SECRET "${PKELO_JWT_SECRET}"
+  local key
+  for key in API_ADMIN_PASSWORD MYSQL_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_VIEWER_PASSWORD; do
+    require_env_value "${PKELO_ENV_FILE}" "${key}" "$(read_env_value "${PKELO_ENV_FILE}" "${key}")"
+  done
   [[ "${PKELO_USER_AUTH_PROVIDER}" == "kakao" ]] || { echo "❌ ${PKELO_ENV_FILE}의 USER_AUTH_PROVIDER는 운영에서 kakao여야 합니다." >&2; exit 1; }
   local key
   for key in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI KAKAO_WEB_ORIGIN; do
     require_env_value "${PKELO_ENV_FILE}" "${key}" "$(read_env_value "${PKELO_ENV_FILE}" "${key}")"
   done
+}
+
+require_proxy_templates() {
+  require_file "${SWAG_TEMPLATE}"
+  require_file "${PKELO_APP_TEMPLATE}"
+  require_file "${PKELO_NOTICE_TEMPLATE}"
+  require_file "${PKELO_SSL_TEMPLATE}"
+}
+
+resolve_environment() {
+  resolve_shared_environment
+  case "${TARGET_STACK}" in
+    pkpkdupr)
+      resolve_primary_environment
+      ;;
+    pkelo)
+      resolve_pkelo_environment
+      ;;
+    all)
+      resolve_primary_environment
+      resolve_pkelo_environment
+      [[ "${PRIMARY_JWT_SECRET}" != "${PKELO_JWT_SECRET}" ]] || { echo "❌ 두 앱의 JWT_SECRET은 서로 달라야 합니다." >&2; exit 1; }
+      require_proxy_templates
+      ;;
+  esac
 }
 
 assert_services_running() {
@@ -194,20 +227,27 @@ if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
   printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 fi
 
-mkdir -p "${DEPLOY_ROOT}/data/uploads/avatars" "${DEPLOY_ROOT}/data/uploads/pkelo/avatars" "${PKELO_CERT_ROOT}"
-sync_credentials
-compose_proxy up -d
-compose_certificate up -d
-wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
-wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
-sync_proxy_site_configs
+if [[ "${TARGET_STACK}" == "all" ]]; then
+  mkdir -p \
+    "${DEPLOY_ROOT}/data/uploads/avatars" \
+    "${DEPLOY_ROOT}/data/uploads/pkelo/avatars" \
+    "${PKELO_CERT_ROOT}"
+  sync_credentials
+  compose_proxy up -d
+  compose_certificate up -d
+  wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
+  wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
+  sync_proxy_site_configs
+fi
 
 case "${TARGET_STACK}" in
   pkpkdupr)
+    mkdir -p "${DEPLOY_ROOT}/data/uploads/avatars"
     compose_primary pull web admin-web api mysql db-server adminer
     compose_primary up -d web admin-web api mysql db-server adminer
     ;;
   pkelo)
+    mkdir -p "${DEPLOY_ROOT}/data/uploads/pkelo/avatars"
     if is_notice_enabled; then
       compose_notice pull pkelo-notice-web
       compose_notice up -d pkelo-notice-web
@@ -229,7 +269,9 @@ case "${TARGET_STACK}" in
     ;;
 esac
 
-compose_proxy exec -T proxy nginx -t
-compose_proxy exec -T proxy nginx -s reload
+if [[ "${TARGET_STACK}" == "all" ]]; then
+  compose_proxy exec -T proxy nginx -t
+  compose_proxy exec -T proxy nginx -s reload
+fi
 assert_target_services_running "${TARGET_STACK}"
 echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG}, 컨테이너 기동 상태 확인 완료)"

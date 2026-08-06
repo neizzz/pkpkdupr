@@ -97,18 +97,6 @@ if [[ -z "${IMAGE_TAG}" ]]; then
   exit 1
 fi
 
-require_file "${UPDATE_SERVER_SCRIPT}"
-require_file "${SHARED_ENV_FILE}"
-require_file "${PRIMARY_ENV_FILE}"
-require_file "${PKELO_ENV_FILE}"
-if [[ "${MIGRATE_SQLITE}" == true ]]; then
-  require_file "${MIGRATE_SQLITE_SCRIPT}"
-  if [[ "${TARGET_STACK}" == "pkelo" ]]; then
-    echo "❌ --migrate-sqlite는 pkelo 단독 배포에 사용할 수 없습니다." >&2
-    exit 1
-  fi
-fi
-
 case "${TARGET_STACK}" in
   pkpkdupr|pkelo|all) ;;
   *)
@@ -116,6 +104,29 @@ case "${TARGET_STACK}" in
     exit 1
     ;;
 esac
+
+require_file "${UPDATE_SERVER_SCRIPT}"
+require_file "${SHARED_ENV_FILE}"
+case "${TARGET_STACK}" in
+  pkpkdupr)
+    require_file "${PRIMARY_ENV_FILE}"
+    ;;
+  pkelo)
+    require_file "${PKELO_ENV_FILE}"
+    ;;
+  all)
+    require_file "${PRIMARY_ENV_FILE}"
+    require_file "${PKELO_ENV_FILE}"
+    ;;
+esac
+
+if [[ "${MIGRATE_SQLITE}" == true ]]; then
+  require_file "${MIGRATE_SQLITE_SCRIPT}"
+  if [[ "${TARGET_STACK}" == "pkelo" ]]; then
+    echo "❌ --migrate-sqlite는 pkelo 단독 배포에 사용할 수 없습니다." >&2
+    exit 1
+  fi
+fi
 
 cd "${SOURCE_REPO_ROOT}"
 
