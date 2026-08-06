@@ -68,6 +68,25 @@ describe("buildPlayerRatingChartProjection", () => {
     ]);
   });
 
+  it("이력 없는 종목의 현재 평점은 오늘 점 하나만 유지한다", () => {
+    const history: PlayerRatingHistory = {
+      singles: [
+        { rating: 3.163, createdAt: now, source: "current" },
+      ],
+      doubles: [],
+    };
+
+    const projection = buildPlayerRatingChartProjection(history, now).singles;
+
+    expect(projection).toEqual([
+      expect.objectContaining({
+        rating: 3.163,
+        source: "current",
+        createdAt: now,
+      }),
+    ]);
+  });
+
   it("직선 추세에서는 불필요한 내부 변곡점을 저장하지 않는다", () => {
     const history: PlayerRatingHistory = {
       singles: Array.from({ length: 12 }, (_, index) => ({

@@ -792,26 +792,110 @@ interface MockRatingChangeLog {
   createdAt: Date;
 }
 
-interface TestRatingHistoryFixture {
-  matchId: string;
-  playerId: "Ptest001" | "Ptest002";
-  playedAt: Date;
-  scoreA: number;
-  scoreB: number;
-  previousDoubles: number;
-  nextDoubles: number;
-}
-
 interface RatingHistoryFixture {
   matchId: string;
   playedAt: Date;
   scoreA: number;
   scoreB: number;
-  previousDoubles: number;
-  nextDoubles: number;
+  type: "singles" | "mixed-doubles";
+  previousRating: PlayerDupr;
+  nextRating: PlayerDupr;
 }
 
-const DEV_LOGIN_PLAYER_ID = "P0neq35z";
+interface TestRatingHistoryFixture extends RatingHistoryFixture {
+  playerId: "Ptest001" | "Ptest002";
+}
+
+const TEST_RATING_FIXTURE_MATCH_IDS = Array.from(
+  { length: 24 },
+  (_, index) => `Mtest${String(index + 1).padStart(3, "0")}`,
+);
+const LEGACY_TEST_RATING_FIXTURE_SOURCE_LOG_IDS = [
+  "match-completed-Mtest001-test1",
+  "match-completed-Mtest002-test2",
+  "match-completed-Mtest003-test2",
+];
+const TEST_RATING_FIXTURE_SOURCE_LOG_IDS = [
+  ...LEGACY_TEST_RATING_FIXTURE_SOURCE_LOG_IDS,
+  ...TEST_RATING_FIXTURE_MATCH_IDS.map(
+    (matchId) => `match-completed-${matchId}-test`,
+  ),
+];
+const TEST_PLAYER_RATINGS = {
+  Ptest001: { singles: 3.163, doubles: 3.23 },
+  Ptest002: { singles: 3.31, doubles: 3.36 },
+} satisfies Record<TestRatingHistoryFixture["playerId"], PlayerDupr>;
+const TEST_RATING_FIXTURE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const createTestRatingHistoryFixtures = (
+  referenceAt: Date,
+): TestRatingHistoryFixture[] => {
+  const createSeries = (
+    playerId: TestRatingHistoryFixture["playerId"],
+    category: "singles" | "doubles",
+    matchIdStart: number,
+    values: number[],
+    daysBefore: number[],
+  ): TestRatingHistoryFixture[] => {
+    const currentRating = TEST_PLAYER_RATINGS[playerId];
+
+    return values.map((value, index) => {
+      const previousValue =
+        index === 0 ? value - 0.012 : (values[index - 1] ?? value);
+      const previousRating: PlayerDupr = {
+        singles:
+          category === "singles" ? previousValue : currentRating.singles,
+        doubles:
+          category === "doubles" ? previousValue : currentRating.doubles,
+      };
+      const nextRating: PlayerDupr = {
+        singles: category === "singles" ? value : currentRating.singles,
+        doubles: category === "doubles" ? value : currentRating.doubles,
+      };
+
+      return {
+        matchId: `Mtest${String(matchIdStart + index).padStart(3, "0")}`,
+        playerId,
+        type: category === "singles" ? "singles" : "mixed-doubles",
+        playedAt: new Date(
+          referenceAt.getTime() -
+            (daysBefore[index] ?? 0) * TEST_RATING_FIXTURE_DAY_MS,
+        ),
+        scoreA: index % 2 === 0 ? 11 : 8,
+        scoreB: index % 2 === 0 ? 8 : 11,
+        previousRating,
+        nextRating,
+      };
+    });
+  };
+
+  return [
+    // test1 Doubles: W형
+    ...createSeries(
+      "Ptest001",
+      "doubles",
+      10,
+      [3.18, 3.258, 3.192, 3.245, 3.205, 3.23],
+      [35, 29, 23, 17, 10, 3],
+    ),
+    // test2 Doubles: 좌상단에서 우하단으로 하락
+    ...createSeries(
+      "Ptest002",
+      "doubles",
+      16,
+      [3.62, 3.55, 3.48, 3.41, 3.36],
+      [34, 26, 18, 10, 3],
+    ),
+    // test2 Singles: U형 반등
+    ...createSeries(
+      "Ptest002",
+      "singles",
+      21,
+      [3.35, 3.18, 3.22, 3.31],
+      [32, 21, 12, 4],
+    ),
+  ];
+};
 
 const mockPlayerRatingChangeLogs: MockRatingChangeLog[] = [
   {
@@ -843,131 +927,6 @@ const mockPlayerRatingChangeLogs: MockRatingChangeLog[] = [
     nextRating: { singles: 3.469, doubles: 3.486 },
     delta: { singles: 0, doubles: 0.014 },
     createdAt: new Date("2026-07-22T20:15:00+09:00"),
-  },
-];
-
-const additionalTestRatingFixtures: TestRatingHistoryFixture[] = [
-  {
-    matchId: "Mtest004",
-    playerId: "Ptest001",
-    playedAt: new Date("2026-07-16T19:10:00+09:00"),
-    scoreA: 11,
-    scoreB: 8,
-    previousDoubles: 3.14,
-    nextDoubles: 3.158,
-  },
-  {
-    matchId: "Mtest005",
-    playerId: "Ptest001",
-    playedAt: new Date("2026-07-17T19:20:00+09:00"),
-    scoreA: 8,
-    scoreB: 11,
-    previousDoubles: 3.158,
-    nextDoubles: 3.145,
-  },
-  {
-    matchId: "Mtest006",
-    playerId: "Ptest001",
-    playedAt: new Date("2026-07-19T19:00:00+09:00"),
-    scoreA: 11,
-    scoreB: 9,
-    previousDoubles: 3.145,
-    nextDoubles: 3.166,
-  },
-  {
-    matchId: "Mtest007",
-    playerId: "Ptest002",
-    playedAt: new Date("2026-07-17T20:00:00+09:00"),
-    scoreA: 11,
-    scoreB: 7,
-    previousDoubles: 3.425,
-    nextDoubles: 3.44,
-  },
-  {
-    matchId: "Mtest008",
-    playerId: "Ptest002",
-    playedAt: new Date("2026-07-18T20:10:00+09:00"),
-    scoreA: 11,
-    scoreB: 9,
-    previousDoubles: 3.44,
-    nextDoubles: 3.461,
-  },
-  {
-    matchId: "Mtest009",
-    playerId: "Ptest002",
-    playedAt: new Date("2026-07-19T20:20:00+09:00"),
-    scoreA: 7,
-    scoreB: 11,
-    previousDoubles: 3.461,
-    nextDoubles: 3.449,
-  },
-];
-
-const devLoginRatingFixtures: RatingHistoryFixture[] = [
-  {
-    matchId: "Mdevr001",
-    playedAt: new Date("2026-07-16T19:10:00+09:00"),
-    scoreA: 11,
-    scoreB: 8,
-    previousDoubles: 3,
-    nextDoubles: 3.022,
-  },
-  {
-    matchId: "Mdevr002",
-    playedAt: new Date("2026-07-17T19:20:00+09:00"),
-    scoreA: 8,
-    scoreB: 11,
-    previousDoubles: 3.022,
-    nextDoubles: 2.987,
-  },
-  {
-    matchId: "Mdevr003",
-    playedAt: new Date("2026-07-18T19:00:00+09:00"),
-    scoreA: 11,
-    scoreB: 9,
-    previousDoubles: 2.987,
-    nextDoubles: 3.041,
-  },
-  {
-    matchId: "Mdevr004",
-    playedAt: new Date("2026-07-19T19:10:00+09:00"),
-    scoreA: 9,
-    scoreB: 11,
-    previousDoubles: 3.041,
-    nextDoubles: 3.012,
-  },
-  {
-    matchId: "Mdevr005",
-    playedAt: new Date("2026-07-23T19:20:00+09:00"),
-    scoreA: 11,
-    scoreB: 7,
-    previousDoubles: 3.012,
-    nextDoubles: 3,
-  },
-  // P0neq35z 로그인 계정에서 최저/최고점 라벨을 모두 확인할 수 있는 구간이다.
-  {
-    matchId: "Mdevr006",
-    playedAt: new Date("2026-07-24T19:10:00+09:00"),
-    scoreA: 7,
-    scoreB: 11,
-    previousDoubles: 3,
-    nextDoubles: 2.8,
-  },
-  {
-    matchId: "Mdevr007",
-    playedAt: new Date("2026-07-26T19:20:00+09:00"),
-    scoreA: 11,
-    scoreB: 9,
-    previousDoubles: 2.8,
-    nextDoubles: 3,
-  },
-  {
-    matchId: "Mdevr008",
-    playedAt: new Date("2026-07-30T19:00:00+09:00"),
-    scoreA: 11,
-    scoreB: 8,
-    previousDoubles: 3,
-    nextDoubles: 3.2,
   },
 ];
 
@@ -1105,7 +1064,6 @@ export class TestDataRepository {
     }
 
     await this.seedAdditionalTestRatingHistory();
-    await this.seedDevLoginRatingHistory();
   }
 
   private resolveDevPlayerId(id: string) {
@@ -1187,46 +1145,83 @@ export class TestDataRepository {
   }
 
   private async seedAdditionalTestRatingHistory() {
-    for (const fixture of additionalTestRatingFixtures) {
+    const referenceAt = new Date();
+    const fixtures = createTestRatingHistoryFixtures(referenceAt);
+    await this.resetTestRatingGraphFixtures();
+
+    for (const fixture of fixtures) {
       await this.seedRatingHistoryMatch(fixture.playerId, fixture);
     }
-  }
 
-  private async seedDevLoginRatingHistory() {
-    const devLoginAccount = await this.playerRepository.findById(
-      DEV_LOGIN_PLAYER_ID,
-    );
-    if (!devLoginAccount) return;
-
-    for (const fixture of devLoginRatingFixtures) {
-      await this.seedRatingHistoryMatch(devLoginAccount.id, fixture);
+    for (const [playerId, rating] of Object.entries(TEST_PLAYER_RATINGS)) {
+      await this.playerRepository.updateDuprState(
+        this.resolveDevPlayerId(playerId),
+        {
+          rating,
+          metrics: {
+            singles: { confidence: 1, accuracy: null },
+            doubles: { confidence: 1, accuracy: null },
+          },
+        },
+      );
     }
-
-    const latestFixture = devLoginRatingFixtures.at(-1);
-    if (!latestFixture) return;
-
-    await this.playerRepository.updateDuprState(devLoginAccount.id, {
-      rating: {
-        singles: 3.038,
-        doubles: latestFixture.nextDoubles,
-      },
-      metrics: {
-        singles: { confidence: 1, accuracy: null },
-        doubles: { confidence: 1, accuracy: null },
-      },
-    });
-    await this.invalidateRatingChartProjection(devLoginAccount.id);
   }
 
-  private async invalidateRatingChartProjection(playerId: string) {
-    await this.client.execute({
-      sql: "DELETE FROM player_rating_chart_points WHERE player_id = ?",
-      args: [playerId],
-    });
-    await this.client.execute({
-      sql: "DELETE FROM player_rating_chart_projections WHERE player_id = ?",
-      args: [playerId],
-    });
+  /**
+   * 기존 Dev DB도 현재 fixture 양상으로 다시 맞춘다. test1/test2 seed가
+   * 소유한 ID와 rating-change log만 지우므로 수동 생성 경기에는 영향이 없다.
+   */
+  private async resetTestRatingGraphFixtures() {
+    const playerIds = Object.keys(TEST_PLAYER_RATINGS).map((playerId) =>
+      this.resolveDevPlayerId(playerId),
+    );
+    const matchPlaceholders = TEST_RATING_FIXTURE_MATCH_IDS.map(() => "?").join(
+      ", ",
+    );
+    const playerPlaceholders = playerIds.map(() => "?").join(", ");
+    const sourceLogPlaceholders = TEST_RATING_FIXTURE_SOURCE_LOG_IDS.map(
+      () => "?",
+    ).join(", ");
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+
+    try {
+      await transaction.execute({
+        sql: `DELETE FROM player_rating_change_logs
+              WHERE player_id IN (${playerPlaceholders})
+                AND source = 'match_completed'
+                AND source_log_id IN (${sourceLogPlaceholders})`,
+        args: [...playerIds, ...TEST_RATING_FIXTURE_SOURCE_LOG_IDS],
+      });
+      for (const table of [
+        "match_result_approvals",
+        "match_scores",
+        "match_participants",
+      ]) {
+        await transaction.execute({
+          sql: `DELETE FROM ${table} WHERE match_id IN (${matchPlaceholders})`,
+          args: TEST_RATING_FIXTURE_MATCH_IDS,
+        });
+      }
+      await transaction.execute({
+        sql: `DELETE FROM matches WHERE id IN (${matchPlaceholders})`,
+        args: TEST_RATING_FIXTURE_MATCH_IDS,
+      });
+      await transaction.execute({
+        sql: `DELETE FROM player_rating_chart_points
+              WHERE player_id IN (${playerPlaceholders})`,
+        args: playerIds,
+      });
+      await transaction.execute({
+        sql: `DELETE FROM player_rating_chart_projections
+              WHERE player_id IN (${playerPlaceholders})`,
+        args: playerIds,
+      });
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) transaction.close();
+    }
   }
 
   private async seedRatingHistoryMatch(
@@ -1236,7 +1231,7 @@ export class TestDataRepository {
     await this.createMatchIfMissing(
       {
         id: fixture.matchId,
-        type: "mixed-doubles",
+        type: fixture.type,
         source: "player_created",
         creatorPlayerId: playerId,
         status: "completed",
@@ -1256,12 +1251,30 @@ export class TestDataRepository {
       scoreB: fixture.scoreB,
     });
 
-    const participants = [
-      { teamIndex: 0, playerId },
-      { teamIndex: 0, playerId: this.resolveDevPlayerId("dev-player-alice") },
-      { teamIndex: 1, playerId: this.resolveDevPlayerId("dev-player-bob") },
-      { teamIndex: 1, playerId: this.resolveDevPlayerId("dev-player-cara") },
-    ] as const;
+    const participants =
+      fixture.type === "singles"
+        ? [
+            { teamIndex: 0, playerId },
+            {
+              teamIndex: 1,
+              playerId: this.resolveDevPlayerId("dev-player-bob"),
+            },
+          ]
+        : [
+            { teamIndex: 0, playerId },
+            {
+              teamIndex: 0,
+              playerId: this.resolveDevPlayerId("dev-player-alice"),
+            },
+            {
+              teamIndex: 1,
+              playerId: this.resolveDevPlayerId("dev-player-bob"),
+            },
+            {
+              teamIndex: 1,
+              playerId: this.resolveDevPlayerId("dev-player-cara"),
+            },
+          ];
     for (const participant of participants) {
       await this.createMatchParticipantIfMissing({
         id: `${fixture.matchId}-team-${participant.teamIndex}-${participant.playerId}`,
@@ -1276,9 +1289,12 @@ export class TestDataRepository {
       playerId,
       source: "match_completed",
       sourceLogId: `match-completed-${fixture.matchId}-test`,
-      previousRating: { singles: 3.038, doubles: fixture.previousDoubles },
-      nextRating: { singles: 3.038, doubles: fixture.nextDoubles },
-      delta: { singles: 0, doubles: fixture.nextDoubles - fixture.previousDoubles },
+      previousRating: fixture.previousRating,
+      nextRating: fixture.nextRating,
+      delta: {
+        singles: fixture.nextRating.singles - fixture.previousRating.singles,
+        doubles: fixture.nextRating.doubles - fixture.previousRating.doubles,
+      },
       createdAt: fixture.playedAt,
     });
   }
