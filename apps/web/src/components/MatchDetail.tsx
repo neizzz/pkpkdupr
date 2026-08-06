@@ -90,6 +90,8 @@ const getScoreRowWinner = (row: ScoreRow): 0 | 1 | null => {
   const scoreB = Number(row.scoreB);
 
   if (
+    row.scoreA.trim() === "" ||
+    row.scoreB.trim() === "" ||
     !Number.isInteger(scoreA) ||
     !Number.isInteger(scoreB) ||
     scoreA < 0 ||
@@ -353,6 +355,26 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     firstTwoSetWinners[0] !== firstTwoSetWinners[1];
   const submittedScoreRows =
     isBestOfThree && !isThirdSetEnabled ? scoreRows.slice(0, 2) : scoreRows;
+  const isResultScoreValid = (() => {
+    const scores = submittedScoreRows.map((row) => ({
+      scoreA: Number(row.scoreA),
+      scoreB: Number(row.scoreB),
+    }));
+
+    if (
+      scores.length > MATCH_RESULT_MAX_SCORE_COUNT ||
+      submittedScoreRows.some((row) => getScoreRowWinner(row) === null)
+    ) {
+      return false;
+    }
+
+    try {
+      validateMatchScoresForMode(match.mode, scores);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
   const totalPoints = useMemo(
     () =>
       (match.scores ?? []).reduce<[number, number]>(
@@ -464,6 +486,8 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
         const scoreB = Number(row.scoreB);
 
         if (
+          row.scoreA.trim() === "" ||
+          row.scoreB.trim() === "" ||
           !Number.isInteger(scoreA) ||
           !Number.isInteger(scoreB) ||
           scoreA < 0 ||
@@ -1039,9 +1063,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
               취소
             </Button>
             <Button
-              className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white"
+              className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
               onPress={() => void handleSubmitResult()}
-              isDisabled={isSubmittingResult}
+              isDisabled={isSubmittingResult || !isResultScoreValid}
             >
               {isSubmittingResult ? "입력 중..." : resultActionLabel}
             </Button>
