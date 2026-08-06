@@ -103,7 +103,11 @@ export const buildPlayerRatingChartProjection = (
       const latest = timeline.at(-1);
       // 같은 날 완료된 매치가 있어도, 해당 시점보다 현재가 늦으면 오늘의
       // 현재 레이팅 지점을 끝점으로 추가한다.
-      if (latest && latest.createdAt.getTime() < now.getTime()) {
+      if (
+        latest &&
+        latest.source !== "current" &&
+        latest.createdAt.getTime() < now.getTime()
+      ) {
         timeline.push(
           clonePoint(latest, { createdAt: now, source: "current" }),
         );
