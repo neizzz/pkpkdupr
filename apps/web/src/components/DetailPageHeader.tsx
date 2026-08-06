@@ -21,6 +21,21 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   const [isScrolled, setIsScrolled] = useState(false);
   const rightDrawerScrollContainer = useRightDrawerScrollContainer();
   const isRightDrawerPage = rightDrawerScrollContainer !== null;
+  const headerBackgroundClassName = isRightDrawerPage
+    ? "bg-transparent"
+    : backgroundClassName;
+  const scrolledButtonClassName =
+    "!bg-[#EBEEFA]/90 shadow-none hover:!bg-[#EBEEFA]";
+  const backButtonClassName = `absolute left-3 !text-pkpk-secondary-bg shadow-none transition-colors duration-100 ${
+    isScrolled
+      ? scrolledButtonClassName
+      : "!bg-transparent !text-pkpk-secondary-bg hover:!bg-transparent"
+  }`;
+  const rightContentClassName = `absolute right-3 flex items-center [&_button]:!px-3 [&_button]:transition-colors [&_button]:duration-100 ${
+    isScrolled
+      ? "[&_button]:!bg-[#EBEEFA]/90 [&_button]:shadow-none [&_button:hover]:!bg-[#EBEEFA]"
+      : ""
+  }`;
 
   useEffect(() => {
     const container =
@@ -28,7 +43,7 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
       document.querySelector<HTMLDivElement>(".app-tab-panel-scroll-area");
     if (!container) return;
 
-    const onScroll = () => setIsScrolled(container.scrollTop > 1);
+    const onScroll = () => setIsScrolled(container.scrollTop >= 5);
     onScroll();
 
     container.addEventListener("scroll", onScroll, { passive: true });
@@ -43,21 +58,20 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   }
 
   return (
-    <div className={`sticky top-0 z-20 ${backgroundClassName}`}>
+    <div className={`sticky top-0 z-20 ${headerBackgroundClassName}`}>
       <div
-        className={`flex h-12 items-center justify-center border-b ${backgroundClassName} px-3 transition-colors ${
-          isScrolled ? "border-border" : "border-transparent"
+        className={`flex h-12 items-center justify-center ${headerBackgroundClassName} px-3 transition-colors ${
+          !isRightDrawerPage
+            ? `border-b ${isScrolled ? "border-border" : "border-transparent"}`
+            : ""
         }`}
       >
-        <TabBackButton
-          tabKey={targetTabKey}
-          className="absolute left-0 !bg-transparent !text-pkpk-secondary-bg shadow-none hover:!bg-transparent"
-        />
+        <TabBackButton tabKey={targetTabKey} className={backButtonClassName} />
         {!isRightDrawerPage ? (
           <h2 className="text-2xl font-bold text-pkpk-secondary-bg">{title}</h2>
         ) : null}
         {rightContent ? (
-          <div className="absolute right-3 flex items-center">{rightContent}</div>
+          <div className={rightContentClassName}>{rightContent}</div>
         ) : null}
       </div>
     </div>
