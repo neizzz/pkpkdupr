@@ -79,18 +79,18 @@ interface MemberProfileProps {
 
 const ProfileStatsSkeleton: React.FC = () => (
   <div
-    className="flex flex-col gap-3"
+    className="flex flex-col gap-0"
     role="status"
     aria-label="프로필 통계 로딩 중"
   >
     <div className="grid grid-cols-2 gap-3">
       {Array.from({ length: 2 }, (_, index) => (
-        <SkeletonBlock key={index} className="h-[4.75rem] rounded-xl" />
+        <SkeletonBlock key={index} className="h-16 rounded-xl" />
       ))}
     </div>
     <div className="grid grid-cols-2 gap-3">
       {Array.from({ length: 2 }, (_, index) => (
-        <SkeletonBlock key={index} className="h-[4.75rem] rounded-xl" />
+        <SkeletonBlock key={index} className="h-16 rounded-xl" />
       ))}
     </div>
   </div>
@@ -368,7 +368,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </div>
           </div>
 
-          <div className="min-h-[28.5rem] rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
+          <div className="h-[28rem] rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg px-4 pt-4 pb-2">
             <h3
               className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold text-pkpk-secondary-font ${
                 showDetailHeader ? "pl-2" : ""
