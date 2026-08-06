@@ -113,13 +113,11 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
   showGradientExtension = true,
   onHeaderElementChange,
 }) => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
     null,
   );
   const gradientBaseRef = useRef<HTMLDivElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const isScrolledRef = useRef(false);
 
   const handleHeaderElementChange = useCallback(
     (element: HTMLDivElement | null) => {
@@ -130,9 +128,8 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
   );
 
   useLayoutEffect(() => {
-    const container = document.querySelector(".app-tab-panel-scroll-area");
     const gradientBase = gradientBaseRef.current;
-    if (!container || !headerElement || !gradientBase) return;
+    if (!headerElement || !gradientBase) return;
 
     const updateGradient = () => {
       const headerHeight = headerElement.clientHeight;
@@ -148,12 +145,6 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
         "--tab-panel-header-gradient-total-height",
         `${totalHeight}px`,
       );
-
-      const nextIsScrolled = container.scrollTop > 1;
-      if (isScrolledRef.current !== nextIsScrolled) {
-        isScrolledRef.current = nextIsScrolled;
-        setIsScrolled(nextIsScrolled);
-      }
     };
 
     const scheduleGradientUpdate = () => {
@@ -167,14 +158,10 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
 
     const resizeObserver = new ResizeObserver(scheduleGradientUpdate);
     resizeObserver.observe(headerElement);
-    container.addEventListener("scroll", scheduleGradientUpdate, {
-      passive: true,
-    });
     updateGradient();
 
     return () => {
       resizeObserver.disconnect();
-      container.removeEventListener("scroll", scheduleGradientUpdate);
       if (animationFrameRef.current !== null) {
         window.cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -190,11 +177,7 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
           aria-hidden="true"
           className="tab-panel-header-gradient-base pointer-events-none absolute inset-x-0 top-0 h-full"
         />
-        <div
-          className={`relative z-10 transition-colors ${
-            isScrolled ? "border-b border-white/20" : ""
-          }`}
-        >
+        <div className="relative z-10">
           <div className="flex min-h-12 items-center justify-between px-4">
             <h2 className="text-[28.8px] font-bold text-pkpk-primary-font">
               {title}
