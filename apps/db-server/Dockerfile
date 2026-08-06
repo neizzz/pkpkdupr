@@ -23,4 +23,4 @@ EXPOSE 5001
 
 WORKDIR /app/apps/db-server
 
-CMD ["node", "--experimental-loader", "newrelic/esm-loader.mjs", "-r", "newrelic", "dist/apps/db-server/src/index.js"]
+CMD ["node", "start.cjs"]

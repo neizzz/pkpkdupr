@@ -23,4 +23,4 @@ EXPOSE 4000
 
 WORKDIR /app/apps/api
 
-CMD ["node", "--experimental-loader", "newrelic/esm-loader.mjs", "-r", "newrelic", "dist/apps/api/src/index.js"]
+CMD ["node", "start.cjs"]
