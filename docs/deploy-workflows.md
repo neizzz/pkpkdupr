@@ -10,9 +10,12 @@
 
 선택한 브랜치의 소스가 빌드되며, 태그는 이미지 식별에만 사용합니다. API 주소는 운영 브라우저 호스트에서 런타임으로 계산하므로 별도 입력하지 않습니다.
 
-이미지 push 뒤에는 공용 infra checkout에서 해당 태그를 사용해 PKELO 스택만 반영합니다.
+이미지 push 뒤에는 서버의 공용 infra checkout에서 해당 태그를 사용해 PKELO 스택만 반영합니다.
 
 ```bash
+cd /opt/pkpkdupr
+git switch infra
+git pull --ff-only origin infra
 bash scripts/manual-deploy.sh --image-tag '<pkelo-tag>' --stack pkelo
 ```
 
