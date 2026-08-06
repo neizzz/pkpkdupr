@@ -18,6 +18,7 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   const targetTabKey = tabKey ?? selectedTab;
   const [isScrolled, setIsScrolled] = useState(false);
   const rightDrawerScrollContainer = useRightDrawerScrollContainer();
+  const isRightDrawerPage = rightDrawerScrollContainer !== null;
 
   useEffect(() => {
     const container =
