@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Button, CloseButton } from "@heroui/react";
+import { Alert, Button } from "@heroui/react";
 import { useLocation } from "react-router-dom";
 import { useAppUpdate } from "@/context/AppUpdateContext";
 import { useAuth } from "@/context/AuthContext";
@@ -28,7 +28,6 @@ const PwaUpdatePrompt: React.FC = () => {
     applyUpdate,
   } = useAppUpdate();
   const lastAutoCheckAtRef = useRef(0);
-  const [isDismissed, setIsDismissed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isFullWidthDevPage =
@@ -97,8 +96,7 @@ const PwaUpdatePrompt: React.FC = () => {
     requiresPasswordChange ||
     isFullWidthDevPage ||
     isForcedPasswordChangePage ||
-    !isUpdateAvailable ||
-    isDismissed
+    !isUpdateAvailable
   ) {
     return null;
   }
@@ -138,11 +136,6 @@ const PwaUpdatePrompt: React.FC = () => {
         >
           {isApplyingUpdate ? "업데이트 중..." : "업데이트"}
         </Button>
-        <CloseButton
-          className="shrink-0 self-center"
-          aria-label="업데이트 안내 닫기"
-          onClick={() => setIsDismissed(true)}
-        />
       </Alert>
     </div>
   );
