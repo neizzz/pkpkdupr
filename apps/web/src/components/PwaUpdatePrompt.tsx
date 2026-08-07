@@ -14,6 +14,8 @@ const isStandaloneDisplay = () =>
       (window.navigator as Navigator & { standalone?: boolean }).standalone,
     ));
 
+const FOREGROUND_UPDATE_CHECK_DEBOUNCE_MS = 5_000;
+
 const PwaUpdatePrompt: React.FC = () => {
   const location = useLocation();
   const isOnline = useOnlineStatus();
@@ -25,7 +27,7 @@ const PwaUpdatePrompt: React.FC = () => {
     checkForUpdate,
     applyUpdate,
   } = useAppUpdate();
-  const hasAutoCheckedRef = useRef(false);
+  const lastAutoCheckAtRef = useRef(0);
   const [isDismissed, setIsDismissed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,24 +39,46 @@ const PwaUpdatePrompt: React.FC = () => {
     typeof window !== "undefined" ? isStandaloneDisplay() : false;
 
   useEffect(() => {
-    if (
-      hasAutoCheckedRef.current ||
-      !isStandalone ||
-      isLoading ||
-      !isAuthenticated ||
-      requiresPasswordChange ||
-      isFullWidthDevPage ||
-      isForcedPasswordChangePage ||
-      !isOnline
-    ) {
-      return;
-    }
+    const checkForAvailableUpdate = () => {
+      if (
+        !isStandalone ||
+        isLoading ||
+        !isAuthenticated ||
+        requiresPasswordChange ||
+        isFullWidthDevPage ||
+        isForcedPasswordChangePage ||
+        !isOnline
+      ) {
+        return;
+      }
 
-    hasAutoCheckedRef.current = true;
+      const now = Date.now();
+      if (now - lastAutoCheckAtRef.current < FOREGROUND_UPDATE_CHECK_DEBOUNCE_MS) {
+        return;
+      }
 
-    void checkForUpdate().catch((err) => {
-      console.error("Failed to auto-check app update", err);
-    });
+      lastAutoCheckAtRef.current = now;
+      void checkForUpdate().catch((err) => {
+        console.error("Failed to auto-check app update", err);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkForAvailableUpdate();
+      }
+    };
+
+    checkForAvailableUpdate();
+    window.addEventListener("focus", checkForAvailableUpdate);
+    window.addEventListener("pageshow", checkForAvailableUpdate);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", checkForAvailableUpdate);
+      window.removeEventListener("pageshow", checkForAvailableUpdate);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [
     checkForUpdate,
     isAuthenticated,
