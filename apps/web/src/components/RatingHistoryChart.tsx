@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Chart as ChartJS,
   type ChartData,
@@ -65,11 +65,16 @@ const formatDate = (value: string) => {
   return `${dateParts.month}.${dateParts.day}`;
 };
 
+const getKoreaDateKey = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const dateParts = getDateParts(date);
+  return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+};
+
 const accentColor = "#eaff19"; // --color-pkpk-accent-bg
 const CHART_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
-const VISUAL_MERGE_X_PX = 16;
-const VISUAL_MERGE_Y_PX = 6;
-const CHART_PLOT_HEIGHT_PX = 102;
 const CHART_LABEL_HORIZONTAL_PADDING_PX = 18;
 const CHART_LABEL_RIGHT_PADDING_PX = 28;
 const CHART_RATING_LABEL_FONT = "700 11px sans-serif";
@@ -110,6 +115,7 @@ interface LabelRect {
 interface RatingLabelTarget {
   index: number;
   kind: RatingLabelKind;
+  isToday: boolean;
 }
 
 interface RatingLabelPlacement extends LabelRect {
@@ -281,9 +287,21 @@ const getRatingLabelPlacement = (
 
 const getRatingLabelCandidateOffsets = (
   kind: RatingLabelKind,
+  isTodayPoint: boolean,
   point: ChartPoint,
   chartArea: { left: number; right: number; top: number; bottom: number },
 ) => {
+  // 오늘 점은 극값과 겹치더라도 수치의 중심을 점의 중심에 맞춘다. 아래쪽은
+  // 날짜 가이드선과 충돌하기 쉬우므로 위쪽 후보를 우선한다.
+  if (isTodayPoint) {
+    return [
+      [0, -15],
+      [0, -27],
+      [0, 15],
+      [0, 27],
+    ] satisfies Array<[number, number]>;
+  }
+
   const inwardDirection =
     point.x <= (chartArea.left + chartArea.right) / 2 ? 1 : -1;
   const topCandidates: Array<[number, number]> = [
@@ -323,6 +341,20 @@ const getRatingLabelCandidateOffsets = (
     : bottomCandidates;
 };
 
+const getTodayPointIndex = (
+  history: MemberProfileRatingHistoryPoint[],
+) => {
+  const latestTodayIndex = history.reduce(
+    (latestIndex, point, index) =>
+      isToday(point.createdAt) ? index : latestIndex,
+    -1,
+  );
+
+  // RatingHistoryChart는 현재 평점을 끝점으로 보정한다. projection 압축으로
+  // source 또는 날짜 판별이 남지 않아도 끝점은 오늘의 강조 점으로 유지한다.
+  return latestTodayIndex >= 0 ? latestTodayIndex : history.length - 1;
+};
+
 const getRatingLabelTargets = (
   history: MemberProfileRatingHistoryPoint[],
 ): RatingLabelTarget[] => {
@@ -331,13 +363,7 @@ const getRatingLabelTargets = (
   const values = history.map((point) => point.rating);
   const maximum = Math.max(...values);
   const minimum = Math.min(...values);
-  const todayCurrentIndex = history.reduce(
-    (latestIndex, point, index) =>
-      point.source === "current" && isToday(point.createdAt)
-        ? index
-        : latestIndex,
-    -1,
-  );
+  const todayCurrentIndex = getTodayPointIndex(history);
   const getExtremumIndex = (rating: number) =>
     todayCurrentIndex >= 0 && values[todayCurrentIndex] === rating
       ? todayCurrentIndex
@@ -360,9 +386,13 @@ const getRatingLabelTargets = (
     minimum: 1,
     today: 2,
   };
-  return [...targets].map(([index, kind]) => ({ index, kind })).sort(
-    (left, right) => priority[left.kind] - priority[right.kind],
-  );
+  return [...targets]
+    .map(([index, kind]) => ({
+      index,
+      kind,
+      isToday: index === todayCurrentIndex,
+    }))
+    .sort((left, right) => priority[left.kind] - priority[right.kind]);
 };
 
 const isInsideLabelBounds = (rect: LabelRect, bounds: LabelRect) =>
@@ -448,6 +478,7 @@ const layoutRatingLabels = (
 
     const candidates = getRatingLabelCandidateOffsets(
       target.kind,
+      target.isToday,
       point,
       chart.chartArea,
     ).map(([offsetX, offsetY]) =>
@@ -475,6 +506,17 @@ const layoutRatingLabels = (
   }
 
   return placements;
+};
+
+const getHighlightedPointIndexes = (
+  pointIndexes: Set<number>,
+  pointCount: number,
+) => {
+  const indexes = new Set(pointIndexes);
+  // 현재 평점은 항상 chartValues의 끝점이다. decoration plugin이 이전 props를
+  // 유지하는 렌더 주기에도 이 점은 반드시 강조한다.
+  if (pointCount > 0) indexes.add(pointCount - 1);
+  return indexes;
 };
 
 const createAreaGradient = (context: ScriptableContext<"line">) => {
@@ -547,17 +589,14 @@ const createChartDecorationPlugin = (
     line.options.fill = false;
     line.draw(ctx);
     line.options.fill = previousFill;
-
-    for (const index of pointIndexes) {
-      const point = datasetMeta.data[index] as unknown as
-        | { draw: (context: CanvasRenderingContext2D) => void }
-        | undefined;
-      point?.draw(ctx);
-    }
   },
   afterDatasetsDraw(chart) {
     const { ctx, chartArea } = chart;
     const points = chart.getDatasetMeta(0).data;
+    const highlightedPointIndexes = getHighlightedPointIndexes(
+      pointIndexes,
+      points.length,
+    );
     const chartPoints = points.map((point) =>
       isChartPoint(point) ? point : undefined,
     );
@@ -566,7 +605,7 @@ const createChartDecorationPlugin = (
     ctx.strokeStyle = "rgba(234, 255, 25, 0.35)";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 3]);
-    for (const index of pointIndexes) {
+    for (const index of highlightedPointIndexes) {
       const point = points[index];
       if (!point) continue;
 
@@ -580,7 +619,9 @@ const createChartDecorationPlugin = (
     ctx.font = CHART_DATE_LABEL_FONT;
     ctx.textBaseline = "top";
     const dateLabelRects: LabelRect[] = [];
-    for (const [index, dateLabel] of dateLabels) {
+    const labelsToDraw = new Map(dateLabels);
+    if (points.length > 0) labelsToDraw.set(points.length - 1, "오늘");
+    for (const [index, dateLabel] of labelsToDraw) {
       const point = points[index];
       if (!point) continue;
 
@@ -605,7 +646,7 @@ const createChartDecorationPlugin = (
       ctx,
       chart,
       chartPoints,
-      pointIndexes,
+      highlightedPointIndexes,
       dateLabelRects,
       ratingLabelTargets,
       ratingLabelTexts,
@@ -614,6 +655,23 @@ const createChartDecorationPlugin = (
       const text = ratingLabelTexts.get(index);
       if (!text) continue;
       ctx.fillText(text, placement.centerX, placement.centerY);
+    }
+    ctx.restore();
+
+    // 가이드선과 라벨을 모두 그린 뒤 강조 점을 다시 올려, Chart.js의
+    // pointRadius 캐시나 후속 canvas draw에 오늘 끝점이 가려지지 않게 한다.
+    ctx.save();
+    ctx.fillStyle = accentColor;
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 2;
+    for (const index of highlightedPointIndexes) {
+      const point = chartPoints[index];
+      if (!point) continue;
+
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
     ctx.restore();
   },
@@ -627,13 +685,7 @@ const getLabeledPointIndexes = (
   const values = history.map((point) => point.rating);
   const maximum = Math.max(...values);
   const minimum = Math.min(...values);
-  const todayCurrentIndex = history.reduce(
-    (latestIndex, point, index) =>
-      point.source === "current" && isToday(point.createdAt)
-        ? index
-        : latestIndex,
-    -1,
-  );
+  const todayCurrentIndex = getTodayPointIndex(history);
   const getExtremumIndex = (rating: number) =>
     todayCurrentIndex >= 0 && values[todayCurrentIndex] === rating
       ? todayCurrentIndex
@@ -659,58 +711,47 @@ const getPointTimestamp = (point: MemberProfileRatingHistoryPoint) => {
 };
 
 /**
- * 원본 projection은 보존하되, 실제 렌더 영역에서 거의 같은 좌표를 차지하는
- * 인접점은 최신 지점으로 합친다. 단독 최고/최저점은 차트 의미를 위해 유지한다.
+ * 차트에서는 같은 KST 날짜에 발생한 여러 변동을 가장 늦은 평점 하나로
+ * 축약한다. 원본 projection과 경기 이력은 그대로 유지하며, 오늘의 current
+ * 점은 같은 시각의 매치 점보다 우선한다.
  */
-const collapseVisuallyOverlappingPoints = (
+const keepLatestRatingPointPerKoreaDate = (
   history: MemberProfileRatingHistoryPoint[],
-  chartWidth: number,
-  chartTimeSpanMs: number,
 ): MemberProfileRatingHistoryPoint[] => {
-  if (history.length < 2 || chartWidth <= 0) return history;
+  const latestByDate = new Map<
+    string,
+    { point: MemberProfileRatingHistoryPoint; index: number }
+  >();
 
-  const values = history.map((point) => point.rating);
-  const maximum = Math.max(...values);
-  const minimum = Math.min(...values);
-  const ratingRange = Math.max(maximum - minimum, 0.01) * 1.24;
-  const isOnlyExtremum = (index: number) => {
-    if (maximum === minimum) return false;
-    const rating = history[index]?.rating;
-    if (rating !== maximum && rating !== minimum) return false;
-    return values.filter((value) => value === rating).length === 1;
-  };
-
-  const collapsed: Array<{ point: MemberProfileRatingHistoryPoint; index: number }> = [];
   for (const [index, point] of history.entries()) {
-    const previous = collapsed[collapsed.length - 1];
+    const dateKey = getKoreaDateKey(point.createdAt) ?? `invalid-${index}`;
+    const previous = latestByDate.get(dateKey);
     if (!previous) {
-      collapsed.push({ point, index });
+      latestByDate.set(dateKey, { point, index });
       continue;
     }
 
-    const horizontalDistance =
-      (Math.abs(getPointTimestamp(point) - getPointTimestamp(previous.point)) /
-        Math.max(chartTimeSpanMs, 1)) *
-      chartWidth;
-    const verticalDistance =
-      (Math.abs(point.rating - previous.point.rating) / ratingRange) *
-      CHART_PLOT_HEIGHT_PX;
-    const overlapsVisually =
-      horizontalDistance <= VISUAL_MERGE_X_PX &&
-      verticalDistance <= VISUAL_MERGE_Y_PX;
+    const pointTimestamp = getPointTimestamp(point);
+    const previousTimestamp = getPointTimestamp(previous.point);
+    const sourcePriority = point.source === "current" ? 1 : 0;
+    const previousSourcePriority = previous.point.source === "current" ? 1 : 0;
+    const isPreferredAtSameTime =
+      pointTimestamp === previousTimestamp &&
+      (sourcePriority > previousSourcePriority ||
+        (sourcePriority === previousSourcePriority && index > previous.index));
 
-    if (
-      overlapsVisually &&
-      !isOnlyExtremum(previous.index) &&
-      !isOnlyExtremum(index)
-    ) {
-      collapsed[collapsed.length - 1] = { point, index };
-    } else {
-      collapsed.push({ point, index });
+    if (pointTimestamp > previousTimestamp || isPreferredAtSameTime) {
+      latestByDate.set(dateKey, { point, index });
     }
   }
 
-  return collapsed.map(({ point }) => point);
+  return [...latestByDate.values()]
+    .sort(
+      (left, right) =>
+        getPointTimestamp(left.point) - getPointTimestamp(right.point) ||
+        left.index - right.index,
+    )
+    .map(({ point }) => point);
 };
 
 const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
@@ -718,29 +759,9 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
   label,
 }) => {
   const [isEntered, setIsEntered] = useState(false);
-  const [chartWidth, setChartWidth] = useState(0);
-  const chartContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => setIsEntered(true));
     return () => window.cancelAnimationFrame(frameId);
-  }, []);
-
-  useEffect(() => {
-    const element = chartContainerRef.current;
-    if (!element) return;
-
-    const updateWidth = () => {
-      const nextWidth = element.getBoundingClientRect().width;
-      setChartWidth((currentWidth) =>
-        Math.abs(currentWidth - nextWidth) < 1 ? currentWidth : nextWidth,
-      );
-    };
-    updateWidth();
-
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(updateWidth);
-    observer.observe(element);
-    return () => observer.disconnect();
   }, []);
 
   const chartNow = useMemo(() => new Date(), [history]);
@@ -763,31 +784,25 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
       },
     ];
   }, [chartNow, history]);
+  const visibleHistory = useMemo(
+    () => keepLatestRatingPointPerKoreaDate(historyWithToday),
+    [historyWithToday],
+  );
   const chartWindowEnd = useMemo(
     () => Math.max(
       chartNow.getTime(),
-      ...historyWithToday.map(getPointTimestamp),
+      ...visibleHistory.map(getPointTimestamp),
     ),
-    [chartNow, historyWithToday],
+    [chartNow, visibleHistory],
   );
   const chartWindowStart = useMemo(() => {
     const earliestTimestamp = Math.min(
-      ...historyWithToday.map(getPointTimestamp),
+      ...visibleHistory.map(getPointTimestamp),
     );
     return earliestTimestamp < chartWindowEnd
       ? earliestTimestamp
       : chartWindowEnd - CHART_WINDOW_MS;
-  }, [chartWindowEnd, historyWithToday]);
-  const chartTimeSpanMs = chartWindowEnd - chartWindowStart;
-  const visibleHistory = useMemo(
-    () =>
-      collapseVisuallyOverlappingPoints(
-        historyWithToday,
-        chartWidth,
-        chartTimeSpanMs,
-      ),
-    [chartTimeSpanMs, chartWidth, historyWithToday],
-  );
+  }, [chartWindowEnd, visibleHistory]);
   const displayHistory = useMemo(
     () =>
       visibleHistory.length === 1
@@ -797,13 +812,20 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
   );
   const valueOffset = visibleHistory.length === 1 ? 1 : 0;
   const dateLabelIndexes = useMemo(
-    () =>
-      new Set(
+    () => {
+      const indexes = new Set(
         [...getLabeledPointIndexes(visibleHistory)].map(
           (index) => index + valueOffset,
         ),
-      ),
-    [valueOffset, visibleHistory],
+      );
+      // 차트의 끝점은 historyWithToday가 보정한 현재 평점이다. projection의
+      // source 압축 여부와 관계없이 오늘 점·가이드선·날짜를 항상 남긴다.
+      if (displayHistory.length > 0) {
+        indexes.add(displayHistory.length - 1);
+      }
+      return indexes;
+    },
+    [displayHistory.length, valueOffset, visibleHistory],
   );
   const dateLabels = useMemo(() => {
     const labels = new Map<number, string>();
@@ -921,7 +943,6 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
 
   return (
     <div
-      ref={chartContainerRef}
       className="mt-2 h-36 min-w-0"
       style={{
         opacity: isEntered ? 1 : 0,

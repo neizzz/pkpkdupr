@@ -807,7 +807,7 @@ interface TestRatingHistoryFixture extends RatingHistoryFixture {
 }
 
 const TEST_RATING_FIXTURE_MATCH_IDS = Array.from(
-  { length: 24 },
+  { length: 27 },
   (_, index) => `Mtest${String(index + 1).padStart(3, "0")}`,
 );
 const LEGACY_TEST_RATING_FIXTURE_SOURCE_LOG_IDS = [
@@ -825,17 +825,65 @@ const TEST_PLAYER_RATINGS = {
   Ptest001: { singles: 3.163, doubles: 3.23 },
   Ptest002: { singles: 3.31, doubles: 3.36 },
 } satisfies Record<TestRatingHistoryFixture["playerId"], PlayerDupr>;
-const TEST_RATING_FIXTURE_DAY_MS = 24 * 60 * 60 * 1000;
+const KOREA_STANDARD_TIME_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+interface TestRatingFixtureSchedule {
+  daysBefore: number;
+  hour: number;
+  minute?: number;
+}
+
+const getTestFixturePlayedAt = (
+  referenceAt: Date,
+  schedule: TestRatingFixtureSchedule,
+) => {
+  // 그래프의 날짜 라벨과 같은 KST 기준으로 일자를 고정한다. 같은 daysBefore에
+  // 서로 다른 시간을 지정하면 하루에 여러 경기를 한 이력을 재현할 수 있다.
+  const koreaReferenceAt = new Date(
+    referenceAt.getTime() + KOREA_STANDARD_TIME_OFFSET_MS,
+  );
+
+  return new Date(
+    Date.UTC(
+      koreaReferenceAt.getUTCFullYear(),
+      koreaReferenceAt.getUTCMonth(),
+      koreaReferenceAt.getUTCDate() - schedule.daysBefore,
+      schedule.hour - 9,
+      schedule.minute ?? 0,
+    ),
+  );
+};
+
+const getTodayTestFixtureSchedules = (
+  referenceAt: Date,
+): TestRatingFixtureSchedule[] => {
+  const koreaReferenceAt = new Date(
+    referenceAt.getTime() + KOREA_STANDARD_TIME_OFFSET_MS,
+  );
+  const minutesSinceMidnight =
+    koreaReferenceAt.getUTCHours() * 60 + koreaReferenceAt.getUTCMinutes();
+  const latestMinute = Math.max(2, minutesSinceMidnight - 30);
+  const interval = Math.max(1, Math.floor(latestMinute / 3));
+
+  return [latestMinute - interval * 2, latestMinute - interval, latestMinute].map(
+    (minutes) => ({
+      daysBefore: 0,
+      hour: Math.floor(minutes / 60),
+      minute: minutes % 60,
+    }),
+  );
+};
 
 const createTestRatingHistoryFixtures = (
   referenceAt: Date,
 ): TestRatingHistoryFixture[] => {
+  const todayTestFixtureSchedules = getTodayTestFixtureSchedules(referenceAt);
   const createSeries = (
     playerId: TestRatingHistoryFixture["playerId"],
     category: "singles" | "doubles",
     matchIdStart: number,
     values: number[],
-    daysBefore: number[],
+    schedules: TestRatingFixtureSchedule[],
   ): TestRatingHistoryFixture[] => {
     const currentRating = TEST_PLAYER_RATINGS[playerId];
 
@@ -857,9 +905,9 @@ const createTestRatingHistoryFixtures = (
         matchId: `Mtest${String(matchIdStart + index).padStart(3, "0")}`,
         playerId,
         type: category === "singles" ? "singles" : "mixed-doubles",
-        playedAt: new Date(
-          referenceAt.getTime() -
-            (daysBefore[index] ?? 0) * TEST_RATING_FIXTURE_DAY_MS,
+        playedAt: getTestFixturePlayedAt(
+          referenceAt,
+          schedules[index] ?? { daysBefore: 0, hour: 19 },
         ),
         scoreA: index % 2 === 0 ? 11 : 8,
         scoreB: index % 2 === 0 ? 8 : 11,
@@ -876,23 +924,43 @@ const createTestRatingHistoryFixtures = (
       "doubles",
       10,
       [3.18, 3.258, 3.192, 3.245, 3.205, 3.23],
-      [35, 29, 23, 17, 10, 3],
+      [
+        { daysBefore: 35, hour: 19 },
+        { daysBefore: 29, hour: 19 },
+        { daysBefore: 23, hour: 12 },
+        { daysBefore: 23, hour: 20 },
+        { daysBefore: 10, hour: 19 },
+        { daysBefore: 3, hour: 19 },
+      ],
     ),
     // test2 Doubles: 좌상단에서 우하단으로 하락
     ...createSeries(
       "Ptest002",
       "doubles",
       16,
-      [3.62, 3.55, 3.48, 3.41, 3.36],
-      [34, 26, 18, 10, 3],
+      [3.62, 3.55, 3.48, 3.41, 3.4, 3.385, 3.372, 3.36],
+      [
+        { daysBefore: 34, hour: 19 },
+        { daysBefore: 26, hour: 19 },
+        { daysBefore: 18, hour: 12 },
+        { daysBefore: 18, hour: 20 },
+        { daysBefore: 3, hour: 19 },
+        // 오늘 3경기: 현재 시각보다 최소 30분 전까지의 동일 KST 날짜 경기다.
+        ...todayTestFixtureSchedules,
+      ],
     ),
     // test2 Singles: U형 반등
     ...createSeries(
       "Ptest002",
       "singles",
-      21,
+      24,
       [3.35, 3.18, 3.22, 3.31],
-      [32, 21, 12, 4],
+      [
+        { daysBefore: 32, hour: 19 },
+        { daysBefore: 21, hour: 12 },
+        { daysBefore: 21, hour: 20 },
+        { daysBefore: 4, hour: 19 },
+      ],
     ),
   ];
 };
