@@ -947,7 +947,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
       style={{
         opacity: isEntered ? 1 : 0,
         transform: isEntered ? "translateY(0)" : "translateY(12px)",
-        transition: "transform 220ms ease-out, opacity 220ms ease-out",
+        transition: "transform 118ms ease-out, opacity 118ms ease-out",
       }}
     >
       <Line

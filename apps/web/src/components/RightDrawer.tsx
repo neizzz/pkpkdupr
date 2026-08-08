@@ -13,7 +13,7 @@ import {
   usePullToRefresh,
 } from "@/hooks/usePullToRefresh";
 
-const TRANSITION_DURATION_MS = 150;
+const TRANSITION_DURATION_MS = 84;
 
 const RightDrawerScrollContext = createContext<HTMLDivElement | null>(null);
 const RightDrawerPullToRefreshContext = createContext<
@@ -162,7 +162,7 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
 
   const transformClassName = isTransitionEnabled
     ? [
-        "transform-gpu transition-transform will-change-transform duration-150",
+        "transform-gpu transition-transform will-change-transform duration-[84ms]",
         isVisible ? "translate-x-0 ease-out" : "translate-x-full ease-in",
       ].join(" ")
     : isVisible

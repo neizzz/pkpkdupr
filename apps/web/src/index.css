@@ -298,11 +298,11 @@
 }
 
 .global-plus-menu-popover[data-entering="true"] {
-  animation: global-plus-menu-enter 200ms ease-out both;
+  animation: global-plus-menu-enter 84ms ease-out both;
 }
 
 .global-plus-menu-popover[data-exiting="true"] {
-  animation: global-plus-menu-exit 200ms ease-in both;
+  animation: global-plus-menu-exit 84ms ease-in both;
 }
 
 @keyframes global-plus-menu-enter {

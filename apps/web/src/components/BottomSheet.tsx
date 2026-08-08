@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 
-const TRANSITION_DURATION_MS = 200;
+const TRANSITION_DURATION_MS = 84;
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -148,7 +148,7 @@ const BottomSheet: BottomSheetComponent = ({
       <div
         aria-hidden="true"
         className={[
-          "pointer-events-none absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-200 ease-out",
+          "pointer-events-none absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-[84ms] ease-out",
           isVisible ? "opacity-100" : "opacity-0",
         ].join(" ")}
       />
@@ -159,8 +159,8 @@ const BottomSheet: BottomSheetComponent = ({
             ? [
                 "transform-gpu transition-transform will-change-transform",
                 isVisible
-                  ? "translate-y-0 duration-200 ease-out"
-                  : "translate-y-[calc(100%+2rem)] duration-200 ease-in",
+                  ? "translate-y-0 duration-[84ms] ease-out"
+                  : "translate-y-[calc(100%+2rem)] duration-[84ms] ease-in",
               ].join(" ")
             : [
                 "transform-gpu",
@@ -176,7 +176,7 @@ const BottomSheet: BottomSheetComponent = ({
               event.stopPropagation();
             }}
             onClick={() => onOpenChange(false)}
-            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-50"
+            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity duration-[84ms] opacity-60 hover:opacity-50"
           >
             ×
           </button>
