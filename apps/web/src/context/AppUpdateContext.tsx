@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 
-const UPDATE_CHECK_TIMEOUT_MS = 2500;
+const UPDATE_CHECK_TIMEOUT_MS = 10_000;
 const UPDATE_APPLY_TIMEOUT_MS = 5000;
 const UPDATE_PREPARE_ERROR_MESSAGE =
   "업데이트 기능을 준비하지 못했습니다. 잠시 후 다시 시도해주세요.";
@@ -71,10 +71,6 @@ const waitForUpdateAvailability = (registration: ServiceWorkerRegistration) =>
 
     const cleanup = () => {
       registration.removeEventListener("updatefound", handleUpdateFound);
-      navigator.serviceWorker.removeEventListener(
-        "controllerchange",
-        handleControllerChange,
-      );
       if (installingWorker) {
         installingWorker.removeEventListener(
           "statechange",
@@ -94,12 +90,6 @@ const waitForUpdateAvailability = (registration: ServiceWorkerRegistration) =>
       resolve(value);
     };
 
-    const handleControllerChange = () => {
-      if (hadController) {
-        complete(true);
-      }
-    };
-
     const handleInstallingStateChange = () => {
       if (!installingWorker || !hadController) {
         return;
@@ -110,12 +100,12 @@ const waitForUpdateAvailability = (registration: ServiceWorkerRegistration) =>
         return;
       }
 
-      if (
-        installingWorker.state === "installed" ||
-        installingWorker.state === "activating" ||
-        installingWorker.state === "activated"
-      ) {
-        complete(true);
+      if (installingWorker.state === "installed") {
+        queueMicrotask(() => {
+          if (registration.waiting) {
+            complete(true);
+          }
+        });
         return;
       }
 
@@ -154,10 +144,6 @@ const waitForUpdateAvailability = (registration: ServiceWorkerRegistration) =>
     }
 
     registration.addEventListener("updatefound", handleUpdateFound);
-    navigator.serviceWorker.addEventListener(
-      "controllerchange",
-      handleControllerChange,
-    );
     attachInstallingWorker(registration.installing);
 
     timeoutId = window.setTimeout(() => complete(false), UPDATE_CHECK_TIMEOUT_MS);
