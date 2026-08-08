@@ -49,8 +49,8 @@ const UserChip: React.FC<UserChipProps> = ({
   const canPress = isPressable && !isDisabled && !!onPress;
   const isMatchSize = size === "match";
   const resolvedIsMeBadgeOffsetX =
-    isMeBadgeOffsetX ?? (isMatchSize ? 10.5 : 40);
-  const resolvedIsMeBadgeOffsetY = isMatchSize ? 10.5 : 20.5;
+    isMeBadgeOffsetX ?? (isMatchSize ? 20 : 40);
+  const resolvedIsMeBadgeOffsetY = isMatchSize ? 12 : 20.5;
   const isMeBadgeScale = isMatchSize
     ? "var(--match-user-chip-me-badge-scale)"
     : 1;
