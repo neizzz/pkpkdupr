@@ -49,7 +49,7 @@ Kakao Developers 콘솔에는 `https://pkelo.app/auth/kakao/callback`을 Redirec
 - `docker-compose.yml` + `docker-compose.pkpkdupr-gateway.yml`: 기존 서비스명과 `mysql-data` 볼륨을 유지하는 기본 앱입니다. 프록시에는 `pkpkdupr-web`, `pkpkdupr-api` 등의 고유 별칭으로 연결됩니다.
 - `docker-compose.pkelo.yml` + `docker-compose.pkelo-gateway.yml`: 새 MySQL 볼륨과 `data/uploads/pkelo/avatars`를 쓰는 `pkelo` 전용 앱입니다.
 
-주 SWAG 설정은 `/opt/pkpkdupr/data/certs/nginx/site-confs/default.conf`에 생성됩니다. `pkelo.app` SNI는 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`를 통해 읽기 전용으로 공유한 Cloudflare 인증서를 사용합니다. DuckDNS와 Cloudflare credential 파일만 스크립트가 `600` 권한으로 동기화합니다.
+주 SWAG는 `/opt/pkpkdupr/data/certs/nginx/site-confs/pkpkdupr.conf`와 `pkelo.conf`를 도메인별로 독립 생성합니다. `pkelo.app` SNI는 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`를 통해 읽기 전용으로 공유한 Cloudflare 인증서를 사용합니다. DuckDNS와 Cloudflare credential 파일만 스크립트가 `600` 권한으로 동기화합니다.
 
 ## 설치·업데이트·롤백
 
@@ -65,7 +65,7 @@ bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkpkdupr
 bash scripts/manual-deploy.sh --image-tag <IMAGE_TAG> --stack pkelo
 ```
 
-`--stack pkpkdupr`와 `--stack pkelo`는 대상 앱의 env와 Compose 서비스만 사용합니다. 반대편 앱의 env·credential 및 공용 인증서·SWAG 설정은 읽거나 갱신하지 않습니다. 단, 공용 gateway network가 없으면 대상 컨테이너 연결을 위해 같은 이름의 bridge network만 생성합니다. 공용 SWAG·인증서 초기화 또는 설정 복구는 `install-server.sh`나 `--stack all`에서만 수행합니다. SQLite→MySQL 이관은 기존 앱에만 적용되므로 `--migrate-sqlite --stack pkelo`은 허용하지 않습니다.
+`--stack pkpkdupr`와 `--stack pkelo`는 대상 앱의 env와 Compose 서비스만 사용하고, 대상 도메인의 site-conf만 원자적으로 갱신한 뒤 실행 중인 `pkpkdupr-proxy`에서 nginx 검증·reload합니다. 반대편 앱 이미지·env·credential은 읽거나 pull하지 않습니다. 공용 proxy 또는 인증서의 최초 초기화만 `install-server.sh`나 `--stack all`에서 수행합니다. 단독 배포 전에 공용 proxy가 실행 중이어야 하며, gateway network가 없으면 대상 컨테이너 연결을 위해 같은 이름의 bridge network만 생성합니다. SQLite→MySQL 이관은 기존 앱에만 적용되므로 `--migrate-sqlite --stack pkelo`은 허용하지 않습니다.
 
 ## 배포 성공 기준과 New Relic
 

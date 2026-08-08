@@ -12,13 +12,15 @@ PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
 NOTICE_ENV_FILE="${ENV_DIR}/pkelo-notice.env"
 IMAGE_TAG_INPUT="${1:-${IMAGE_TAG:-latest}}"
 TARGET_STACK="${2:-all}"
-SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
-SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+PKPKDUPR_SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkpkdupr.conf.template"
+PKPKDUPR_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkpkdupr.conf"
 PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
 PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
-PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
+PKELO_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
+LEGACY_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+LEGACY_PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_CERT_ROOT="${DEPLOY_ROOT}/data/pkelo-certs"
 NOTICE_DATA_PATH="${DEPLOY_ROOT}/data/pkelo-notice"
 NOTICE_STATE_FILE="${NOTICE_DATA_PATH}/state.env"
@@ -54,20 +56,149 @@ render_template() {
   local template="$1" target="$2" temp_file
   mkdir -p "$(dirname "${target}")"
   temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
-  sed -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" "${template}" > "${temp_file}"
+  sed -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" "${template}" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${target}"
 }
 
-sync_proxy_site_configs() {
+copy_file_atomically() {
+  local source="$1" target="$2" temp_file
+  mkdir -p "$(dirname "${target}")"
+  temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
+  cat "${source}" > "${temp_file}"
+  chmod 644 "${temp_file}"
+  mv -f "${temp_file}" "${target}"
+}
+
+migrate_legacy_proxy_site_configs() {
+  if [[ ! -f "${PKPKDUPR_SWAG_TARGET}" && -f "${LEGACY_SWAG_TARGET}" ]]; then
+    local temp_file
+    mkdir -p "$(dirname "${PKPKDUPR_SWAG_TARGET}")"
+    temp_file="$(mktemp "$(dirname "${PKPKDUPR_SWAG_TARGET}")/.$(basename "${PKPKDUPR_SWAG_TARGET}").XXXXXX")"
+    sed \
+      -e '/^# pkelo\.app은 일반 서비스와 임시 안내 모드 중 하나를 /d' \
+      -e '/^# 원자적으로 생성해 include합니다\. 이 파일은 site-confs 밖에 두어 SWAG glob에 중복되지 않습니다\.$/d' \
+      -e '/^[[:space:]]*include[[:space:]]*\/config\/nginx\/pkelo-mode\.conf;[[:space:]]*$/d' \
+      "${LEGACY_SWAG_TARGET}" > "${temp_file}"
+    chmod 644 "${temp_file}"
+    mv -f "${temp_file}" "${PKPKDUPR_SWAG_TARGET}"
+  fi
+
+  if [[ ! -f "${PKELO_SWAG_TARGET}" && -f "${LEGACY_PKELO_MODE_TARGET}" ]]; then
+    copy_file_atomically "${LEGACY_PKELO_MODE_TARGET}" "${PKELO_SWAG_TARGET}"
+  fi
+}
+
+retire_legacy_proxy_site_configs() {
+  if [[ -f "${PKPKDUPR_SWAG_TARGET}" && -f "${PKELO_SWAG_TARGET}" ]]; then
+    rm -f "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"
+  fi
+}
+
+sync_pkpkdupr_proxy_site_config() {
+  render_template "${PKPKDUPR_SWAG_TEMPLATE}" "${PKPKDUPR_SWAG_TARGET}"
+}
+
+sync_pkelo_proxy_site_config() {
   local pkelo_template="${PKELO_APP_TEMPLATE}"
   if is_notice_enabled; then
     pkelo_template="${PKELO_NOTICE_TEMPLATE}"
   fi
-  render_template "${SWAG_TEMPLATE}" "${SWAG_TARGET}"
-  render_template "${pkelo_template}" "${PKELO_MODE_TARGET}"
+  render_template "${pkelo_template}" "${PKELO_SWAG_TARGET}"
   render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
 }
+
+sync_proxy_site_configs() {
+  sync_pkpkdupr_proxy_site_config
+  sync_pkelo_proxy_site_config
+}
+
+require_running_proxy() {
+  if [[ "$(docker inspect -f '{{.State.Running}}' pkpkdupr-proxy 2>/dev/null || true)" != "true" ]]; then
+    echo "❌ 공용 SWAG proxy가 실행 중이지 않습니다. 최초 설치는 --stack all 또는 install-server.sh를 사용하세요." >&2
+    exit 1
+  fi
+}
+
+backup_proxy_site_configs() {
+  local backup_dir="$1"
+  local path
+  for path in \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
+    local name
+    name="$(basename "${path}")"
+    if [[ -f "${path}" ]]; then
+      cp -p "${path}" "${backup_dir}/${name}"
+    else
+      : > "${backup_dir}/${name}.absent"
+    fi
+  done
+}
+
+restore_proxy_site_configs() {
+  local backup_dir="$1"
+  local path
+  for path in \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
+    local name
+    name="$(basename "${path}")"
+    if [[ -f "${backup_dir}/${name}" ]]; then
+      mkdir -p "$(dirname "${path}")"
+      cp -p "${backup_dir}/${name}" "${path}"
+    else
+      rm -f "${path}"
+    fi
+  done
+}
+
+apply_proxy_site_configs() {
+  local target="$1" backup_dir
+  backup_dir="$(mktemp -d)"
+  backup_proxy_site_configs "${backup_dir}"
+
+  rollback_proxy_site_configs() {
+    echo "❌ 새 SWAG 설정 적용에 실패했습니다. 기존 설정으로 되돌립니다." >&2
+    restore_proxy_site_configs "${backup_dir}"
+    docker exec pkpkdupr-proxy nginx -t >/dev/null 2>&1 && docker exec pkpkdupr-proxy nginx -s reload || true
+    rm -rf "${backup_dir}"
+  }
+
+  if ! migrate_legacy_proxy_site_configs; then
+    rollback_proxy_site_configs
+    return 1
+  fi
+
+  case "${target}" in
+    pkpkdupr)
+      if ! sync_pkpkdupr_proxy_site_config; then
+        rollback_proxy_site_configs
+        return 1
+      fi
+      ;;
+    pkelo)
+      if ! sync_pkelo_proxy_site_config; then
+        rollback_proxy_site_configs
+        return 1
+      fi
+      ;;
+    all)
+      if ! sync_proxy_site_configs; then
+        rollback_proxy_site_configs
+        return 1
+      fi
+      ;;
+  esac
+
+  if ! retire_legacy_proxy_site_configs || ! docker exec pkpkdupr-proxy nginx -t || ! docker exec pkpkdupr-proxy nginx -s reload; then
+    rollback_proxy_site_configs
+    return 1
+  fi
+
+  rm -rf "${backup_dir}"
+}
+
 
 is_notice_enabled() {
   [[ -f "${NOTICE_STATE_FILE}" ]] && [[ "$(read_env_value "${NOTICE_STATE_FILE}" PKELO_NOTICE_ENABLED)" == "true" ]]
@@ -150,8 +281,11 @@ resolve_pkelo_environment() {
   done
 }
 
-require_proxy_templates() {
-  require_file "${SWAG_TEMPLATE}"
+require_pkpkdupr_proxy_template() {
+  require_file "${PKPKDUPR_SWAG_TEMPLATE}"
+}
+
+require_pkelo_proxy_templates() {
   require_file "${PKELO_APP_TEMPLATE}"
   require_file "${PKELO_NOTICE_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
@@ -162,15 +296,18 @@ resolve_environment() {
   case "${TARGET_STACK}" in
     pkpkdupr)
       resolve_primary_environment
+      require_pkpkdupr_proxy_template
       ;;
     pkelo)
       resolve_pkelo_environment
+      require_pkelo_proxy_templates
       ;;
     all)
       resolve_primary_environment
       resolve_pkelo_environment
       [[ "${PRIMARY_JWT_SECRET}" != "${PKELO_JWT_SECRET}" ]] || { echo "❌ 두 앱의 JWT_SECRET은 서로 달라야 합니다." >&2; exit 1; }
-      require_proxy_templates
+      require_pkpkdupr_proxy_template
+      require_pkelo_proxy_templates
       ;;
   esac
 }
@@ -247,6 +384,7 @@ resolve_environment
 
 if [[ "${TARGET_STACK}" != "all" ]]; then
   ensure_gateway_network
+  require_running_proxy
 fi
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
@@ -263,7 +401,6 @@ if [[ "${TARGET_STACK}" == "all" ]]; then
   compose_certificate up -d
   wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
   wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
-  sync_proxy_site_configs
 fi
 
 case "${TARGET_STACK}" in
@@ -295,9 +432,6 @@ case "${TARGET_STACK}" in
     ;;
 esac
 
-if [[ "${TARGET_STACK}" == "all" ]]; then
-  compose_proxy exec -T proxy nginx -t
-  compose_proxy exec -T proxy nginx -s reload
-fi
+apply_proxy_site_configs "${TARGET_STACK}"
 assert_target_services_running "${TARGET_STACK}"
 echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG}, 컨테이너 기동 상태 확인 완료)"

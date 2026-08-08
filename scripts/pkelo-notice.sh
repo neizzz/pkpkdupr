@@ -7,7 +7,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 ENV_DIR="${DEPLOY_ROOT}/env"
 SHARED_ENV_FILE="${ENV_DIR}/shared.env"
-PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
 PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
 NOTICE_ENV_FILE="${ENV_DIR}/pkelo-notice.env"
 NOTICE_ENV_EXAMPLE="${SOURCE_REPO_ROOT}/env/pkelo-notice.env.example"
@@ -15,11 +14,12 @@ NOTICE_DATA_PATH="${DEPLOY_ROOT}/data/pkelo-notice"
 NOTICE_PUBLIC_DIR="${NOTICE_DATA_PATH}/public"
 NOTICE_JSON_FILE="${NOTICE_PUBLIC_DIR}/notice.json"
 NOTICE_STATE_FILE="${NOTICE_DATA_PATH}/state.env"
-SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
-SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+PKPKDUPR_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkpkdupr.conf"
+PKELO_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo.conf"
+LEGACY_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+LEGACY_PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
 PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
-PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
 
@@ -98,9 +98,7 @@ ensure_notice_env() {
 
 load_environment() {
   require_file "${SHARED_ENV_FILE}"
-  require_file "${PRIMARY_ENV_FILE}"
   require_file "${PKELO_ENV_FILE}"
-  require_file "${SWAG_TEMPLATE}"
   require_file "${PKELO_APP_TEMPLATE}"
   require_file "${PKELO_NOTICE_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
@@ -133,14 +131,6 @@ load_environment() {
     exit 1
   fi
 
-  PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"
-  PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-pkpkdupr.duckdns.org}"
-}
-
-compose_proxy() {
-  docker compose --project-name pkpkdupr \
-    --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" \
-    -f docker-compose.proxy.yml "$@"
 }
 
 compose_pkelo() {
@@ -212,11 +202,41 @@ render_template() {
   mkdir -p "$(dirname "${target}")"
   temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
   sed \
-    -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" \
-    -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" \
+    -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" \
+    -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" \
     "${template}" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${target}"
+}
+
+copy_file_atomically() {
+  local source="$1" target="$2" temp_file
+  mkdir -p "$(dirname "${target}")"
+  temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
+  cat "${source}" > "${temp_file}"
+  chmod 644 "${temp_file}"
+  mv -f "${temp_file}" "${target}"
+}
+
+migrate_legacy_proxy_site_configs() {
+  if [[ ! -f "${PKPKDUPR_SWAG_TARGET}" && -f "${LEGACY_SWAG_TARGET}" ]]; then
+    local temp_file
+    mkdir -p "$(dirname "${PKPKDUPR_SWAG_TARGET}")"
+    temp_file="$(mktemp "$(dirname "${PKPKDUPR_SWAG_TARGET}")/.$(basename "${PKPKDUPR_SWAG_TARGET}").XXXXXX")"
+    sed \
+      -e '/^# pkelo\.app은 일반 서비스와 임시 안내 모드 중 하나를 /d' \
+      -e '/^# 원자적으로 생성해 include합니다\. 이 파일은 site-confs 밖에 두어 SWAG glob에 중복되지 않습니다\.$/d' \
+      -e '/^[[:space:]]*include[[:space:]]*\/config\/nginx\/pkelo-mode\.conf;[[:space:]]*$/d' \
+      "${LEGACY_SWAG_TARGET}" > "${temp_file}"
+    chmod 644 "${temp_file}"
+    mv -f "${temp_file}" "${PKPKDUPR_SWAG_TARGET}"
+  fi
+}
+
+retire_legacy_proxy_site_configs() {
+  if [[ -f "${PKPKDUPR_SWAG_TARGET}" && -f "${PKELO_SWAG_TARGET}" ]]; then
+    rm -f "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"
+  fi
 }
 
 sync_proxy_site_configs() {
@@ -225,15 +245,18 @@ sync_proxy_site_configs() {
     pkelo_template="${PKELO_NOTICE_TEMPLATE}"
   fi
 
-  render_template "${SWAG_TEMPLATE}" "${SWAG_TARGET}"
-  render_template "${pkelo_template}" "${PKELO_MODE_TARGET}"
+  migrate_legacy_proxy_site_configs
+  render_template "${pkelo_template}" "${PKELO_SWAG_TARGET}"
   render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
+  retire_legacy_proxy_site_configs
 }
 
 backup_proxy_configs() {
   local backup_dir="$1"
   local path
-  for path in "${SWAG_TARGET}" "${PKELO_MODE_TARGET}" "${PKELO_SSL_TARGET}"; do
+  for path in \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
     local name
     name="$(basename "${path}")"
     if [[ -f "${path}" ]]; then
@@ -247,10 +270,13 @@ backup_proxy_configs() {
 restore_proxy_configs() {
   local backup_dir="$1"
   local path
-  for path in "${SWAG_TARGET}" "${PKELO_MODE_TARGET}" "${PKELO_SSL_TARGET}"; do
+  for path in \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
     local name
     name="$(basename "${path}")"
     if [[ -f "${backup_dir}/${name}" ]]; then
+      mkdir -p "$(dirname "${path}")"
       cp -p "${backup_dir}/${name}" "${path}"
     else
       rm -f "${path}"
@@ -258,22 +284,30 @@ restore_proxy_configs() {
   done
 }
 
+require_running_proxy() {
+  if [[ "$(docker inspect -f '{{.State.Running}}' pkpkdupr-proxy 2>/dev/null || true)" != "true" ]]; then
+    echo "❌ 공용 SWAG proxy가 실행 중이지 않습니다." >&2
+    return 1
+  fi
+}
+
 sync_and_reload_proxy() {
   local backup_dir
   backup_dir="$(mktemp -d)"
   backup_proxy_configs "${backup_dir}"
 
-  if ! sync_proxy_site_configs || ! compose_proxy exec -T proxy nginx -t; then
-    echo "❌ 새 SWAG 설정 검증에 실패했습니다. 기존 설정을 유지합니다." >&2
+  if ! sync_proxy_site_configs || ! require_running_proxy || ! docker exec pkpkdupr-proxy nginx -t; then
+    echo "❌ 새 SWAG 설정 검증에 실패했습니다. 기존 설정으로 되돌립니다." >&2
     restore_proxy_configs "${backup_dir}"
+    docker exec pkpkdupr-proxy nginx -t >/dev/null 2>&1 && docker exec pkpkdupr-proxy nginx -s reload || true
     rm -rf "${backup_dir}"
     return 1
   fi
 
-  if ! compose_proxy exec -T proxy nginx -s reload; then
+  if ! docker exec pkpkdupr-proxy nginx -s reload; then
     echo "❌ SWAG graceful reload에 실패했습니다. 기존 설정으로 되돌립니다." >&2
     restore_proxy_configs "${backup_dir}"
-    compose_proxy exec -T proxy nginx -s reload || true
+    docker exec pkpkdupr-proxy nginx -t >/dev/null 2>&1 && docker exec pkpkdupr-proxy nginx -s reload || true
     rm -rf "${backup_dir}"
     return 1
   fi

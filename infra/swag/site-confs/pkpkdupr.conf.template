@@ -86,7 +86,3 @@ server {
         include /config/nginx/proxy.conf;
     }
 }
-
-# pkelo.app은 일반 서비스와 임시 안내 모드 중 하나를 /config/nginx/pkelo-mode.conf로
-# 원자적으로 생성해 include합니다. 이 파일은 site-confs 밖에 두어 SWAG glob에 중복되지 않습니다.
-include /config/nginx/pkelo-mode.conf;

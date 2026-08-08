@@ -11,13 +11,15 @@ PRIMARY_ENV_FILE="${ENV_DIR}/pkpkdupr.env"
 PKELO_ENV_FILE="${ENV_DIR}/pkelo.env"
 NOTICE_ENV_FILE="${ENV_DIR}/pkelo-notice.env"
 NOTICE_ENV_EXAMPLE="${SOURCE_REPO_ROOT}/env/pkelo-notice.env.example"
-SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/default.conf.template"
-SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+PKPKDUPR_SWAG_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkpkdupr.conf.template"
+PKPKDUPR_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkpkdupr.conf"
 PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
 PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
-PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
+PKELO_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
+LEGACY_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
+LEGACY_PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_CERT_ROOT="${DEPLOY_ROOT}/data/pkelo-certs"
 NOTICE_STATE_FILE="${DEPLOY_ROOT}/data/pkelo-notice/state.env"
 NOTICE_DATA_PATH="${DEPLOY_ROOT}/data/pkelo-notice"
@@ -122,8 +124,8 @@ render_template() {
   mkdir -p "$(dirname "${target}")"
   temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
   sed \
-    -e "s/__DOMAIN__/${PRIMARY_DOMAIN}/g" \
-    -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN}/g" \
+    -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" \
+    -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" \
     "${template}" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${target}"
@@ -134,9 +136,10 @@ sync_proxy_site_configs() {
   if is_notice_enabled; then
     pkelo_template="${PKELO_NOTICE_TEMPLATE}"
   fi
-  render_template "${SWAG_TEMPLATE}" "${SWAG_TARGET}"
-  render_template "${pkelo_template}" "${PKELO_MODE_TARGET}"
+  render_template "${PKPKDUPR_SWAG_TEMPLATE}" "${PKPKDUPR_SWAG_TARGET}"
+  render_template "${pkelo_template}" "${PKELO_SWAG_TARGET}"
   render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
+  rm -f "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"
 }
 
 is_notice_enabled() {
@@ -158,7 +161,7 @@ resolve_environment() {
   require_file "${SHARED_ENV_FILE}"
   require_file "${PRIMARY_ENV_FILE}"
   require_file "${PKELO_ENV_FILE}"
-  require_file "${SWAG_TEMPLATE}"
+  require_file "${PKPKDUPR_SWAG_TEMPLATE}"
   require_file "${PKELO_APP_TEMPLATE}"
   require_file "${PKELO_NOTICE_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
