@@ -1365,14 +1365,14 @@ const BottomNav: React.FC = () => {
                   <Button
                     isIconOnly
                     aria-label="Global plus menu"
-                    className={`h-[4.32rem] w-[4.32rem] shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors ${
+                    className={`h-[4.32rem] w-[4.32rem] shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors duration-[84ms] ${
                       isGlobalMenuVisible
                         ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
                         : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
                     }`}
                   >
                     <IoAdd
-                      className={`h-7 w-7 shrink-0 transition-transform duration-200 ${
+                      className={`h-7 w-7 shrink-0 transition-transform duration-[84ms] ${
                         isGlobalMenuVisible ? "rotate-45" : "rotate-0"
                       }`}
                       style={{ width: "33.6px", height: "33.6px" }}
