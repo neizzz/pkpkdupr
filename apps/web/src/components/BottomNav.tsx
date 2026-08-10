@@ -934,8 +934,7 @@ const BottomNav: React.FC = () => {
         event.touches.length !== 1 ||
         isPullRefreshingRef.current ||
         hasBlockingLayer ||
-        !pullToRefreshHandlersRef.current[selectedTab] ||
-        (scrollContainer.scrollTop ?? 0) > 0
+        !pullToRefreshHandlersRef.current[selectedTab]
       ) {
         return;
       }
@@ -1013,6 +1012,20 @@ const BottomNav: React.FC = () => {
         lastY: touch.clientY,
       };
 
+      let pullDeltaY = deltaY;
+      if (!isPullGestureActiveRef.current) {
+        if (deltaY <= 0) return true;
+
+        const scrollContainer = scrollContainerRef.current;
+        const scrollTop = Math.max(scrollContainer?.scrollTop ?? 0, 0);
+        if (scrollTop > 0) {
+          if (deltaY <= scrollTop) return true;
+
+          scrollContainer!.scrollTop = 0;
+          pullDeltaY = deltaY - scrollTop;
+        }
+      }
+
       const pullProgress = Math.min(
         pullDistanceRef.current / PULL_TO_REFRESH_THRESHOLD,
         1,
@@ -1022,9 +1035,9 @@ const BottomNav: React.FC = () => {
         (PULL_TO_REFRESH_BASE_RESISTANCE - PULL_TO_REFRESH_MIN_RESISTANCE) *
           pullProgress;
       const adjustedDeltaY =
-        deltaY > 0
-          ? deltaY * downwardResistance
-          : deltaY * PULL_TO_REFRESH_BASE_RESISTANCE;
+        pullDeltaY > 0
+          ? pullDeltaY * downwardResistance
+          : pullDeltaY * PULL_TO_REFRESH_BASE_RESISTANCE;
       const distance = Math.min(
         Math.max(0, pullDistanceRef.current + adjustedDeltaY),
         PULL_TO_REFRESH_THRESHOLD * 1.25,
@@ -1040,6 +1053,9 @@ const BottomNav: React.FC = () => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.style.overflow = "hidden";
         }
+      } else {
+        isPullGestureActiveRef.current = false;
+        scrollContainerRef.current?.style.removeProperty("overflow");
       }
       setPullDistance(distance);
       setPullToRefreshStatus(
@@ -1070,6 +1086,9 @@ const BottomNav: React.FC = () => {
       if (!touch) return;
 
       updatePullDistance(touch);
+      if (isPullGestureActiveRef.current && event.cancelable) {
+        event.preventDefault();
+      }
     },
     [resetPullToRefresh, updatePullDistance],
   );
