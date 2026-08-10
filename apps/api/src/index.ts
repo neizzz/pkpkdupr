@@ -21,6 +21,8 @@ import {
 } from "@pkpkdupr/shared/match";
 import { generateEntityId, isEntityId } from "@pkpkdupr/shared/entityId";
 import {
+  getCommonAffiliationNames,
+  normalizeAffiliationNames,
   PLAYER_AFFILIATION_MAX_COUNT,
   PLAYER_AFFILIATION_NAME_MAX_LENGTH,
   PLAYER_STATUS_MESSAGE_MAX_LENGTH,
@@ -284,7 +286,13 @@ const normalizeMatchSession = (
     throw new Error("유효한 세션 날짜가 필요합니다.");
   }
 
-  return { id: generateEntityId("session"), name, date, location };
+  return {
+    id: generateEntityId("session"),
+    name,
+    date,
+    location,
+    affiliationNames: [],
+  };
 };
 
 const parseAdminMatchMetadataUpdate = (
@@ -1306,9 +1314,28 @@ app.get("/api/match-feed", async (req, res) => {
 
     const page = Number(req.query.page ?? 0);
     const limit = Number(req.query.limit ?? 20);
-    const playerId =
-      typeof req.query.playerId === "string" ? req.query.playerId : undefined;
-    res.json(await matchRepository.findFeed(page, limit, playerId));
+    const scope = req.query.scope ?? "mine";
+    if (scope !== "mine" && scope !== "affiliation") {
+      return res.status(400).json({ error: "유효한 매치 범위가 필요합니다." });
+    }
+
+    if (scope === "mine") {
+      return res.json(
+        await matchRepository.findFeed(page, limit, decoded.playerId),
+      );
+    }
+
+    const currentPlayer = await authService.getPlayerById(decoded.playerId);
+    const affiliationNames = normalizeAffiliationNames(
+      (currentPlayer?.affiliations ?? []).map((affiliation) => affiliation.name),
+    );
+    if (!affiliationNames.length) {
+      return res.json({ items: [], total: 0 });
+    }
+
+    res.json(
+      await matchRepository.findFeed(page, limit, undefined, affiliationNames),
+    );
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
@@ -1412,6 +1439,9 @@ app.post("/api/matches", async (req, res) => {
       creatorPlayerId: decoded.playerId,
       status: "created",
       teams: matchTeams,
+      affiliationNames: getCommonAffiliationNames(
+        matchTeams.flatMap((team) => team.players),
+      ),
       scores: [],
       resultSubmittedByPlayerId: null,
       resultSubmittedAt: null,
@@ -1598,6 +1628,8 @@ app.post(
           name: session.name,
           date: session.date,
           location: session.location,
+          clubId: session.clubId,
+          affiliationNames: session.affiliationNames,
         },
         type,
         mode: mode ?? DEFAULT_MATCH_MODE,
@@ -1605,6 +1637,9 @@ app.post(
         creatorPlayerId: decoded.playerId,
         status: "created",
         teams: matchTeams,
+        affiliationNames: getCommonAffiliationNames(
+          matchTeams.flatMap((team) => team.players),
+        ),
         scores: [],
         resultSubmittedByPlayerId: null,
         resultSubmittedAt: null,
@@ -1709,6 +1744,8 @@ app.post(
             name: context.session.name,
             date: context.session.date,
             location: context.session.location,
+            clubId: context.session.clubId,
+            affiliationNames: context.session.affiliationNames,
           },
           type: match.type,
           mode: match.mode,
@@ -1716,6 +1753,9 @@ app.post(
           creatorPlayerId: decoded.playerId,
           status: "created" as const,
           teams: match.teams,
+          affiliationNames: getCommonAffiliationNames(
+            match.teams.flatMap((team) => team.players),
+          ),
           scores: [],
           resultSubmittedByPlayerId: null,
           resultSubmittedAt: null,
@@ -1828,13 +1868,15 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
 
       return {
         name: normalizeOptionalName(name),
-        session: commonSession,
         type,
         mode: resolvedMode,
         source: "admin_created_result" as const,
         creatorPlayerId: createdBy.id,
         status: "completed" as const,
         teams: matchTeams,
+        affiliationNames: getCommonAffiliationNames(
+          matchTeams.flatMap((team) => team.players),
+        ),
         scores: normalizedScores,
         resultSubmittedByPlayerId: createdBy.id,
         resultSubmittedAt: matchStartsAtDate,
@@ -1846,8 +1888,23 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       };
     });
 
+    const session = commonSession
+      ? {
+          ...commonSession,
+          affiliationNames: getCommonAffiliationNames(
+            matchesToCreate.flatMap((match) =>
+              match.teams.flatMap((team) => team.players),
+            ),
+          ),
+        }
+      : undefined;
+    const matchInputs = matchesToCreate.map((match) => ({
+      ...match,
+      session,
+    }));
+
     const createdMatches = [];
-    for (const matchInput of matchesToCreate) {
+    for (const matchInput of matchInputs) {
       createdMatches.push(await matchRepository.create(matchInput));
     }
 

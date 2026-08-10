@@ -38,6 +38,7 @@ const buildMatch = (
     mode: "single-game",
     source: "player_created",
     creatorPlayerId: player.id,
+    affiliationNames: [],
     status: "completed",
     teams: [
       { id: `${id}-a`, name: "A", players: [player] },

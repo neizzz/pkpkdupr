@@ -166,6 +166,9 @@ export const matches = mysqlTable("matches", {
     .default("player_created"),
   creatorPlayerId: id("creator_player_id").notNull(),
   name: varchar("name", { length: 255 }),
+  affiliationNamesJson: varchar("affiliation_names_json", { length: 1024 })
+    .notNull()
+    .default("[]"),
   sessionId: id("session_id"),
   sessionName: varchar("session_name", { length: 255 }),
   sessionDate: unixTimestamp("session_date"),
@@ -191,6 +194,9 @@ export const matchSessions = mysqlTable(
     date: unixTimestamp("date").notNull(),
     location: varchar("location", { length: 255 }).notNull(),
     clubId: id("club_id"),
+    affiliationNamesJson: varchar("affiliation_names_json", { length: 1024 })
+      .notNull()
+      .default("[]"),
     createdAt: unixTimestamp("created_at").notNull(),
     updatedAt: unixTimestamp("updated_at").notNull(),
   },

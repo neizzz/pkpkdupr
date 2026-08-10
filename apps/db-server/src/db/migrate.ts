@@ -241,6 +241,13 @@ const migrations = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
+  {
+    id: "0005_match_affiliation_snapshots",
+    statements: [
+      `ALTER TABLE matches ADD COLUMN affiliation_names_json VARCHAR(1024) NOT NULL DEFAULT '[]'`,
+      `ALTER TABLE match_sessions ADD COLUMN affiliation_names_json VARCHAR(1024) NOT NULL DEFAULT '[]'`,
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

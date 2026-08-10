@@ -21,8 +21,11 @@ import {
   validateMatchScoresForMode,
 } from "@pkpkdupr/shared/match";
 import {
+  getCommonAffiliationNames,
+  normalizeAffiliationNames,
   normalizeNullablePlayerDupr,
   type Player,
+  type PlayerAffiliation,
   type PublicPlayerDupr,
 } from "@pkpkdupr/shared/player";
 import { and, desc, eq, isNotNull, max } from "drizzle-orm";
@@ -78,6 +81,7 @@ export interface CreateMatchInput {
   creatorPlayerId: string;
   name?: string;
   session?: Session;
+  affiliationNames?: string[];
   status: Match["status"];
   teams: [Team, Team];
   scores?: MatchScore[];
@@ -123,6 +127,37 @@ const toDate = (value: Date | string | number) => new Date(value);
 const toUnixTimestampSeconds = (value: Date) =>
   Math.floor(value.getTime() / 1000);
 
+const parseAffiliationNames = (value: string | null | undefined): string[] => {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? normalizeAffiliationNames(parsed) : [];
+  } catch {
+    return [];
+  }
+};
+
+const parsePlayerAffiliations = (
+  value: string | null | undefined,
+): PlayerAffiliation[] => {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const { name, isPrimary } = item as Record<string, unknown>;
+      return typeof name === "string" && name.trim() && typeof isPrimary === "boolean"
+        ? [{ name: name.trim(), isPrimary }]
+        : [];
+    });
+  } catch {
+    return [];
+  }
+};
+
 const toPublicPlayer = (record: StoredPlayer): Player => ({
   id: record.id,
   username: record.username,
@@ -130,6 +165,7 @@ const toPublicPlayer = (record: StoredPlayer): Player => ({
   gender: record.gender as Player["gender"],
   status: record.status as Player["status"],
   avatarUrl: record.avatarUrl ?? undefined,
+  affiliations: parsePlayerAffiliations(record.affiliationsJson),
   createdAt: toDate(record.createdAt),
   updatedAt: toDate(record.updatedAt),
 });
@@ -213,6 +249,7 @@ export class MatchRepository {
       date: toDate(stored.date),
       location: stored.location,
       clubId: stored.clubId ?? undefined,
+      affiliationNames: parseAffiliationNames(stored.affiliationNamesJson),
     };
   }
 
@@ -238,6 +275,7 @@ export class MatchRepository {
       date: toDate(stored.date),
       location: stored.location,
       clubId: stored.clubId ?? undefined,
+      affiliationNames: parseAffiliationNames(stored.affiliationNamesJson),
       participantIds: participantRecords.map(
         (participant: typeof matchSessionParticipants.$inferSelect) =>
           participant.playerId,
@@ -331,8 +369,22 @@ export class MatchRepository {
         });
       }
       await transaction.execute({
-        sql: "UPDATE match_sessions SET updated_at = ? WHERE id = ?",
-        args: [toUnixTimestampSeconds(now), sessionId],
+        sql: `
+          UPDATE match_sessions
+          SET affiliation_names_json = ?, updated_at = ?
+          WHERE id = ?
+        `,
+        args: [
+          JSON.stringify(
+            getCommonAffiliationNames(
+              playerRecords.filter(
+                (player): player is StoredPlayer => Boolean(player),
+              ).map(toPublicPlayer),
+            ),
+          ),
+          toUnixTimestampSeconds(now),
+          sessionId,
+        ],
       });
       await transaction.commit();
       committed = true;
@@ -471,7 +523,15 @@ export class MatchRepository {
     page: number = 0,
     limit: number = 20,
     playerId?: string,
+    affiliationNames?: string[],
   ): Promise<{ items: MatchFeedItem[]; total: number }> {
+    const affiliationNameSet = new Set(
+      normalizeAffiliationNames(affiliationNames ?? []),
+    );
+    const hasAffiliationFilter = affiliationNameSet.size > 0;
+    const hasAffiliationMatch = (names: string[]) =>
+      hasAffiliationFilter &&
+      normalizeAffiliationNames(names).some((name) => affiliationNameSet.has(name));
     const allMatches = await this.loadAllMatches();
     const sessionSummaries = this.buildSessionSummaries(allMatches);
     const registeredParticipants = await this.db
@@ -532,7 +592,11 @@ export class MatchRepository {
     for (const match of allMatches) {
       const sessionKey = this.getSessionKey(match);
       if (!sessionKey) {
-        if (!playerId || this.isPlayerInMatch(match, playerId)) {
+        if (
+          hasAffiliationFilter
+            ? hasAffiliationMatch(match.affiliationNames ?? [])
+            : !playerId || this.isPlayerInMatch(match, playerId)
+        ) {
           feedItems.push({ kind: "match", match });
         }
         continue;
@@ -546,8 +610,9 @@ export class MatchRepository {
       const summary = sessionSummaries.get(sessionKey);
       if (
         summary &&
-        (!playerId ||
-          sessionParticipantIds.get(sessionKey)?.has(playerId))
+        (hasAffiliationFilter
+          ? hasAffiliationMatch(summary.affiliationNames ?? [])
+          : !playerId || sessionParticipantIds.get(sessionKey)?.has(playerId))
       ) {
         feedItems.push({ kind: "session", session: summary });
       }
@@ -591,6 +656,9 @@ export class MatchRepository {
       source: data.source ?? "player_created",
       creatorPlayerId: data.creatorPlayerId,
       name: data.name?.trim() || null,
+      affiliationNamesJson: JSON.stringify(
+        normalizeAffiliationNames(data.affiliationNames ?? []),
+      ),
       sessionId,
       sessionName: data.session?.name?.trim() || null,
       sessionDate: toDateOrNull(data.session?.date),
@@ -682,6 +750,7 @@ export class MatchRepository {
               source,
               creator_player_id,
               name,
+              affiliation_names_json,
               session_id,
               session_name,
               session_date,
@@ -695,7 +764,7 @@ export class MatchRepository {
               created_at,
               updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `,
           args: [
             match.id,
@@ -704,6 +773,7 @@ export class MatchRepository {
             match.source ?? "admin_created",
             match.creatorPlayerId,
             match.name?.trim() || null,
+            JSON.stringify(normalizeAffiliationNames(match.affiliationNames ?? [])),
             session.id,
             session.name?.trim() || null,
             toUnixTimestampSeconds(sessionDate),
@@ -1544,8 +1614,10 @@ export class MatchRepository {
             date: toDate(session.date),
             location: session.location,
             clubId: session.clubId ?? undefined,
+            affiliationNames: parseAffiliationNames(session.affiliationNamesJson),
           }
         : undefined,
+      affiliationNames: parseAffiliationNames(match.affiliationNamesJson),
       status: match.status as Match["status"],
       teams,
       scores: scores
@@ -1618,6 +1690,7 @@ export class MatchRepository {
           date: match.session.date,
           location: match.session.location,
           clubId: match.session.clubId,
+          affiliationNames: match.session.affiliationNames,
           matchCount: 0,
           participants: [],
           latestCreatedAt: match.createdAt,
@@ -1709,6 +1782,9 @@ export class MatchRepository {
           date,
           location,
           clubId: session.clubId ?? null,
+          affiliationNamesJson: JSON.stringify(
+            normalizeAffiliationNames(session.affiliationNames ?? []),
+          ),
           createdAt: now,
           updatedAt: now,
         });

@@ -124,6 +124,7 @@ describe("GET /api/admin/ratings/comparison", () => {
       mode: "single-game",
       source: "player_created",
       creatorPlayerId: "winner-a",
+      affiliationNames: [],
       status: "completed",
       teams: [
         {

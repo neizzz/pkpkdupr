@@ -32,6 +32,7 @@ const buildMatch = (id: string): Match => ({
   mode: "single-game",
   source: "admin_created",
   creatorPlayerId: admin.id,
+  affiliationNames: [],
   status: "created",
   teams: [
     { id: `${id}-team-a`, name: "Team A", players: [admin] },
@@ -72,6 +73,7 @@ describe("admin match metadata", () => {
               name: "수요일 저녁 세션",
               date: now,
               location: "PKELO Court A",
+              affiliationNames: [],
             }
           : undefined,
       }));

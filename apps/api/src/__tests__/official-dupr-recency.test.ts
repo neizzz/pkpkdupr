@@ -41,6 +41,7 @@ const buildMatch = (completedAt: Date): Match => ({
   mode: "single-game",
   source: "player_created",
   creatorPlayerId: "anchor",
+  affiliationNames: [],
   status: "completed",
   teams: [
     {

@@ -254,6 +254,27 @@ describe("POST /api/matches", () => {
     expect(capturedCreatePayload?.type).toBe("mixed-doubles");
   });
 
+  it("참가자 전체의 공통 소속을 생성 시점 스냅샷으로 전달한다", async () => {
+    vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue({
+      ...creator,
+      affiliations: [
+        { name: "  Pickle   Seoul ", isPrimary: true },
+        { name: "개인 소속", isPrimary: false },
+      ],
+    });
+    vi.spyOn(AuthService.prototype, "getPublicPlayers").mockResolvedValue([
+      {
+        ...players[0],
+        affiliations: [{ name: "pickle seoul", isPrimary: true }],
+      },
+    ]);
+
+    const response = await postMatch([[creator.id], [players[0].id]]);
+
+    expect(response.status).toBe(201);
+    expect(capturedCreatePayload?.affiliationNames).toEqual(["pickle seoul"]);
+  });
+
   it("matchStartsAt을 보내면 해당 값이 사용된다", async () => {
     const response = await request(app)
       .post("/api/matches")

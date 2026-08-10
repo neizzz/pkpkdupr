@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Button, Card, Switch } from "@heroui/react";
+import { Button, Card } from "@heroui/react";
 import type { MatchScore } from "@pkpkdupr/shared/match";
 import Match, {
   type MatchFeedItemInfo,
@@ -12,7 +12,9 @@ import RightDrawer from "@/components/RightDrawer";
 import SessionCard from "@/components/SessionCard";
 import SessionDetail from "@/components/SessionDetail";
 import SkeletonBlock from "@/components/SkeletonBlock";
-import TabPanelHeader from "@/components/TabPanelHeader";
+import TabPanelHeader, {
+  TabPanelHeaderGradientExtension,
+} from "@/components/TabPanelHeader";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
@@ -25,12 +27,13 @@ interface MatchesProps {
   reloadKey?: number;
 }
 
-const CACHED_MATCH_FEED_KEY = "pkpkdupr:matches:v3-session-feed";
-const CACHED_MY_MATCH_FEED_KEY = `${CACHED_MATCH_FEED_KEY}:my`;
+const CACHED_MATCH_FEED_KEY = "pkpkdupr:matches:v4-scoped-feed";
 const LEGACY_CACHED_MATCH_KEYS = [
   "pkpkdupr:matches",
   "pkpkdupr:matches:v2-public-dupr",
   "pkpkdupr:matches:v2-public-dupr:my",
+  "pkpkdupr:matches:v3-session-feed",
+  "pkpkdupr:matches:v3-session-feed:my",
 ];
 const MATCHES_PAGE_SIZE = 20;
 const OFFLINE_FALLBACK_MESSAGE =
@@ -46,35 +49,40 @@ interface MatchFeedResponse {
   total: number;
 }
 
-const MatchFeedSkeleton: React.FC = () => (
-  <div
-    className="flex flex-col gap-3"
-    role="status"
-    aria-label="매치 목록 로딩 중"
-  >
-    {Array.from({ length: 4 }, (_, index) => (
-      <Card key={index} className="rounded-3xl bg-white/95 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <SkeletonBlock className="h-3 w-28" />
-            <SkeletonBlock className="h-5 w-10 rounded-full" />
+const MatchFeedSkeleton: React.FC<{
+  headerElement: HTMLDivElement | null;
+}> = ({ headerElement }) => (
+  <div role="status" aria-label="매치 목록 로딩 중">
+    <TabPanelHeaderGradientExtension
+      headerElement={headerElement}
+      className="z-0"
+      position="flow"
+    />
+    <div className="relative z-10 mx-1.5 mt-1 flex flex-col gap-3">
+      {Array.from({ length: 4 }, (_, index) => (
+        <Card key={index} className="rounded-3xl bg-white/95 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <SkeletonBlock className="h-3 w-28" />
+              <SkeletonBlock className="h-5 w-10 rounded-full" />
+            </div>
+            <SkeletonBlock className="size-5 rounded-full" />
           </div>
-          <SkeletonBlock className="size-5 rounded-full" />
-        </div>
-        <SkeletonBlock className="mt-2 h-5 w-36" />
-        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
-          <div className="flex flex-col gap-2">
-            <SkeletonBlock className="h-3 w-12" />
-            <SkeletonBlock className="h-7 w-24 rounded-full" />
+          <SkeletonBlock className="mt-2 h-5 w-36" />
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3">
+            <div className="flex flex-col gap-2">
+              <SkeletonBlock className="h-3 w-12" />
+              <SkeletonBlock className="h-7 w-24 rounded-full" />
+            </div>
+            <SkeletonBlock className="h-9 w-14" />
+            <div className="flex flex-col items-end gap-2">
+              <SkeletonBlock className="h-3 w-12" />
+              <SkeletonBlock className="h-7 w-24 rounded-full" />
+            </div>
           </div>
-          <SkeletonBlock className="h-9 w-14" />
-          <div className="flex flex-col items-end gap-2">
-            <SkeletonBlock className="h-3 w-12" />
-            <SkeletonBlock className="h-7 w-24 rounded-full" />
-          </div>
-        </div>
-      </Card>
-    ))}
+        </Card>
+      ))}
+    </div>
   </div>
 );
 
@@ -84,8 +92,8 @@ const clearLegacyCachedMatches = () => {
   }
 };
 
-const getCachedMatchFeedKey = (isMyMatchOnly: boolean) =>
-  isMyMatchOnly ? CACHED_MY_MATCH_FEED_KEY : CACHED_MATCH_FEED_KEY;
+const getCachedMatchFeedKey = (playerId: string) =>
+  `${CACHED_MATCH_FEED_KEY}:mine:${playerId}`;
 
 const readCachedMatchFeed = (key: string): CachedMatchFeed | null => {
   try {
@@ -167,7 +175,9 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
+  const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
+    null,
+  );
   const [selectedSession, setSelectedSession] =
     useState<MatchSessionSummaryInfo | null>(null);
   const [selectedSessionMatches, setSelectedSessionMatches] = useState<
@@ -188,7 +198,6 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
   const wasTabActiveRef = useRef(false);
   const pendingReloadRef = useRef(false);
   const previousReloadKeyRef = useRef(reloadKey);
-  const previousIsMyMatchOnlyRef = useRef(isMyMatchOnly);
   const [pendingMatchAction, setPendingMatchAction] = useState<{
     matchId: string;
     type:
@@ -209,7 +218,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       preserveVisibleData = false,
       throwOnError = false,
     ) => {
-      if (!token) {
+      if (!token || !player?.id) {
         latestRequestIdRef.current += 1;
         setFeedItems([]);
         setTotal(0);
@@ -221,7 +230,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
       const requestId = latestRequestIdRef.current + 1;
       latestRequestIdRef.current = requestId;
-      const cachedFeedKey = getCachedMatchFeedKey(isMyMatchOnly);
+      const cachedFeedKey = getCachedMatchFeedKey(player.id);
 
       try {
         if (append) {
@@ -240,10 +249,8 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         const searchParams = new URLSearchParams({
           page: String(page),
           limit: String(MATCHES_PAGE_SIZE),
+          scope: "mine",
         });
-        if (isMyMatchOnly && player?.id) {
-          searchParams.set("playerId", player.id);
-        }
 
         const res = await fetch(
           buildApiUrl(`/api/match-feed?${searchParams.toString()}`),
@@ -309,7 +316,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         }
       }
     },
-    [isMyMatchOnly, isOnline, player?.id, token],
+    [isOnline, player?.id, token],
   );
 
   const loadSelectedMatch = useCallback(
@@ -440,17 +447,6 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     }
     void loadFeed(0, false, feedItems.length > 0);
   }, [feedItems.length, loadFeed, reloadKey, selectedTab]);
-
-  useEffect(() => {
-    if (previousIsMyMatchOnlyRef.current === isMyMatchOnly) return;
-
-    previousIsMyMatchOnlyRef.current = isMyMatchOnly;
-    if (selectedTab !== "match") {
-      pendingReloadRef.current = true;
-      return;
-    }
-    void loadFeed();
-  }, [isMyMatchOnly, loadFeed, selectedTab]);
 
   useEffect(() => {
     if (!selectedMatchId) return;
@@ -766,6 +762,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
         session={selectedSession}
         matches={selectedSessionMatches}
         currentPlayerId={player?.id}
+        defaultIsMyMatchOnly
         isLoading={isLoadingSession}
         error={sessionError}
         onRetry={() => void loadSessionMatches(selectedSession)}
@@ -775,91 +772,77 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
   return (
     <>
-      <TabPanelHeader title="Matches">
-        <Switch
-          aria-label="내경기만 보기"
-          className="shrink-0"
-          isSelected={isMyMatchOnly}
-          onChange={setIsMyMatchOnly}
-          size="sm"
-          style={
-            {
-              "--switch-control-bg": "#d1d5db",
-              "--switch-control-bg-hover": "#cbd5e1",
-              "--switch-control-bg-checked": "#3b52cc",
-              "--switch-control-bg-checked-hover": "#2d42a8",
-            } as React.CSSProperties
-          }
-        >
-          <Switch.Content className="-ml-2 mr-0 -my-1 min-h-11 gap-2 rounded-full px-2 py-1 text-pkpk-accent-font touch-manipulation">
-            <Switch.Control>
-              <Switch.Thumb />
-            </Switch.Control>
-            <span className="text-sm font-bold leading-none text-pkpk-primary-bg">
-              내경기
-            </span>
-          </Switch.Content>
-        </Switch>
-      </TabPanelHeader>
-      <div className="flex min-h-full p-2">
-        <div className="mx-auto flex min-h-full w-full flex-1 flex-col gap-4">
+      <div className="flex min-h-full flex-col">
+      <TabPanelHeader
+        title="내 매치"
+        showGradientExtension={false}
+        onHeaderElementChange={setHeaderElement}
+      />
+      <div className="tab-panel-header-content flex min-h-0 flex-1 bg-white">
+        <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
           {notice ? (
-            <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-pkpk-sub-font">
+            <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-pkpk-sub-font">
               {notice}
             </p>
           ) : null}
 
-          {isMatchFeedLoading ? (
-            <MatchFeedSkeleton />
-          ) : error ? (
-            <TabPanelStatus message={error} tone="error" />
-          ) : feedItems.length === 0 ? (
-            <TabPanelStatus
-              message={
-                isMyMatchOnly
-                  ? "현재 표시할 내 경기가 없어요."
-                  : "현재 표시할 매치가 없어요."
-              }
-            />
-          ) : (
-            <div className="flex flex-col gap-3">
-              {feedItems.map((item) =>
-                item.kind === "session" ? (
-                  <SessionCard
-                    key={getFeedItemKey(item)}
-                    session={item.session}
-                    onPress={openSessionDetail}
-                  />
-                ) : (
-                  <Match
-                    key={item.match.id}
-                    match={item.match}
-                    currentPlayerId={player?.id}
-                    onPress={openMatchDetail}
-                  />
-                ),
-              )}
-              {loadMoreError ? (
-                <p
-                  className="text-center text-sm font-medium text-error"
-                  role="alert"
-                >
-                  {loadMoreError}
-                </p>
-              ) : null}
-              {hasMoreItems ? (
-                <Button
-                  type="button"
-                  className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-                  isDisabled={isLoadingMore}
-                  onPress={() => void loadFeed(nextPage, true)}
-                >
-                  {isLoadingMore ? "불러오는 중..." : "더 보기"}
-                </Button>
-              ) : null}
-            </div>
-          )}
+          <div className="flex flex-1 flex-col">
+            {isMatchFeedLoading ? (
+              <MatchFeedSkeleton headerElement={headerElement} />
+            ) : error ? (
+              <TabPanelStatus message={error} tone="error" />
+            ) : feedItems.length === 0 ? (
+              <TabPanelStatus
+                message="현재 표시할 내 매치가 없어요."
+              />
+            ) : (
+              <div>
+                <TabPanelHeaderGradientExtension
+                  headerElement={headerElement}
+                  className="z-0"
+                  position="flow"
+                />
+                <div className="relative z-10 mx-1.5 mt-1 flex flex-col gap-3">
+                  {feedItems.map((item) =>
+                    item.kind === "session" ? (
+                      <SessionCard
+                        key={getFeedItemKey(item)}
+                        session={item.session}
+                        onPress={openSessionDetail}
+                      />
+                    ) : (
+                      <Match
+                        key={item.match.id}
+                        match={item.match}
+                        currentPlayerId={player?.id}
+                        onPress={openMatchDetail}
+                      />
+                    ),
+                  )}
+                  {loadMoreError ? (
+                    <p
+                      className="text-center text-sm font-medium text-error"
+                      role="alert"
+                    >
+                      {loadMoreError}
+                    </p>
+                  ) : null}
+                  {hasMoreItems ? (
+                    <Button
+                      type="button"
+                      className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                      isDisabled={isLoadingMore}
+                      onPress={() => void loadFeed(nextPage, true)}
+                    >
+                      {isLoadingMore ? "불러오는 중..." : "더 보기"}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
       </div>
       {selectedSession && sessionDepthId ? (
         <RightDrawer

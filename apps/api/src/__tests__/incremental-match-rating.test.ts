@@ -78,6 +78,7 @@ describe("incremental match rating", () => {
       mode: "single-game",
       source: "player_created",
       creatorPlayerId: "winner",
+      affiliationNames: [],
       status: "completed",
       teams: [
         { id: "team-a", name: "A", players: [players.get("winner")!] },

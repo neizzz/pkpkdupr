@@ -23,6 +23,8 @@ import {
   IoPeopleOutline,
   IoQrCodeSharp,
   IoSettingsOutline,
+  IoTrophy,
+  IoTrophyOutline,
 } from "react-icons/io5";
 import { TbAffiliate, TbAffiliateFilled } from "react-icons/tb";
 import AppSettingsSheetBody from "@/components/AppSettingsSheetBody";
@@ -53,6 +55,7 @@ import { buildApiUrl } from "@/lib/api";
 import { triggerHapticFeedback } from "@/lib/haptics";
 import Members from "@/pages/Members";
 import Affiliations from "@/pages/Affiliations";
+import Matches from "@/pages/Matches";
 
 const TAB_KEYS: TabKey[] = ["match", "members", "affiliations", "me"];
 const DEFAULT_THEME_COLOR = "#8b1e77";
@@ -1170,8 +1173,25 @@ const BottomNav: React.FC = () => {
           <Tabs.ListContainer className="global-plus-menu-tab-spacer min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-2 gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid grid-cols-3 gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
+              <Tabs.Tab
+                id="match"
+                onPointerDownCapture={() => handleActiveTabPointerDown("match")}
+                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+              >
+                <div className="flex flex-col items-center gap-1 py-1.5">
+                  {selectedTab === "match" ? (
+                    <IoTrophy className="text-lg" />
+                  ) : (
+                    <IoTrophyOutline className="text-lg" />
+                  )}
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">
+                    내 매치
+                  </span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
               <Tabs.Tab
                 id="members"
                 onPointerDownCapture={() =>
@@ -1246,6 +1266,13 @@ const BottomNav: React.FC = () => {
             </div>
           ) : null}
           <Tabs.Panel
+            id="match"
+            shouldForceMount={visitedTabs.match}
+            className="min-h-full bg-white p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
+          >
+            <Matches />
+          </Tabs.Panel>
+          <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
             className="h-full min-h-full bg-white p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
@@ -1268,7 +1295,9 @@ const BottomNav: React.FC = () => {
         <div
           aria-hidden="true"
           className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(6.333rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] bg-gradient-to-t ${
-            selectedTab === "members" ? "from-white" : "from-pkpk-bg"
+            selectedTab === "members" || selectedTab === "match"
+              ? "from-white"
+              : "from-pkpk-bg"
           } to-transparent`}
         />
 

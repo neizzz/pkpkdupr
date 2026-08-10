@@ -11,6 +11,7 @@ interface TabPanelHeaderProps {
 interface TabPanelHeaderGradientExtensionProps {
   headerElement: HTMLDivElement | null;
   className?: string;
+  position?: "sticky" | "flow";
 }
 
 const getGradientExtensionHeight = (headerWidth: number) =>
@@ -18,7 +19,7 @@ const getGradientExtensionHeight = (headerWidth: number) =>
 
 export const TabPanelHeaderGradientExtension: React.FC<
   TabPanelHeaderGradientExtensionProps
-> = ({ headerElement, className = "z-30" }) => {
+> = ({ headerElement, className = "z-30", position = "sticky" }) => {
   const gradientExtensionAnchorRef = useRef<HTMLDivElement | null>(null);
   const gradientExtensionRef = useRef<HTMLDivElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -45,7 +46,11 @@ export const TabPanelHeaderGradientExtension: React.FC<
       );
       const totalHeight = headerHeight + extensionHeight;
 
-      gradientExtensionAnchor.style.top = `${headerHeight}px`;
+      if (position === "sticky") {
+        gradientExtensionAnchor.style.top = `${headerHeight}px`;
+      } else {
+        gradientExtensionAnchor.style.removeProperty("top");
+      }
       gradientExtension.style.setProperty(
         "--tab-panel-header-gradient-extension-height",
         `${extensionHeight}px`,
@@ -60,7 +65,7 @@ export const TabPanelHeaderGradientExtension: React.FC<
       );
       gradientExtension.style.setProperty(
         "--tab-panel-header-gradient-extension-scale-y",
-        container.scrollTop > 1 ? "0" : "1",
+        position === "sticky" && container.scrollTop > 1 ? "0" : "1",
       );
     };
 
@@ -88,7 +93,7 @@ export const TabPanelHeaderGradientExtension: React.FC<
         animationFrameRef.current = null;
       }
     };
-  }, [headerElement]);
+  }, [headerElement, position]);
 
   if (!headerElement) return null;
 
@@ -96,7 +101,9 @@ export const TabPanelHeaderGradientExtension: React.FC<
     <div
       aria-hidden="true"
       ref={gradientExtensionAnchorRef}
-      className={`tab-panel-header-gradient-extension-anchor sticky top-12 ${className} h-0`}
+      className={`tab-panel-header-gradient-extension-anchor ${
+        position === "sticky" ? "sticky top-12" : "relative"
+      } ${className} h-0`}
     >
       <div
         ref={gradientExtensionRef}

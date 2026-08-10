@@ -9,6 +9,7 @@ import type {
 } from "@pkpkdupr/shared/match";
 import { DEFAULT_MATCH_MODE } from "@pkpkdupr/shared/match";
 import { generateEntityId } from "@pkpkdupr/shared/entityId";
+import { normalizeAffiliationNames } from "@pkpkdupr/shared/player";
 import type {
   PlayerRatingChangeLog,
   PlayerRatingHistory,
@@ -44,6 +45,9 @@ export interface PlayerRatingChartProjection {
 const toDateOrNull = (value: string | Date | null | undefined) =>
   value == null ? null : new Date(value);
 
+const hydrateAffiliationNames = (value: unknown): string[] =>
+  Array.isArray(value) ? normalizeAffiliationNames(value) : [];
+
 const hydrateSession = (record: any): Session | undefined => {
   if (!record.session?.date) {
     return undefined;
@@ -61,6 +65,7 @@ const hydrateSession = (record: any): Session | undefined => {
         ? record.session.location.trim()
         : "Court TBD",
     clubId: typeof record.session.clubId === "string" ? record.session.clubId : undefined,
+    affiliationNames: hydrateAffiliationNames(record.session.affiliationNames),
   };
 };
 
@@ -70,6 +75,7 @@ const hydrateStandaloneSession = (record: any): Session => ({
   date: new Date(record.date),
   location: record.location,
   clubId: typeof record.clubId === "string" ? record.clubId : undefined,
+  affiliationNames: hydrateAffiliationNames(record.affiliationNames),
 });
 
 export const hydrateManagedSession = (record: any): ManagedMatchSession => ({
@@ -78,6 +84,7 @@ export const hydrateManagedSession = (record: any): ManagedMatchSession => ({
   date: new Date(record.date),
   location: record.location,
   clubId: typeof record.clubId === "string" ? record.clubId : undefined,
+  affiliationNames: hydrateAffiliationNames(record.affiliationNames),
   participantIds: record.participantIds ?? [],
   matchCount: Number(record.matchCount ?? 0),
   createdAt: new Date(record.createdAt),
@@ -114,6 +121,7 @@ export const hydrateMatch = (record: any): Match => ({
   ...record,
   mode: (record.mode as MatchMode | undefined) ?? DEFAULT_MATCH_MODE,
   source: record.source ?? "player_created",
+  affiliationNames: hydrateAffiliationNames(record.affiliationNames),
   name:
     typeof record.name === "string" && record.name.trim()
       ? record.name.trim()
@@ -169,6 +177,7 @@ const hydrateSessionSummary = (record: any): MatchSessionSummary => ({
       ? record.location.trim()
       : "Court TBD",
   clubId: typeof record.clubId === "string" ? record.clubId : undefined,
+  affiliationNames: hydrateAffiliationNames(record.affiliationNames),
   status: record.status === "completed" ? "completed" : "created",
   matchCount: record.matchCount,
   participants: (record.participants ?? []).map((participant: any) => ({
@@ -575,6 +584,7 @@ export class MatchRepository {
     page: number = 0,
     limit: number = 20,
     playerId?: string,
+    affiliationNames?: string[],
   ): Promise<{ items: MatchFeedItem[]; total: number }> {
     const params = new URLSearchParams({
       page: String(page),
@@ -582,6 +592,11 @@ export class MatchRepository {
     });
     if (playerId) {
       params.set("playerId", playerId);
+    }
+    for (const affiliationName of normalizeAffiliationNames(
+      affiliationNames ?? [],
+    )) {
+      params.append("affiliationName", affiliationName);
     }
 
     const result = await this.dbRequest<{ items: any[]; total: number }>(

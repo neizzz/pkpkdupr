@@ -21,6 +21,7 @@ interface SessionDetailProps {
   onRetry: () => void;
   onPressMatch: (match: MatchInfo) => void;
   tabKey?: TabKey;
+  defaultIsMyMatchOnly?: boolean;
 }
 
 const SessionMatchListSkeleton: React.FC = () => (
@@ -59,9 +60,10 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   onRetry,
   onPressMatch,
   tabKey = "match",
+  defaultIsMyMatchOnly = false,
 }) => {
   const sessionId = session.id;
-  const [isMyMatchOnly, setIsMyMatchOnly] = useState(false);
+  const [isMyMatchOnly, setIsMyMatchOnly] = useState(defaultIsMyMatchOnly);
   const isMatchesLoading = useMinimumLoading(isLoading);
   const displayedMatches = useMemo(
     () =>

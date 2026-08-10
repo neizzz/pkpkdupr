@@ -412,6 +412,7 @@ const Affiliations: React.FC = () => {
         date: new Date(session.date).toISOString(),
         location: session.location,
         clubId: session.clubId,
+        affiliationNames: session.affiliationNames,
         status: "created",
         matchCount: session.matchCount,
         participants: dashboard.members

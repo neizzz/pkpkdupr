@@ -157,6 +157,7 @@ const seedDevClubData = async () => {
       await matchRepository.createSession({
         ...devClub.session,
         clubId: devClub.id,
+        affiliationNames: [],
       });
     }
   }
@@ -628,8 +629,17 @@ app.get("/internal/match-feed", async (req, res) => {
     const limit = Number(req.query.limit ?? 20);
     const playerId =
       typeof req.query.playerId === "string" ? req.query.playerId : undefined;
+    const affiliationNames = Array.isArray(req.query.affiliationName)
+      ? req.query.affiliationName.filter(
+          (value): value is string => typeof value === "string",
+        )
+      : typeof req.query.affiliationName === "string"
+        ? [req.query.affiliationName]
+        : undefined;
 
-    res.json(await matchRepository.findFeed(page, limit, playerId));
+    res.json(
+      await matchRepository.findFeed(page, limit, playerId, affiliationNames),
+    );
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

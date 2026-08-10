@@ -155,6 +155,7 @@ export interface Session {
   date: Date;
   location: string;
   clubId?: string;
+  affiliationNames: string[];
 }
 
 export interface ManagedMatchSession {
@@ -163,6 +164,7 @@ export interface ManagedMatchSession {
   date: Date;
   location: string;
   clubId?: string;
+  affiliationNames: string[];
   participantIds: string[];
   matchCount: number;
   createdAt: Date;
@@ -181,6 +183,7 @@ export interface MatchSessionSummary {
   date: Date;
   location: string;
   clubId?: string;
+  affiliationNames: string[];
   status: MatchSessionStatus;
   matchCount: number;
   participants: MatchSessionParticipant[];
@@ -274,6 +277,7 @@ export interface Match {
   creatorPlayerId: string;
   name?: string;
   session?: Session;
+  affiliationNames: string[];
   status: MatchStatus;
   teams: [Team, Team];
   scores?: MatchScore[];

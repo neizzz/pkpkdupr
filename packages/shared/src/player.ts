@@ -9,6 +9,36 @@ export const PLAYER_AFFILIATION_MAX_COUNT = 5;
 export const PLAYER_AFFILIATION_NAME_MAX_LENGTH = 30;
 export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 30;
 
+/**
+ * 소속 비교와 매치 스냅샷에 쓰는 정규화된 이름입니다.
+ * 표기만 다른 같은 소속을 하나로 취급하기 위해 앞뒤/연속 공백과 대소문자를
+ * 정리합니다.
+ */
+export const normalizeAffiliationName = (value: unknown): string | undefined => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+  return normalized || undefined;
+};
+
+export const normalizeAffiliationNames = (values: Iterable<unknown>): string[] => {
+  const seen = new Set<string>();
+  const normalizedNames: string[] = [];
+
+  for (const value of values) {
+    const normalizedName = normalizeAffiliationName(value);
+    if (!normalizedName || seen.has(normalizedName)) {
+      continue;
+    }
+    seen.add(normalizedName);
+    normalizedNames.push(normalizedName);
+  }
+
+  return normalizedNames;
+};
+
 export type PlayerCreationSource =
   | "self_register"
   | "admin_register"
@@ -465,6 +495,30 @@ export interface Player {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** 모든 참가자가 공통으로 가진 소속명만 정규화해 반환합니다. */
+export const getCommonAffiliationNames = (
+  participants: ReadonlyArray<Pick<Player, "affiliations">>,
+): string[] => {
+  if (participants.length === 0) {
+    return [];
+  }
+
+  const [firstParticipant, ...remainingParticipants] = participants;
+  const firstNames = normalizeAffiliationNames(
+    (firstParticipant.affiliations ?? []).map((affiliation) =>
+      affiliation.name,
+    ),
+  );
+
+  return firstNames.filter((name) =>
+    remainingParticipants.every((participant) =>
+      normalizeAffiliationNames(
+        (participant.affiliations ?? []).map((affiliation) => affiliation.name),
+      ).includes(name),
+    ),
+  );
+};
 
 export interface MemberListPlayer extends Player {
   lastPlayedAt: Date | null;

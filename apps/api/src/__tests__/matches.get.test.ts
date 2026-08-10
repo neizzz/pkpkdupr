@@ -41,6 +41,7 @@ const match: Match = {
   mode: "single-game",
   source: "player_created",
   creatorPlayerId: player.id,
+  affiliationNames: [],
   status: "created",
   teams: [
     { id: "team-a", name: "Team A", players: [player] },
@@ -178,6 +179,7 @@ describe("POST /api/matches/:matchId/result", () => {
         name: "관리자 세션",
         date: now,
         location: "PKELO Court",
+        affiliationNames: [],
       },
     };
     vi.spyOn(MatchRepository.prototype, "findById").mockResolvedValue(
@@ -436,6 +438,7 @@ describe("GET /api/match-feed", () => {
         name: "토요 오전 세션",
         date: now,
         location: "PKELO Court A",
+        affiliationNames: [],
       },
     };
     const feedItems: MatchFeedItem[] = [
@@ -446,6 +449,7 @@ describe("GET /api/match-feed", () => {
           name: "토요 오전 세션",
           date: now,
           location: "PKELO Court A",
+          affiliationNames: [],
           status: "completed",
           matchCount: 2,
           participants: [
@@ -462,7 +466,7 @@ describe("GET /api/match-feed", () => {
       .mockResolvedValue({ items: feedItems, total: 2 });
 
     const response = await request(app)
-      .get("/api/match-feed?page=1&limit=10&playerId=player-001")
+      .get("/api/match-feed?page=1&limit=10&playerId=player-outsider")
       .set("Authorization", "Bearer test-token");
 
     expect(response.status).toBe(200);
@@ -487,6 +491,42 @@ describe("GET /api/match-feed", () => {
     });
 
     expect(sessionMatch.session?.name).toBe("토요 오전 세션");
+  });
+
+  it("소속 범위는 인증 사용자의 현재 소속으로만 조회한다", async () => {
+    vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue({
+      ...player,
+      affiliations: [
+        { name: "  Pickle   Seoul ", isPrimary: true },
+        { name: "주말 클럽", isPrimary: false },
+      ],
+    });
+    const findFeed = vi
+      .spyOn(MatchRepository.prototype, "findFeed")
+      .mockResolvedValue({ items: [], total: 0 });
+
+    const response = await request(app)
+      .get("/api/match-feed?scope=affiliation&playerId=player-outsider")
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(findFeed).toHaveBeenCalledWith(0, 20, undefined, [
+      "pickle seoul",
+      "주말 클럽",
+    ]);
+  });
+
+  it("소속이 없으면 소속 피드를 비워 반환한다", async () => {
+    vi.spyOn(AuthService.prototype, "getPlayerById").mockResolvedValue(player);
+    const findFeed = vi.spyOn(MatchRepository.prototype, "findFeed");
+
+    const response = await request(app)
+      .get("/api/match-feed?scope=affiliation")
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ items: [], total: 0 });
+    expect(findFeed).not.toHaveBeenCalled();
   });
 
   it("인증 토큰이 없으면 401을 반환한다", async () => {
@@ -519,6 +559,7 @@ describe("GET /api/match-sessions/:sessionId/matches", () => {
           name: "토요 세션",
           date: now,
           location: "PKELO Court A",
+          affiliationNames: [],
         },
       },
       {
@@ -529,6 +570,7 @@ describe("GET /api/match-sessions/:sessionId/matches", () => {
           name: "토요 세션",
           date: now,
           location: "PKELO Court A",
+          affiliationNames: [],
         },
       },
     ];

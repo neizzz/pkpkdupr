@@ -42,6 +42,7 @@ const managedSession: ManagedMatchSession = {
   name: "토요 오전 세션",
   date: new Date("2026-07-25T01:00:00.000Z"),
   location: "PKELO Court A",
+  affiliationNames: [],
   participantIds: participants.map((player) => player.id),
   matchCount: 0,
   createdAt: now,
@@ -67,6 +68,7 @@ describe("admin match sessions", () => {
       name: "토요 오전 세션",
       date: new Date("2026-07-25T01:00:00.000Z"),
       location: "PKELO Court A",
+      affiliationNames: [],
     };
     const createSession = vi
       .spyOn(MatchRepository.prototype, "createSession")
@@ -87,6 +89,7 @@ describe("admin match sessions", () => {
         name: createdSession.name,
         date: createdSession.date,
         location: createdSession.location,
+        affiliationNames: [],
       }),
     );
     expect(response.body).toEqual({
@@ -191,6 +194,7 @@ describe("admin match sessions", () => {
       mode: "single-game",
       source: "admin_created",
       creatorPlayerId: admin.id,
+      affiliationNames: [],
       session: managedSession,
       status: "created",
       teams: [
@@ -361,6 +365,7 @@ describe("admin match sessions", () => {
       mode: "single-game",
       source: "admin_created",
       creatorPlayerId: admin.id,
+      affiliationNames: [],
       session: managedSession,
       status: "completed",
       teams: [
