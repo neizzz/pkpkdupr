@@ -53,7 +53,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const res = await fetch("/api/me", {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          logout();
+        }
+        return;
+      }
 
       const data = (await res.json()) as AdminSessionResponse;
       if (!data.id || data.isAdmin !== true) {

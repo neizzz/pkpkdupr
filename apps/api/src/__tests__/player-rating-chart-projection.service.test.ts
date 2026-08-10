@@ -1,8 +1,11 @@
 import type { PlayerRatingHistory } from "@pkpkdupr/shared/player";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { MatchRepository } from "../repositories/MatchRepository";
+import type { AuthService } from "../services/AuthService";
 import {
   PLAYER_RATING_CHART_MAX_POINTS,
   buildPlayerRatingChartProjection,
+  PlayerRatingChartProjectionService,
 } from "../services/PlayerRatingChartProjectionService";
 
 const now = new Date("2026-08-03T12:00:00.000Z");
@@ -102,5 +105,42 @@ describe("buildPlayerRatingChartProjection", () => {
     expect(projection).toHaveLength(2);
     expect(projection[0]?.source).toBe("match");
     expect(projection[1]).toMatchObject({ source: "match", createdAt: now });
+  });
+});
+
+describe("PlayerRatingChartProjectionService", () => {
+  it("여러 선수 projection 교체를 순차 실행한다", async () => {
+    let activeReplacementCount = 0;
+    let maxActiveReplacementCount = 0;
+    const replacedPlayerIds: string[] = [];
+    const repository = {
+      findByPlayerId: vi.fn().mockResolvedValue({ matches: [], total: 0 }),
+      getPlayerRatingChangeLogs: vi.fn().mockResolvedValue([]),
+      replacePlayerRatingChartProjection: vi.fn(
+        async (playerId: string, projection: unknown) => {
+          activeReplacementCount += 1;
+          maxActiveReplacementCount = Math.max(
+            maxActiveReplacementCount,
+            activeReplacementCount,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          replacedPlayerIds.push(playerId);
+          activeReplacementCount -= 1;
+          return projection;
+        },
+      ),
+    } as unknown as MatchRepository;
+    const playerLookup = {
+      getPlayerById: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AuthService;
+    const service = new PlayerRatingChartProjectionService(
+      repository,
+      playerLookup,
+    );
+
+    await service.rebuildPlayers(["player-a", "player-b", "player-a"]);
+
+    expect(replacedPlayerIds).toEqual(["player-a", "player-b"]);
+    expect(maxActiveReplacementCount).toBe(1);
   });
 });
