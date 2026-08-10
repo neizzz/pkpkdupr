@@ -37,10 +37,12 @@ const Login: React.FC = () => {
         <header className="mb-8 text-center text-white">
           <img
             src="/pkelo-login-brand.png"
-            alt="PKELO 피클볼 로고"
+            alt="pkpkdupr 피클볼 로고"
             className="mx-auto mb-0 h-auto w-28"
           />
-          <h1 className="text-[1.2rem] font-extrabold tracking-tight">PKELO</h1>
+          <h1 className="text-[1.2rem] font-extrabold tracking-tight">
+            pkpkdupr
+          </h1>
           <p className="mt-2 text-sm font-medium leading-6 text-white/85">
             기록하고, 교류하고, 성장하는 피클볼 라이프
           </p>
