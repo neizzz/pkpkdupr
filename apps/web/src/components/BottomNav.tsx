@@ -53,13 +53,12 @@ import {
 } from "@/hooks/usePullToRefresh";
 import { buildApiUrl } from "@/lib/api";
 import { triggerHapticFeedback } from "@/lib/haptics";
+import { DEFAULT_THEME_COLOR, DIMMED_THEME_COLOR } from "@/lib/themeColor";
 import Members from "@/pages/Members";
 import Affiliations from "@/pages/Affiliations";
 import Matches from "@/pages/Matches";
 
 const TAB_KEYS: TabKey[] = ["match", "members", "affiliations", "me"];
-const DEFAULT_THEME_COLOR = "#8b1e77";
-const DIMMED_THEME_COLOR = "#aeaeaf";
 const TAB_THEME_COLOR_MAP: Record<TabKey, string> = {
   match: DEFAULT_THEME_COLOR,
   members: DEFAULT_THEME_COLOR,
@@ -783,7 +782,11 @@ const BottomNav: React.FC = () => {
 
   const isGlobalMenuVisible =
     isGlobalMenuOpen && globalMenuTabKey === selectedTab;
+  const hasActiveBottomSheet = depthEntriesRef.current[selectedTab].some(
+    (entry) => entry.kind === "bottom-sheet",
+  );
   const isDimmedOverlayVisible =
+    hasActiveBottomSheet ||
     isGlobalMenuVisible ||
     (isQrOpen && qrTabKey === selectedTab) ||
     (isCreateMatchOpen && createMatchTabKey === selectedTab) ||
@@ -1301,45 +1304,45 @@ const BottomNav: React.FC = () => {
           } to-transparent`}
         />
 
-        <BottomSheet
-          isOpen={isQrOpen}
-          isActive={qrTabKey === selectedTab}
-          onOpenChange={handleQrOpenChange}
-          ariaLabel="Player QR code"
-        >
-          <PlayerQrSheetBody
-            qrToken={qrToken}
-            qrRemainingSeconds={qrRemainingSeconds}
-            qrError={qrError}
-            isQrLoading={isQrLoading}
-            onRefresh={handleRefreshPlayerQrToken}
-          />
-        </BottomSheet>
-
-        <BottomSheet
-          isOpen={isCreateMatchOpen}
-          isActive={createMatchTabKey === selectedTab}
-          onOpenChange={handleCreateMatchOpenChange}
-          ariaLabel="Create match"
-        >
-          <CreateMatchDrawerBody
-            onCreateMatch={handleCreateMatch}
-            onCancel={handleCancelCreateMatch}
-            onQrScannerOpenChange={handleCreateMatchQrScannerOpenChange}
-            isOnline={isOnline}
-            closeQrScannerRequestKey={createMatchQrScannerCloseRequestKey}
-          />
-        </BottomSheet>
-
-        <BottomSheet
-          isOpen={isAppSettingsOpen}
-          isActive={appSettingsTabKey === selectedTab}
-          onOpenChange={handleAppSettingsOpenChange}
-          ariaLabel="앱 설정"
-        >
-          <AppSettingsSheetBody />
-        </BottomSheet>
       </Tabs>
+      <BottomSheet
+        isOpen={isQrOpen}
+        isActive={qrTabKey === selectedTab}
+        onOpenChange={handleQrOpenChange}
+        ariaLabel="Player QR code"
+      >
+        <PlayerQrSheetBody
+          qrToken={qrToken}
+          qrRemainingSeconds={qrRemainingSeconds}
+          qrError={qrError}
+          isQrLoading={isQrLoading}
+          onRefresh={handleRefreshPlayerQrToken}
+        />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={isCreateMatchOpen}
+        isActive={createMatchTabKey === selectedTab}
+        onOpenChange={handleCreateMatchOpenChange}
+        ariaLabel="Create match"
+      >
+        <CreateMatchDrawerBody
+          onCreateMatch={handleCreateMatch}
+          onCancel={handleCancelCreateMatch}
+          onQrScannerOpenChange={handleCreateMatchQrScannerOpenChange}
+          isOnline={isOnline}
+          closeQrScannerRequestKey={createMatchQrScannerCloseRequestKey}
+        />
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={isAppSettingsOpen}
+        isActive={appSettingsTabKey === selectedTab}
+        onOpenChange={handleAppSettingsOpenChange}
+        ariaLabel="앱 설정"
+      >
+        <AppSettingsSheetBody />
+      </BottomSheet>
       {deepLinkMatchId && deepLinkMatchDepthId ? (
         <ProfileMatchDetailDrawer
           isOpen={isDeepLinkMatchDrawerOpen}
