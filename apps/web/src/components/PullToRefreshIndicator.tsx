@@ -20,6 +20,7 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
   threshold,
 }) => {
   const isVisible = status !== "idle";
+  const isPullGestureActive = status === "pulling" || status === "armed";
   const progress = Math.min(distance / threshold, 1);
   const isRefreshing = status === "refreshing";
   const isArmed = status === "armed";
@@ -35,9 +36,11 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
         opacity: isVisible ? 1 : 0,
         transform: `translateY(${translateY}px)`,
         transition:
-          status === "pulling" || status === "armed"
+          isPullGestureActive
             ? "opacity 120ms ease-out"
-            : "transform 180ms ease-out, opacity 180ms ease-out",
+            : status === "idle"
+              ? "transform 167ms ease-in, opacity 1ms linear 167ms"
+              : "transform 180ms ease-out, opacity 180ms ease-out",
       }}
     >
       <div
