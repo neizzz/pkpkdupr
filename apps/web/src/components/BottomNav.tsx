@@ -1457,7 +1457,7 @@ const BottomNav: React.FC = () => {
               aria-hidden={!isGlobalMenuVisible}
               tabIndex={-1}
               onClick={() => handleGlobalMenuOpenChange(false)}
-              className={`fixed inset-0 z-50 cursor-default bg-black/30 backdrop-blur-sm transition-opacity duration-200 ease-out ${
+              className={`fixed inset-0 z-50 cursor-default bg-black/30 backdrop-blur-sm transition-opacity duration-[84ms] ease-out ${
                 isGlobalMenuVisible
                   ? "opacity-100"
                   : "pointer-events-none opacity-0"
