@@ -73,6 +73,7 @@ type ImportedPreviewRow = {
   sourceRowNumber: number;
   matchNumber: string;
   dateLabel: string;
+  timeLabel: string;
   usernames: [string, string, string, string];
   inferredType: MatchType | null;
   scoreLabel: string;
@@ -104,6 +105,10 @@ const REQUIRED_IMPORT_HEADERS = [
   "A팀 점수",
   "B팀 점수",
 ] as const;
+const OPTIONAL_IMPORT_HEADERS = ["시간"] as const;
+type ImportHeader =
+  | (typeof REQUIRED_IMPORT_HEADERS)[number]
+  | (typeof OPTIONAL_IMPORT_HEADERS)[number];
 
 const createEmptyScoreRow = (): ScoreRowDraft => ({ scoreA: "", scoreB: "" });
 
@@ -191,7 +196,33 @@ const normalizeImportedUsername = (value: string) => {
   return markdownLinkMatch ? markdownLinkMatch[1].trim() : trimmed;
 };
 
-const parseImportedDateToIso = (value: string) => {
+const parseImportedTime = (value: string) => {
+  const timeMatch = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!timeMatch) {
+    return null;
+  }
+
+  const [, hour, minute] = timeMatch;
+  const parsedHour = Number(hour);
+  const parsedMinute = Number(minute);
+  if (
+    !Number.isInteger(parsedHour) ||
+    !Number.isInteger(parsedMinute) ||
+    parsedHour < 0 ||
+    parsedHour > 23 ||
+    parsedMinute < 0 ||
+    parsedMinute > 59
+  ) {
+    return null;
+  }
+
+  return { hour: parsedHour, minute: parsedMinute };
+};
+
+const parseImportedDateToIso = (
+  value: string,
+  time: { hour: number; minute: number },
+) => {
   const trimmed = value.trim();
   const koreanDateMatch = trimmed.match(
     /^(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일$/,
@@ -200,7 +231,14 @@ const parseImportedDateToIso = (value: string) => {
   if (koreanDateMatch) {
     const [, year, month, day] = koreanDateMatch;
     return new Date(
-      Date.UTC(Number(year), Number(month) - 1, Number(day), 3, 0, 0),
+      Date.UTC(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        time.hour - 9,
+        time.minute,
+        0,
+      ),
     ).toISOString();
   }
 
@@ -209,7 +247,16 @@ const parseImportedDateToIso = (value: string) => {
     return null;
   }
 
-  return fallbackDate.toISOString();
+  return new Date(
+    Date.UTC(
+      fallbackDate.getFullYear(),
+      fallbackDate.getMonth(),
+      fallbackDate.getDate(),
+      time.hour - 9,
+      time.minute,
+      0,
+    ),
+  ).toISOString();
 };
 
 const buildImportedPreview = (
@@ -254,7 +301,7 @@ const buildImportedPreview = (
 
   const getCell = (
     columns: string[],
-    header: (typeof REQUIRED_IMPORT_HEADERS)[number],
+    header: ImportHeader,
   ) =>
     columns[headerIndexByKey.get(normalizeHeader(header)) ?? -1]?.trim() ?? "";
 
@@ -265,6 +312,7 @@ const buildImportedPreview = (
     const columns = line.split("\t");
     const matchNumber = getCell(columns, "경기번호");
     const dateLabel = getCell(columns, "날짜");
+    const timeLabel = getCell(columns, "시간");
     const usernames = [
       normalizeImportedUsername(getCell(columns, "A팀 선수1")),
       normalizeImportedUsername(getCell(columns, "A팀 선수2")),
@@ -313,7 +361,16 @@ const buildImportedPreview = (
       issues.push("점수가 유효하지 않습니다.");
     }
 
-    const matchStartsAt = parseImportedDateToIso(dateLabel);
+    const parsedTime = timeLabel
+      ? parseImportedTime(timeLabel)
+      : { hour: 12, minute: 0 };
+    if (!parsedTime) {
+      issues.push(`시간은 HH:mm 형식이어야 합니다: ${timeLabel}`);
+    }
+
+    const matchStartsAt = parsedTime
+      ? parseImportedDateToIso(dateLabel, parsedTime)
+      : null;
     if (!matchStartsAt) {
       issues.push(`날짜를 파싱할 수 없습니다: ${dateLabel}`);
     }
@@ -387,6 +444,7 @@ const buildImportedPreview = (
       sourceRowNumber: rowIndex + 2,
       matchNumber,
       dateLabel,
+      timeLabel,
       usernames,
       inferredType,
       scoreLabel: `${Number.isFinite(scoreA) ? scoreA : "-"}:${Number.isFinite(scoreB) ? scoreB : "-"}`,
@@ -1180,6 +1238,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             <p className="mt-2 text-xs text-slate-500">
               필수 헤더: {REQUIRED_IMPORT_HEADERS.join(" / ")}
             </p>
+            <p className="mt-1 text-xs text-slate-500">
+              선택 헤더: 시간 (HH:mm, 없으면 12:00)
+            </p>
           </div>
 
           {importedPreview ? (
@@ -1225,6 +1286,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                         <th className="pb-2 pr-3">행</th>
                         <th className="pb-2 pr-3">경기번호</th>
                         <th className="pb-2 pr-3">날짜</th>
+                        <th className="pb-2 pr-3">시간</th>
                         <th className="pb-2 pr-3">참가자</th>
                         <th className="pb-2 pr-3">종목</th>
                         <th className="pb-2 pr-3">점수</th>
@@ -1244,6 +1306,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                             {row.matchNumber || "-"}
                           </td>
                           <td className="py-3 pr-3">{row.dateLabel || "-"}</td>
+                          <td className="py-3 pr-3">
+                            {row.timeLabel || "12:00"}
+                          </td>
                           <td className="py-3 pr-3">
                             <div className="space-y-1">
                               <div>
