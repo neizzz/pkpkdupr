@@ -935,7 +935,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
 
   if (history.length === 0) {
     return (
-      <div className="mt-2 flex h-36 items-center justify-center px-4 text-center text-sm font-medium text-pkpk-secondary-font/70">
+      <div className="flex h-full items-center justify-center px-4 text-center text-sm font-medium text-pkpk-secondary-font/70">
         평점 이력이 없습니다.
       </div>
     );
@@ -943,7 +943,7 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
 
   return (
     <div
-      className="mt-2 h-36 min-w-0"
+      className="h-full min-w-0"
       style={{
         opacity: isEntered ? 1 : 0,
         transform: isEntered ? "translateY(0)" : "translateY(12px)",

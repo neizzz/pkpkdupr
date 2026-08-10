@@ -79,18 +79,18 @@ interface MemberProfileProps {
 
 const ProfileStatsSkeleton: React.FC = () => (
   <div
-    className="flex flex-col gap-0"
+    className="grid h-full grid-rows-2"
     role="status"
     aria-label="프로필 통계 로딩 중"
   >
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid h-full grid-cols-2 gap-3">
       {Array.from({ length: 2 }, (_, index) => (
-        <SkeletonBlock key={index} className="h-16 rounded-xl" />
+        <SkeletonBlock key={index} className="h-full rounded-xl" />
       ))}
     </div>
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid h-full grid-cols-2 gap-3">
       {Array.from({ length: 2 }, (_, index) => (
-        <SkeletonBlock key={index} className="h-16 rounded-xl" />
+        <SkeletonBlock key={index} className="h-full rounded-xl" />
       ))}
     </div>
   </div>
@@ -418,26 +418,30 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
 
             {isProfileStatsLoading ? (
               <>
-                <div className="mt-2 flex h-36 items-center justify-center">
-                  <Spinner
-                    aria-label="평점 이력 로딩 중"
-                    className="text-pkpk-accent-bg"
-                    color="current"
-                    size="md"
-                  />
+                <div className="mt-2 h-36 min-w-0">
+                  <div className="flex h-full items-center justify-center">
+                    <Spinner
+                      aria-label="평점 이력 로딩 중"
+                      className="text-pkpk-accent-bg"
+                      color="current"
+                      size="md"
+                    />
+                  </div>
                 </div>
-                <div className="mt-3">
+                <div className="mt-3 h-36">
                   <ProfileStatsSkeleton />
                 </div>
               </>
             ) : expandedItem ? (
               <>
-                <RatingHistoryChart
-                  key={expandedItem.type}
-                  history={ratingHistory?.[expandedItem.type] ?? []}
-                  label={expandedItem.label}
-                />
-                <div className="mt-3 flex flex-col">
+                <div className="mt-2 h-36 min-w-0">
+                  <RatingHistoryChart
+                    key={expandedItem.type}
+                    history={ratingHistory?.[expandedItem.type] ?? []}
+                    label={expandedItem.label}
+                  />
+                </div>
+                <div className="mt-3 flex h-36 flex-col">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl px-4 py-3">
                       <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
