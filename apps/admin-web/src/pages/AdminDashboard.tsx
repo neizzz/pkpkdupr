@@ -1277,7 +1277,7 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white shadow-sm border-b px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-blue-600">PKELO Admin</h1>
+        <h1 className="text-xl font-bold text-blue-600">pkpkdupr Admin</h1>
         <div className="flex gap-4 items-center">
           <span className="text-sm text-gray-400">{__APP_VERSION__}</span>
           <span className="text-sm text-gray-600">
