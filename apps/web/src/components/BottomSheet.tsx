@@ -1,5 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
+import { DIMMED_THEME_COLOR } from "@/lib/themeColor";
 
 const TRANSITION_DURATION_MS = 84;
 
@@ -52,6 +53,32 @@ const BottomSheet: BottomSheetComponent = ({
     React.useState(false);
   const openAnimationFrameRef = React.useRef<number | null>(null);
   const transitionTimeoutRef = React.useRef<number | null>(null);
+
+  React.useLayoutEffect(() => {
+    if (!isOpen || !isActive || typeof document === "undefined") {
+      return undefined;
+    }
+
+    const themeColorMeta = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+
+    if (!themeColorMeta) {
+      return undefined;
+    }
+
+    const previousThemeColor = themeColorMeta.getAttribute("content");
+    themeColorMeta.setAttribute("content", DIMMED_THEME_COLOR);
+
+    return () => {
+      if (themeColorMeta.getAttribute("content") === DIMMED_THEME_COLOR) {
+        themeColorMeta.setAttribute(
+          "content",
+          previousThemeColor ?? "",
+        );
+      }
+    };
+  }, [isActive, isOpen]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
