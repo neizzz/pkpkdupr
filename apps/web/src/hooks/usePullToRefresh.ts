@@ -82,13 +82,29 @@ export const usePullToRefresh = ({
 
       const deltaY = touch.clientY - start.lastY;
       startRef.current = { ...start, lastX: touch.clientX, lastY: touch.clientY };
+
+      let pullDeltaY = deltaY;
+      if (!isGestureActiveRef.current) {
+        if (deltaY <= 0) return true;
+
+        const scrollTop = Math.max(container?.scrollTop ?? 0, 0);
+        if (scrollTop > 0) {
+          if (deltaY <= scrollTop) return true;
+
+          container!.scrollTop = 0;
+          pullDeltaY = deltaY - scrollTop;
+        }
+      }
+
       const progress = Math.min(distanceRef.current / PULL_TO_REFRESH_THRESHOLD, 1);
       const resistance =
         PULL_TO_REFRESH_BASE_RESISTANCE -
         (PULL_TO_REFRESH_BASE_RESISTANCE - PULL_TO_REFRESH_MIN_RESISTANCE) *
           progress;
       const adjustedDeltaY =
-        deltaY > 0 ? deltaY * resistance : deltaY * PULL_TO_REFRESH_BASE_RESISTANCE;
+        pullDeltaY > 0
+          ? pullDeltaY * resistance
+          : pullDeltaY * PULL_TO_REFRESH_BASE_RESISTANCE;
       const nextDistance = Math.min(
         Math.max(0, distanceRef.current + adjustedDeltaY),
         PULL_TO_REFRESH_THRESHOLD * 1.25,
@@ -101,6 +117,9 @@ export const usePullToRefresh = ({
       if (nextDistance > 0) {
         isGestureActiveRef.current = true;
         container?.style.setProperty("overflow", "hidden");
+      } else {
+        isGestureActiveRef.current = false;
+        container?.style.removeProperty("overflow");
       }
       setDistance(nextDistance);
       setStatus(nextDistance === 0 ? "idle" : isArmed ? "armed" : "pulling");
@@ -118,8 +137,7 @@ export const usePullToRefresh = ({
     const handleTouchStart = (event: TouchEvent) => {
       if (
         event.touches.length !== 1 ||
-        isRefreshingRef.current ||
-        container.scrollTop > 0
+        isRefreshingRef.current
       ) {
         return;
       }
