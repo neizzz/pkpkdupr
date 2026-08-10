@@ -617,6 +617,10 @@ const Affiliations: React.FC = () => {
       </TabPanelHeader>
 
       <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
+        <TabPanelHeaderGradientExtension
+          headerElement={headerElement}
+          className="z-0"
+        />
         {isLoading ? (
           <TabPanelStatus isLoading ariaLabel="클럽을 불러오는 중" message="클럽을 불러오는 중이에요." />
         ) : error && !activeClubs.length ? (
@@ -643,10 +647,6 @@ const Affiliations: React.FC = () => {
           </TabPanelEmptyState>
         ) : (
           <div className="mx-auto w-full min-h-full shrink-0">
-            <TabPanelHeaderGradientExtension
-              headerElement={headerElement}
-              className="z-0"
-            />
             <div className="relative z-10 mx-1.5 mt-1 overflow-hidden rounded-3xl bg-white pt-1">
               <div className="space-y-3 pb-[calc(7rem+var(--safe-bottom))]">
                 {error ? (

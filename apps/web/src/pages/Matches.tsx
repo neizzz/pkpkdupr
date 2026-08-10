@@ -56,7 +56,6 @@ const MatchFeedSkeleton: React.FC<{
     <TabPanelHeaderGradientExtension
       headerElement={headerElement}
       className="z-0"
-      position="flow"
     />
     <div className="relative z-10 mx-1.5 mt-1 flex flex-col gap-3">
       {Array.from({ length: 4 }, (_, index) => (
@@ -774,7 +773,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
     <>
       <div className="flex min-h-full flex-col">
       <TabPanelHeader
-        title="내 매치"
+        title="My Matches"
         showGradientExtension={false}
         onHeaderElementChange={setHeaderElement}
       />
@@ -800,7 +799,6 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                 <TabPanelHeaderGradientExtension
                   headerElement={headerElement}
                   className="z-0"
-                  position="flow"
                 />
                 <div className="relative z-10 mx-1.5 mt-1 flex flex-col gap-3">
                   {feedItems.map((item) =>
