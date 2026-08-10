@@ -7,7 +7,10 @@ import type {
   ClubMembership,
   ClubRankingEntry,
 } from "@pkpkdupr/shared/club";
-import type { Match, ManagedMatchSession } from "@pkpkdupr/shared/match";
+import type {
+  Match as SharedMatch,
+  ManagedMatchSession,
+} from "@pkpkdupr/shared/match";
 import { PiRankingLight } from "react-icons/pi";
 import { TbAffiliate } from "react-icons/tb";
 import {
@@ -24,9 +27,11 @@ import {
 import QrCode from "react-qr-code";
 import BottomSheet from "@/components/BottomSheet";
 import ClubQrScannerSheetBody from "@/components/ClubQrScannerSheetBody";
-import type {
-  MatchInfo,
-  MatchSessionSummaryInfo,
+import DetailPageHeader from "@/components/DetailPageHeader";
+import MatchCard, {
+  type MatchInfo,
+  type MatchListResponse,
+  type MatchSessionSummaryInfo,
 } from "@/components/Match";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import RightDrawer from "@/components/RightDrawer";
@@ -46,6 +51,7 @@ type ScannerTarget = "invite" | "player" | null;
 type RankingCategory = "singles" | "doubles";
 
 const noop = () => {};
+const CLUB_MATCH_HISTORY_PAGE_SIZE = 20;
 
 const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
   month: "numeric",
@@ -62,7 +68,7 @@ const formatDateTime = (value: Date | string) => {
     : dateTimeFormatter.format(date);
 };
 
-const getMatchName = (match: Match) =>
+const getMatchName = (match: SharedMatch) =>
   match.name ||
   match.teams
     .flatMap((team) => team.players.map((player) => player.username))
@@ -127,6 +133,19 @@ const Affiliations: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<MatchInfo | null>(null);
+  const [clubMatchHistoryClub, setClubMatchHistoryClub] = useState<
+    Pick<Club, "id" | "name"> | null
+  >(null);
+  const [clubMatchHistoryMatches, setClubMatchHistoryMatches] = useState<
+    MatchInfo[]
+  >([]);
+  const [isClubMatchHistoryLoading, setIsClubMatchHistoryLoading] =
+    useState(false);
+  const [clubMatchHistoryError, setClubMatchHistoryError] = useState<
+    string | null
+  >(null);
+  const [clubMatchHistoryPage, setClubMatchHistoryPage] = useState(0);
+  const [clubMatchHistoryTotal, setClubMatchHistoryTotal] = useState(0);
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -388,6 +407,41 @@ const Affiliations: React.FC = () => {
     [request],
   );
 
+  const loadClubMatchHistory = useCallback(
+    async (clubId: string, page: number, append = false) => {
+      setIsClubMatchHistoryLoading(true);
+      setClubMatchHistoryError(null);
+      try {
+        const searchParams = new URLSearchParams({
+          page: String(page),
+          limit: String(CLUB_MATCH_HISTORY_PAGE_SIZE),
+        });
+        const data = await request<MatchListResponse>(
+          `/api/clubs/${encodeURIComponent(clubId)}/matches?${searchParams.toString()}`,
+        );
+        setClubMatchHistoryMatches((current) => {
+          if (!append) return data.matches;
+          const currentIds = new Set(current.map((match) => match.id));
+          return [
+            ...current,
+            ...data.matches.filter((match) => !currentIds.has(match.id)),
+          ];
+        });
+        setClubMatchHistoryPage(page + 1);
+        setClubMatchHistoryTotal(data.total);
+      } catch (loadError) {
+        setClubMatchHistoryError(
+          loadError instanceof Error
+            ? loadError.message
+            : "소속 매치를 불러오지 못했어요.",
+        );
+      } finally {
+        setIsClubMatchHistoryLoading(false);
+      }
+    },
+    [request],
+  );
+
   const openMatchDetail = useCallback(
     (match: MatchInfo) => {
       saveScrollPosition("affiliations");
@@ -401,6 +455,28 @@ const Affiliations: React.FC = () => {
     },
     [pushDepth, saveScrollPosition, scrollToTop],
   );
+
+  const openClubMatchHistory = useCallback(() => {
+    if (!dashboard) return;
+
+    const historyClub = {
+      id: dashboard.club.id,
+      name: dashboard.club.name,
+    };
+    saveScrollPosition("affiliations");
+    pushDepth("affiliations", {
+      id: `club-match-history:${historyClub.id}`,
+      kind: "match-history",
+      onClose: noop,
+    });
+    setClubMatchHistoryClub(historyClub);
+    setClubMatchHistoryMatches([]);
+    setClubMatchHistoryError(null);
+    setClubMatchHistoryPage(0);
+    setClubMatchHistoryTotal(0);
+    window.requestAnimationFrame(() => scrollToTop("auto"));
+    void loadClubMatchHistory(historyClub.id, 0);
+  }, [dashboard, loadClubMatchHistory, pushDepth, saveScrollPosition, scrollToTop]);
 
   const openSessionDetail = useCallback(
     (session: ManagedMatchSession) => {
@@ -452,16 +528,31 @@ const Affiliations: React.FC = () => {
     restoreScrollTop("affiliations");
   }, [restoreScrollTop]);
 
+  const completeClubMatchHistoryClose = useCallback(() => {
+    setClubMatchHistoryClub(null);
+    setClubMatchHistoryMatches([]);
+    setClubMatchHistoryError(null);
+    setClubMatchHistoryPage(0);
+    setClubMatchHistoryTotal(0);
+    restoreScrollTop("affiliations");
+  }, [restoreScrollTop]);
+
   const sessionDepthId = selectedSession
     ? `club-session-detail:${selectedSession.id}`
     : null;
   const matchDepthId = selectedMatch
     ? `club-match-detail:${selectedMatch.id}`
     : null;
+  const clubMatchHistoryDepthId = clubMatchHistoryClub
+    ? `club-match-history:${clubMatchHistoryClub.id}`
+    : null;
   const isSessionDrawerOpen =
     !!sessionDepthId && depthStacks.affiliations.includes(sessionDepthId);
   const isMatchDrawerOpen =
     !!matchDepthId && depthStacks.affiliations.includes(matchDepthId);
+  const isClubMatchHistoryDrawerOpen =
+    !!clubMatchHistoryDepthId &&
+    depthStacks.affiliations.includes(clubMatchHistoryDepthId);
 
   const registerSessionScrollContainer = useCallback(
     (element: HTMLDivElement | null) => {
@@ -477,6 +568,14 @@ const Affiliations: React.FC = () => {
       registerScrollContainer("affiliations", matchDepthId, element);
     },
     [matchDepthId, registerScrollContainer],
+  );
+
+  const registerClubMatchHistoryScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!clubMatchHistoryDepthId) return;
+      registerScrollContainer("affiliations", clubMatchHistoryDepthId, element);
+    },
+    [clubMatchHistoryDepthId, registerScrollContainer],
   );
 
   const renderSchedule = () => {
@@ -534,6 +633,48 @@ const Affiliations: React.FC = () => {
               </p>
               <p className="mt-0.5 truncate text-xs text-pkpk-sub-font">
                 {formatDateTime(match.matchStartsAt)} · {match.location}
+              </p>
+            </div>
+            <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const hasUpcomingSchedule = Boolean(
+    dashboard &&
+      (dashboard.upcomingSessions.length ||
+        dashboard.upcomingMatches.some((match) => !match.session)),
+  );
+
+  const renderRecentCompletedMatches = () => {
+    if (!dashboard) return null;
+    if (!dashboard.recentCompletedMatches.length) {
+      return (
+        <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
+          최근에 끝난 매치가 없어요.
+        </p>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        {dashboard.recentCompletedMatches.map((match) => (
+          <button
+            key={match.id}
+            type="button"
+            onClick={() => openMatchDetail(match as unknown as MatchInfo)}
+            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3 text-left"
+          >
+            <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
+              완료
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-pkpk-main-font">
+                {getMatchName(match)}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-pkpk-sub-font">
+                {formatDateTime(match.completedAt ?? match.matchStartsAt)} · {match.location}
               </p>
             </div>
             <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
@@ -663,6 +804,30 @@ const Affiliations: React.FC = () => {
                       <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="다가오는 경기 & 세션" />
                       {renderSchedule()}
                     </section>
+
+                    {!hasUpcomingSchedule ? (
+                      <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
+                        <SectionTitle
+                          icon={<IoCalendarOutline className="size-5" />}
+                          title="최근에 끝난 매치"
+                        />
+                        {renderRecentCompletedMatches()}
+                      </section>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={openClubMatchHistory}
+                      className="flex w-full items-center gap-3 rounded-3xl border border-border bg-white px-4 py-4 text-left transition-colors hover:bg-pkpk-session-bg"
+                    >
+                      <span className="flex size-11 items-center justify-center rounded-2xl bg-pkpk-session-bg text-pkpk-primary-bg">
+                        <IoCalendarOutline className="size-6" />
+                      </span>
+                      <span className="min-w-0 flex-1 text-sm font-bold text-pkpk-main-font">
+                        {dashboard.club.name}의 매치 전체 보기
+                      </span>
+                      <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
+                    </button>
 
                     <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
                       <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
@@ -1023,6 +1188,86 @@ const Affiliations: React.FC = () => {
           ) : null}
         </div>
       </RightDrawer>
+
+      {clubMatchHistoryClub && clubMatchHistoryDepthId ? (
+        <RightDrawer
+          isOpen={isClubMatchHistoryDrawerOpen}
+          isActive={selectedTab === "affiliations"}
+          ariaLabel={`${clubMatchHistoryClub.name}의 매치 전체`}
+          onExited={completeClubMatchHistoryClose}
+          onScrollContainerChange={registerClubMatchHistoryScrollContainer}
+          onPullToRefresh={() =>
+            loadClubMatchHistory(clubMatchHistoryClub.id, 0)
+          }
+          layer={60}
+          className="!bg-white"
+        >
+          <div className="min-h-full bg-white">
+            <DetailPageHeader
+              title={`${clubMatchHistoryClub.name}의 매치 전체`}
+              tabKey="affiliations"
+              backgroundClassName="bg-white"
+            />
+            <div className="space-y-3 p-3">
+              <h2 className="px-1 text-xl font-bold text-pkpk-secondary-bg">
+                {clubMatchHistoryClub.name}의 매치 전체
+              </h2>
+              {isClubMatchHistoryLoading && !clubMatchHistoryMatches.length ? (
+                <TabPanelStatus
+                  isLoading
+                  ariaLabel="소속 매치를 불러오는 중"
+                  message="소속 매치를 불러오는 중이에요."
+                />
+              ) : clubMatchHistoryError ? (
+                <div className="space-y-3">
+                  <TabPanelStatus tone="error" message={clubMatchHistoryError} />
+                  <Button
+                    type="button"
+                    className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-white"
+                    onPress={() =>
+                      void loadClubMatchHistory(clubMatchHistoryClub.id, 0)
+                    }
+                  >
+                    다시 시도
+                  </Button>
+                </div>
+              ) : !clubMatchHistoryMatches.length ? (
+                <TabPanelStatus message="표시할 소속 매치가 없어요." />
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {clubMatchHistoryMatches.map((match) => (
+                      <MatchCard
+                        key={match.id}
+                        match={match}
+                        currentPlayerId={player?.id}
+                        onPress={openMatchDetail}
+                      />
+                    ))}
+                  </div>
+                  {clubMatchHistoryMatches.length < clubMatchHistoryTotal ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="app-action-button w-full rounded-2xl font-semibold"
+                      isDisabled={isClubMatchHistoryLoading}
+                      onPress={() =>
+                        void loadClubMatchHistory(
+                          clubMatchHistoryClub.id,
+                          clubMatchHistoryPage,
+                          true,
+                        )
+                      }
+                    >
+                      {isClubMatchHistoryLoading ? "불러오는 중..." : "더 보기"}
+                    </Button>
+                  ) : null}
+                </>
+              )}
+            </div>
+          </div>
+        </RightDrawer>
+      ) : null}
 
       {selectedSession && sessionDepthId ? (
         <RightDrawer

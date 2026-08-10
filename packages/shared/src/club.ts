@@ -55,15 +55,48 @@ export interface ClubRankingEntry {
 
 export type ClubRankings = Record<PlayerDuprCategory, ClubRankingEntry[]>;
 
+export const isMatchForClub = (
+  match: Match,
+  clubId: string,
+  memberIds: ReadonlySet<string>,
+) => {
+  if (match.session?.clubId === clubId) return true;
+  if (match.session) return false;
+  const participants = match.teams.flatMap((team) => team.players);
+  return (
+    participants.length > 0 &&
+    participants.every((participant) => memberIds.has(participant.id))
+  );
+};
+
+export const getRecentCompletedMatches = (
+  matches: readonly Match[],
+  limit: number = 2,
+) =>
+  matches
+    .filter((match) => match.status === "completed" && match.completedAt !== null)
+    .sort(
+      (left, right) =>
+        (right.completedAt?.getTime() ?? 0) -
+        (left.completedAt?.getTime() ?? 0),
+    )
+    .slice(0, limit);
+
 export interface ClubDashboard {
   club: Club;
   membership: ClubMembership;
   upcomingSessions: ManagedMatchSession[];
   upcomingMatches: Match[];
+  recentCompletedMatches: Match[];
   announcements: ClubAnnouncement[];
   rankings: ClubRankings;
   members: ClubMember[];
   pendingRequests: ClubMembership[];
+}
+
+export interface ClubMatchList {
+  matches: Match[];
+  total: number;
 }
 
 export interface ClubInvitePayload {

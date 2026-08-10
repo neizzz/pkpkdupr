@@ -430,6 +430,18 @@ app.get("/internal/clubs/:clubId/dashboard/:playerId", async (req, res) => {
   }
 });
 
+app.get("/internal/clubs/:clubId/matches", async (req, res) => {
+  try {
+    const page = Number(req.query.page ?? 0);
+    const limit = Number(req.query.limit ?? 20);
+    res.json(
+      await clubRepository.listMatches(req.params.clubId, page, limit),
+    );
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.post("/internal/clubs/invite-join-requests", async (req, res) => {
   try {
     res.status(201).json(

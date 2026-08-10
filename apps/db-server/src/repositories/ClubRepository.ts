@@ -1,9 +1,14 @@
 import { randomUUID } from "crypto";
+import {
+  getRecentCompletedMatches,
+  isMatchForClub,
+} from "@pkpkdupr/shared/club";
 import type {
   Club,
   ClubAnnouncement,
   ClubDashboard,
   ClubInvite,
+  ClubMatchList,
   ClubMember,
   ClubMembership,
   ClubRankings,
@@ -597,33 +602,25 @@ export class ClubRepository {
     if (!club || !membership) return undefined;
 
     const members = await this.listMembers(clubId);
-    const memberIds = new Set(members.map((member) => member.id));
     const now = new Date();
     const [{ matches: allMatches }, allSessions, announcements] = await Promise.all([
       this.matchRepository.findAll(0, 10_000),
       this.matchRepository.findSessions(),
       this.listAnnouncements(clubId),
     ]);
+    const clubMatches = this.filterClubMatches(allMatches, members, clubId);
     const upcomingSessions = allSessions
       .filter(
         (session: ManagedMatchSession) =>
           session.clubId === clubId && session.date.getTime() >= now.getTime(),
       )
       .sort((left, right) => left.date.getTime() - right.date.getTime());
-    const upcomingMatches = allMatches
-      .filter((match: Match) => {
-        if (match.matchStartsAt.getTime() < now.getTime()) return false;
-        if (match.session?.clubId === clubId) return true;
-        if (match.session) return false;
-        const participants = match.teams.flatMap((team) => team.players);
-        return (
-          participants.length > 0 &&
-          participants.every((participant) => memberIds.has(participant.id))
-        );
-      })
+    const upcomingMatches = clubMatches
+      .filter((match: Match) => match.matchStartsAt.getTime() >= now.getTime())
       .sort(
         (left, right) => left.matchStartsAt.getTime() - right.matchStartsAt.getTime(),
       );
+    const recentCompletedMatches = getRecentCompletedMatches(clubMatches);
     const pendingRequests =
       membership.role === "owner" || membership.role === "manager"
         ? await this.listPendingRequests(clubId)
@@ -634,10 +631,43 @@ export class ClubRepository {
       membership,
       upcomingSessions,
       upcomingMatches,
+      recentCompletedMatches,
       announcements,
       rankings: await this.getRankings(members),
       members,
       pendingRequests,
     };
+  }
+
+  async listMatches(
+    clubId: string,
+    page: number = 0,
+    limit: number = 20,
+  ): Promise<ClubMatchList> {
+    const members = await this.listMembers(clubId);
+    const { matches: allMatches } = await this.matchRepository.findAll(0, 10_000);
+    const matches = this.filterClubMatches(allMatches, members, clubId).sort(
+      (left, right) => right.matchStartsAt.getTime() - left.matchStartsAt.getTime(),
+    );
+    const safePage = Number.isFinite(page) ? Math.max(0, Math.floor(page)) : 0;
+    const safeLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.min(100, Math.floor(limit)))
+      : 20;
+    const start = safePage * safeLimit;
+
+    return {
+      matches: matches.slice(start, start + safeLimit),
+      total: matches.length,
+    };
+  }
+
+  private filterClubMatches(
+    matches: Match[],
+    members: ClubMember[],
+    clubId: string,
+  ): Match[] {
+    const memberIds = new Set(members.map((member) => member.id));
+
+    return matches.filter((match) => isMatchForClub(match, clubId, memberIds));
   }
 }

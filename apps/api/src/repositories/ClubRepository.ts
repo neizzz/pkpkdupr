@@ -3,6 +3,7 @@ import type {
   ClubAnnouncement,
   ClubDashboard,
   ClubInvite,
+  ClubMatchList,
   ClubMember,
   ClubMembership,
 } from "@pkpkdupr/shared/club";
@@ -72,6 +73,7 @@ const hydrateDashboard = (record: any): ClubDashboard => ({
   membership: hydrateMembership(record.membership),
   upcomingSessions: (record.upcomingSessions ?? []).map(hydrateManagedSession),
   upcomingMatches: (record.upcomingMatches ?? []).map(hydrateMatch),
+  recentCompletedMatches: (record.recentCompletedMatches ?? []).map(hydrateMatch),
   announcements: (record.announcements ?? []).map(hydrateAnnouncement),
   rankings: {
     singles: record.rankings?.singles ?? [],
@@ -167,6 +169,24 @@ export class ClubRepository {
       if ((error as DbRequestError).status === 404) return undefined;
       throw error;
     }
+  }
+
+  async listMatches(
+    clubId: string,
+    page: number = 0,
+    limit: number = 20,
+  ): Promise<ClubMatchList> {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    const result = await this.dbRequest<{ matches: any[]; total: number }>(
+      `/internal/clubs/${encodeURIComponent(clubId)}/matches?${params.toString()}`,
+    );
+    return {
+      matches: (result.matches ?? []).map(hydrateMatch),
+      total: Number(result.total ?? 0),
+    };
   }
 
   async requestJoinByInvite(token: string, playerId: string) {

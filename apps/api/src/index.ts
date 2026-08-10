@@ -797,6 +797,20 @@ app.get("/api/clubs/:clubId/dashboard", async (req, res) => {
   }
 });
 
+app.get("/api/clubs/:clubId/matches", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    const access = await getClubAccess(req.params.clubId, decoded.playerId, res);
+    if (!access) return;
+    const page = Number(req.query.page ?? 0);
+    const limit = Number(req.query.limit ?? 20);
+    res.json(await clubRepository.listMatches(req.params.clubId, page, limit));
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
 app.post("/api/club-invites/join-requests", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);

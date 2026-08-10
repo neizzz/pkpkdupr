@@ -58,6 +58,7 @@ const dashboard: ClubDashboard = {
   membership: buildMembership(owner.id, "owner"),
   upcomingSessions: [],
   upcomingMatches: [],
+  recentCompletedMatches: [],
   announcements: [],
   rankings: { singles: [], doubles: [] },
   members: [],
@@ -191,5 +192,55 @@ describe("club API", () => {
     expect(response.body).toEqual(
       expect.objectContaining({ club: expect.objectContaining({ id: clubId }) }),
     );
+  });
+
+  it("대시보드에 최근 완료 매치를 함께 반환한다", async () => {
+    vi.spyOn(ClubRepository.prototype, "getDashboard").mockResolvedValue({
+      ...dashboard,
+      recentCompletedMatches: [
+        {
+          id: "Mcompleted1",
+          status: "completed",
+          completedAt: new Date("2026-08-01T08:00:00.000Z"),
+        } as ClubDashboard["recentCompletedMatches"][number],
+      ],
+    });
+
+    const response = await request(app)
+      .get(`/api/clubs/${clubId}/dashboard`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body.recentCompletedMatches).toEqual([
+      expect.objectContaining({ id: "Mcompleted1", status: "completed" }),
+    ]);
+  });
+
+  it("활성 멤버에게 소속 매치를 페이지 단위로 반환한다", async () => {
+    const listMatches = vi
+      .spyOn(ClubRepository.prototype, "listMatches")
+      .mockResolvedValue({ matches: [], total: 3 });
+
+    const response = await request(app)
+      .get(`/api/clubs/${clubId}/matches?page=1&limit=2`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ matches: [], total: 3 });
+    expect(listMatches).toHaveBeenCalledWith(clubId, 1, 2);
+  });
+
+  it("비멤버는 소속 매치 전체 목록을 조회할 수 없다", async () => {
+    vi.spyOn(ClubRepository.prototype, "findMembership").mockResolvedValue(
+      undefined,
+    );
+    const listMatches = vi.spyOn(ClubRepository.prototype, "listMatches");
+
+    const response = await request(app)
+      .get(`/api/clubs/${clubId}/matches`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(403);
+    expect(listMatches).not.toHaveBeenCalled();
   });
 });
