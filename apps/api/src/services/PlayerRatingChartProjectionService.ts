@@ -249,6 +249,11 @@ export class PlayerRatingChartProjectionService {
 
   async rebuildPlayers(playerIds: Iterable<string>): Promise<void> {
     const uniquePlayerIds = [...new Set([...playerIds].filter(Boolean))];
-    await Promise.all(uniquePlayerIds.map((playerId) => this.rebuildPlayer(playerId)));
+    // 각 projection 교체는 기존 포인트를 지운 뒤 다시 넣는 write
+    // transaction이다. 병렬 실행하면 InnoDB의 보조 인덱스 gap lock이
+    // 서로 충돌할 수 있으므로 한 번에 하나씩 갱신한다.
+    for (const playerId of uniquePlayerIds) {
+      await this.rebuildPlayer(playerId);
+    }
   }
 }
