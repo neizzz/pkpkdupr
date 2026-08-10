@@ -53,9 +53,13 @@ const BottomSheet: BottomSheetComponent = ({
     React.useState(false);
   const openAnimationFrameRef = React.useRef<number | null>(null);
   const transitionTimeoutRef = React.useRef<number | null>(null);
+  const transitionStyle = React.useMemo(
+    () => ({ transitionDuration: `${TRANSITION_DURATION_MS}ms` }),
+    [],
+  );
 
   React.useLayoutEffect(() => {
-    if (!isOpen || !isActive || typeof document === "undefined") {
+    if (!shouldRender || !isActive || typeof document === "undefined") {
       return undefined;
     }
 
@@ -78,7 +82,7 @@ const BottomSheet: BottomSheetComponent = ({
         );
       }
     };
-  }, [isActive, isOpen]);
+  }, [isActive, shouldRender]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -175,9 +179,10 @@ const BottomSheet: BottomSheetComponent = ({
       <div
         aria-hidden="true"
         className={[
-          "pointer-events-none absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-[84ms] ease-out",
+          "pointer-events-none absolute inset-0 bg-black/30 backdrop-blur-sm transition-opacity ease-out",
           isVisible ? "opacity-100" : "opacity-0",
         ].join(" ")}
+        style={transitionStyle}
       />
       <div
         className={[
@@ -186,14 +191,15 @@ const BottomSheet: BottomSheetComponent = ({
             ? [
                 "transform-gpu transition-transform will-change-transform",
                 isVisible
-                  ? "translate-y-0 duration-[84ms] ease-out"
-                  : "translate-y-[calc(100%+2rem)] duration-[84ms] ease-in",
+                  ? "translate-y-0 ease-out"
+                  : "translate-y-[calc(100%+2rem)] ease-in",
               ].join(" ")
             : [
                 "transform-gpu",
                 isVisible ? "translate-y-0" : "translate-y-[calc(100%+2rem)]",
               ].join(" "),
         ].join(" ")}
+        style={transitionStyle}
       >
         <div className="pointer-events-none absolute inset-x-0 -top-10 z-20 flex justify-end px-4">
           <button
@@ -203,7 +209,8 @@ const BottomSheet: BottomSheetComponent = ({
               event.stopPropagation();
             }}
             onClick={() => onOpenChange(false)}
-            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity duration-[84ms] opacity-60 hover:opacity-50"
+            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-50"
+            style={transitionStyle}
           >
             ×
           </button>
