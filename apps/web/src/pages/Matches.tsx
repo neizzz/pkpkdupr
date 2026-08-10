@@ -8,6 +8,7 @@ import Match, {
 } from "@/components/Match";
 import MatchDetail, { MatchDetailSkeleton } from "@/components/MatchDetail";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import LoadMoreButton from "@/components/LoadMoreButton";
 import RightDrawer from "@/components/RightDrawer";
 import SessionCard from "@/components/SessionCard";
 import SessionDetail from "@/components/SessionDetail";
@@ -826,14 +827,10 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
                     </p>
                   ) : null}
                   {hasMoreItems ? (
-                    <Button
-                      type="button"
-                      className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-                      isDisabled={isLoadingMore}
+                    <LoadMoreButton
+                      isLoading={isLoadingMore}
                       onPress={() => void loadFeed(nextPage, true)}
-                    >
-                      {isLoadingMore ? "불러오는 중..." : "더 보기"}
-                    </Button>
+                    />
                   ) : null}
                 </div>
               </div>

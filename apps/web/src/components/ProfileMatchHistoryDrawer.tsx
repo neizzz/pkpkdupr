@@ -1,7 +1,7 @@
 import React from "react";
-import { Button, Spinner } from "@heroui/react";
 import type { MatchInfo } from "@/components/Match";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import LoadMoreButton from "@/components/LoadMoreButton";
 import ProfileMatchList, {
   type ProfileMatchListItem,
 } from "@/components/ProfileMatchList";
@@ -58,23 +58,13 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
       <div className="p-2">
         <ProfileMatchList
           matches={matches}
-          isLoading={isLoading}
+          isLoading={isLoading && matches.length === 0}
           variant="plain"
           emptyMessage="완료된 매치가 없어요."
           onPressMatch={onPressMatch}
         />
         {hasMore ? (
-          <div className="flex justify-center pt-3 pb-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              isDisabled={isLoadingMore}
-              onPress={onLoadMore}
-            >
-              {isLoadingMore ? <Spinner size="sm" /> : "더 보기"}
-            </Button>
-          </div>
+          <LoadMoreButton isLoading={isLoadingMore} onPress={onLoadMore} />
         ) : null}
       </div>
     </div>
