@@ -53,6 +53,13 @@ require_file() {
   }
 }
 
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "❌ '$1' 명령이 필요합니다." >&2
+    exit 1
+  }
+}
+
 read_env_value() {
   local env_file="$1" key="$2"
   awk -F= -v target="${key}" '$1 == target { print substr($0, index($0, "=") + 1) }' "${env_file}" | tail -n 1
@@ -95,15 +102,27 @@ write_notice_state() {
 }
 
 require_certificate() {
-  local domain
+  local domain admin_domain host
   domain="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"
   domain="${domain:-pkelo.app}"
+  admin_domain="$(read_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN)"
+  [[ -n "${admin_domain}" && "${admin_domain}" != replace-with-* ]] || {
+    echo "❌ ${PKELO_ENV_FILE}의 ADMIN_DOMAIN 값을 설정해야 합니다." >&2
+    exit 1
+  }
   local certificate_file="${PKELO_CERT_ROOT}/etc/letsencrypt/live/${domain}/fullchain.pem"
 
   [[ -f "${certificate_file}" ]] || {
     echo "❌ PKELO 인증서가 없습니다. 먼저 bash scripts/bootstrap-pkelo-certificate.sh를 실행하세요." >&2
     exit 1
   }
+
+  for host in "${domain}" "${admin_domain}"; do
+    openssl x509 -in "${certificate_file}" -noout -checkhost "${host}" >/dev/null || {
+      echo "❌ PKELO 인증서에 ${host}가 포함되어 있지 않습니다. bootstrap-pkelo-certificate.sh를 다시 실행하세요." >&2
+      exit 1
+    }
+  done
 }
 
 run_notice_deploy() {
@@ -170,6 +189,7 @@ require_file "${PKELO_ENV_FILE}"
 require_file "${NOTICE_ENV_FILE}"
 require_file "${MANUAL_DEPLOY_SCRIPT}"
 require_file "${PKELO_NOTICE_SCRIPT}"
+require_command openssl
 
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"

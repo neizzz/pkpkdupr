@@ -20,7 +20,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-pkelo-dev-secret-change-me}
       DOMAIN: ${DOMAIN:-pkelo.app}
       WEB_PUBLIC_PORT: ${WEB_PUBLIC_PORT:-443}
-      ADMIN_STACK_PORT: ${ADMIN_STACK_PORT:-3333}
+      ADMIN_WEB_ORIGIN: https://${ADMIN_DOMAIN:-admin.pkelo.app}
       API_ADMIN_USERNAME: ${API_ADMIN_USERNAME:-admin}
       API_ADMIN_PASSWORD: ${API_ADMIN_PASSWORD:-admin123qwe}
       USER_AUTH_PROVIDER: ${USER_AUTH_PROVIDER:-kakao}

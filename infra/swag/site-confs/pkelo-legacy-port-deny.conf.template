@@ -1,0 +1,10 @@
+server {
+    listen 3333 ssl;
+    listen [::]:3333 ssl;
+
+    server_name __PKELO_DOMAIN__ __PKELO_ADMIN_DOMAIN__;
+
+    include /config/nginx/pkelo-ssl.conf;
+
+    return 444;
+}

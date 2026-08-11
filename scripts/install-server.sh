@@ -16,6 +16,11 @@ PKPKDUPR_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkpkdupr.conf"
 PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
 PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
 PKELO_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo.conf"
+PKELO_ADMIN_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-admin.conf.template"
+PKELO_ADMIN_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-admin-notice.conf.template"
+PKELO_ADMIN_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo-admin.conf"
+PKELO_LEGACY_PORT_DENY_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-legacy-port-deny.conf.template"
+PKELO_LEGACY_PORT_DENY_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo-legacy-port-deny.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
 LEGACY_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
@@ -126,6 +131,7 @@ render_template() {
   sed \
     -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" \
     -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" \
+    -e "s/__PKELO_ADMIN_DOMAIN__/${PKELO_ADMIN_DOMAIN:-}/g" \
     "${template}" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${target}"
@@ -133,11 +139,15 @@ render_template() {
 
 sync_proxy_site_configs() {
   local pkelo_template="${PKELO_APP_TEMPLATE}"
+  local pkelo_admin_template="${PKELO_ADMIN_APP_TEMPLATE}"
   if is_notice_enabled; then
     pkelo_template="${PKELO_NOTICE_TEMPLATE}"
+    pkelo_admin_template="${PKELO_ADMIN_NOTICE_TEMPLATE}"
   fi
   render_template "${PKPKDUPR_SWAG_TEMPLATE}" "${PKPKDUPR_SWAG_TARGET}"
   render_template "${pkelo_template}" "${PKELO_SWAG_TARGET}"
+  render_template "${pkelo_admin_template}" "${PKELO_ADMIN_SWAG_TARGET}"
+  render_template "${PKELO_LEGACY_PORT_DENY_TEMPLATE}" "${PKELO_LEGACY_PORT_DENY_TARGET}"
   render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
   rm -f "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"
 }
@@ -164,12 +174,16 @@ resolve_environment() {
   require_file "${PKPKDUPR_SWAG_TEMPLATE}"
   require_file "${PKELO_APP_TEMPLATE}"
   require_file "${PKELO_NOTICE_TEMPLATE}"
+  require_file "${PKELO_ADMIN_APP_TEMPLATE}"
+  require_file "${PKELO_ADMIN_NOTICE_TEMPLATE}"
+  require_file "${PKELO_LEGACY_PORT_DENY_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
 
   PRIMARY_DOMAIN="$(read_env_value "${PRIMARY_ENV_FILE}" DOMAIN)"
   PRIMARY_DOMAIN="${PRIMARY_DOMAIN:-pkpkdupr.duckdns.org}"
   PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"
   PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
+  PKELO_ADMIN_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN)"
   ADMIN_STACK_PORT="$(read_env_value "${SHARED_ENV_FILE}" ADMIN_STACK_PORT)"
   ADMIN_STACK_PORT="${ADMIN_STACK_PORT:-3333}"
   PRIMARY_DUCKDNS_TOKEN="$(read_env_value "${PRIMARY_ENV_FILE}" DUCKDNSTOKEN)"
@@ -185,6 +199,7 @@ resolve_environment() {
   require_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN "${PKELO_CLOUDFLARE_TOKEN}"
   require_env_value "${PRIMARY_ENV_FILE}" JWT_SECRET "${PRIMARY_JWT_SECRET}"
   require_env_value "${PKELO_ENV_FILE}" JWT_SECRET "${PKELO_JWT_SECRET}"
+  require_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN "${PKELO_ADMIN_DOMAIN}"
 
   local env_file key
   for env_file in "${PRIMARY_ENV_FILE}" "${PKELO_ENV_FILE}"; do
@@ -209,6 +224,17 @@ resolve_environment() {
   local key
   for key in KAKAO_REST_API_KEY KAKAO_CLIENT_SECRET KAKAO_REDIRECT_URI KAKAO_WEB_ORIGIN; do
     require_env_value "${PKELO_ENV_FILE}" "${key}" "$(read_env_value "${PKELO_ENV_FILE}" "${key}")"
+  done
+}
+
+verify_pkelo_certificate_hosts() {
+  local certificate_file="${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
+  local host
+  for host in "${PKELO_DOMAIN}" "${PKELO_ADMIN_DOMAIN}"; do
+    openssl x509 -in "${certificate_file}" -noout -checkhost "${host}" >/dev/null || {
+      echo "❌ PKELO 인증서에 ${host}가 포함되어 있지 않습니다. Cloudflare DNS-01 인증서를 다시 발급하세요." >&2
+      exit 1
+    }
   done
 }
 
@@ -248,6 +274,7 @@ assert_all_services_running() {
 
 require_command docker
 require_command sed
+require_command openssl
 docker compose version >/dev/null
 
 cd "${SOURCE_REPO_ROOT}"
@@ -268,6 +295,7 @@ compose_proxy up -d
 compose_certificate up -d
 wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
 wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
+verify_pkelo_certificate_hosts
 sync_proxy_site_configs
 compose_proxy exec -T proxy nginx -t
 compose_proxy exec -T proxy nginx -s reload
@@ -286,4 +314,4 @@ compose_proxy exec -T proxy nginx -t
 compose_proxy exec -T proxy nginx -s reload
 
 assert_all_services_running
-echo "🎉 설치 완료: pkpkdupr=https://${PRIMARY_DOMAIN}, pkelo=https://${PKELO_DOMAIN} (컨테이너 기동 상태 확인 완료)"
+echo "🎉 설치 완료: pkpkdupr=https://${PRIMARY_DOMAIN}, pkelo=https://${PKELO_DOMAIN}, pkelo-admin=https://${PKELO_ADMIN_DOMAIN} (컨테이너 기동 상태 확인 완료)"

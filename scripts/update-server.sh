@@ -17,6 +17,11 @@ PKPKDUPR_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkpkdupr.conf"
 PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
 PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
 PKELO_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo.conf"
+PKELO_ADMIN_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-admin.conf.template"
+PKELO_ADMIN_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-admin-notice.conf.template"
+PKELO_ADMIN_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo-admin.conf"
+PKELO_LEGACY_PORT_DENY_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-legacy-port-deny.conf.template"
+PKELO_LEGACY_PORT_DENY_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo-legacy-port-deny.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
 LEGACY_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
@@ -56,7 +61,11 @@ render_template() {
   local template="$1" target="$2" temp_file
   mkdir -p "$(dirname "${target}")"
   temp_file="$(mktemp "$(dirname "${target}")/.$(basename "${target}").XXXXXX")"
-  sed -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" "${template}" > "${temp_file}"
+  sed \
+    -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" \
+    -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" \
+    -e "s/__PKELO_ADMIN_DOMAIN__/${PKELO_ADMIN_DOMAIN:-}/g" \
+    "${template}" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${target}"
 }
@@ -101,10 +110,14 @@ sync_pkpkdupr_proxy_site_config() {
 
 sync_pkelo_proxy_site_config() {
   local pkelo_template="${PKELO_APP_TEMPLATE}"
+  local pkelo_admin_template="${PKELO_ADMIN_APP_TEMPLATE}"
   if is_notice_enabled; then
     pkelo_template="${PKELO_NOTICE_TEMPLATE}"
+    pkelo_admin_template="${PKELO_ADMIN_NOTICE_TEMPLATE}"
   fi
   render_template "${pkelo_template}" "${PKELO_SWAG_TARGET}"
+  render_template "${pkelo_admin_template}" "${PKELO_ADMIN_SWAG_TARGET}"
+  render_template "${PKELO_LEGACY_PORT_DENY_TEMPLATE}" "${PKELO_LEGACY_PORT_DENY_TARGET}"
   render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
 }
 
@@ -124,7 +137,8 @@ backup_proxy_site_configs() {
   local backup_dir="$1"
   local path
   for path in \
-    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_ADMIN_SWAG_TARGET}" \
+    "${PKELO_LEGACY_PORT_DENY_TARGET}" "${PKELO_SSL_TARGET}" \
     "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
     local name
     name="$(basename "${path}")"
@@ -140,7 +154,8 @@ restore_proxy_site_configs() {
   local backup_dir="$1"
   local path
   for path in \
-    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_ADMIN_SWAG_TARGET}" \
+    "${PKELO_LEGACY_PORT_DENY_TARGET}" "${PKELO_SSL_TARGET}" \
     "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
     local name
     name="$(basename "${path}")"
@@ -213,6 +228,17 @@ wait_for_file() {
   exit 1
 }
 
+verify_pkelo_certificate_hosts() {
+  local certificate_file="${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
+  local host
+  for host in "${PKELO_DOMAIN}" "${PKELO_ADMIN_DOMAIN}"; do
+    openssl x509 -in "${certificate_file}" -noout -checkhost "${host}" >/dev/null || {
+      echo "❌ PKELO 인증서에 ${host}가 포함되어 있지 않습니다. bootstrap-pkelo-certificate.sh를 다시 실행하세요." >&2
+      exit 1
+    }
+  done
+}
+
 compose_proxy() {
   docker compose --project-name pkpkdupr --env-file "${SHARED_ENV_FILE}" --env-file "${PRIMARY_ENV_FILE}" -f docker-compose.proxy.yml "$@"
 }
@@ -264,12 +290,14 @@ resolve_pkelo_environment() {
   require_file "${PKELO_ENV_FILE}"
   PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"
   PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
+  PKELO_ADMIN_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN)"
   PKELO_CLOUDFLARE_TOKEN="$(read_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN)"
   PKELO_JWT_SECRET="$(read_env_value "${PKELO_ENV_FILE}" JWT_SECRET)"
   PKELO_USER_AUTH_PROVIDER="$(read_env_value "${PKELO_ENV_FILE}" USER_AUTH_PROVIDER)"
   PKELO_USER_AUTH_PROVIDER="${PKELO_USER_AUTH_PROVIDER:-kakao}"
   require_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN "${PKELO_CLOUDFLARE_TOKEN}"
   require_env_value "${PKELO_ENV_FILE}" JWT_SECRET "${PKELO_JWT_SECRET}"
+  require_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN "${PKELO_ADMIN_DOMAIN}"
   local key
   for key in API_ADMIN_PASSWORD MYSQL_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_VIEWER_PASSWORD; do
     require_env_value "${PKELO_ENV_FILE}" "${key}" "$(read_env_value "${PKELO_ENV_FILE}" "${key}")"
@@ -288,6 +316,9 @@ require_pkpkdupr_proxy_template() {
 require_pkelo_proxy_templates() {
   require_file "${PKELO_APP_TEMPLATE}"
   require_file "${PKELO_NOTICE_TEMPLATE}"
+  require_file "${PKELO_ADMIN_APP_TEMPLATE}"
+  require_file "${PKELO_ADMIN_NOTICE_TEMPLATE}"
+  require_file "${PKELO_LEGACY_PORT_DENY_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
 }
 
@@ -376,6 +407,9 @@ esac
 
 require_command docker
 require_command sed
+if [[ "${TARGET_STACK}" != "pkpkdupr" ]]; then
+  require_command openssl
+fi
 docker compose version >/dev/null
 cd "${SOURCE_REPO_ROOT}"
 export PKPKDUPR_DEPLOY_PATH="${DEPLOY_ROOT}"
@@ -385,6 +419,9 @@ resolve_environment
 if [[ "${TARGET_STACK}" != "all" ]]; then
   ensure_gateway_network
   require_running_proxy
+  if [[ "${TARGET_STACK}" == "pkelo" ]]; then
+    verify_pkelo_certificate_hosts
+  fi
 fi
 
 if [[ -n "${GHCR_USERNAME:-}" && -n "${GHCR_TOKEN:-}" ]]; then
@@ -401,6 +438,7 @@ if [[ "${TARGET_STACK}" == "all" ]]; then
   compose_certificate up -d
   wait_for_file "${DEPLOY_ROOT}/data/certs/nginx/proxy.conf"
   wait_for_file "${PKELO_CERT_ROOT}/etc/letsencrypt/live/${PKELO_DOMAIN}/fullchain.pem"
+  verify_pkelo_certificate_hosts
 fi
 
 case "${TARGET_STACK}" in

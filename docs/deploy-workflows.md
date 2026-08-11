@@ -18,11 +18,11 @@ chmod 600 env/*.env
 
 | 파일 | 소유 설정 |
 | --- | --- |
-| `shared.env` | 이미지 태그, 외부 포트, 공용 게이트웨이 네트워크, SWAG 런타임 계정 |
+| `shared.env` | 이미지 태그, 기존 pkpkdupr의 3333 운영 포트, 공용 게이트웨이 네트워크, SWAG 런타임 계정 |
 | `pkpkdupr.env` | 기존 DuckDNS 앱의 도메인·DuckDNS 토큰·JWT·관리자·MySQL·업로드 경로와 `USER_AUTH_PROVIDER=password` |
-| `pkelo.env` | `pkelo.app`의 도메인·Cloudflare 토큰·JWT·관리자·MySQL·업로드 경로와 Kakao OAuth 시크릿 |
+| `pkelo.env` | `pkelo.app` 사용자 도메인과 `admin.pkelo.app` 관리자 도메인, Cloudflare 토큰·JWT·관리자·MySQL·업로드 경로와 Kakao OAuth 시크릿 |
 
-두 앱 파일은 모두 같은 일반 변수명(`DOMAIN`, `JWT_SECRET`, `MYSQL_*`, `API_ADMIN_*`, `CORS_ADDITIONAL_ORIGINS`)을 사용합니다. `pkelo`용 접두사 변수는 사용하지 않습니다. 두 `JWT_SECRET`은 반드시 서로 달라야 합니다.
+두 앱 파일은 모두 같은 일반 변수명(`DOMAIN`, `JWT_SECRET`, `MYSQL_*`, `API_ADMIN_*`, `CORS_ADDITIONAL_ORIGINS`)을 사용합니다. PKELO에는 관리자 호스트용 `ADMIN_DOMAIN=admin.pkelo.app`도 설정합니다. 두 `JWT_SECRET`은 반드시 서로 달라야 합니다.
 
 ## PKELO Kakao 로그인
 
@@ -36,7 +36,7 @@ KAKAO_REDIRECT_URI=https://pkelo.app/auth/kakao/callback
 KAKAO_WEB_ORIGIN=https://pkelo.app
 ```
 
-Kakao Developers 콘솔에는 `https://pkelo.app/auth/kakao/callback`을 Redirect URI로 정확히 등록합니다. 일반 사용자는 Kakao 로그인만 사용하며 첫 로그인 뒤 PKELO 사용자명과 성별을 한 번 입력합니다. 관리자는 계속 `https://pkelo.app:3333/admin/`에서 별도 아이디·비밀번호로 로그인합니다.
+Kakao Developers 콘솔에는 `https://pkelo.app/auth/kakao/callback`을 Redirect URI로 정확히 등록합니다. 일반 사용자는 Kakao 로그인만 사용하며 첫 로그인 뒤 PKELO 사용자명과 성별을 한 번 입력합니다. 관리자는 `https://admin.pkelo.app/`에서 별도 아이디·비밀번호로 로그인하고, Adminer는 `https://admin.pkelo.app/db/`를 사용합니다.
 
 로컬은 `pnpm dev:pkelo`을 사용하면 `USER_AUTH_PROVIDER=kakao-mock` 기본값으로 외부 Kakao 호출 없이 같은 state·callback·onboarding 흐름을 검증합니다. 운영 env에서 `kakao-mock`은 설치·업데이트 단계와 API 시작 단계에서 모두 거부됩니다.
 
@@ -44,18 +44,18 @@ Kakao Developers 콘솔에는 `https://pkelo.app/auth/kakao/callback`을 Redirec
 
 ## Compose와 인증서
 
-- `docker-compose.proxy.yml`: 외부 `443`, `3333`을 바인딩하는 DuckDNS SWAG와 공용 `pkpkdupr-gateway` 네트워크를 생성합니다.
-- `docker-compose.pkelo-certificate.yml`: 포트를 열지 않는 Cloudflare DNS-01 SWAG입니다. `pkelo.app` 인증서를 `/opt/pkpkdupr/data/pkelo-certs`에 갱신합니다.
+- `docker-compose.proxy.yml`: 외부 `443`, 기존 pkpkdupr용 `3333`을 바인딩하는 DuckDNS SWAG와 공용 `pkpkdupr-gateway` 네트워크를 생성합니다. PKELO 도메인에는 3333 서비스를 제공하지 않습니다.
+- `docker-compose.pkelo-certificate.yml`: 포트를 열지 않는 Cloudflare DNS-01 SWAG입니다. `pkelo.app`과 `admin.pkelo.app` 인증서를 `/opt/pkpkdupr/data/pkelo-certs`에 갱신합니다.
 - `docker-compose.yml` + `docker-compose.pkpkdupr-gateway.yml`: 기존 서비스명과 `mysql-data` 볼륨을 유지하는 기본 앱입니다. 프록시에는 `pkpkdupr-web`, `pkpkdupr-api` 등의 고유 별칭으로 연결됩니다.
 - `docker-compose.pkelo.yml` + `docker-compose.pkelo-gateway.yml`: 새 MySQL 볼륨과 `data/uploads/pkelo/avatars`를 쓰는 `pkelo` 전용 앱입니다.
 
-주 SWAG는 `/opt/pkpkdupr/data/certs/nginx/site-confs/pkpkdupr.conf`와 `pkelo.conf`를 도메인별로 독립 생성합니다. `pkelo.app` SNI는 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`를 통해 읽기 전용으로 공유한 Cloudflare 인증서를 사용합니다. DuckDNS와 Cloudflare credential 파일만 스크립트가 `600` 권한으로 동기화합니다.
+주 SWAG는 `/opt/pkpkdupr/data/certs/nginx/site-confs/pkpkdupr.conf`, `pkelo.conf`, `pkelo-admin.conf`를 도메인별로 독립 생성합니다. PKELO의 옛 3333 요청은 전용 deny 설정으로 차단해 pkpkdupr 기본 vhost로 떨어지지 않게 합니다. `pkelo.app`과 `admin.pkelo.app` SNI는 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`를 통해 읽기 전용으로 공유한 Cloudflare 인증서를 사용합니다. DuckDNS와 Cloudflare credential 파일만 스크립트가 `600` 권한으로 동기화합니다.
 
 ## 기존 pkpkdupr 서버에 PKELO 최초 추가
 
 기존 `pkpkdupr-proxy`가 실행 중이고 PKELO와 pkpkdupr의 이미지 태그를 분리한다면, `--stack all` 대신 PKELO 인증서만 먼저 초기화합니다. 이 과정은 기존 pkpkdupr 앱 컨테이너를 재시작하거나 이미지를 pull하지 않습니다.
 
-`/opt/pkpkdupr/env/pkelo.env`에 `CLOUDFLARE_DNS_API_TOKEN`을 설정한 뒤 아래 명령을 실행합니다. 스크립트가 `data/pkelo-certs/dns-conf/cloudflare.ini`을 `600` 권한으로 생성하고 Cloudflare DNS-01 인증서 발급까지 대기합니다.
+Cloudflare DNS에 `admin` 레코드를 기존 원본 서버로 추가하고 주황 구름(프록시)을 켭니다. `/opt/pkpkdupr/env/pkelo.env`에는 `ADMIN_DOMAIN=admin.pkelo.app`과 `CLOUDFLARE_DNS_API_TOKEN`을 설정합니다. 아래 스크립트는 `data/pkelo-certs/dns-conf/cloudflare.ini`을 `600` 권한으로 생성하고 두 PKELO 호스트가 포함된 Cloudflare DNS-01 인증서 발급까지 대기합니다.
 
 ```bash
 bash scripts/bootstrap-pkelo-certificate.sh
@@ -162,12 +162,12 @@ NEW_RELIC_LICENSE_KEY=<new-relic-license-key>
 New Relic UI에서 TLS 검증을 켠 서울·도쿄·싱가포르 공개 위치 3곳, 5분 주기의 monitor 5개를 수동으로 생성합니다.
 
 - Simple Browser: `https://pkelo.app/`
-- Scripted API: `https://pkelo.app:3333/api/health` — HTTP 200, JSON `status: "ok"`
-- Scripted API: `https://pkelo.app:3333/api/ping` — HTTP 200, JSON `message: "pong"`
-- Simple Browser: `https://pkelo.app:3333/admin/`
-- Simple Browser: `https://pkelo.app:3333/db/` — 응답 본문 `adminer`
+- Scripted API: `https://pkelo.app/api/health` — HTTP 200, JSON `status: "ok"`
+- Scripted API: `https://pkelo.app/api/ping` — HTTP 200, JSON `message: "pong"`
+- Simple Browser: `https://admin.pkelo.app/`
+- Simple Browser: `https://admin.pkelo.app/db/` — 응답 본문 `adminer`
 
-두 Scripted API monitor는 위 `pkpkdupr Synthetics` assertion 스크립트에서 URL만 PKELO 대상 URL로 바꿔 사용합니다. PKELO monitor에는 Alert policy, condition, Workflow, notification destination을 만들지 않습니다. 공개 위치에서 `:3333` 포트가 접근 가능해야 합니다.
+두 Scripted API monitor는 위 `pkpkdupr Synthetics` assertion 스크립트에서 URL만 `https://pkelo.app/api/health`, `https://pkelo.app/api/ping`으로 바꿔 사용합니다. PKELO monitor에는 Alert policy, condition, Workflow, notification destination을 만들지 않습니다.
 
 ## GitHub Actions
 

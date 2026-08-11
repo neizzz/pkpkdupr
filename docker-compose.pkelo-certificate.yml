@@ -11,6 +11,6 @@ services:
       URL: ${DOMAIN:-pkelo.app}
       VALIDATION: dns
       DNSPLUGIN: cloudflare
-      SUBDOMAINS: ""
+      SUBDOMAINS: admin
     volumes:
       - ${PKPKDUPR_DEPLOY_PATH:-.}/data/pkelo-certs:/config

@@ -18,7 +18,7 @@ usage() {
 usage: bash scripts/bootstrap-pkelo-certificate.sh
 
 pkelo.env의 CLOUDFLARE_DNS_API_TOKEN으로 Cloudflare DNS-01 credential을 생성하고,
-pkelo.app 인증서 컨테이너를 기동한 뒤 인증서 발급을 기다립니다.
+pkelo.app 및 admin.pkelo.app 인증서 컨테이너를 기동한 뒤 인증서 발급을 기다립니다.
 
 환경 변수:
   PKPKDUPR_DEPLOY_PATH       배포 루트 (기본: /opt/pkpkdupr)
@@ -90,6 +90,19 @@ wait_for_certificate() {
   exit 1
 }
 
+verify_certificate_hosts() {
+  local certificate_file="${CERTIFICATE_FILE}/${PKELO_DOMAIN}/fullchain.pem"
+  local host
+  for host in "${PKELO_DOMAIN}" "${PKELO_ADMIN_DOMAIN}"; do
+    openssl x509 -in "${certificate_file}" -noout -checkhost "${host}" >/dev/null || {
+      echo "❌ PKELO 인증서에 ${host}가 포함되어 있지 않습니다. Cloudflare DNS-01 인증서를 다시 발급하세요." >&2
+      exit 1
+    }
+  done
+
+  echo "✅ PKELO 인증서에 ${PKELO_DOMAIN}, ${PKELO_ADMIN_DOMAIN} 호스트가 포함되어 있습니다."
+}
+
 case "${1:-}" in
   "" ) ;;
   -h|--help)
@@ -105,6 +118,7 @@ esac
 require_command awk
 require_command docker
 require_command mktemp
+require_command openssl
 docker compose version >/dev/null
 
 if ! [[ "${WAIT_SECONDS}" =~ ^[1-9][0-9]*$ ]]; then
@@ -119,9 +133,12 @@ require_file "${PKELO_ENV_FILE}"
 
 PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"
 PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
+PKELO_ADMIN_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN)"
 PKELO_CLOUDFLARE_TOKEN="$(read_env_value "${PKELO_ENV_FILE}" CLOUDFLARE_DNS_API_TOKEN)"
 require_env_value "CLOUDFLARE_DNS_API_TOKEN" "${PKELO_CLOUDFLARE_TOKEN}"
+require_env_value "ADMIN_DOMAIN" "${PKELO_ADMIN_DOMAIN}"
 
 write_cloudflare_credentials
 compose_certificate up -d
 wait_for_certificate
+verify_certificate_hosts

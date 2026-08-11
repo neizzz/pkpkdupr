@@ -20,6 +20,11 @@ LEGACY_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/default.conf"
 LEGACY_PKELO_MODE_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-mode.conf"
 PKELO_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-app.conf.template"
 PKELO_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-notice.conf.template"
+PKELO_ADMIN_APP_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-admin.conf.template"
+PKELO_ADMIN_NOTICE_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-admin-notice.conf.template"
+PKELO_LEGACY_PORT_DENY_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-legacy-port-deny.conf.template"
+PKELO_ADMIN_SWAG_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo-admin.conf"
+PKELO_LEGACY_PORT_DENY_TARGET="${DEPLOY_ROOT}/data/certs/nginx/site-confs/pkelo-legacy-port-deny.conf"
 PKELO_SSL_TEMPLATE="${SOURCE_REPO_ROOT}/infra/swag/site-confs/pkelo-ssl.conf.template"
 PKELO_SSL_TARGET="${DEPLOY_ROOT}/data/certs/nginx/pkelo-ssl.conf"
 
@@ -78,6 +83,16 @@ is_blank() {
   [[ -z "${1//[[:space:]]/}" ]]
 }
 
+require_env_value() {
+  local key="$1" value="$2"
+  case "${value}" in
+    ""|replace-with-*)
+      echo "❌ ${PKELO_ENV_FILE}의 ${key} 값을 설정해야 합니다." >&2
+      exit 1
+      ;;
+  esac
+}
+
 ensure_notice_env() {
   if [[ -f "${NOTICE_ENV_FILE}" ]]; then
     return
@@ -101,6 +116,9 @@ load_environment() {
   require_file "${PKELO_ENV_FILE}"
   require_file "${PKELO_APP_TEMPLATE}"
   require_file "${PKELO_NOTICE_TEMPLATE}"
+  require_file "${PKELO_ADMIN_APP_TEMPLATE}"
+  require_file "${PKELO_ADMIN_NOTICE_TEMPLATE}"
+  require_file "${PKELO_LEGACY_PORT_DENY_TEMPLATE}"
   require_file "${PKELO_SSL_TEMPLATE}"
 
   ensure_notice_env
@@ -111,8 +129,8 @@ load_environment() {
 
   PKELO_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" DOMAIN)"
   PKELO_DOMAIN="${PKELO_DOMAIN:-pkelo.app}"
-  ADMIN_STACK_PORT="$(read_env_value "${SHARED_ENV_FILE}" ADMIN_STACK_PORT)"
-  ADMIN_STACK_PORT="${ADMIN_STACK_PORT:-3333}"
+  PKELO_ADMIN_DOMAIN="$(read_env_value "${PKELO_ENV_FILE}" ADMIN_DOMAIN)"
+  require_env_value "ADMIN_DOMAIN" "${PKELO_ADMIN_DOMAIN}"
   NOTICE_TITLE="$(read_env_value "${settings_file}" PKELO_NOTICE_TITLE)"
   NOTICE_MESSAGE="$(read_env_value "${settings_file}" PKELO_NOTICE_MESSAGE)"
   if [[ "${HAS_NOTICE_TITLE_OVERRIDE}" == true ]]; then
@@ -204,6 +222,7 @@ render_template() {
   sed \
     -e "s/__DOMAIN__/${PRIMARY_DOMAIN:-}/g" \
     -e "s/__PKELO_DOMAIN__/${PKELO_DOMAIN:-}/g" \
+    -e "s/__PKELO_ADMIN_DOMAIN__/${PKELO_ADMIN_DOMAIN:-}/g" \
     "${template}" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${target}"
@@ -241,12 +260,16 @@ retire_legacy_proxy_site_configs() {
 
 sync_proxy_site_configs() {
   local pkelo_template="${PKELO_APP_TEMPLATE}"
+  local pkelo_admin_template="${PKELO_ADMIN_APP_TEMPLATE}"
   if is_notice_enabled; then
     pkelo_template="${PKELO_NOTICE_TEMPLATE}"
+    pkelo_admin_template="${PKELO_ADMIN_NOTICE_TEMPLATE}"
   fi
 
   migrate_legacy_proxy_site_configs
   render_template "${pkelo_template}" "${PKELO_SWAG_TARGET}"
+  render_template "${pkelo_admin_template}" "${PKELO_ADMIN_SWAG_TARGET}"
+  render_template "${PKELO_LEGACY_PORT_DENY_TEMPLATE}" "${PKELO_LEGACY_PORT_DENY_TARGET}"
   render_template "${PKELO_SSL_TEMPLATE}" "${PKELO_SSL_TARGET}"
   retire_legacy_proxy_site_configs
 }
@@ -255,7 +278,8 @@ backup_proxy_configs() {
   local backup_dir="$1"
   local path
   for path in \
-    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_ADMIN_SWAG_TARGET}" \
+    "${PKELO_LEGACY_PORT_DENY_TARGET}" "${PKELO_SSL_TARGET}" \
     "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
     local name
     name="$(basename "${path}")"
@@ -271,7 +295,8 @@ restore_proxy_configs() {
   local backup_dir="$1"
   local path
   for path in \
-    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_SSL_TARGET}" \
+    "${PKPKDUPR_SWAG_TARGET}" "${PKELO_SWAG_TARGET}" "${PKELO_ADMIN_SWAG_TARGET}" \
+    "${PKELO_LEGACY_PORT_DENY_TARGET}" "${PKELO_SSL_TARGET}" \
     "${LEGACY_SWAG_TARGET}" "${LEGACY_PKELO_MODE_TARGET}"; do
     local name
     name="$(basename "${path}")"

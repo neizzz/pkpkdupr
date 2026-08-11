@@ -3,7 +3,7 @@ server {
     listen [::]:443 ssl;
     http2 on;
 
-    server_name __PKELO_DOMAIN__;
+    server_name __PKELO_ADMIN_DOMAIN__;
 
     include /config/nginx/pkelo-ssl.conf;
 
@@ -13,10 +13,8 @@ server {
         return 404;
     }
 
-    location = /api/runtime-notice {
-        add_header Cache-Control "no-store" always;
-        proxy_pass http://pkelo-web:80/runtime/notice.json;
-        include /config/nginx/proxy.conf;
+    location = /db {
+        return 301 /db/;
     }
 
     location ^~ /api/ {
@@ -29,13 +27,14 @@ server {
         include /config/nginx/proxy.conf;
     }
 
-    location ^~ /auth/kakao/ {
-        proxy_pass http://pkelo-api:4000;
+    location /db/ {
+        rewrite ^/db/(.*)$ /$1 break;
+        proxy_pass http://pkelo-adminer:8080;
         include /config/nginx/proxy.conf;
     }
 
     location / {
-        proxy_pass http://pkelo-web:80;
+        proxy_pass http://pkelo-admin-web:80;
         include /config/nginx/proxy.conf;
     }
 }
