@@ -127,7 +127,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
           aria-label="상태메시지 추가"
         >
           상태메시지 추가
-          <MdEdit className="size-3.5 shrink-0" />
+          <MdEdit className="size-3.5 shrink-0 text-pkpk-main-font" />
         </button>
       ) : null}
 

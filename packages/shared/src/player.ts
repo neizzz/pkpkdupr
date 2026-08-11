@@ -7,7 +7,7 @@ export interface PlayerAffiliation {
 
 export const PLAYER_AFFILIATION_MAX_COUNT = 5;
 export const PLAYER_AFFILIATION_NAME_MAX_LENGTH = 30;
-export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 30;
+export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 20;
 
 /**
  * 소속 비교와 매치 스냅샷에 쓰는 정규화된 이름입니다.

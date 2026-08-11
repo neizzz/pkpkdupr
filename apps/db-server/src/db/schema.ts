@@ -15,6 +15,7 @@ import {
   matchSourceValues,
   matchTypeValues,
 } from "@pkpkdupr/shared/match";
+import { PLAYER_STATUS_MESSAGE_MAX_LENGTH } from "@pkpkdupr/shared/player";
 
 /**
  * The SQLite database persisted timestamps as Unix seconds. Keep that storage
@@ -37,7 +38,9 @@ export const players = mysqlTable("players", {
   status: varchar("status", { length: 32 }).notNull(),
   avatarUrl: text("avatar_url"),
   affiliationsJson: text("affiliations_json"),
-  statusMessage: text("status_message"),
+  statusMessage: varchar("status_message", {
+    length: PLAYER_STATUS_MESSAGE_MAX_LENGTH,
+  }),
   statusMessageBackgroundColor: varchar("status_message_background_color", {
     length: 32,
   }),
