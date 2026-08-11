@@ -84,6 +84,7 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
+        inlineWorkboxRuntime: true,
         importScripts: ["/cleanup-outdated-caches.js"],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
         navigateFallback: "/index.html",
