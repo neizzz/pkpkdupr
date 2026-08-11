@@ -542,7 +542,26 @@ export class AuthService {
   }
 
   private async refreshPlayerRatingChartProjections(playerIds: Iterable<string>) {
-    await this.playerRatingChartProjectionRefresher?.rebuildPlayers(playerIds);
+    const uniquePlayerIds = [...new Set([...playerIds].filter(Boolean))];
+    if (
+      uniquePlayerIds.length === 0 ||
+      !this.playerRatingChartProjectionRefresher
+    ) {
+      return;
+    }
+
+    try {
+      await this.playerRatingChartProjectionRefresher.rebuildPlayers(
+        uniquePlayerIds,
+      );
+    } catch (error) {
+      // 차트 projection은 평점 로그에서 다시 만들 수 있는 파생 데이터다.
+      // 여기서의 DB deadlock이 완료 경기의 평점 반영 자체를 중단시키면 안 된다.
+      console.error(
+        "[RATING_CHART_PROJECTION] projection 갱신 실패; 평점 반영은 유지합니다.",
+        { playerIds: uniquePlayerIds, error },
+      );
+    }
   }
 
   private shouldRequirePasswordChange(

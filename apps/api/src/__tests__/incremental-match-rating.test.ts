@@ -42,9 +42,10 @@ const jsonResponse = (body: unknown) =>
 describe("incremental match rating", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
-  it("완료된 한 경기의 참가자 상태와 로그만 증분 반영하고 재처리는 건너뛴다", async () => {
+  it("projection 갱신이 실패해도 완료 경기의 평점 로그를 저장하고 재처리는 건너뛴다", async () => {
     const players = new Map([
       ["winner", createPlayer("winner", 3)],
       ["loser", createPlayer("loser", 2.8)],
@@ -165,7 +166,10 @@ describe("incremental match rating", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const service = new AuthService(ratingService);
-    const rebuildPlayers = vi.fn().mockResolvedValue(undefined);
+    const rebuildPlayers = vi
+      .fn()
+      .mockRejectedValue(new Error("Deadlock found when trying to get lock"));
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     service.setPlayerRatingChartProjectionRefresher({ rebuildPlayers });
     const result = await service.applyMatchResultToRatings(match);
 
@@ -188,6 +192,13 @@ describe("incremental match rating", () => {
       `match-completed-${match.id}-${completedAt.getTime()}`,
     ]);
     expect(rebuildPlayers).toHaveBeenCalledWith(["winner", "loser"]);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[RATING_CHART_PROJECTION] projection 갱신 실패; 평점 반영은 유지합니다.",
+      expect.objectContaining({
+        playerIds: ["winner", "loser"],
+        error: expect.any(Error),
+      }),
+    );
     expect(
       fetchMock.mock.calls.some(([input]) =>
         String(input).endsWith("/internal/matches?page=0&limit=10000"),
