@@ -172,3 +172,11 @@ New Relic UI에서 TLS 검증을 켠 서울·도쿄·싱가포르 공개 위치 
 ## GitHub Actions
 
 `/Users/neiz/pkpkdupr/.github/workflows/deploy.yml`은 도메인 설정을 주입하지 않고 web/admin-web/api/db-server 이미지를 GHCR에 빌드·푸시만 합니다. 서버 반영은 운영자가 위 수동 명령으로 수행합니다.
+
+## PKELO 인증 전송 보안
+
+PKELO는 `pkelo.app`과 `admin.pkelo.app`의 443 TLS 가상 호스트만 서비스하며, PKELO의 3333 요청은 deny 설정으로 차단합니다. HTTP 80, 앱 API 4000, DB 포트는 공개하지 않습니다. 공용 PKELO TLS 템플릿은 `Strict-Transport-Security: max-age=31536000`을 반환하며 `includeSubDomains`와 `preload`는 사용하지 않습니다.
+
+운영 사용자 웹은 HTTPS API와 Kakao 로그인 URL만 사용합니다. 개발 모드의 loopback HTTP(`localhost`, `127.0.0.1`, `::1`)만 예외입니다. Kakao OAuth 인가 코드·일회성 ticket·JWT 및 관리자 비밀번호 흐름의 API 응답은 `Cache-Control: no-store`를 반환하고, Kakao callback 성공·실패 리다이렉트는 `Referrer-Policy: no-referrer`를 반환해야 합니다. 비밀번호, access token, OAuth 코드, ticket, 요청 본문을 proxy/API 로그 또는 New Relic 등 텔레메트리 속성에 기록하지 않습니다.
+
+배포 뒤 외부 환경에서 `https://pkelo.app/`와 `https://admin.pkelo.app/`의 인증서·HSTS를 확인하고, 4000·DB 포트 연결 실패와 민감 API의 `Cache-Control: no-store` 응답을 점검합니다.
