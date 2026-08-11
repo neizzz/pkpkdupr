@@ -6,6 +6,7 @@ server {
     server_name __DOMAIN__;
 
     include /config/nginx/ssl.conf;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     client_max_body_size 10m;
 
@@ -50,6 +51,7 @@ server {
     server_name __DOMAIN__;
 
     include /config/nginx/ssl.conf;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     client_max_body_size 10m;
 
