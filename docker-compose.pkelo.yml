@@ -1,18 +1,18 @@
 services:
   pkelo-web:
-    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkpkdupr-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkelo-web:${IMAGE_TAG:-latest}
     container_name: pkelo-web-app
     networks:
       - pkelo-network
 
   pkelo-admin-web:
-    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkpkdupr-admin-web:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkelo-admin-web:${IMAGE_TAG:-latest}
     container_name: pkelo-admin-web-app
     networks:
       - pkelo-network
 
   pkelo-api:
-    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkpkdupr-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkelo-api:${IMAGE_TAG:-latest}
     container_name: pkelo-api-server
     environment:
       NODE_ENV: production
@@ -75,7 +75,7 @@ services:
       - pkelo-network
 
   pkelo-db-server:
-    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkpkdupr-db-server:${IMAGE_TAG:-latest}
+    image: ghcr.io/${GHCR_NAMESPACE:-neizzz}/pkelo-db-server:${IMAGE_TAG:-latest}
     container_name: pkelo-db-server
     environment:
       DB_HOST: pkelo-mysql
