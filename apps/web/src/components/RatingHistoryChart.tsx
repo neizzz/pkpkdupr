@@ -85,8 +85,10 @@ const CHART_LINE_CLEARANCE_PX = 3;
 const CHART_POINT_CLEARANCE_PX = 5;
 const CHART_GUIDE_CLEARANCE_PX = 2;
 const CHART_CURVE_SAMPLE_COUNT = 24;
+const CHART_POINT_RADIUS_PX = 3;
+const CHART_TREND_FLAT_THRESHOLD = 0.0005;
 
-type RatingLabelKind = "maximum" | "minimum" | "today";
+type RatingLabelKind = "maximum" | "minimum" | "today" | "turning";
 
 interface ChartPoint {
   x: number;
@@ -116,11 +118,22 @@ interface RatingLabelTarget {
   index: number;
   kind: RatingLabelKind;
   isToday: boolean;
+  isOptional: boolean;
 }
 
 interface RatingLabelPlacement extends LabelRect {
   centerX: number;
   centerY: number;
+}
+
+interface DateLabelDecoration {
+  index: number;
+  text: string;
+  rect: LabelRect;
+}
+
+interface OptionalPointDecoration extends DateLabelDecoration {
+  ratingLabelPlacement: RatingLabelPlacement;
 }
 
 const isChartPoint = (point: unknown): point is MonotoneChartPoint =>
@@ -319,6 +332,7 @@ const getRatingLabelCandidateOffsets = (
     [-inwardDirection * 20, 14],
   ];
   const bottomCandidates: Array<[number, number]> = [
+    [0, 14],
     [inwardDirection * 20, 14],
     [-inwardDirection * 20, 14],
     [inwardDirection * 28, 22],
@@ -355,6 +369,40 @@ const getTodayPointIndex = (
   return latestTodayIndex >= 0 ? latestTodayIndex : history.length - 1;
 };
 
+const getRatingTrendDirection = (difference: number) => {
+  // 차트의 표기 단위(소수 셋째 자리)보다 작은 차이는 시각적으로 평평한
+  // 구간으로 취급한다. 이러면 중앙의 상승→평탄 연결점을 놓치지 않는다.
+  if (difference > CHART_TREND_FLAT_THRESHOLD) return 1;
+  if (difference < -CHART_TREND_FLAT_THRESHOLD) return -1;
+  return 0;
+};
+
+const getTurningPointIndexes = (
+  history: MemberProfileRatingHistoryPoint[],
+) => {
+  const indexes: number[] = [];
+
+  for (let index = 1; index < history.length - 1; index += 1) {
+    const previous = history[index - 1];
+    const current = history[index];
+    const next = history[index + 1];
+    if (!previous || !current || !next) continue;
+
+    const incomingDirection = getRatingTrendDirection(
+      current.rating - previous.rating,
+    );
+    const outgoingDirection = getRatingTrendDirection(
+      next.rating - current.rating,
+    );
+    // 상승·평탄·하락 중 어느 쪽이든 인접 구간의 상태가 바뀌는 지점은
+    // 실제 선이 꺾이는 이력 점이다. 따라서 상승 후 평평해지는 중앙 지점도
+    // 후보로 남긴다.
+    if (incomingDirection !== outgoingDirection) indexes.push(index);
+  }
+
+  return indexes;
+};
+
 const getRatingLabelTargets = (
   history: MemberProfileRatingHistoryPoint[],
 ): RatingLabelTarget[] => {
@@ -385,14 +433,26 @@ const getRatingLabelTargets = (
     maximum: 0,
     minimum: 1,
     today: 2,
+    turning: 3,
   };
-  return [...targets]
+  const primaryTargets = [...targets]
     .map(([index, kind]) => ({
       index,
       kind,
       isToday: index === todayCurrentIndex,
+      isOptional: false,
     }))
     .sort((left, right) => priority[left.kind] - priority[right.kind]);
+  const turningTargets = getTurningPointIndexes(history)
+    .filter((index) => !targets.has(index))
+    .map((index) => ({
+      index,
+      kind: "turning" as const,
+      isToday: false,
+      isOptional: true,
+    }));
+
+  return [...primaryTargets, ...turningTargets];
 };
 
 const isInsideLabelBounds = (rect: LabelRect, bounds: LabelRect) =>
@@ -440,72 +500,208 @@ const getRatingLabelCollisionScore = (
   return score;
 };
 
-const layoutRatingLabels = (
+const getChartGuideRect = (
+  point: ChartPoint,
+  chartArea: LabelRect,
+): LabelRect => ({
+  left: point.x - CHART_GUIDE_CLEARANCE_PX,
+  right: point.x + CHART_GUIDE_CLEARANCE_PX,
+  top: point.y,
+  bottom: chartArea.bottom,
+});
+
+const getDateLabelRect = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  point: ChartPoint,
+  chartArea: LabelRect,
+): LabelRect => {
+  ctx.save();
+  ctx.font = CHART_DATE_LABEL_FONT;
+  const width = ctx.measureText(text).width;
+  ctx.restore();
+  const top = chartArea.bottom + 8;
+
+  return {
+    left: point.x - width / 2,
+    right: point.x + width / 2,
+    top,
+    bottom: top + CHART_RATING_LABEL_HEIGHT_PX,
+  };
+};
+
+const getPointMarkerRect = (point: ChartPoint): LabelRect => ({
+  left: point.x - CHART_POINT_RADIUS_PX,
+  right: point.x + CHART_POINT_RADIUS_PX,
+  top: point.y - CHART_POINT_RADIUS_PX,
+  bottom: point.y + CHART_POINT_RADIUS_PX,
+});
+
+const getCollisionFreeRatingLabelPlacement = (
   ctx: CanvasRenderingContext2D,
   chart: { width: number; chartArea: LabelRect },
   points: Array<MonotoneChartPoint | undefined>,
-  pointIndexes: Set<number>,
+  lineSegments: LineSegment[],
+  guideRects: LabelRect[],
   dateLabelRects: LabelRect[],
-  targets: RatingLabelTarget[],
-  labelTexts: Map<number, string>,
+  placedLabelRects: LabelRect[],
+  target: RatingLabelTarget,
+  text: string,
 ) => {
-  const lineSegments = getMonotoneCurveSegments(points);
-  const guideRects = [...pointIndexes].flatMap((index) => {
-    const point = points[index];
-    if (!point) return [];
-    return [
-      {
-        left: point.x - CHART_GUIDE_CLEARANCE_PX,
-        right: point.x + CHART_GUIDE_CLEARANCE_PX,
-        top: point.y,
-        bottom: chart.chartArea.bottom,
-      },
-    ];
-  });
+  const point = points[target.index];
+  if (!point) return null;
+
   const bounds: LabelRect = {
     left: CHART_RATING_LABEL_MARGIN_PX,
     right: chart.width - CHART_RATING_LABEL_MARGIN_PX,
     top: CHART_RATING_LABEL_MARGIN_PX,
     bottom: chart.chartArea.bottom + 4,
   };
-  const placedLabelRects: LabelRect[] = [];
-  const placements = new Map<number, RatingLabelPlacement>();
+  const candidates = getRatingLabelCandidateOffsets(
+    target.kind,
+    target.isToday,
+    point,
+    chart.chartArea,
+  ).map(([offsetX, offsetY]) =>
+    getRatingLabelPlacement(ctx, text, point.x + offsetX, point.y + offsetY),
+  );
+  const targetGuideRect = getChartGuideRect(point, chart.chartArea);
+  const otherGuideRects = guideRects.filter(
+    (guide) =>
+      guide.left !== targetGuideRect.left ||
+      guide.right !== targetGuideRect.right ||
+      guide.top !== targetGuideRect.top ||
+      guide.bottom !== targetGuideRect.bottom,
+  );
 
-  for (const target of targets) {
-    const point = points[target.index];
-    const text = labelTexts.get(target.index);
-    if (!point || !text) continue;
-
-    const candidates = getRatingLabelCandidateOffsets(
-      target.kind,
-      target.isToday,
-      point,
-      chart.chartArea,
-    ).map(([offsetX, offsetY]) =>
-      getRatingLabelPlacement(ctx, text, point.x + offsetX, point.y + offsetY),
-    );
-    const scoredCandidates = candidates.map((placement) => ({
-      placement,
-      score: getRatingLabelCollisionScore(
+  return candidates.find(
+    (placement) =>
+      getRatingLabelCollisionScore(
         placement,
         bounds,
         points,
         lineSegments,
-        guideRects,
+        // 같은 점에서 시작하는 가이드는 라벨이 점 가까이에 붙는 것을 막지
+        // 않는다. 다른 점의 가이드·곡선·점·날짜·라벨과의 충돌은 그대로
+        // 유지해 읽기 쉬운 배치를 보장한다.
+        otherGuideRects,
         dateLabelRects,
         placedLabelRects,
-      ),
-    }));
-    const collisionFree = scoredCandidates.find(({ score }) => score === 0);
+      ) === 0,
+  ) ?? null;
+};
+
+const layoutRatingLabels = (
+  ctx: CanvasRenderingContext2D,
+  chart: { width: number; chartArea: LabelRect },
+  points: Array<MonotoneChartPoint | undefined>,
+  guideRects: LabelRect[],
+  dateLabelRects: LabelRect[],
+  targets: RatingLabelTarget[],
+  labelTexts: Map<number, string>,
+  initialPlacedLabelRects: LabelRect[] = [],
+) => {
+  const lineSegments = getMonotoneCurveSegments(points);
+  const placedLabelRects = [...initialPlacedLabelRects];
+  const placements = new Map<number, RatingLabelPlacement>();
+
+  for (const target of targets) {
+    const text = labelTexts.get(target.index);
+    if (!text) continue;
+
+    const collisionFree = getCollisionFreeRatingLabelPlacement(
+      ctx,
+      chart,
+      points,
+      lineSegments,
+      guideRects,
+      dateLabelRects,
+      placedLabelRects,
+      target,
+      text,
+    );
     // 최고·최저도 충돌 위치로 물러서지 않는다. 위·아래 여백과 추가 대각선
     // 후보 안에서 실제 곡선과 분리된 위치만 표시한다.
     if (!collisionFree) continue;
 
-    placements.set(target.index, collisionFree.placement);
-    placedLabelRects.push(collisionFree.placement);
+    placements.set(target.index, collisionFree);
+    placedLabelRects.push(collisionFree);
   }
 
   return placements;
+};
+
+const layoutOptionalPointDecorations = (
+  ctx: CanvasRenderingContext2D,
+  chart: { width: number; chartArea: LabelRect },
+  points: Array<MonotoneChartPoint | undefined>,
+  highlightedPointIndexes: Set<number>,
+  guideRects: LabelRect[],
+  dateLabelRects: LabelRect[],
+  placedLabelRects: LabelRect[],
+  targets: RatingLabelTarget[],
+  dateLabels: Map<number, string>,
+  ratingLabelTexts: Map<number, string>,
+) => {
+  const lineSegments = getMonotoneCurveSegments(points);
+  const occupiedGuideRects = [...guideRects];
+  const occupiedDateLabelRects = [...dateLabelRects];
+  const occupiedLabelRects = [...placedLabelRects];
+  const occupiedPointRects = [...highlightedPointIndexes].flatMap((index) => {
+    const point = points[index];
+    return point ? [getPointMarkerRect(point)] : [];
+  });
+  const decorations: OptionalPointDecoration[] = [];
+
+  for (const target of targets) {
+    const point = points[target.index];
+    const dateLabel = dateLabels.get(target.index);
+    const ratingLabel = ratingLabelTexts.get(target.index);
+    if (!point || !dateLabel || !ratingLabel) continue;
+
+    const dateLabelRect = getDateLabelRect(ctx, dateLabel, point, chart.chartArea);
+    const guideRect = getChartGuideRect(point, chart.chartArea);
+    const markerRect = getPointMarkerRect(point);
+    const dateIsVisible =
+      dateLabelRect.left >= CHART_RATING_LABEL_MARGIN_PX &&
+      dateLabelRect.right <= chart.width - CHART_RATING_LABEL_MARGIN_PX;
+    const collidesWithExistingDecoration =
+      occupiedDateLabelRects.some((rect) => rectanglesOverlap(dateLabelRect, rect)) ||
+      occupiedGuideRects.some((rect) => rectanglesOverlap(guideRect, rect)) ||
+      occupiedPointRects.some((rect) => rectanglesOverlap(markerRect, rect)) ||
+      occupiedLabelRects.some(
+        (rect) =>
+          rectanglesOverlap(guideRect, rect) ||
+          rectanglesOverlap(dateLabelRect, rect),
+      );
+    if (!dateIsVisible || collidesWithExistingDecoration) continue;
+
+    const ratingLabelPlacement = getCollisionFreeRatingLabelPlacement(
+      ctx,
+      chart,
+      points,
+      lineSegments,
+      [...occupiedGuideRects, guideRect],
+      [...occupiedDateLabelRects, dateLabelRect],
+      occupiedLabelRects,
+      target,
+      ratingLabel,
+    );
+    if (!ratingLabelPlacement) continue;
+
+    decorations.push({
+      index: target.index,
+      text: dateLabel,
+      rect: dateLabelRect,
+      ratingLabelPlacement,
+    });
+    occupiedGuideRects.push(guideRect);
+    occupiedDateLabelRects.push(dateLabelRect);
+    occupiedLabelRects.push(ratingLabelPlacement);
+    occupiedPointRects.push(markerRect);
+  }
+
+  return decorations;
 };
 
 const getHighlightedPointIndexes = (
@@ -600,40 +796,89 @@ const createChartDecorationPlugin = (
     const chartPoints = points.map((point) =>
       isChartPoint(point) ? point : undefined,
     );
+    const primaryTargets = ratingLabelTargets.filter(
+      (target) => !target.isOptional,
+    );
+    const optionalTargets = ratingLabelTargets.filter(
+      (target) => target.isOptional,
+    );
+    const dateLabelDecorations = [...highlightedPointIndexes].flatMap((index) => {
+      const point = chartPoints[index];
+      const text =
+        dateLabels.get(index) ?? (index === points.length - 1 ? "오늘" : "");
+      if (!point || !text) return [];
+
+      return [
+        {
+          index,
+          text,
+          rect: getDateLabelRect(ctx, text, point, chartArea),
+        },
+      ];
+    });
+    const guideRects = [...highlightedPointIndexes].flatMap((index) => {
+      const point = chartPoints[index];
+      return point ? [getChartGuideRect(point, chartArea)] : [];
+    });
+    const dateLabelRects = dateLabelDecorations.map(({ rect }) => rect);
+
+    ctx.save();
+    ctx.fillStyle = accentColor;
+    ctx.font = CHART_RATING_LABEL_FONT;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const primaryPlacements = layoutRatingLabels(
+      ctx,
+      chart,
+      chartPoints,
+      guideRects,
+      dateLabelRects,
+      primaryTargets,
+      ratingLabelTexts,
+    );
+    const optionalDecorations = layoutOptionalPointDecorations(
+      ctx,
+      chart,
+      chartPoints,
+      highlightedPointIndexes,
+      guideRects,
+      dateLabelRects,
+      [...primaryPlacements.values()],
+      optionalTargets,
+      dateLabels,
+      ratingLabelTexts,
+    );
+    ctx.restore();
 
     ctx.save();
     ctx.strokeStyle = "rgba(234, 255, 25, 0.35)";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 3]);
-    for (const index of highlightedPointIndexes) {
-      const point = points[index];
-      if (!point) continue;
-
+    for (const rect of [
+      ...guideRects,
+      ...optionalDecorations.flatMap(({ index }) => {
+        const point = chartPoints[index];
+        return point ? [getChartGuideRect(point, chartArea)] : [];
+      }),
+    ]) {
       ctx.beginPath();
-      ctx.moveTo(point.x, point.y);
-      ctx.lineTo(point.x, chartArea.bottom);
+      ctx.moveTo((rect.left + rect.right) / 2, rect.top);
+      ctx.lineTo((rect.left + rect.right) / 2, rect.bottom);
       ctx.stroke();
     }
+    ctx.restore();
 
+    ctx.save();
     ctx.fillStyle = accentColor;
     ctx.font = CHART_DATE_LABEL_FONT;
+    ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    const dateLabelRects: LabelRect[] = [];
-    const labelsToDraw = new Map(dateLabels);
-    if (points.length > 0) labelsToDraw.set(points.length - 1, "오늘");
-    for (const [index, dateLabel] of labelsToDraw) {
-      const point = points[index];
-      if (!point) continue;
-
-      ctx.textAlign = "center";
-      ctx.fillText(dateLabel, point.x, chartArea.bottom + 8);
-      const width = ctx.measureText(dateLabel).width;
-      dateLabelRects.push({
-        left: point.x - width / 2,
-        right: point.x + width / 2,
-        top: chartArea.bottom + 8,
-        bottom: chartArea.bottom + 8 + CHART_RATING_LABEL_HEIGHT_PX,
-      });
+    for (const decoration of [...dateLabelDecorations, ...optionalDecorations]) {
+      ctx.fillText(
+        decoration.text,
+        (decoration.rect.left + decoration.rect.right) / 2,
+        decoration.rect.top,
+      );
     }
     ctx.restore();
 
@@ -642,19 +887,19 @@ const createChartDecorationPlugin = (
     ctx.font = CHART_RATING_LABEL_FONT;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const placements = layoutRatingLabels(
-      ctx,
-      chart,
-      chartPoints,
-      highlightedPointIndexes,
-      dateLabelRects,
-      ratingLabelTargets,
-      ratingLabelTexts,
-    );
-    for (const [index, placement] of placements) {
+    for (const [index, placement] of primaryPlacements) {
       const text = ratingLabelTexts.get(index);
       if (!text) continue;
       ctx.fillText(text, placement.centerX, placement.centerY);
+    }
+    for (const decoration of optionalDecorations) {
+      const text = ratingLabelTexts.get(decoration.index);
+      if (!text) continue;
+      ctx.fillText(
+        text,
+        decoration.ratingLabelPlacement.centerX,
+        decoration.ratingLabelPlacement.centerY,
+      );
     }
     ctx.restore();
 
@@ -664,12 +909,15 @@ const createChartDecorationPlugin = (
     ctx.fillStyle = accentColor;
     ctx.strokeStyle = accentColor;
     ctx.lineWidth = 2;
-    for (const index of highlightedPointIndexes) {
+    for (const index of [
+      ...highlightedPointIndexes,
+      ...optionalDecorations.map(({ index }) => index),
+    ]) {
       const point = chartPoints[index];
       if (!point) continue;
 
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 3, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, CHART_POINT_RADIUS_PX, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
@@ -827,14 +1075,6 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
     },
     [displayHistory.length, valueOffset, visibleHistory],
   );
-  const dateLabels = useMemo(() => {
-    const labels = new Map<number, string>();
-    for (const index of dateLabelIndexes) {
-      const point = displayHistory[index];
-      if (point) labels.set(index, formatDate(point.createdAt));
-    }
-    return labels;
-  }, [dateLabelIndexes, displayHistory]);
   const ratingLabelTargets = useMemo(
     () =>
       getRatingLabelTargets(visibleHistory).map((target) => ({
@@ -843,6 +1083,14 @@ const RatingHistoryChart: React.FC<RatingHistoryChartProps> = ({
       })),
     [valueOffset, visibleHistory],
   );
+  const dateLabels = useMemo(() => {
+    const labels = new Map<number, string>();
+    for (const { index } of ratingLabelTargets) {
+      const point = displayHistory[index];
+      if (point) labels.set(index, formatDate(point.createdAt));
+    }
+    return labels;
+  }, [displayHistory, ratingLabelTargets]);
   const ratingLabelTexts = useMemo(() => {
     const texts = new Map<number, string>();
     for (const { index } of ratingLabelTargets) {
