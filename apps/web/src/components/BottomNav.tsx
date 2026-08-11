@@ -1427,7 +1427,11 @@ const BottomNav: React.FC = () => {
                         onAction={handleGlobalAction}
                         className="bg-transparent"
                       >
-                        <Dropdown.Item id="settings" textValue="Settings">
+                        <Dropdown.Item
+                          id="settings"
+                          textValue="Settings"
+                          className="data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
+                        >
                           <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
                           <Label className="text-[1.05rem] font-medium leading-5">
                             설정
@@ -1444,6 +1448,7 @@ const BottomNav: React.FC = () => {
                           id="qr"
                           textValue="QR code"
                           isDisabled={!isOnline}
+                          className="data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
                         >
                           <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
                           <Label className="text-[1.05rem] font-medium leading-5">
@@ -1455,6 +1460,7 @@ const BottomNav: React.FC = () => {
                           id="create-match"
                           textValue="Create match"
                           isDisabled={!isOnline}
+                          className="data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
                         >
                           <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
                           <Label className="text-[1.05rem] font-medium leading-5">
