@@ -16,7 +16,7 @@ const RatingDeltaChip: React.FC<RatingDeltaChipProps> = ({
   const chipClassName =
     appearance === "rating"
       ? "!h-6 !min-h-6 px-1.5 opacity-90 shadow-none"
-      : "h-6 px-1.5";
+      : "h-6 w-16 justify-center px-1.5";
   const ratingBackgroundClassName =
     appearance === "rating"
       ? delta > 0
