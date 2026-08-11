@@ -573,13 +573,22 @@ const getCollisionFreeRatingLabelPlacement = (
       guide.top !== targetGuideRect.top ||
       guide.bottom !== targetGuideRect.bottom,
   );
+  // 최고·최저·오늘처럼 반드시 보여야 하는 라벨은 자기 점의 마커와 함께
+  // 장식된다. 자기 마커까지 충돌 대상으로 삼으면, 특히 왼쪽 최저점의
+  // 아래쪽 후보가 모두 탈락해 평점 수치가 생략될 수 있다. 다른 점·선·
+  // 가이드·날짜·라벨과의 충돌 검사는 그대로 유지한다.
+  const otherPoints = target.isOptional
+    ? points
+    : points.map((candidatePoint, index) =>
+      index === target.index ? undefined : candidatePoint,
+    );
 
   return candidates.find(
     (placement) =>
       getRatingLabelCollisionScore(
         placement,
         bounds,
-        points,
+        otherPoints,
         lineSegments,
         // 같은 점에서 시작하는 가이드는 라벨이 점 가까이에 붙는 것을 막지
         // 않는다. 다른 점의 가이드·곡선·점·날짜·라벨과의 충돌은 그대로
