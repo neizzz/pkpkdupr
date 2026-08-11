@@ -918,6 +918,19 @@ const createTestRatingHistoryFixtures = (
   };
 
   return [
+    // test1 Singles: 좌측 시작점에서 아래로 하락
+    ...createSeries(
+      "Ptest001",
+      "singles",
+      4,
+      [3.31, 3.27, 3.23, 3.19],
+      [
+        { daysBefore: 35, hour: 19 },
+        { daysBefore: 29, hour: 19 },
+        { daysBefore: 23, hour: 19 },
+        { daysBefore: 10, hour: 19 },
+      ],
+    ),
     // test1 Doubles: W형
     ...createSeries(
       "Ptest001",
