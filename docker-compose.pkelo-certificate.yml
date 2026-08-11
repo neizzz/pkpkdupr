@@ -12,5 +12,6 @@ services:
       VALIDATION: dns
       DNSPLUGIN: cloudflare
       SUBDOMAINS: admin
+      PROPAGATION: 60
     volumes:
       - ${PKPKDUPR_DEPLOY_PATH:-.}/data/pkelo-certs:/config
