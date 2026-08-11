@@ -20,3 +20,5 @@ bash scripts/manual-deploy.sh --image-tag '<pkelo-tag>' --stack pkelo
 ```
 
 PKELO 임시 안내·점검 모드도 공용 infra checkout의 `scripts/pkelo-notice.sh`에서 관리합니다. 이 앱 브랜치에는 SWAG 설정이나 운영 인증서 파일을 두지 않습니다.
+
+New Relic APM 및 Synthetic 운영 설정은 [New Relic 관측성 가이드](./new-relic.md)를 따릅니다.

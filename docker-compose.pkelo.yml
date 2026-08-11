@@ -31,6 +31,12 @@ services:
       KAKAO_MOCK_SUBJECT: ${KAKAO_MOCK_SUBJECT:-}
       CORS_ADDITIONAL_ORIGINS: ${CORS_ADDITIONAL_ORIGINS:-}
       AVATAR_UPLOAD_DIR: /app/data/uploads/avatars
+      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED:-false}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: pkelo-api
+      NEW_RELIC_NO_CONFIG_FILE: "true"
+      NEW_RELIC_LOG: stdout
+      NEW_RELIC_HOST: ${NEW_RELIC_HOST:-collector.newrelic.com}
     volumes:
       - ${APP_DATA_PATH:-./data/pkelo}/uploads/avatars:/app/data/uploads/avatars
     depends_on:
@@ -77,6 +83,12 @@ services:
       DB_NAME: ${MYSQL_DATABASE:-pkelo}
       DB_USER: ${MYSQL_USER:-pkelo}
       DB_PASSWORD: ${MYSQL_PASSWORD:-change-me}
+      NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED:-false}
+      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
+      NEW_RELIC_APP_NAME: pkelo-db-server
+      NEW_RELIC_NO_CONFIG_FILE: "true"
+      NEW_RELIC_LOG: stdout
+      NEW_RELIC_HOST: ${NEW_RELIC_HOST:-collector.newrelic.com}
     depends_on:
       pkelo-mysql:
         condition: service_healthy
