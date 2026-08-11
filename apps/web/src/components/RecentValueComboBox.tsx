@@ -87,7 +87,7 @@ const RecentValueComboBox: React.FC<RecentValueComboBoxProps> = ({
               key={recentValue}
               id={recentValue}
               textValue={recentValue}
-              className="cursor-pointer rounded-lg px-3 py-2 text-sm text-pkpk-sub-font outline-none data-[focused]:bg-primary/10"
+              className="cursor-pointer rounded-lg px-3 py-2 text-sm text-pkpk-sub-font outline-none data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
             >
               {recentValue}
             </ListBox.Item>
