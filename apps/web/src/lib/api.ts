@@ -18,12 +18,31 @@ const resolveApiBaseUrl = () => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+const isLoopbackHostname = (hostname: string) =>
+  hostname === "localhost" ||
+  hostname === "127.0.0.1" ||
+  hostname === "[::1]" ||
+  hostname === "::1";
+
+const assertSecureProductionApiUrl = (url: string) => {
+  if (import.meta.env.DEV || typeof window === "undefined") {
+    return;
+  }
+
+  const target = new URL(url, window.location.origin);
+  if (target.protocol !== "https:" && !isLoopbackHostname(target.hostname)) {
+    throw new Error("운영 API 주소는 HTTPS여야 합니다.");
+  }
+};
+
 export const buildApiUrl = (path: string) => {
   if (!path.startsWith("/")) {
     throw new Error(`API path must start with '/': ${path}`);
   }
 
-  return `${API_BASE_URL}${path}`;
+  const apiUrl = `${API_BASE_URL}${path}`;
+  assertSecureProductionApiUrl(apiUrl);
+  return apiUrl;
 };
 
 export const resolveAssetUrl = (value?: string | null) => {

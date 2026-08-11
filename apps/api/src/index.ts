@@ -53,6 +53,7 @@ import {
   normalizeCourtName,
   normalizeCourtNames,
 } from "./services/SessionCourtSchedule";
+import { sensitiveResponseHeaders } from "./middleware/sensitiveResponseHeaders";
 
 const app: express.Express = express();
 const PORT = process.env.PORT || 4000;
@@ -106,6 +107,7 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "2mb" }));
+app.use(sensitiveResponseHeaders);
 app.use(AVATAR_UPLOAD_ROUTE, express.static(avatarUploadDir));
 
 app.get("/api/health", (_req, res) => {

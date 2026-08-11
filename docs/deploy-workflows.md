@@ -12,6 +12,12 @@
 
 workflow는 GHCR 이미지만 push하며 운영 시크릿을 읽지 않습니다.
 
+## 비밀번호 전송 보안
+
+- 운영의 브라우저/API 통신은 SWAG 게이트웨이가 노출하는 TLS 443·3333 포트만 사용합니다. API 4000, DB와 내부 서비스 포트는 외부에 노출하지 않습니다.
+- 가입·로그인·비밀번호 변경·관리자 초기화·관리자 비밀번호 확인 응답은 `Cache-Control: no-store`로 전달합니다. 비밀번호, access token, HTTP 요청 본문을 로그나 텔레메트리 속성에 기록하지 않습니다.
+- 로컬 개발의 loopback Vite/API HTTP는 운영 전송 보장의 예외입니다. 운영 `VITE_API_BASE_URL`에는 반드시 `https://` 주소를 설정합니다.
+
 이미지 push 뒤에는 서버의 공용 infra checkout에서 해당 태그를 사용해 PkpkDupr 스택만 반영합니다.
 
 ```bash
