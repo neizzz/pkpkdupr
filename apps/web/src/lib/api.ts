@@ -1,6 +1,34 @@
 const normalizeBaseUrl = (value: string | undefined) =>
   value ? value.replace(/\/+$/, "") : "";
 
+const isLoopbackHostname = (hostname: string) => {
+  const normalizedHostname = hostname.replace(/^\[|\]$/g, "");
+  return (
+    normalizedHostname === "localhost" ||
+    normalizedHostname === "127.0.0.1" ||
+    normalizedHostname === "::1"
+  );
+};
+
+const assertSecureProductionUrl = (value: string, label: string) => {
+  if (import.meta.env.DEV || typeof window === "undefined") {
+    return;
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value, window.location.origin);
+  } catch {
+    throw new Error(`${label} URL이 올바르지 않습니다.`);
+  }
+
+  if (url.protocol === "https:" || isLoopbackHostname(url.hostname)) {
+    return;
+  }
+
+  throw new Error(`${label} 요청은 운영 환경에서 HTTPS를 사용해야 합니다.`);
+};
+
 const isPkeloPublicHost = () =>
   typeof window !== "undefined" && window.location.hostname === "pkelo.app";
 
@@ -30,7 +58,9 @@ export const buildApiUrl = (path: string) => {
     throw new Error(`API path must start with '/': ${path}`);
   }
 
-  return `${API_BASE_URL}${path}`;
+  const apiUrl = `${API_BASE_URL}${path}`;
+  assertSecureProductionUrl(apiUrl, "API");
+  return apiUrl;
 };
 
 export const buildPublicAuthUrl = (path: string) => {
@@ -42,7 +72,9 @@ export const buildPublicAuthUrl = (path: string) => {
     return path;
   }
 
-  return `${window.location.origin}${path}`;
+  const publicAuthUrl = `${window.location.origin}${path}`;
+  assertSecureProductionUrl(publicAuthUrl, "Kakao 로그인");
+  return publicAuthUrl;
 };
 
 export const resolveAssetUrl = (value?: string | null) => {

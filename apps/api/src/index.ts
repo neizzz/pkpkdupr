@@ -51,6 +51,7 @@ import {
   isExternalUserAuthProvider,
   resolveUserAuthProvider,
 } from "./services/authConfig";
+import { sensitiveResponseHeaders } from "./middleware/sensitiveResponseHeaders";
 import { AutoApprovalService } from "./services/AutoApprovalService";
 import {
   attachMatchRatingChanges,
@@ -134,6 +135,7 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "2mb" }));
+app.use(sensitiveResponseHeaders);
 app.use(AVATAR_UPLOAD_ROUTE, express.static(avatarUploadDir));
 
 app.get("/api/health", (_req, res) => {
@@ -1127,7 +1129,6 @@ app.get("/auth/kakao/callback", async (req, res) => {
       code: typeof req.query.code === "string" ? req.query.code : undefined,
       mock: req.query.mock === "1",
     });
-    res.setHeader("Referrer-Policy", "no-referrer");
     res.redirect(302, redirectUrl);
   } catch {
     res.redirect(302, `${(process.env.KAKAO_WEB_ORIGIN ?? webOrigin).replace(/\/+$/, "")}/login?error=kakao_login_failed`);
