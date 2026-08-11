@@ -120,6 +120,31 @@ $http.get("https://pkpkdupr.duckdns.org:3333/api/ping", (error, response, body) 
 
 `pkpkdupr-production` Alert policy에 위 monitor를 연결합니다. 외부 notification destination은 만들지 않고 New Relic Issue만 생성합니다. 공개 위치에서 `:3333` 포트가 접근 가능해야 합니다.
 
+### PKELO APM
+
+`/opt/pkpkdupr/env/pkelo.env`에만 아래 값을 설정합니다. key 값은 Git이나 쉘 인자에 넣지 않습니다.
+
+```dotenv
+NEW_RELIC_ENABLED=true
+NEW_RELIC_LICENSE_KEY=<new-relic-license-key>
+# EU/JP 등 regional account에서만 New Relic이 안내한 collector host를 설정
+# NEW_RELIC_HOST=collector.eu01.nr-data.net
+```
+
+배포 후 New Relic APM에 `pkelo-api`, `pkelo-db-server`가 각각 보고되어야 합니다.
+
+### PKELO Synthetics
+
+New Relic UI에서 TLS 검증을 켠 서울·도쿄·싱가포르 공개 위치 3곳, 5분 주기의 monitor 5개를 수동으로 생성합니다.
+
+- Simple Browser: `https://pkelo.app/`
+- Scripted API: `https://pkelo.app:3333/api/health` — HTTP 200, JSON `status: "ok"`
+- Scripted API: `https://pkelo.app:3333/api/ping` — HTTP 200, JSON `message: "pong"`
+- Simple Browser: `https://pkelo.app:3333/admin/`
+- Simple Browser: `https://pkelo.app:3333/db/` — 응답 본문 `adminer`
+
+두 Scripted API monitor는 위 `pkpkdupr Synthetics` assertion 스크립트에서 URL만 PKELO 대상 URL로 바꿔 사용합니다. PKELO monitor에는 Alert policy, condition, Workflow, notification destination을 만들지 않습니다. 공개 위치에서 `:3333` 포트가 접근 가능해야 합니다.
+
 ## GitHub Actions
 
 `/Users/neiz/pkpkdupr/.github/workflows/deploy.yml`은 도메인 설정을 주입하지 않고 web/admin-web/api/db-server 이미지를 GHCR에 빌드·푸시만 합니다. 서버 반영은 운영자가 위 수동 명령으로 수행합니다.
