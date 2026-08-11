@@ -7,7 +7,7 @@ export interface PlayerAffiliation {
 
 export const PLAYER_AFFILIATION_MAX_COUNT = 5;
 export const PLAYER_AFFILIATION_NAME_MAX_LENGTH = 30;
-export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 30;
+export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 20;
 
 export type PlayerCreationSource =
   | "self_register"

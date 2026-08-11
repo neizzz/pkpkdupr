@@ -1,5 +1,13 @@
 import { getDbClient } from "./client";
 
+type MigrationExecutor = Pick<ReturnType<typeof getDbClient>, "execute">;
+
+interface Migration {
+  id: string;
+  statements: string[];
+  beforeApply?: (executor: MigrationExecutor) => Promise<void>;
+}
+
 const initialSchemaStatements = [
   `CREATE TABLE IF NOT EXISTS players (
     id VARCHAR(255) PRIMARY KEY,
@@ -9,7 +17,7 @@ const initialSchemaStatements = [
     status VARCHAR(32) NOT NULL,
     avatar_url TEXT NULL,
     affiliations_json TEXT NULL,
-    status_message TEXT NULL,
+    status_message VARCHAR(20) NULL,
     status_message_background_color VARCHAR(32) NULL,
     password_hash VARCHAR(255) NOT NULL,
     is_first_login BOOLEAN NOT NULL,
@@ -127,7 +135,7 @@ const initialSchemaStatements = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 ];
 
-const migrations = [
+const migrations: Migration[] = [
   {
     id: "0000_mysql_initial_schema",
     statements: initialSchemaStatements,
@@ -152,6 +160,27 @@ const migrations = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
+  {
+    id: "0005_player_status_message_max_length",
+    beforeApply: async (executor) => {
+      const result = await executor.execute(`
+        SELECT username, CHAR_LENGTH(status_message) AS status_message_length
+        FROM players
+        WHERE status_message IS NOT NULL
+          AND CHAR_LENGTH(status_message) > 20
+        LIMIT 1
+      `);
+      const invalidPlayer = result.rows[0];
+      if (!invalidPlayer) return;
+
+      throw new Error(
+        `상태메시지 최대 길이를 20자로 줄일 수 없습니다. ${String(invalidPlayer.username)}의 상태메시지가 ${String(invalidPlayer.status_message_length)}자입니다. 데이터를 먼저 20자 이하로 수정하세요.`,
+      );
+    },
+    statements: [
+      "ALTER TABLE players MODIFY COLUMN status_message VARCHAR(20) NULL",
+    ],
+  },
 ];
 
 export const runMigrations = async () => {
@@ -172,6 +201,7 @@ export const runMigrations = async () => {
 
     const transaction = await client.transaction("write");
     try {
+      await migration.beforeApply?.(transaction);
       for (const statement of migration.statements) {
         await transaction.execute(statement);
       }
