@@ -51,6 +51,30 @@ Kakao Developers 콘솔에는 `https://pkelo.app/auth/kakao/callback`을 Redirec
 
 주 SWAG는 `/opt/pkpkdupr/data/certs/nginx/site-confs/pkpkdupr.conf`와 `pkelo.conf`를 도메인별로 독립 생성합니다. `pkelo.app` SNI는 `/opt/pkpkdupr/data/certs/nginx/pkelo-ssl.conf`를 통해 읽기 전용으로 공유한 Cloudflare 인증서를 사용합니다. DuckDNS와 Cloudflare credential 파일만 스크립트가 `600` 권한으로 동기화합니다.
 
+## 기존 pkpkdupr 서버에 PKELO 최초 추가
+
+기존 `pkpkdupr-proxy`가 실행 중이고 PKELO와 pkpkdupr의 이미지 태그를 분리한다면, `--stack all` 대신 PKELO 인증서만 먼저 초기화합니다. 이 과정은 기존 pkpkdupr 앱 컨테이너를 재시작하거나 이미지를 pull하지 않습니다.
+
+`/opt/pkpkdupr/env/pkelo.env`에 `CLOUDFLARE_DNS_API_TOKEN`을 설정한 뒤 아래 명령을 실행합니다. 스크립트가 `data/pkelo-certs/dns-conf/cloudflare.ini`을 `600` 권한으로 생성하고 Cloudflare DNS-01 인증서 발급까지 대기합니다.
+
+```bash
+bash scripts/bootstrap-pkelo-certificate.sh
+```
+
+PKELO를 안내 페이지로 먼저 공개하려면 `pkelo-notice.env`의 제목·문구를 설정한 뒤 같은 PKELO 태그로 아래 명령을 실행합니다. 이 명령은 notice JSON과 상태를 만들고 notice web만 배포합니다.
+
+```bash
+bash scripts/manage-pkelo-launch.sh notice --image-tag <PKELO_IMAGE_TAG>
+```
+
+실제 PKELO 앱을 열 때는 처음 배포에 사용한 동일한 태그를 지정합니다. `shared.env`의 pkpkdupr 이미지 태그는 변경하지 않습니다.
+
+```bash
+bash scripts/manage-pkelo-launch.sh open --image-tag <PKELO_IMAGE_TAG>
+```
+
+`notice`는 필요하면 `--ghcr-username`과 `--ghcr-token`을 받아 GHCR 로그인을 수행합니다. `--stack pkelo`은 공용 proxy가 이미 실행 중이어야 합니다.
+
 ## 설치·업데이트·롤백
 
 ```bash
