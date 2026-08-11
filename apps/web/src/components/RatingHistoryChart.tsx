@@ -317,6 +317,10 @@ const getRatingLabelCandidateOffsets = (
 
   const inwardDirection =
     point.x <= (chartArea.left + chartArea.right) / 2 ? 1 : -1;
+  const leftEdgeMinimumCandidates: Array<[number, number]> =
+    kind === "minimum" && point.x <= chartArea.left + CHART_POINT_RADIUS_PX
+      ? [[inwardDirection * 16, 12]]
+      : [];
   const topCandidates: Array<[number, number]> = [
     [0, -15],
     [inwardDirection * 20, -14],
@@ -333,6 +337,9 @@ const getRatingLabelCandidateOffsets = (
   ];
   const bottomCandidates: Array<[number, number]> = [
     [0, 14],
+    // 왼쪽 끝 최저점은 기존 후보보다 점에 가깝게 우선 시도한다. 이후
+    // 공통 충돌 검사를 통과하지 못하면 기존의 더 먼 후보로 진행한다.
+    ...leftEdgeMinimumCandidates,
     [inwardDirection * 20, 14],
     [-inwardDirection * 20, 14],
     [inwardDirection * 28, 22],
