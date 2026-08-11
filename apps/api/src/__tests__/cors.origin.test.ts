@@ -7,6 +7,7 @@ const originalEnvironment = {
   DOMAIN: process.env.DOMAIN,
   WEB_PUBLIC_PORT: process.env.WEB_PUBLIC_PORT,
   ADMIN_STACK_PORT: process.env.ADMIN_STACK_PORT,
+  ADMIN_WEB_ORIGIN: process.env.ADMIN_WEB_ORIGIN,
   CORS_ADDITIONAL_ORIGINS: process.env.CORS_ADDITIONAL_ORIGINS,
   DEV_CORS_ORIGINS: process.env.DEV_CORS_ORIGINS,
 };
@@ -28,13 +29,14 @@ describe("production CORS origin isolation", () => {
     vi.resetModules();
   });
 
-  it("현재 앱 도메인 web/admin origin만 허용하고 다른 도메인은 거부한다", async () => {
+  it("지정한 사용자·관리자 origin만 허용하고 다른 도메인은 거부한다", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     process.env.NODE_ENV = "production";
     process.env.VITEST = "true";
     process.env.DOMAIN = "pkelo.app";
     process.env.WEB_PUBLIC_PORT = "443";
     process.env.ADMIN_STACK_PORT = "3333";
+    process.env.ADMIN_WEB_ORIGIN = "https://admin.pkelo.app";
     process.env.CORS_ADDITIONAL_ORIGINS = "";
     vi.resetModules();
 
@@ -50,11 +52,16 @@ describe("production CORS origin isolation", () => {
 
     const adminOriginResponse = await request(app)
       .get("/api/health")
-      .set("Origin", "https://pkelo.app:3333");
+      .set("Origin", "https://admin.pkelo.app");
     expect(adminOriginResponse.status).toBe(200);
     expect(adminOriginResponse.headers["access-control-allow-origin"]).toBe(
-      "https://pkelo.app:3333",
+      "https://admin.pkelo.app",
     );
+
+    const legacyPortOriginResponse = await request(app)
+      .get("/api/health")
+      .set("Origin", "https://pkelo.app:3333");
+    expect(legacyPortOriginResponse.status).toBe(500);
 
     const rejectedOriginResponse = await request(app)
       .get("/api/health")
@@ -69,7 +76,28 @@ describe("production CORS origin isolation", () => {
       .set("Origin", "http://localhost:8080");
     expect(localhostResponse.status).toBe(500);
     expect(localhostResponse.headers["access-control-allow-origin"]).toBeUndefined();
-    expect(errorSpy).toHaveBeenCalledTimes(2);
+    expect(errorSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("관리자 origin을 지정하지 않으면 기존 포트 기반 origin을 유지한다", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.VITEST = "true";
+    process.env.DOMAIN = "pkpkdupr.duckdns.org";
+    process.env.WEB_PUBLIC_PORT = "443";
+    process.env.ADMIN_STACK_PORT = "3333";
+    delete process.env.ADMIN_WEB_ORIGIN;
+    process.env.CORS_ADDITIONAL_ORIGINS = "";
+    vi.resetModules();
+
+    const { app } = await import("../index");
+    const response = await request(app)
+      .get("/api/health")
+      .set("Origin", "https://pkpkdupr.duckdns.org:3333");
+
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe(
+      "https://pkpkdupr.duckdns.org:3333",
+    );
   });
 });
 

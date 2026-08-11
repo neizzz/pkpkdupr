@@ -87,11 +87,13 @@ const domain = process.env.DOMAIN || "pkelo.app";
 const webPublicPort = process.env.WEB_PUBLIC_PORT || "443";
 const adminStackPort =
   process.env.ADMIN_STACK_PORT || process.env.PROXY_PORT || "3333";
+const configuredAdminWebOrigin = process.env.ADMIN_WEB_ORIGIN?.trim();
 const webOrigin =
   webPublicPort === "443"
     ? `https://${domain}`
     : `https://${domain}:${webPublicPort}`;
-const adminStackOrigin = `https://${domain}:${adminStackPort}`;
+const adminStackOrigin =
+  configuredAdminWebOrigin || `https://${domain}:${adminStackPort}`;
 const additionalAllowedOrigins = (process.env.CORS_ADDITIONAL_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())

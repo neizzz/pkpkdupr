@@ -1,6 +1,9 @@
 const normalizeBaseUrl = (value: string | undefined) =>
   value ? value.replace(/\/+$/, "") : "";
 
+const isPkeloPublicHost = () =>
+  typeof window !== "undefined" && window.location.hostname === "pkelo.app";
+
 const resolveApiBaseUrl = () => {
   const configuredBaseUrl = normalizeBaseUrl(import.meta.env.VITE_API_BASE_URL);
   if (configuredBaseUrl) {
@@ -9,6 +12,10 @@ const resolveApiBaseUrl = () => {
 
   if (import.meta.env.DEV || typeof window === "undefined") {
     return "";
+  }
+
+  if (isPkeloPublicHost()) {
+    return window.location.origin;
   }
 
   const apiUrl = new URL(window.location.origin);
