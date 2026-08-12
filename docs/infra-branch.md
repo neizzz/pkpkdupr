@@ -2,7 +2,7 @@
 
 `infra` 브랜치는 두 앱의 서버 설정만 소유합니다.
 
-- 하나의 SWAG가 443·3333을 점유하고 `pkpkdupr.duckdns.org`와 `pkelo.app`을 `server_name`으로 분기합니다.
+- 하나의 SWAG가 443과 기존 pkpkdupr용 3333을 점유합니다. PKELO는 `pkelo.app`과 `admin.pkelo.app`을 443으로만 분기합니다.
 - DuckDNS 인증서와 PKELO Cloudflare DNS-01 인증서를 각각 갱신하며, 각 앱의 API·MySQL·업로드·JWT는 분리합니다.
 - `scripts/manual-deploy.sh --stack pkpkdupr|pkelo`와 `scripts/pkelo-notice.sh`는 이 브랜치 checkout에서만 실행합니다.
 
