@@ -89,4 +89,30 @@ jobs:
           - DB Server: \`${REGISTRY}/${IMAGE_NAMESPACE}/pkelo-db-server:${IMAGE_TAG}\`
 
           이 workflow는 GHCR 이미지 push만 수행합니다. 운영 반영과 SWAG reload는 공용 \`infra\` checkout에서 대상 앱 스택만 지정해 실행합니다.
+          ## 다음 단계: PKELO 운영 반영 (수동)
+
+          이 workflow는 GHCR 이미지만 push하며, 운영 서버의 컨테이너나 SWAG 설정을 자동으로 갱신하지 않습니다.
+          위 `이미지 태그`와 동일한 값을 사용해, 서버의 최신 `infra` checkout에서 아래 중 하나를 실행하세요.
+
+          ```bash
+          # PKELO를 안내 페이지로 먼저 공개
+          bash scripts/manage-pkelo-launch.sh notice --image-tag ${IMAGE_TAG}
+
+          # 안내를 해제하고 실제 PKELO 앱 공개
+          bash scripts/manage-pkelo-launch.sh open --image-tag ${IMAGE_TAG}
+          ```
+
+          최초 배포 전에는 `/opt/pkpkdupr/env/pkelo.env`의 `ADMIN_DOMAIN=admin.pkelo.app`을 설정하고, 아래 인증서 초기화를 먼저 완료해야 합니다.
+
+          ```bash
+          bash scripts/bootstrap-pkelo-certificate.sh
+          ```
+
+          배포 후 확인 주소:
+
+          - 사용자/notice: `https://pkelo.app/`
+          - notice 상태: `https://pkelo.app/api/runtime-notice`
+          - 실제 서비스 상태: `https://pkelo.app/api/health`
+          - 관리자: `https://admin.pkelo.app/`
+          - Adminer: `https://admin.pkelo.app/db/`
           EOF
