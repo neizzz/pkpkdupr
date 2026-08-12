@@ -14,6 +14,7 @@ const UPDATE_PREPARE_ERROR_MESSAGE =
   "업데이트 기능을 준비하지 못했습니다. 잠시 후 다시 시도해주세요.";
 const UPDATE_APPLY_ERROR_MESSAGE =
   "새 버전을 적용하지 못했습니다. 잠시 후 다시 시도해주세요.";
+export const APP_UPDATE_APPLIED_AT_STORAGE_KEY = "pkelo-app-update-applied-at";
 
 export type AppUpdateCheckResult = "update-available" | "up-to-date";
 
@@ -276,6 +277,14 @@ export const AppUpdateProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       clearUpdateAvailable();
+      try {
+        window.sessionStorage.setItem(
+          APP_UPDATE_APPLIED_AT_STORAGE_KEY,
+          String(Date.now()),
+        );
+      } catch {
+        // Continue updating even when session storage is unavailable.
+      }
       window.location.reload();
     } catch (error) {
       throw error instanceof Error

@@ -5,33 +5,25 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   Alert,
   Button,
   CloseButton,
-  Dropdown,
-  Label,
-  Separator,
   Tabs,
 } from "@heroui/react";
 import {
-  IoAdd,
-  IoAddCircleOutline,
-  IoLogOutOutline,
   IoPeople,
   IoPeopleOutline,
   IoQrCodeSharp,
+  IoSettings,
   IoSettingsOutline,
   IoTrophy,
   IoTrophyOutline,
 } from "react-icons/io5";
 import { TbAffiliate, TbAffiliateFilled } from "react-icons/tb";
-import AppSettingsSheetBody from "@/components/AppSettingsSheetBody";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
-import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import PullToRefreshIndicator, {
@@ -57,12 +49,20 @@ import { DEFAULT_THEME_COLOR, DIMMED_THEME_COLOR } from "@/lib/themeColor";
 import Members from "@/pages/Members";
 import Affiliations from "@/pages/Affiliations";
 import Matches from "@/pages/Matches";
+import Settings from "@/pages/Settings";
 
-const TAB_KEYS: TabKey[] = ["match", "members", "affiliations", "me"];
+const TAB_KEYS: TabKey[] = [
+  "match",
+  "members",
+  "affiliations",
+  "settings",
+  "me",
+];
 const TAB_THEME_COLOR_MAP: Record<TabKey, string> = {
   match: DEFAULT_THEME_COLOR,
   members: DEFAULT_THEME_COLOR,
   affiliations: DEFAULT_THEME_COLOR,
+  settings: DEFAULT_THEME_COLOR,
   me: DEFAULT_THEME_COLOR,
 };
 
@@ -70,6 +70,7 @@ const emptyDepthStacks = (): TabDepthStacks => ({
   match: [],
   members: [],
   affiliations: [],
+  settings: [],
   me: [],
 });
 
@@ -77,6 +78,7 @@ const initiallyVisitedTabs = (): Record<TabKey, boolean> => ({
   match: false,
   members: true,
   affiliations: false,
+  settings: false,
   me: false,
 });
 
@@ -121,21 +123,17 @@ const isTabDepthHistoryState = (
 };
 
 const BottomNav: React.FC = () => {
-  const { token, logout, player } = useAuth();
+  const { token, player } = useAuth();
   const isOnline = useOnlineStatus();
   const [selectedTab, setSelectedTab] = useState<TabKey>("members");
   const [visitedTabs, setVisitedTabs] =
     useState<Record<TabKey, boolean>>(initiallyVisitedTabs);
   const [depthStacks, setDepthStacks] =
     useState<TabDepthStacks>(emptyDepthStacks);
-  const [isGlobalMenuOpen, setIsGlobalMenuOpen] = useState(false);
-  const [globalMenuTabKey, setGlobalMenuTabKey] = useState<TabKey>("members");
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [qrTabKey, setQrTabKey] = useState<TabKey>("members");
   const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
   const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("members");
-  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
-  const [appSettingsTabKey, setAppSettingsTabKey] = useState<TabKey>("members");
   const [deepLinkMatchId, setDeepLinkMatchId] = useState<string | null>(
     getDeepLinkMatchId,
   );
@@ -164,6 +162,7 @@ const BottomNav: React.FC = () => {
     match: [],
     members: [],
     affiliations: [],
+    settings: [],
     me: [],
   });
   const scrollPositionsRef = useRef<Record<string, number>>({});
@@ -200,6 +199,7 @@ const BottomNav: React.FC = () => {
       match: depthEntriesRef.current.match.map((entry) => entry.id),
       members: depthEntriesRef.current.members.map((entry) => entry.id),
       affiliations: depthEntriesRef.current.affiliations.map((entry) => entry.id),
+      settings: depthEntriesRef.current.settings.map((entry) => entry.id),
       me: depthEntriesRef.current.me.map((entry) => entry.id),
     });
   }, []);
@@ -509,17 +509,6 @@ const BottomNav: React.FC = () => {
     [getScrollTop, requestCloseTopDepth, scrollToTop],
   );
 
-  const openGlobalMenu = useCallback(() => {
-    const tabKey = selectedTabRef.current;
-    setGlobalMenuTabKey(tabKey);
-    pushDepth(tabKey, {
-      id: "global-menu",
-      kind: "dropdown",
-      onClose: () => setIsGlobalMenuOpen(false),
-    });
-    setIsGlobalMenuOpen(true);
-  }, [pushDepth]);
-
   const openQrSheet = useCallback(() => {
     const tabKey = selectedTabRef.current;
     setQrTabKey(tabKey);
@@ -542,30 +531,6 @@ const BottomNav: React.FC = () => {
     });
     setIsCreateMatchOpen(true);
   }, [pushDepth]);
-
-  const openAppSettingsSheet = useCallback(() => {
-    const tabKey = selectedTabRef.current;
-    setAppSettingsTabKey(tabKey);
-    pushDepth(tabKey, {
-      id: "app-settings-sheet",
-      kind: "bottom-sheet",
-      onClose: () => setIsAppSettingsOpen(false),
-    });
-    setIsAppSettingsOpen(true);
-  }, [pushDepth]);
-
-  const handleGlobalMenuOpenChange = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen) {
-        openGlobalMenu();
-        return;
-      }
-
-      closeDepth(globalMenuTabKey, "global-menu");
-      setIsGlobalMenuOpen(false);
-    },
-    [closeDepth, globalMenuTabKey, openGlobalMenu],
-  );
 
   const handleQrOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -596,19 +561,6 @@ const BottomNav: React.FC = () => {
       setIsCreateMatchOpen(false);
     },
     [closeDepth, createMatchTabKey, openCreateMatchSheet],
-  );
-
-  const handleAppSettingsOpenChange = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen) {
-        openAppSettingsSheet();
-        return;
-      }
-
-      closeDepth(appSettingsTabKey, "app-settings-sheet");
-      setIsAppSettingsOpen(false);
-    },
-    [appSettingsTabKey, closeDepth, openAppSettingsSheet],
   );
 
   const loadPlayerQrToken = useCallback(async () => {
@@ -723,42 +675,6 @@ const BottomNav: React.FC = () => {
     };
   }, [isQrOpen, qrToken]);
 
-  const handleGlobalAction = (key: React.Key) => {
-    const action = () => {
-      switch (String(key)) {
-        case "qr":
-          if (!isOnline) return;
-          openQrSheet();
-          break;
-        case "create-match":
-          if (!isOnline) return;
-          openCreateMatchSheet();
-          break;
-        case "settings":
-          openAppSettingsSheet();
-          break;
-        default:
-          break;
-      }
-    };
-
-    if (!closeDepth(globalMenuTabKey, "global-menu", action)) {
-      setIsGlobalMenuOpen(false);
-      action();
-    }
-  };
-
-  const handleLogout = useCallback(() => {
-    const action = () => {
-      logout();
-    };
-
-    if (!closeDepth(globalMenuTabKey, "global-menu", action)) {
-      setIsGlobalMenuOpen(false);
-      action();
-    }
-  }, [closeDepth, globalMenuTabKey, logout]);
-
   const handleCreateMatch = () => {
     isCreateMatchQrScannerOpenRef.current = false;
     if (!closeDepth(createMatchTabKey, "create-match-sheet")) {
@@ -780,17 +696,13 @@ const BottomNav: React.FC = () => {
     [],
   );
 
-  const isGlobalMenuVisible =
-    isGlobalMenuOpen && globalMenuTabKey === selectedTab;
   const hasActiveBottomSheet = depthEntriesRef.current[selectedTab].some(
     (entry) => entry.kind === "bottom-sheet",
   );
   const isDimmedOverlayVisible =
     hasActiveBottomSheet ||
-    isGlobalMenuVisible ||
     (isQrOpen && qrTabKey === selectedTab) ||
-    (isCreateMatchOpen && createMatchTabKey === selectedTab) ||
-    (isAppSettingsOpen && appSettingsTabKey === selectedTab);
+    (isCreateMatchOpen && createMatchTabKey === selectedTab);
   const hasBlockingLayer = useMemo(() => {
     const activeDepthEntries = depthEntriesRef.current[selectedTab];
     const hasBlockingDepth = activeDepthEntries.some(
@@ -799,18 +711,13 @@ const BottomNav: React.FC = () => {
 
     return (
       hasBlockingDepth ||
-      isGlobalMenuVisible ||
       (isQrOpen && qrTabKey === selectedTab) ||
-      (isCreateMatchOpen && createMatchTabKey === selectedTab) ||
-      (isAppSettingsOpen && appSettingsTabKey === selectedTab)
+      (isCreateMatchOpen && createMatchTabKey === selectedTab)
     );
   }, [
-    appSettingsTabKey,
     createMatchTabKey,
     depthStacks,
-    isAppSettingsOpen,
     isCreateMatchOpen,
-    isGlobalMenuVisible,
     isQrOpen,
     qrTabKey,
     selectedTab,
@@ -1192,10 +1099,20 @@ const BottomNav: React.FC = () => {
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
         <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-3">
-          <Tabs.ListContainer className="global-plus-menu-tab-spacer min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
+          <Button
+            type="button"
+            isIconOnly
+            aria-label="내 QR 코드 열기"
+            isDisabled={!isOnline}
+            onPress={openQrSheet}
+            className="player-qr-trigger absolute right-3 bottom-[calc(100%+0.25rem)] shrink-0 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-bg/90 disabled:bg-slate-200 disabled:text-slate-400"
+          >
+            <IoQrCodeSharp className="player-qr-trigger-icon" />
+          </Button>
+          <Tabs.ListContainer className="min-w-0 w-full border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-3 gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid grid-cols-4 gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
               <Tabs.Tab
                 id="match"
@@ -1248,6 +1165,25 @@ const BottomNav: React.FC = () => {
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
+              <Tabs.Tab
+                id="settings"
+                onPointerDownCapture={() =>
+                  handleActiveTabPointerDown("settings")
+                }
+                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+              >
+                <div className="flex flex-col items-center gap-1 py-1.5">
+                  {selectedTab === "settings" ? (
+                    <IoSettings className="text-lg" />
+                  ) : (
+                    <IoSettingsOutline className="text-lg" />
+                  )}
+                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">
+                    설정
+                  </span>
+                </div>
+                <Tabs.Indicator />
+              </Tabs.Tab>
             </Tabs.List>
           </Tabs.ListContainer>
         </div>
@@ -1292,7 +1228,7 @@ const BottomNav: React.FC = () => {
             shouldForceMount={visitedTabs.match}
             className="min-h-full bg-white p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
-            <Matches />
+            <Matches onRequestCreateMatch={openCreateMatchSheet} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
@@ -1304,23 +1240,22 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="affiliations"
             shouldForceMount={visitedTabs.affiliations}
-            className="h-full min-h-full bg-pkpk-bg p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
+            className="h-full min-h-full bg-white p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
           >
             <Affiliations />
           </Tabs.Panel>
-          {/* <div
-            aria-hidden="true"
-            className="h-[calc(5.5rem+env(safe-area-inset-bottom))] shrink-0"
-          /> */}
+          <Tabs.Panel
+            id="settings"
+            shouldForceMount={visitedTabs.settings}
+            className="h-full min-h-full bg-white p-0 pb-[calc(5rem+var(--safe-bottom))] data-[inert=true]:hidden"
+          >
+            <Settings />
+          </Tabs.Panel>
         </div>
 
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(6.333rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] bg-gradient-to-t ${
-            selectedTab === "members" || selectedTab === "match"
-              ? "from-white"
-              : "from-pkpk-bg"
-          } to-transparent`}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[calc(6.333rem+env(safe-area-inset-bottom)+var(--app-keyboard-offset))] bg-gradient-to-t from-white to-transparent"
         />
 
       </Tabs>
@@ -1354,14 +1289,6 @@ const BottomNav: React.FC = () => {
         />
       </BottomSheet>
 
-      <BottomSheet
-        isOpen={isAppSettingsOpen}
-        isActive={appSettingsTabKey === selectedTab}
-        onOpenChange={handleAppSettingsOpenChange}
-        ariaLabel="앱 설정"
-      >
-        <AppSettingsSheetBody />
-      </BottomSheet>
       {deepLinkMatchId && deepLinkMatchDepthId ? (
         <ProfileMatchDetailDrawer
           isOpen={isDeepLinkMatchDrawerOpen}
@@ -1375,124 +1302,6 @@ const BottomNav: React.FC = () => {
           layer={70}
         />
       ) : null}
-      {typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className={`pointer-events-none fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset)+0.75rem)] left-1/2 flex app-shell-width -translate-x-1/2 justify-end px-3 ${
-                isGlobalMenuVisible ? "z-[60]" : "z-40"
-              }`}
-            >
-              <div className="pointer-events-auto">
-                <Dropdown
-                  isOpen={isGlobalMenuVisible}
-                  onOpenChange={handleGlobalMenuOpenChange}
-                >
-                  <Button
-                    isIconOnly
-                    aria-label="Global plus menu"
-                    className={`global-plus-menu-trigger shrink-0 rounded-full text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors duration-[84ms] ${
-                      isGlobalMenuVisible
-                        ? "bg-[#f8626c] hover:bg-[#f8626c]/90"
-                        : "bg-pkpk-primary-bg hover:bg-pkpk-primary-bg/90"
-                    }`}
-                  >
-                    <IoAdd
-                      className={`global-plus-menu-trigger-icon shrink-0 transition-transform duration-[84ms] ${
-                        isGlobalMenuVisible ? "rotate-45" : "rotate-0"
-                      }`}
-                    />
-                  </Button>
-                  <Dropdown.Popover
-                    className="global-plus-menu-popover relative z-[70] min-w-[194px] overflow-visible border-0 bg-transparent p-0 shadow-none"
-                    offset={12}
-                    placement="top end"
-                  >
-                    <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
-                      <div className="px-1.5 py-1.5">
-                        <HoldToConfirmButton
-                          holdDurationMs={1000}
-                          ariaLabel="길게 눌러 로그아웃"
-                          onComplete={handleLogout}
-                          className="rounded-lg text-[#f8626c] hover:bg-[#f8626c]/6"
-                          progressClassName="bg-[#f8626c]/18"
-                        >
-                          <IoLogOutOutline className="size-4 shrink-0 text-[#f8626c]" />
-                          <span className="truncate text-[1.05rem] font-medium leading-5 text-[#f8626c]">
-                            길게 눌러 로그아웃
-                          </span>
-                        </HoldToConfirmButton>
-                      </div>
-                      <Separator className="mx-[3%] w-[94%]" />
-                      <Dropdown.Menu
-                        onAction={handleGlobalAction}
-                        className="bg-transparent"
-                      >
-                        <Dropdown.Item
-                          id="settings"
-                          textValue="Settings"
-                          className="data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
-                        >
-                          <IoSettingsOutline className="size-4 shrink-0 text-pkpk-sub-font" />
-                          <Label className="text-[1.05rem] font-medium leading-5">
-                            설정
-                          </Label>
-                        </Dropdown.Item>
-                      </Dropdown.Menu>
-                    </div>
-                    <div className="mt-2 overflow-hidden rounded-2xl border border-border bg-white shadow-lg">
-                      <Dropdown.Menu
-                        onAction={handleGlobalAction}
-                        className="bg-transparent"
-                      >
-                        <Dropdown.Item
-                          id="qr"
-                          textValue="QR code"
-                          isDisabled={!isOnline}
-                          className="data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
-                        >
-                          <IoQrCodeSharp className="size-4 shrink-0 text-pkpk-sub-font" />
-                          <Label className="text-[1.05rem] font-medium leading-5">
-                            QR 코드
-                          </Label>
-                        </Dropdown.Item>
-                        <Separator className="mx-2" />
-                        <Dropdown.Item
-                          id="create-match"
-                          textValue="Create match"
-                          isDisabled={!isOnline}
-                          className="data-[focused]:bg-pkpk-primary-bg/5 data-[hovered]:bg-pkpk-primary-bg/5"
-                        >
-                          <IoAddCircleOutline className="size-4 shrink-0 text-pkpk-sub-font" />
-                          <Label className="text-[1.05rem] font-medium leading-5">
-                            매치 생성
-                          </Label>
-                        </Dropdown.Item>
-                      </Dropdown.Menu>
-                    </div>
-                  </Dropdown.Popover>
-                </Dropdown>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-      {typeof document !== "undefined"
-        ? createPortal(
-            <button
-              type="button"
-              aria-label="전역 메뉴 닫기"
-              aria-hidden={!isGlobalMenuVisible}
-              tabIndex={-1}
-              onClick={() => handleGlobalMenuOpenChange(false)}
-              className={`fixed inset-0 z-50 cursor-default bg-black/30 backdrop-blur-sm transition-opacity duration-[84ms] ease-out ${
-                isGlobalMenuVisible
-                  ? "opacity-100"
-                  : "pointer-events-none opacity-0"
-              }`}
-            />,
-            document.body,
-          )
-        : null}
     </TabNavigationProvider>
   );
 };

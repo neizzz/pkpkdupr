@@ -1,10 +1,9 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useLayoutEffect, useRef } from "react";
 
 interface TabPanelHeaderProps {
   title: string;
   children?: React.ReactNode;
   footer?: React.ReactNode;
-  showGradientExtension?: boolean;
   onHeaderElementChange?: (element: HTMLDivElement | null) => void;
 }
 
@@ -37,13 +36,13 @@ export const TabPanelHeaderGradientExtension: React.FC<
     }
 
     const updateGradientExtension = () => {
-      const headerHeight = headerElement.clientHeight;
+      const { height: headerHeight, width: headerWidth } =
+        headerElement.getBoundingClientRect();
       if (!headerHeight) return;
 
-      const extensionHeight = getGradientExtensionHeight(
-        headerElement.clientWidth,
-      );
+      const extensionHeight = getGradientExtensionHeight(headerWidth);
       const totalHeight = headerHeight + extensionHeight;
+      const isExtensionVisible = container.scrollTop <= 1;
 
       gradientExtensionAnchor.style.top = `${headerHeight}px`;
       gradientExtension.style.setProperty(
@@ -59,8 +58,8 @@ export const TabPanelHeaderGradientExtension: React.FC<
         `${totalHeight}px`,
       );
       gradientExtension.style.setProperty(
-        "--tab-panel-header-gradient-extension-scale-y",
-        container.scrollTop > 1 ? "0" : "1",
+        "--tab-panel-header-gradient-visible-height",
+        `${headerHeight + (isExtensionVisible ? extensionHeight : 0)}px`,
       );
     };
 
@@ -90,8 +89,6 @@ export const TabPanelHeaderGradientExtension: React.FC<
     };
   }, [headerElement]);
 
-  if (!headerElement) return null;
-
   return (
     <div
       aria-hidden="true"
@@ -100,7 +97,7 @@ export const TabPanelHeaderGradientExtension: React.FC<
     >
       <div
         ref={gradientExtensionRef}
-        className="tab-panel-header-gradient-extension pointer-events-none absolute inset-x-0 top-0 origin-top transition-transform duration-100 will-change-transform"
+        className="tab-panel-header-gradient-extension pointer-events-none absolute inset-x-0"
       />
     </div>
   );
@@ -110,87 +107,37 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
   title,
   children,
   footer,
-  showGradientExtension = true,
   onHeaderElementChange,
 }) => {
-  const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
-    null,
-  );
-  const gradientBaseRef = useRef<HTMLDivElement | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-
   const handleHeaderElementChange = useCallback(
     (element: HTMLDivElement | null) => {
-      setHeaderElement(element);
       onHeaderElementChange?.(element);
     },
     [onHeaderElementChange],
   );
 
-  useLayoutEffect(() => {
-    const gradientBase = gradientBaseRef.current;
-    if (!headerElement || !gradientBase) return;
-
-    const updateGradient = () => {
-      const headerHeight = headerElement.clientHeight;
-      if (!headerHeight) return;
-
-      const totalHeight =
-        headerHeight + getGradientExtensionHeight(headerElement.clientWidth);
-      gradientBase.style.setProperty(
-        "--tab-panel-header-gradient-header-height",
-        `${headerHeight}px`,
-      );
-      gradientBase.style.setProperty(
-        "--tab-panel-header-gradient-total-height",
-        `${totalHeight}px`,
-      );
-    };
-
-    const scheduleGradientUpdate = () => {
-      if (animationFrameRef.current !== null) return;
-
-      animationFrameRef.current = window.requestAnimationFrame(() => {
-        animationFrameRef.current = null;
-        updateGradient();
-      });
-    };
-
-    const resizeObserver = new ResizeObserver(scheduleGradientUpdate);
-    resizeObserver.observe(headerElement);
-    updateGradient();
-
-    return () => {
-      resizeObserver.disconnect();
-      if (animationFrameRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
-  }, [headerElement]);
-
   return (
-    <>
-      <div ref={handleHeaderElementChange} className="sticky top-0 z-20 isolate">
-        <div
-          ref={gradientBaseRef}
-          aria-hidden="true"
-          className="tab-panel-header-gradient-base pointer-events-none absolute inset-x-0 top-0 h-full"
-        />
-        <div className="relative z-10">
-          <div className="flex min-h-12 items-center justify-between px-4">
-            <h2 className="text-[28.8px] font-bold text-pkpk-primary-font">
-              {title}
-            </h2>
-            {children}
-          </div>
-          {footer ? <div className="px-4 pb-2">{footer}</div> : null}
+    <div
+      ref={handleHeaderElementChange}
+      className="tab-panel-header-gradient-base sticky top-0 z-20 isolate"
+      style={{
+        backgroundColor: "#8b1e77",
+        backgroundImage:
+          "linear-gradient(to bottom right, rgb(59 82 204 / 0%) 0%, rgb(59 82 204 / 0%) 52%, #3b52cc 100%)",
+        backgroundPosition: "0 0",
+        backgroundSize: "100% 96px",
+      }}
+    >
+      <div className="relative z-10">
+        <div className="flex min-h-12 items-center justify-between px-4">
+          <h2 className="text-[28.8px] font-bold text-pkpk-primary-font">
+            {title}
+          </h2>
+          {children}
         </div>
+        {footer ? <div className="px-4 pb-2">{footer}</div> : null}
       </div>
-      {showGradientExtension ? (
-        <TabPanelHeaderGradientExtension headerElement={headerElement} />
-      ) : null}
-    </>
+    </div>
   );
 };
 

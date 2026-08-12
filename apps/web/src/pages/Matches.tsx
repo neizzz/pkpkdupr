@@ -26,6 +26,7 @@ import { isTabRefreshDue } from "@/lib/tabRefresh";
 
 interface MatchesProps {
   reloadKey?: number;
+  onRequestCreateMatch?: () => void;
 }
 
 const CACHED_MATCH_FEED_KEY = "pkpkdupr:matches:v4-scoped-feed";
@@ -50,14 +51,8 @@ interface MatchFeedResponse {
   total: number;
 }
 
-const MatchFeedSkeleton: React.FC<{
-  headerElement: HTMLDivElement | null;
-}> = ({ headerElement }) => (
+const MatchFeedSkeleton: React.FC = () => (
   <div role="status" aria-label="매치 목록 로딩 중">
-    <TabPanelHeaderGradientExtension
-      headerElement={headerElement}
-      className="z-0"
-    />
     <div className="relative z-10 mx-1.5 mt-1 flex flex-col gap-3">
       {Array.from({ length: 4 }, (_, index) => (
         <Card key={index} className="rounded-3xl bg-white/95 p-3">
@@ -154,7 +149,10 @@ const isSameSession = (
 
 const noop = () => {};
 
-const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
+const Matches: React.FC<MatchesProps> = ({
+  reloadKey = 0,
+  onRequestCreateMatch,
+}) => {
   const { player, token } = useAuth();
   const isOnline = useOnlineStatus();
   const {
@@ -775,11 +773,23 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
       <div className="flex min-h-full flex-col">
       <TabPanelHeader
         title="My Matches"
-        showGradientExtension={false}
         onHeaderElementChange={setHeaderElement}
-      />
-      <div className="tab-panel-header-content flex min-h-0 flex-1 bg-white">
-        <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
+      >
+        <button
+          type="button"
+          className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!isOnline}
+          onClick={onRequestCreateMatch}
+        >
+          + 매치 만들기
+        </button>
+      </TabPanelHeader>
+      <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
+        <TabPanelHeaderGradientExtension
+          headerElement={headerElement}
+          className="z-20"
+        />
+        <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col">
           {notice ? (
             <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-pkpk-sub-font">
               {notice}
@@ -788,7 +798,7 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
 
           <div className="flex flex-1 flex-col">
             {isMatchFeedLoading ? (
-              <MatchFeedSkeleton headerElement={headerElement} />
+              <MatchFeedSkeleton />
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
             ) : feedItems.length === 0 ? (
@@ -797,10 +807,6 @@ const Matches: React.FC<MatchesProps> = ({ reloadKey = 0 }) => {
               />
             ) : (
               <div>
-                <TabPanelHeaderGradientExtension
-                  headerElement={headerElement}
-                  className="z-0"
-                />
                 <div className="relative z-10 mx-1.5 mt-1 flex flex-col gap-3">
                   {feedItems.map((item) =>
                     item.kind === "session" ? (

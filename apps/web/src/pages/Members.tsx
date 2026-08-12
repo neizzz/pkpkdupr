@@ -52,14 +52,8 @@ type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
 };
 
-const MemberListSkeleton: React.FC<{
-  headerElement: HTMLDivElement | null;
-}> = ({ headerElement }) => (
+const MemberListSkeleton: React.FC = () => (
   <div role="status" aria-label="멤버 목록 로딩 중">
-    <TabPanelHeaderGradientExtension
-      headerElement={headerElement}
-      className="z-0"
-    />
     <div className="relative z-10 mx-1.5 mt-1 overflow-hidden rounded-3xl bg-white pt-1">
       {Array.from({ length: 6 }, (_, index) => (
         <div
@@ -578,7 +572,6 @@ const Members: React.FC = () => {
       <div className="flex h-full min-h-full flex-col">
         <TabPanelHeader
           title="Players"
-          showGradientExtension={false}
           onHeaderElementChange={setHeaderElement}
         >
           <button
@@ -598,8 +591,12 @@ const Members: React.FC = () => {
             />
           </button>
         </TabPanelHeader>
-        <div className="tab-panel-header-content flex min-h-0 flex-1 bg-white">
-          <div className="mx-auto flex min-h-full w-full flex-1 flex-col">
+        <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
+          <TabPanelHeaderGradientExtension
+            headerElement={headerElement}
+            className="z-20"
+          />
+          <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col">
             <div>
               {notice ? (
                 <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
@@ -610,7 +607,7 @@ const Members: React.FC = () => {
 
             <div className="flex flex-1 flex-col">
             {isMemberListLoading ? (
-              <MemberListSkeleton headerElement={headerElement} />
+              <MemberListSkeleton />
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
             ) : sortedMembers.length === 0 ? (

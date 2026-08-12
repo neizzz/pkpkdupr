@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from "react";
 
-export type TabKey = "match" | "members" | "affiliations" | "me";
+export type TabKey = "match" | "members" | "affiliations" | "settings" | "me";
 
 export type TabDepthKind =
   | "match-detail"
