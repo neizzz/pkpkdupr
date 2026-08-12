@@ -94,13 +94,45 @@ describe("admin match metadata", () => {
     });
   });
 
-  it("경기 예정 일시와 코트명을 독립적으로 수정한다", async () => {
+  it("선택한 매치의 장소를 중복 없이 일괄 수정한다", async () => {
+    const updateMetadata = vi
+      .spyOn(MatchRepository.prototype, "updateMetadata")
+      .mockImplementation(async (matchId, input) => ({
+        ...buildMatch(matchId),
+        location: input.location ?? "PKELO Court A",
+      }));
+
+    const response = await request(app)
+      .patch("/api/admin/matches/bulk-metadata")
+      .set("Authorization", "Bearer admin-token")
+      .send({
+        matchIds: ["match-001", "match-002", "match-001"],
+        location: "  PKELO Court B  ",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.matches).toHaveLength(2);
+    expect(updateMetadata).toHaveBeenNthCalledWith(1, "match-001", {
+      location: "PKELO Court B",
+    });
+    expect(updateMetadata).toHaveBeenNthCalledWith(2, "match-002", {
+      location: "PKELO Court B",
+    });
+    expect(response.body.matches).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ location: "PKELO Court B" }),
+      ]),
+    );
+  });
+
+  it("경기 예정 일시, 코트명, 장소를 독립적으로 수정한다", async () => {
     const matchStartsAt = "2026-07-23T11:15:00.000Z";
     const updateMetadata = vi
       .spyOn(MatchRepository.prototype, "updateMetadata")
       .mockImplementation(async (matchId, input) => ({
         ...buildMatch(matchId),
         courtName: input.courtName ?? undefined,
+        location: input.location ?? "PKELO Court A",
         matchStartsAt: input.matchStartsAt
           ? new Date(input.matchStartsAt)
           : now,
@@ -109,17 +141,39 @@ describe("admin match metadata", () => {
     const response = await request(app)
       .patch("/api/admin/matches/match-001/metadata")
       .set("Authorization", "Bearer admin-token")
-      .send({ courtName: "코트 B", matchStartsAt });
+      .send({
+        courtName: "코트 B",
+        location: "  PKELO Court C  ",
+        matchStartsAt,
+      });
 
     expect(response.status).toBe(200);
     expect(updateMetadata).toHaveBeenCalledWith("match-001", {
       courtName: "코트 B",
+      location: "PKELO Court C",
       matchStartsAt,
     });
     expect(response.body).toMatchObject({
       courtName: "코트 B",
+      location: "PKELO Court C",
       matchStartsAt,
     });
+  });
+
+  it.each([
+    ["빈 문자열", "   "],
+    ["문자열이 아닌 값", { name: "PKELO Court A" }],
+  ])("%s 장소 일괄 수정을 거부한다", async (_label, location) => {
+    const updateMetadata = vi.spyOn(MatchRepository.prototype, "updateMetadata");
+
+    const response = await request(app)
+      .patch("/api/admin/matches/bulk-metadata")
+      .set("Authorization", "Bearer admin-token")
+      .send({ matchIds: ["match-001"], location });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("매치 장소");
+    expect(updateMetadata).not.toHaveBeenCalled();
   });
 
   it("세션 연결 해제를 명시적인 sessionId null로 전달한다", async () => {

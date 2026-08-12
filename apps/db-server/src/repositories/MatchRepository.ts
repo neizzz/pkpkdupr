@@ -93,6 +93,7 @@ export interface CreateMatchInput {
 export interface UpdateMatchMetadataInput {
   name?: string | null;
   sessionId?: string | null;
+  location?: string;
   courtName?: string | null;
   matchStartsAt?: Date | string;
 }
@@ -1424,6 +1425,15 @@ export class MatchRepository {
 
     if ("name" in data) {
       updatePayload.name = data.name?.trim() || null;
+    }
+
+    if ("location" in data) {
+      const location =
+        typeof data.location === "string" ? data.location.trim() : "";
+      if (!location) {
+        throw new Error("매치 장소를 입력해주세요.");
+      }
+      updatePayload.location = location;
     }
 
     if ("courtName" in data) {
