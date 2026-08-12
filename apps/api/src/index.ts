@@ -34,7 +34,11 @@ import type {
   PlayerStatus,
 } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
-import type { ClubRole } from "@pkpkdupr/shared/club";
+import {
+  CLUB_DESCRIPTION_MAX_LENGTH,
+  getUnicodeCodePointLength,
+  type ClubRole,
+} from "@pkpkdupr/shared/club";
 import {
   DbRequestError,
   MatchRepository,
@@ -722,7 +726,7 @@ const normalizeClubDescription = (value: unknown) => {
     throw new Error("클럽 소개를 확인해주세요.");
   }
   const description = value.trim();
-  if (description.length > 500) {
+  if (getUnicodeCodePointLength(description) > CLUB_DESCRIPTION_MAX_LENGTH) {
     throw new Error("클럽 소개는 500자 이하여야 합니다.");
   }
   return description;

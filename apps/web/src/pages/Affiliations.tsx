@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
-import type {
-  Club,
+import {
+  CLUB_DESCRIPTION_MAX_LENGTH,
+  getUnicodeCodePointLength,
+  truncateToUnicodeCodePoints,
+  type Club,
   ClubDashboard,
   ClubInvite,
   ClubMembership,
@@ -933,16 +936,23 @@ const Affiliations: React.FC = () => {
                 클럽 소개 <span className="font-normal text-pkpk-sub-font">(선택)</span>
               </label>
               <span className="text-xs text-pkpk-sub-font">
-                {clubDescription.length}/500
+                {getUnicodeCodePointLength(clubDescription)}/
+                {CLUB_DESCRIPTION_MAX_LENGTH}
               </span>
             </div>
             <textarea
               id="club-description"
               value={clubDescription}
-              maxLength={500}
-              onChange={(event) => setClubDescription(event.target.value)}
+              onChange={(event) =>
+                setClubDescription(
+                  truncateToUnicodeCodePoints(
+                    event.target.value,
+                    CLUB_DESCRIPTION_MAX_LENGTH,
+                  ),
+                )
+              }
               placeholder="클럽을 소개해 주세요"
-              className="min-h-24 w-full resize-none rounded-2xl border border-border bg-white px-4 py-3 text-sm text-pkpk-main-font outline-none focus:border-pkpk-primary-bg"
+              className="club-description-input min-h-24 w-full resize-none rounded-2xl border border-border bg-white px-4 py-3 text-sm text-pkpk-main-font outline-none focus:border-pkpk-primary-bg"
             />
           </div>
           <Button

@@ -4,6 +4,18 @@ import type { Player, PlayerDuprCategory, PublicPlayerDupr } from "./player";
 export type ClubRole = "owner" | "manager" | "member";
 export type ClubMembershipStatus = "active" | "pending";
 
+export const CLUB_DESCRIPTION_MAX_LENGTH = 500;
+
+/**
+ * Counts Unicode code points instead of UTF-16 code units so astral characters
+ * such as emoji are handled as one character by every club-description layer.
+ */
+export const getUnicodeCodePointLength = (value: string) =>
+  Array.from(value).length;
+
+export const truncateToUnicodeCodePoints = (value: string, maxLength: number) =>
+  Array.from(value).slice(0, maxLength).join("");
+
 export interface Club {
   id: string;
   name: string;

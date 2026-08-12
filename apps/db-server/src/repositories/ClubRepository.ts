@@ -1,6 +1,8 @@
 import { randomUUID } from "crypto";
 import {
+  CLUB_DESCRIPTION_MAX_LENGTH,
   getRecentCompletedMatches,
+  getUnicodeCodePointLength,
   isMatchForClub,
 } from "@pkpkdupr/shared/club";
 import type {
@@ -190,7 +192,7 @@ export class ClubRepository {
       throw new Error("클럽 이름은 1~120자여야 합니다.");
     }
     const description = input.description.trim();
-    if (description.length > 500) {
+    if (getUnicodeCodePointLength(description) > CLUB_DESCRIPTION_MAX_LENGTH) {
       throw new Error("클럽 소개는 500자 이하여야 합니다.");
     }
 

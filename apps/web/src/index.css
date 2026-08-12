@@ -151,6 +151,19 @@
 }
 
 @layer utilities {
+  .club-description-input {
+    font-family:
+      "Pretendard Variable",
+      Pretendard,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Noto Color Emoji",
+      sans-serif;
+  }
+
   .app-shell-width {
     width: 100%;
     max-width: 480px;

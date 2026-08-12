@@ -98,6 +98,34 @@ describe("club API", () => {
     );
   });
 
+  it("500 코드포인트 이모지 소개를 생성한다", async () => {
+    const description = "😀".repeat(500);
+    const createClub = vi
+      .spyOn(ClubRepository.prototype, "createClub")
+      .mockResolvedValue({ ...club, description });
+
+    const response = await request(app)
+      .post("/api/clubs")
+      .set("Authorization", "Bearer test-token")
+      .send({ name: "테스트 클럽", description });
+
+    expect(response.status).toBe(201);
+    expect(createClub).toHaveBeenCalledWith("테스트 클럽", description, owner.id);
+  });
+
+  it("501 코드포인트 소개는 거절한다", async () => {
+    const createClub = vi.spyOn(ClubRepository.prototype, "createClub");
+
+    const response = await request(app)
+      .post("/api/clubs")
+      .set("Authorization", "Bearer test-token")
+      .send({ name: "테스트 클럽", description: "😀".repeat(501) });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "클럽 소개는 500자 이하여야 합니다." });
+    expect(createClub).not.toHaveBeenCalled();
+  });
+
   it("운영진이 플레이어 QR을 스캔하면 즉시 멤버로 추가한다", async () => {
     vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
       buildSession(manager),
