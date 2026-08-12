@@ -818,7 +818,7 @@ const Affiliations: React.FC = () => {
                     <button
                       type="button"
                       onClick={openClubMatchHistory}
-                      className="flex w-full items-center gap-3 rounded-3xl border border-border bg-white px-4 py-4 text-left transition-colors hover:bg-pkpk-session-bg"
+                      className="flex w-full items-center gap-3 rounded-3xl border border-border bg-white px-4 py-4 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
                     >
                       <span className="flex size-11 items-center justify-center rounded-2xl bg-pkpk-session-bg text-pkpk-primary-bg">
                         <IoCalendarOutline className="size-6" />

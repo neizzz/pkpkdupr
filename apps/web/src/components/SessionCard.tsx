@@ -69,7 +69,9 @@ const SessionCard: React.FC<SessionCardProps> = ({
   const card = (
     <Card
       className={`relative w-full overflow-hidden rounded-3xl border border-pkpk-primary-bg p-3 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-5 before:bg-[linear-gradient(to_bottom,_var(--color-pkpk-primary-bg),_transparent)] before:opacity-5 ${
-        onPress ? "transition-colors hover:bg-pkpk-primary-bg/5" : ""
+        onPress
+          ? "transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+          : ""
       }`}
     >
       <div className="relative z-10">
