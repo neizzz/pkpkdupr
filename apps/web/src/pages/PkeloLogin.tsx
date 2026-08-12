@@ -29,12 +29,14 @@ const PkeloLogin: React.FC = () => {
 
         <a
           href={buildPublicAuthUrl("/auth/kakao/login")}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] px-4 py-3 font-semibold text-[#191919] shadow-sm transition-colors hover:bg-[#f5dc00]"
+          aria-label="카카오 로그인"
+          className="mx-auto block h-[45px] w-[183px] rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FEE500]"
         >
-          <span aria-hidden="true" className="text-lg font-black leading-none">
-            K
-          </span>
-          카카오로 계속하기
+          <img
+            src="/login-button_kakao.png"
+            alt=""
+            className="h-full w-full"
+          />
         </a>
         <p className="mt-4 text-center text-xs leading-5 text-white/75">
           카카오 계정으로만 로그인할 수 있습니다.
