@@ -259,19 +259,12 @@ const migrations: Migration[] = [
   {
     id: "0006_player_status_message_max_length",
     beforeApply: async (executor) => {
-      const result = await executor.execute(`
-        SELECT username, CHAR_LENGTH(status_message) AS status_message_length
-        FROM players
+      await executor.execute(`
+        UPDATE players
+        SET status_message = LEFT(status_message, 20)
         WHERE status_message IS NOT NULL
           AND CHAR_LENGTH(status_message) > 20
-        LIMIT 1
       `);
-      const invalidPlayer = result.rows[0];
-      if (!invalidPlayer) return;
-
-      throw new Error(
-        `상태메시지 최대 길이를 20자로 줄일 수 없습니다. ${String(invalidPlayer.username)}의 상태메시지가 ${String(invalidPlayer.status_message_length)}자입니다. 데이터를 먼저 20자 이하로 수정하세요.`,
-      );
     },
     statements: [
       "ALTER TABLE players MODIFY COLUMN status_message VARCHAR(20) NULL",
