@@ -312,10 +312,12 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
   return (
     <>
-      <BottomSheet.Body className="min-w-0 pb-4">
-        <h2 className="bs-text-head sticky top-0 z-10 -mx-4 shrink-0 bg-white px-4 text-left text-pkpk-main-font">
+      <BottomSheet.Header>
+        <h2 className="bs-text-head text-left text-pkpk-main-font">
           {isQrScannerOpen ? "QR코드 스캔" : "매치 생성"}
         </h2>
+      </BottomSheet.Header>
+      <BottomSheet.Body className="min-w-0 pb-4">
         {isQrScannerOpen ? (
           <CreateMatchQrScannerPanel
             teamGrid={
@@ -496,9 +498,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             </BottomSheetSection>
           </>
         )}
-      </BottomSheet.Body>
-      {!isQrScannerOpen ? (
-        <>
+        {!isQrScannerOpen ? (
           <div className="flex flex-col gap-2">
             {createMatchError ? (
               <p className="bs-text-body text-error">{createMatchError}</p>
@@ -526,8 +526,8 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
               </HoldToConfirmButton>
             </div>
           </div>
-        </>
-      ) : null}
+        ) : null}
+      </BottomSheet.Body>
     </>
   );
 };

@@ -12,10 +12,13 @@ interface AvatarUploadConfirmSheetBodyProps {
 const AvatarUploadConfirmSheetBody: React.FC<
   AvatarUploadConfirmSheetBodyProps
 > = ({ previewUrl, name, isSaving, onConfirm, onCancel }) => (
-  <BottomSheet.Body className="items-center text-center">
-    <h2 className="bs-text-head self-stretch text-left text-pkpk-main-font">
-      프로필 사진 확인
-    </h2>
+  <>
+    <BottomSheet.Header>
+      <h2 className="bs-text-head text-left text-pkpk-main-font">
+        프로필 사진 확인
+      </h2>
+    </BottomSheet.Header>
+    <BottomSheet.Body className="items-center text-center">
     <img
       src={previewUrl}
       alt={`${name} 프로필 사진 미리보기`}
@@ -42,7 +45,8 @@ const AvatarUploadConfirmSheetBody: React.FC<
         {isSaving ? "적용 중..." : "적용"}
       </button>
     </div>
-  </BottomSheet.Body>
+    </BottomSheet.Body>
+  </>
 );
 
 export default AvatarUploadConfirmSheetBody;

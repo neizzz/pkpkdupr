@@ -71,10 +71,13 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
   };
 
   return (
-    <BottomSheet.Body className="max-h-[75vh] overflow-y-auto">
-      <h2 className="bs-text-head text-left text-pkpk-main-font">
-        상태메시지 수정
-      </h2>
+    <>
+      <BottomSheet.Header>
+        <h2 className="bs-text-head text-left text-pkpk-main-font">
+          상태메시지 수정
+        </h2>
+      </BottomSheet.Header>
+      <BottomSheet.Body>
 
       <BottomSheetSection>
         <span className="bs-text-title text-pkpk-sub-font">미리보기</span>
@@ -155,7 +158,8 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
       >
         {isSaving ? "저장 중..." : "저장"}
       </button>
-    </BottomSheet.Body>
+      </BottomSheet.Body>
+    </>
   );
 };
 

@@ -18,14 +18,18 @@ const ProfileSettingsSheetBody: React.FC = () => {
   };
 
   return (
-    <BottomSheet.Body>
-      <h2 className="bs-text-head text-left text-pkpk-main-font">설정</h2>
+    <>
+      <BottomSheet.Header>
+        <h2 className="bs-text-head text-left text-pkpk-main-font">설정</h2>
+      </BottomSheet.Header>
+      <BottomSheet.Body>
 
       <PasswordChangeForm
         title="패스워드 변경"
         onSuccess={handlePasswordChangeSuccess}
       />
-    </BottomSheet.Body>
+      </BottomSheet.Body>
+    </>
   );
 };
 

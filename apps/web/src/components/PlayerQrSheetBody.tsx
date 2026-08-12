@@ -29,10 +29,13 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
   const canRefresh = !isQrLoading && (!qrToken || qrRemainingSeconds <= 60);
 
   return (
-    <BottomSheet.Body className="items-center justify-center text-center">
-      <h2 className="bs-text-head self-stretch text-left text-pkpk-main-font">
-        QR 코드
-      </h2>
+    <>
+      <BottomSheet.Header>
+        <h2 className="bs-text-head text-left text-pkpk-main-font">
+          QR 코드
+        </h2>
+      </BottomSheet.Header>
+      <BottomSheet.Body className="items-center justify-center text-center">
       {qrToken ? (
         <>
           <div className="rounded-2xl bg-white p-3 ring-1 ring-border">
@@ -80,7 +83,8 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
           {isQrLoading ? "갱신 중..." : "새로고침"}
         </Button>
       )}
-    </BottomSheet.Body>
+      </BottomSheet.Body>
+    </>
   );
 };
 

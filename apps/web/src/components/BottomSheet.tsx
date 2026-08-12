@@ -20,12 +20,33 @@ interface BottomSheetBodyProps {
   className?: string;
 }
 
+interface BottomSheetHeaderProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+const BottomSheetHeader: React.FC<BottomSheetHeaderProps> = ({
+  children,
+  className,
+}) => (
+  <div
+    className={["relative z-10 shrink-0 bg-white pb-4", className]
+      .filter(Boolean)
+      .join(" ")}
+  >
+    {children}
+  </div>
+);
+
 const BottomSheetBody: React.FC<BottomSheetBodyProps> = ({
   children,
   className,
 }) => (
   <div
-    className={["flex flex-col gap-4", className]
+    className={[
+      "app-bottom-sheet-body min-h-0 flex-1 flex flex-col gap-4",
+      className,
+    ]
       .filter(Boolean)
       .join(" ")}
   >
@@ -34,6 +55,7 @@ const BottomSheetBody: React.FC<BottomSheetBodyProps> = ({
 );
 
 type BottomSheetComponent = React.FC<BottomSheetProps> & {
+  Header: typeof BottomSheetHeader;
   Body: typeof BottomSheetBody;
 };
 
@@ -210,7 +232,7 @@ const BottomSheet: BottomSheetComponent = ({
           role="dialog"
           aria-label={ariaLabel}
           className={[
-            "app-bottom-sheet-surface relative w-full rounded-t-3xl bg-white px-4 pt-5 pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl",
+            "app-bottom-sheet-surface relative flex min-h-0 w-full flex-col overflow-hidden rounded-t-3xl bg-white px-4 pt-5 pb-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))] shadow-2xl",
             className,
           ]
             .filter(Boolean)
@@ -225,6 +247,7 @@ const BottomSheet: BottomSheetComponent = ({
   );
 };
 
+BottomSheet.Header = BottomSheetHeader;
 BottomSheet.Body = BottomSheetBody;
 
 export default BottomSheet;
