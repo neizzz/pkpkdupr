@@ -15,11 +15,15 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
       type="button"
       size="sm"
       variant="secondary"
-      className="h-[45px] min-w-[96px] rounded-xl px-[17px] text-sm font-semibold"
+      className="h-[45px] min-w-0 rounded-full px-5 font-semibold"
       isDisabled={isLoading || !onPress}
       onPress={onPress}
     >
-      {isLoading ? <Spinner aria-label="추가 매치 로딩 중" size="sm" /> : "더 보기"}
+      {isLoading ? (
+        <Spinner aria-label="추가 매치 로딩 중" size="sm" />
+      ) : (
+        <span className="text-base">더 보기</span>
+      )}
     </Button>
   </div>
 );
