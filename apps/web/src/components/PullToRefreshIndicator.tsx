@@ -39,7 +39,7 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
           isPullGestureActive
             ? "opacity 120ms ease-out"
             : status === "idle"
-              ? "transform 167ms ease-in, opacity 1ms linear 167ms"
+              ? "transform 84ms ease-in, opacity 1ms linear 84ms"
               : "transform 180ms ease-out, opacity 180ms ease-out",
       }}
     >
