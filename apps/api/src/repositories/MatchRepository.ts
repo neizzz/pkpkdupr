@@ -620,6 +620,7 @@ export class MatchRepository {
     input: {
       name?: string | null;
       sessionId?: string | null;
+      location?: string;
       courtName?: string | null;
       matchStartsAt?: string;
     },

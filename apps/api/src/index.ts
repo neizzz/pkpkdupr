@@ -225,6 +225,7 @@ type SubmitMatchResultRequest = {
 type AdminMatchMetadataUpdateRequest = {
   name?: unknown;
   sessionId?: unknown;
+  location?: unknown;
   courtName?: unknown;
   matchStartsAt?: unknown;
 };
@@ -304,6 +305,7 @@ const parseAdminMatchMetadataUpdate = (
 ) => {
   const hasName = Object.prototype.hasOwnProperty.call(body, "name");
   const hasSessionId = Object.prototype.hasOwnProperty.call(body, "sessionId");
+  const hasLocation = Object.prototype.hasOwnProperty.call(body, "location");
   const hasCourtName = Object.prototype.hasOwnProperty.call(body, "courtName");
   const hasMatchStartsAt = Object.prototype.hasOwnProperty.call(
     body,
@@ -320,6 +322,7 @@ const parseAdminMatchMetadataUpdate = (
   if (
     !hasName &&
     !hasSessionId &&
+    !hasLocation &&
     !hasCourtName &&
     !hasMatchStartsAt
   ) {
@@ -338,6 +341,12 @@ const parseAdminMatchMetadataUpdate = (
   const normalizedCourtName = hasCourtName
     ? normalizeNullableCourtName(body.courtName)
     : undefined;
+  const normalizedLocation = hasLocation
+    ? normalizeOptionalName(body.location)
+    : undefined;
+  if (hasLocation && !normalizedLocation) {
+    throw new Error("매치 장소를 입력해주세요.");
+  }
   const normalizedMatchStartsAt = hasMatchStartsAt
     ? normalizeMatchStartsAt(body.matchStartsAt)
     : undefined;
@@ -345,6 +354,7 @@ const parseAdminMatchMetadataUpdate = (
   return {
     ...(hasName ? { name: normalizeOptionalName(body.name) ?? null } : {}),
     ...(hasSessionId ? { sessionId: normalizedSessionId } : {}),
+    ...(hasLocation ? { location: normalizedLocation } : {}),
     ...(hasCourtName ? { courtName: normalizedCourtName } : {}),
     ...(hasMatchStartsAt ? { matchStartsAt: normalizedMatchStartsAt } : {}),
   };

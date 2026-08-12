@@ -289,6 +289,7 @@ const AdminDashboard: React.FC = () => {
   >({});
   const [selectedMatchIds, setSelectedMatchIds] = useState<string[]>([]);
   const [bulkSessionId, setBulkSessionId] = useState("");
+  const [bulkMatchLocation, setBulkMatchLocation] = useState("");
   const [bulkMatchStartsAt, setBulkMatchStartsAt] = useState("");
   const [savingGenderPlayerId, setSavingGenderPlayerId] = useState<
     string | null
@@ -1095,6 +1096,81 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleBulkMatchLocationApply = async () => {
+    if (selectedMatchIds.length === 0) {
+      setError("장소를 일괄 설정할 매치를 먼저 선택해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    const nextLocation = bulkMatchLocation.trim();
+    if (!nextLocation) {
+      setError("일괄 적용할 매치 장소를 입력해주세요.");
+      setSuccess(null);
+      return;
+    }
+
+    const matchesToUpdate = matches.filter(
+      (match) =>
+        selectedMatchIds.includes(match.id) &&
+        (match.location?.trim() ?? "") !== nextLocation,
+    );
+    if (!matchesToUpdate.length) {
+      setSuccess("선택한 매치에 반영할 장소 변경이 없습니다.");
+      setError(null);
+      return;
+    }
+
+    try {
+      setIsSavingBulkMatchMetadata(true);
+      setSavingMatchMetadataIds((prev) => [
+        ...new Set([...prev, ...matchesToUpdate.map((match) => match.id)]),
+      ]);
+      setError(null);
+      setSuccess(null);
+
+      const res = await fetch("/api/admin/matches/bulk-metadata", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          matchIds: matchesToUpdate.map((match) => match.id),
+          location: nextLocation,
+        }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "매치 장소 일괄 설정 실패");
+      }
+
+      const { matches: updatedMatches } = (await res.json()) as {
+        matches: MatchInfo[];
+      };
+      const updatedMatchesById = new Map(
+        updatedMatches.map((match) => [match.id, match]),
+      );
+      setMatches((prev) =>
+        prev.map((match) => updatedMatchesById.get(match.id) ?? match),
+      );
+      setBulkMatchLocation("");
+      setSelectedMatchIds([]);
+      setSuccess(`${updatedMatches.length}개 매치의 장소를 설정했습니다.`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "알 수 없는 오류");
+      setSuccess(null);
+    } finally {
+      setIsSavingBulkMatchMetadata(false);
+      setSavingMatchMetadataIds((prev) =>
+        prev.filter(
+          (savingMatchId) =>
+            !matchesToUpdate.some((match) => match.id === savingMatchId),
+        ),
+      );
+    }
+  };
+
   const handleBulkSessionDisconnect = async () => {
     const matchesToUpdate = matches.filter(
       (match) => selectedMatchIds.includes(match.id) && match.session?.id,
@@ -1734,6 +1810,32 @@ const AdminDashboard: React.FC = () => {
                 <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-end">
                   <div className="flex-1">
                     <label className="mb-1 block text-sm font-medium text-slate-700">
+                      일괄 매치 장소
+                    </label>
+                    <input
+                      value={bulkMatchLocation}
+                      onChange={(e) => setBulkMatchLocation(e.target.value)}
+                      placeholder="예: PKELO Court A"
+                      className="w-full rounded-lg border px-3 py-2"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={
+                      isSavingBulkMatchMetadata ||
+                      selectedMatchIds.length === 0
+                    }
+                    onClick={() => void handleBulkMatchLocationApply()}
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:bg-slate-300"
+                  >
+                    {isSavingBulkMatchMetadata
+                      ? "일괄 설정 중..."
+                      : `선택 ${selectedMatchIds.length}개 장소 설정`}
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-end">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
                       일괄 경기 예정 일시
                     </label>
                     <input
@@ -1758,8 +1860,8 @@ const AdminDashboard: React.FC = () => {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  선택한 매치의 세션 연결 또는 경기 예정 일시를 일괄 설정할 수
-                  있습니다. 연결 해제는 별도 버튼과 확인 절차로만 수행됩니다.
+                  선택한 매치의 세션 연결, 매치 장소 또는 경기 예정 일시를 일괄
+                  설정할 수 있습니다. 연결 해제는 별도 버튼과 확인 절차로만 수행됩니다.
                 </p>
               </div>
 
@@ -1783,7 +1885,9 @@ const AdminDashboard: React.FC = () => {
                       <th className="px-4 py-3 whitespace-nowrap">세션 ID</th>
                       <th className="px-4 py-3 whitespace-nowrap">세션명</th>
                       <th className="px-4 py-3 whitespace-nowrap">세션 날짜</th>
-                      <th className="px-4 py-3 whitespace-nowrap">장소</th>
+                      <th className="px-4 py-3 whitespace-nowrap">
+                        매치 장소
+                      </th>
                       <th className="px-4 py-3 whitespace-nowrap">매치명</th>
                       <th className="px-4 py-3 whitespace-nowrap">타입</th>
                       <th className="px-4 py-3 whitespace-nowrap">모드</th>
@@ -1815,6 +1919,10 @@ const AdminDashboard: React.FC = () => {
                         draftSessionId.trim() !== (match.session?.id ?? "");
                       const isSavingMatchMetadata =
                         savingMatchMetadataIds.includes(match.id);
+                      const displayedMatchLocation =
+                        match.location?.trim() ||
+                        match.session?.location?.trim() ||
+                        "-";
 
                       return (
                         <tr
@@ -1890,7 +1998,7 @@ const AdminDashboard: React.FC = () => {
                           </td>
                           <td className="px-4 py-4 min-w-[180px]">
                             <span className="text-xs text-slate-600">
-                              {match.session?.location ?? "-"}
+                              {displayedMatchLocation}
                             </span>
                           </td>
                           <td className="px-4 py-4 min-w-[180px]">
