@@ -41,6 +41,11 @@ const KEYBOARD_INPUT_TYPES = new Set([
   "week",
 ]);
 
+const isIosLike = () =>
+  /iphone|ipad|ipod/i.test(window.navigator.userAgent) ||
+  (window.navigator.platform === "MacIntel" &&
+    window.navigator.maxTouchPoints > 1);
+
 const isKeyboardInputElement = (
   element: Element | null | undefined,
 ): boolean => {
@@ -166,6 +171,70 @@ function App() {
   const location = useLocation();
   const isFullWidthDevPage =
     import.meta.env.DEV && location.pathname === "/dev/qrs";
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !isIosLike()) {
+      return;
+    }
+
+    const root = document.documentElement;
+    const viewportMeta = document.querySelector<HTMLMetaElement>(
+      'meta[name="viewport"]',
+    );
+    const previousViewportContent = viewportMeta?.getAttribute("content");
+    const listenerOptions = { capture: true, passive: false };
+    const preventGestureZoom = (event: Event) => {
+      if (event.cancelable) {
+        event.preventDefault();
+      }
+    };
+    const preventMultiTouchZoom = (event: TouchEvent) => {
+      if (event.touches.length > 1 && event.cancelable) {
+        event.preventDefault();
+      }
+    };
+
+    root.dataset.iosViewportLocked = "true";
+    if (viewportMeta) {
+      viewportMeta.setAttribute(
+        "content",
+        `${previousViewportContent ?? ""}, minimum-scale=1, maximum-scale=1, user-scalable=no`,
+      );
+    }
+
+    document.addEventListener(
+      "gesturestart",
+      preventGestureZoom,
+      listenerOptions,
+    );
+    document.addEventListener(
+      "gesturechange",
+      preventGestureZoom,
+      listenerOptions,
+    );
+    document.addEventListener("dblclick", preventGestureZoom, listenerOptions);
+    document.addEventListener(
+      "touchmove",
+      preventMultiTouchZoom,
+      listenerOptions,
+    );
+
+    return () => {
+      document.removeEventListener("gesturestart", preventGestureZoom, true);
+      document.removeEventListener("gesturechange", preventGestureZoom, true);
+      document.removeEventListener("dblclick", preventGestureZoom, true);
+      document.removeEventListener("touchmove", preventMultiTouchZoom, true);
+      delete root.dataset.iosViewportLocked;
+
+      if (viewportMeta) {
+        if (previousViewportContent == null) {
+          viewportMeta.removeAttribute("content");
+        } else {
+          viewportMeta.setAttribute("content", previousViewportContent);
+        }
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {

@@ -104,6 +104,19 @@
     overscroll-behavior: none;
   }
 
+  html[data-ios-viewport-locked="true"],
+  html[data-ios-viewport-locked="true"] body,
+  html[data-ios-viewport-locked="true"] #root {
+    overscroll-behavior: none;
+    touch-action: pan-y;
+  }
+
+  html[data-ios-viewport-locked="true"] input,
+  html[data-ios-viewport-locked="true"] textarea,
+  html[data-ios-viewport-locked="true"] select {
+    font-size: max(16px, 1em);
+  }
+
   /*
    * Native buttons and HeroUI primitives intentionally keep their default
    * cursor. Make every enabled action discoverable when the mobile-first UI
@@ -152,6 +165,13 @@
     overscroll-behavior: none;
     overscroll-behavior-y: none;
     -webkit-overflow-scrolling: touch;
+  }
+
+  html[data-ios-viewport-locked="true"] .app-tab-panel-scroll-area,
+  html[data-ios-viewport-locked="true"] .app-bottom-sheet-body,
+  html[data-ios-viewport-locked="true"] .app-right-drawer-scroll-area {
+    overscroll-behavior: none;
+    touch-action: pan-y;
   }
 
   .app-bottom-sheet-surface {
