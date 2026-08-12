@@ -18,20 +18,23 @@ const ProfileSettingsSheetBody: React.FC = () => {
   };
 
   return (
-    <BottomSheet.Body>
-      <h2 className="bs-text-head text-left text-pkpk-main-font">설정</h2>
-
-      {player?.authProvider === "password" || !player?.authProvider ? (
-        <PasswordChangeForm
-          title="패스워드 변경"
-          onSuccess={handlePasswordChangeSuccess}
-        />
-      ) : (
-        <p className="rounded-xl bg-default-100 px-4 py-3 text-center text-sm text-default-600">
-          카카오 로그인 계정은 비밀번호를 변경할 수 없습니다.
-        </p>
-      )}
-    </BottomSheet.Body>
+    <>
+      <BottomSheet.Header>
+        <h2 className="bs-text-head text-left text-pkpk-main-font">설정</h2>
+      </BottomSheet.Header>
+      <BottomSheet.Body>
+        {player?.authProvider === "password" || !player?.authProvider ? (
+          <PasswordChangeForm
+            title="패스워드 변경"
+            onSuccess={handlePasswordChangeSuccess}
+          />
+        ) : (
+          <p className="rounded-xl bg-default-100 px-4 py-3 text-center text-sm text-default-600">
+            카카오 로그인 계정은 비밀번호를 변경할 수 없습니다.
+          </p>
+        )}
+      </BottomSheet.Body>
+    </>
   );
 };
 

@@ -159,7 +159,13 @@
       var(--app-shell-height) - var(--app-keyboard-offset) - 3rem -
         env(safe-area-inset-top)
     );
+    overflow: hidden;
+  }
+
+  .app-bottom-sheet-body {
+    min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
@@ -174,13 +180,13 @@
 
   @media (max-width: 480px) {
     .app-tab-panel-scroll-area,
-    .app-bottom-sheet-surface,
+    .app-bottom-sheet-body,
     .app-right-drawer-scroll-area {
       scrollbar-width: none;
     }
 
     .app-tab-panel-scroll-area::-webkit-scrollbar,
-    .app-bottom-sheet-surface::-webkit-scrollbar,
+    .app-bottom-sheet-body::-webkit-scrollbar,
     .app-right-drawer-scroll-area::-webkit-scrollbar {
       display: none;
     }

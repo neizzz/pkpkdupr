@@ -961,10 +961,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
         className="[container-type:inline-size]"
         layer={80}
       >
-        <BottomSheet.Body>
+        <BottomSheet.Header>
           <h2 className="bs-text-head text-pkpk-main-font">
             {hasResultScores ? "경기 결과 수정" : "경기 결과 입력"}
           </h2>
+        </BottomSheet.Header>
+        <BottomSheet.Body>
           <div className="flex flex-col">
             <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)] items-end gap-2">
               <span aria-hidden="true" />

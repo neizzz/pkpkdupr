@@ -45,8 +45,13 @@ const AppSettingsSheetBody: React.FC = () => {
   };
 
   return (
-    <BottomSheet.Body>
-      <h2 className="bs-text-head text-left text-pkpk-main-font">앱 설정</h2>
+    <>
+      <BottomSheet.Header>
+        <h2 className="bs-text-head text-left text-pkpk-main-font">
+          앱 설정
+        </h2>
+      </BottomSheet.Header>
+      <BottomSheet.Body>
 
       {(message || error) && (
         <div
@@ -98,7 +103,8 @@ const AppSettingsSheetBody: React.FC = () => {
           </div>
         </div>
       </section>
-    </BottomSheet.Body>
+      </BottomSheet.Body>
+    </>
   );
 };
 
