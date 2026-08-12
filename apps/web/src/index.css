@@ -281,14 +281,63 @@
   }
 }
 
+@property --player-qr-trigger-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .player-qr-trigger {
+  --player-qr-trigger-fill: var(--color-pkpk-primary-bg);
   width: var(--player-qr-trigger-size);
   height: var(--player-qr-trigger-size);
+  border: 3px solid transparent;
+  background:
+    linear-gradient(
+        var(--player-qr-trigger-fill),
+        var(--player-qr-trigger-fill)
+      )
+      padding-box,
+    conic-gradient(
+        from var(--player-qr-trigger-border-angle),
+        var(--color-pkpk-primary-bg),
+        var(--color-pkpk-secondary-bg),
+        var(--color-pkpk-primary-bg)
+      )
+      border-box;
+  animation: player-qr-trigger-border-gradient 5s linear infinite;
+}
+
+.player-qr-trigger:hover:not(:disabled) {
+  --player-qr-trigger-fill: rgb(59 82 204 / 0.9);
+}
+
+.player-qr-trigger:disabled {
+  --player-qr-trigger-fill: #e2e8f0;
+  background:
+    linear-gradient(
+        var(--player-qr-trigger-fill),
+        var(--player-qr-trigger-fill)
+      )
+      padding-box,
+    linear-gradient(var(--color-pkpk-sub-bg), var(--color-pkpk-sub-bg))
+      border-box;
+  animation: none;
 }
 
 .player-qr-trigger-icon {
   width: 48.6111%;
   height: 48.6111%;
+}
+
+@keyframes player-qr-trigger-border-gradient {
+  from {
+    --player-qr-trigger-border-angle: 0deg;
+  }
+
+  to {
+    --player-qr-trigger-border-angle: 360deg;
+  }
 }
 
 .tab-panel-header-gradient-base,
@@ -332,6 +381,10 @@
 @media (prefers-reduced-motion: reduce) {
   .tab-panel-header-gradient-extension {
     transition: none;
+  }
+
+  .player-qr-trigger {
+    animation: none;
   }
 }
 

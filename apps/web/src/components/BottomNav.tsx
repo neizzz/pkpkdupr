@@ -1098,14 +1098,14 @@ const BottomNav: React.FC = () => {
         onSelectionChange={handleSelectionChange}
         className="relative flex h-full w-full flex-col overflow-hidden bg-white pb-[var(--safe-bottom)]"
       >
-        <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3 pt-3">
+        <div className="fixed bottom-[calc(var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-20 flex app-shell-width -translate-x-1/2 items-end px-3 pb-3">
           <Button
             type="button"
             isIconOnly
             aria-label="내 QR 코드 열기"
             isDisabled={!isOnline}
             onPress={openQrSheet}
-            className="player-qr-trigger absolute right-3 bottom-[calc(100%+0.25rem)] shrink-0 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-bg/90 disabled:bg-slate-200 disabled:text-slate-400"
+            className="player-qr-trigger absolute right-3 bottom-[calc(100%+0.75rem)] shrink-0 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-bg/90 disabled:bg-slate-200 disabled:text-slate-400"
           >
             <IoQrCodeSharp className="player-qr-trigger-icon" />
           </Button>
