@@ -88,13 +88,30 @@ const getLastPlayedAtMs = (lastPlayedAt: string | null) => {
   return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value;
 };
 
+const getCalendarDayDifference = (lastPlayedAtMs: number, nowMs: number) => {
+  const lastPlayedAt = new Date(lastPlayedAtMs);
+  const now = new Date(nowMs);
+  const lastPlayedDayMs = Date.UTC(
+    lastPlayedAt.getFullYear(),
+    lastPlayedAt.getMonth(),
+    lastPlayedAt.getDate(),
+  );
+  const todayMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+
+  return Math.max(
+    0,
+    Math.floor((todayMs - lastPlayedDayMs) / (24 * 60 * 60 * 1000)),
+  );
+};
+
 const formatLastPlayedAt = (lastPlayedAt: string | null) => {
   const lastPlayedAtMs = getLastPlayedAtMs(lastPlayedAt);
   if (!Number.isFinite(lastPlayedAtMs)) {
     return "최근 경기 없음";
   }
 
-  const elapsedMs = Math.max(0, Date.now() - lastPlayedAtMs);
+  const nowMs = Date.now();
+  const elapsedMs = Math.max(0, nowMs - lastPlayedAtMs);
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
@@ -106,7 +123,7 @@ const formatLastPlayedAt = (lastPlayedAt: string | null) => {
   if (elapsedMs < day) {
     return `${Math.floor(elapsedMs / hour)}시간전 마지막 플레이`;
   }
-  return `${Math.floor(elapsedMs / day)}일전 마지막 플레이`;
+  return `${getCalendarDayDifference(lastPlayedAtMs, nowMs)}일전 마지막 플레이`;
 };
 
 const readCachedMembers = (): MemberListPlayerInfo[] | null => {
