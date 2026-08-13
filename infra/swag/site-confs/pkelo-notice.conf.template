@@ -9,7 +9,7 @@ server {
 
     location = /api/runtime-notice {
         add_header Cache-Control "no-store" always;
-        proxy_pass http://pkelo-notice-web:80/runtime/notice.json;
+        proxy_pass http://pkelo-api:4000;
         include /config/nginx/proxy.conf;
     }
 

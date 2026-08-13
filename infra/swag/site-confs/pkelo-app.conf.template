@@ -13,12 +13,6 @@ server {
         return 404;
     }
 
-    location = /api/runtime-notice {
-        add_header Cache-Control "no-store" always;
-        proxy_pass http://pkelo-web:80/runtime/notice.json;
-        include /config/nginx/proxy.conf;
-    }
-
     location ^~ /api/ {
         proxy_pass http://pkelo-api:4000;
         include /config/nginx/proxy.conf;
