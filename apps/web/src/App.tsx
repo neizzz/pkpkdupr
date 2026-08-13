@@ -22,7 +22,7 @@ const isPkeloAppHost = () => {
 
   return (
     window.location.hostname === "pkelo.app" ||
-    (import.meta.env.DEV && window.location.hostname === "pkelo.localhost")
+    import.meta.env.DEV
   );
 };
 

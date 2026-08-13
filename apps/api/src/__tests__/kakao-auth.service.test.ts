@@ -47,7 +47,7 @@ describe("KakaoAuthService", () => {
   });
 
   it("mock provider가 state를 저장하고 callback handoff ticket을 발급한다", async () => {
-    process.env.KAKAO_WEB_ORIGIN = "http://pkelo.localhost:8081";
+    process.env.KAKAO_WEB_ORIGIN = "http://localhost:8443";
     process.env.KAKAO_MOCK_SUBJECT = "mock-subject-1";
     const fetchImpl = vi
       .fn()
@@ -69,7 +69,7 @@ describe("KakaoAuthService", () => {
       mock: true,
     });
     expect(callbackRedirect).toMatch(
-      /^http:\/\/pkelo\.localhost:8081\/login\/kakao\/callback#ticket=/,
+      /^http:\/\/localhost:8443\/login\/kakao\/callback#ticket=/,
     );
 
     const createPayload = JSON.parse(

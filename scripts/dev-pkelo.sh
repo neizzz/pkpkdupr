@@ -18,9 +18,11 @@ export NODE_ENV=development
 export ENABLE_DEV_MOCK_DATA=true
 export DOMAIN="${DOMAIN:-pkelo.localhost}"
 export JWT_SECRET="${JWT_SECRET:-pkelo-local-dev-jwt-secret}"
+export PKELO_DEV_WEB_PORT="${PKELO_DEV_WEB_PORT:-8443}"
+export PKELO_DEV_WEB_ORIGIN="${PKELO_DEV_WEB_ORIGIN:-http://localhost:${PKELO_DEV_WEB_PORT}}"
 export USER_AUTH_PROVIDER="${USER_AUTH_PROVIDER:-kakao-mock}"
-export KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-http://pkelo.localhost:8081/auth/kakao/callback}"
-export KAKAO_WEB_ORIGIN="${KAKAO_WEB_ORIGIN:-http://pkelo.localhost:8081}"
+export KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-${PKELO_DEV_WEB_ORIGIN}/auth/kakao/callback}"
+export KAKAO_WEB_ORIGIN="${KAKAO_WEB_ORIGIN:-${PKELO_DEV_WEB_ORIGIN}}"
 export KAKAO_MOCK_SUBJECT="${KAKAO_MOCK_SUBJECT:-pkelo-local-mock-user}"
 export API_ADMIN_USERNAME="${API_ADMIN_USERNAME:-admin}"
 export API_ADMIN_PASSWORD="${API_ADMIN_PASSWORD:-admin123qwe}"
@@ -36,7 +38,8 @@ export DB_NAME="${MYSQL_DATABASE}"
 export DB_USER="${MYSQL_USER}"
 export DB_PASSWORD="${MYSQL_PASSWORD}"
 export AVATAR_UPLOAD_DIR="${ROOT_DIR}/data/pkelo-dev/uploads/avatars"
-export DEV_CORS_ORIGINS="http://pkelo.localhost:8081,http://localhost:8081,http://127.0.0.1:8081,http://pkelo.localhost:3101"
+export DEV_CORS_ORIGINS="${DEV_CORS_ORIGINS:-${PKELO_DEV_WEB_ORIGIN},http://localhost:${PKELO_DEV_WEB_PORT},http://127.0.0.1:${PKELO_DEV_WEB_PORT},http://pkelo.localhost:${PKELO_DEV_WEB_PORT},https://neiz-office2.fedev.kakao.com,https://neiz-home2.fedev.kakao.com,http://pkelo.localhost:3101}"
+export VITE_DEV_ALLOWED_HOSTS="${VITE_DEV_ALLOWED_HOSTS:-localhost,127.0.0.1,pkelo.localhost,neiz-office2.fedev.kakao.com,neiz-home2.fedev.kakao.com}"
 
 mkdir -p "${AVATAR_UPLOAD_DIR}"
 bash scripts/dev-pkelo-db.sh browser
@@ -89,16 +92,16 @@ wait_for_db_server "${PIDS[0]}"
 
 start_process env PORT=4001 DB_SERVER_URL=http://127.0.0.1:5002 \
   pnpm --filter @pkpkdupr/api dev
-start_process env VITE_DEV_PORT=8081 VITE_DEV_API_TARGET=http://127.0.0.1:4001 \
+start_process env VITE_DEV_PORT="${PKELO_DEV_WEB_PORT}" VITE_DEV_API_TARGET=http://127.0.0.1:4001 \
   VITE_DEV_ADMINER_TARGET=http://127.0.0.1:${PKELO_DEV_ADMINER_PORT:-3302} \
-  VITE_DEV_ALLOWED_HOSTS=pkelo.localhost VITE_DEV_HMR_HOST=pkelo.localhost \
+  VITE_DEV_ALLOWED_HOSTS="${VITE_DEV_ALLOWED_HOSTS}" \
   pnpm --filter @pkpkdupr/web dev
 start_process env VITE_DEV_PORT=3101 VITE_DEV_API_TARGET=http://127.0.0.1:4001 \
   VITE_DEV_ALLOWED_HOSTS=pkelo.localhost \
   pnpm --filter @pkpkdupr/admin-web dev
 
 echo "🚀 PKELO 개발 환경이 실행되었습니다."
-echo "   사용자 앱: http://pkelo.localhost:8081/login"
+echo "   사용자 앱: ${PKELO_DEV_WEB_ORIGIN}/login"
 echo "   관리자:   http://pkelo.localhost:3101"
 echo "   Adminer:  http://localhost:${PKELO_DEV_ADMINER_PORT:-3302}"
 

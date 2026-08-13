@@ -114,24 +114,34 @@ describe("development CORS origin isolation", () => {
     process.env.VITEST = "true";
     process.env.DOMAIN = "pkelo.localhost";
     process.env.DEV_CORS_ORIGINS =
-      "http://pkelo.localhost:8081,http://pkelo.localhost:3101";
+      "http://localhost:8443,http://127.0.0.1:8443,http://pkelo.localhost:8443,https://neiz-office2.fedev.kakao.com,https://neiz-home2.fedev.kakao.com,http://pkelo.localhost:3101";
     vi.resetModules();
 
     const { app } = await import("../index");
 
     const webOriginResponse = await request(app)
       .get("/api/health")
-      .set("Origin", "http://pkelo.localhost:8081");
+      .set("Origin", "http://localhost:8443");
     expect(webOriginResponse.status).toBe(200);
     expect(webOriginResponse.headers["access-control-allow-origin"]).toBe(
-      "http://pkelo.localhost:8081",
+      "http://localhost:8443",
     );
 
-    const primaryOriginResponse = await request(app)
+    const proxyOriginResponse = await request(app)
+      .get("/api/health")
+      .set("Origin", "https://neiz-office2.fedev.kakao.com");
+    expect(proxyOriginResponse.status).toBe(200);
+    expect(proxyOriginResponse.headers["access-control-allow-origin"]).toBe(
+      "https://neiz-office2.fedev.kakao.com",
+    );
+
+    const rejectedOriginResponse = await request(app)
       .get("/api/health")
       .set("Origin", "http://localhost:8080");
-    expect(primaryOriginResponse.status).toBe(500);
-    expect(primaryOriginResponse.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(rejectedOriginResponse.status).toBe(500);
+    expect(
+      rejectedOriginResponse.headers["access-control-allow-origin"],
+    ).toBeUndefined();
     expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 });

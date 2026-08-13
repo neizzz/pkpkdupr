@@ -52,9 +52,9 @@ export class KakaoAuthService {
     this.clientSecret = process.env.KAKAO_CLIENT_SECRET?.trim() ?? "";
     this.redirectUri =
       process.env.KAKAO_REDIRECT_URI?.trim() ??
-      "http://localhost:4001/auth/kakao/callback";
+      "http://localhost:8443/auth/kakao/callback";
     this.webOrigin =
-      process.env.KAKAO_WEB_ORIGIN?.trim() ?? "http://pkelo.localhost:8081";
+      process.env.KAKAO_WEB_ORIGIN?.trim() ?? "http://localhost:8443";
     this.mockSubject =
       process.env.KAKAO_MOCK_SUBJECT?.trim() ?? "mock-kakao-user";
   }

@@ -8,17 +8,19 @@
 pnpm dev                 # MySQL 준비 후 web/admin/api/db-server 실행
 pnpm dev:db              # MySQL만 기동
 pnpm dev:db:down         # MySQL 중지
-pnpm dev:db-browser      # Adminer 기동 (http://localhost:3301/)
+pnpm dev:db-browser      # Adminer 기동 (http://localhost:3302/)
 pnpm dev:db-browser:down
 ```
+
+사용자 앱은 `http://localhost:8443/login`에서 엽니다.
 
 `pnpm dev`는 다음 환경 변수를 DB 서버에 주입하고 개발 mock 데이터를 넣습니다.
 
 ```text
 DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_NAME=pkpkdupr
-DB_USER=pkpkdupr
+DB_PORT=3307
+DB_NAME=pkelo_dev
+DB_USER=pkelo_dev
 DB_PASSWORD=<MYSQL_PASSWORD>
 ENABLE_DEV_MOCK_DATA=true
 ```
@@ -26,25 +28,35 @@ ENABLE_DEV_MOCK_DATA=true
 ## 구조
 
 ```text
-apps/web :8080 ── /api ──> apps/api :4000
+apps/web :8443 ── /api ──> apps/api :4001
                                  │ internal HTTP
                                  ▼
-                        apps/db-server :5001
+                        apps/db-server :5002
                                  │ mysql2 + Drizzle
                                  ▼
-                         MySQL 9.7 :3306
+                         MySQL 9.7 :3307
                                  ▲
-                     Adminer :3301 (read-only viewer account)
+                     Adminer :3302 (read-only viewer account)
 ```
 
-Vite는 `/api`, `/uploads`, `/db`를 각각 API 또는 Adminer 개발 서비스로 프록시합니다.
+Vite는 `/api`, `/auth`, `/uploads`, `/db`를 각각 API 또는 Adminer 개발 서비스로 프록시합니다.
 
 ## Adminer
 
-- 직접 접근: `http://localhost:3301/`
-- Vite 경유 접근: `http://localhost:8080/db/`
-- 서버는 `mysql`, 데이터베이스는 `pkpkdupr`를 입력합니다.
+- 직접 접근: `http://localhost:3302/`
+- Vite 경유 접근: `http://localhost:8443/db/`
+- 서버는 `mysql`, 데이터베이스는 `pkelo_dev`를 입력합니다.
 - 조회에는 `.env`의 `MYSQL_VIEWER_USER` / `MYSQL_VIEWER_PASSWORD`를 사용합니다. 이 계정은 `SELECT`, `SHOW VIEW` 권한만 가집니다.
+
+## HTTPS 프록시와 카카오 로그인
+
+`neiz-office2.fedev.kakao.com`, `neiz-home2.fedev.kakao.com`은 개발 Vite 허용 host입니다. 실카카오 로그인은 사용할 프록시 도메인을 카카오디벨로퍼스 Redirect URI에 등록한 뒤, `env/pkelo.dev.env`에 같은 origin을 설정합니다.
+
+```env
+PKELO_DEV_WEB_ORIGIN=https://neiz-office2.fedev.kakao.com
+KAKAO_WEB_ORIGIN=https://neiz-office2.fedev.kakao.com
+KAKAO_REDIRECT_URI=https://neiz-office2.fedev.kakao.com/auth/kakao/callback
+```
 
 ## SQLite 데이터 이관
 

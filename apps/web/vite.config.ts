@@ -44,14 +44,17 @@ const resolveAllowedHosts = (value: string | undefined, fallback: string[]) => {
   return hosts?.length ? hosts : fallback;
 };
 
-const devPort = resolvePort(process.env.VITE_DEV_PORT, 8080);
+const devPort = resolvePort(process.env.VITE_DEV_PORT, 8443);
 const devApiTarget = process.env.VITE_DEV_API_TARGET || "http://localhost:4000";
 const devAdminerTarget =
   process.env.VITE_DEV_ADMINER_TARGET || "http://localhost:3301";
-const devHmrHost =
-  process.env.VITE_DEV_HMR_HOST || "neiz-office.fedev.kakao.com";
+const devHmrHost = process.env.VITE_DEV_HMR_HOST?.trim();
 const devAllowedHosts = resolveAllowedHosts(process.env.VITE_DEV_ALLOWED_HOSTS, [
-  "neiz-office.fedev.kakao.com",
+  "localhost",
+  "127.0.0.1",
+  "pkelo.localhost",
+  "neiz-office2.fedev.kakao.com",
+  "neiz-home2.fedev.kakao.com",
 ]);
 
 export default defineConfig({
@@ -165,10 +168,9 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: devPort,
+    strictPort: true,
     allowedHosts: devAllowedHosts,
-    hmr: {
-      host: devHmrHost,
-    },
+    ...(devHmrHost ? { hmr: { host: devHmrHost } } : {}),
     proxy: {
       "/api": {
         target: devApiTarget,
