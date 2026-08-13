@@ -23,7 +23,9 @@ export const TabPanelHeaderGradientExtension: React.FC<
   const animationFrameRef = useRef<number | null>(null);
 
   useLayoutEffect(() => {
-    const container = document.querySelector(".app-tab-panel-scroll-area");
+    const container = document.querySelector<HTMLDivElement>(
+      ".app-tab-panel-scroll-area",
+    );
     const gradientExtensionAnchor = gradientExtensionAnchorRef.current;
     const gradientExtension = gradientExtensionRef.current;
     if (
@@ -44,11 +46,15 @@ export const TabPanelHeaderGradientExtension: React.FC<
       const totalHeight = headerHeight + extensionHeight;
       const isExtensionVisible = container.scrollTop <= 1;
 
-      gradientExtensionAnchor.style.top = `${headerHeight}px`;
-      gradientExtension.style.setProperty(
-        "--tab-panel-header-gradient-extension-height",
-        `${extensionHeight}px`,
+      headerElement.style.setProperty(
+        "--tab-panel-header-gradient-header-height",
+        `${headerHeight}px`,
       );
+      headerElement.style.setProperty(
+        "--tab-panel-header-gradient-total-height",
+        `${totalHeight}px`,
+      );
+      gradientExtensionAnchor.style.top = `${headerHeight}px`;
       gradientExtension.style.setProperty(
         "--tab-panel-header-gradient-header-height",
         `${headerHeight}px`,
@@ -120,13 +126,6 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
     <div
       ref={handleHeaderElementChange}
       className="tab-panel-header-gradient-base sticky top-0 z-20 isolate"
-      style={{
-        backgroundColor: "#8b1e77",
-        backgroundImage:
-          "linear-gradient(to bottom right, rgb(59 82 204 / 0%) 0%, rgb(59 82 204 / 0%) 52%, #3b52cc 100%)",
-        backgroundPosition: "0 0",
-        backgroundSize: "100% 96px",
-      }}
     >
       <div className="relative z-10">
         <div className="flex min-h-12 items-center justify-between px-4">
