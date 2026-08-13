@@ -31,6 +31,7 @@ services:
       KAKAO_MOCK_SUBJECT: ${KAKAO_MOCK_SUBJECT:-}
       CORS_ADDITIONAL_ORIGINS: ${CORS_ADDITIONAL_ORIGINS:-}
       AVATAR_UPLOAD_DIR: /app/data/uploads/avatars
+      PKELO_RUNTIME_NOTICE_FILE: /app/data/runtime-notice/notice.json
       NEW_RELIC_ENABLED: ${NEW_RELIC_ENABLED:-false}
       NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY:-}
       NEW_RELIC_APP_NAME: pkelo-api
@@ -39,6 +40,7 @@ services:
       NEW_RELIC_HOST: ${NEW_RELIC_HOST:-collector.newrelic.com}
     volumes:
       - ${APP_DATA_PATH:-./data/pkelo}/uploads/avatars:/app/data/uploads/avatars
+      - ${PKELO_NOTICE_DATA_PATH:-${PKPKDUPR_DEPLOY_PATH:-.}/data/pkelo-notice}/public:/app/data/runtime-notice:ro
     depends_on:
       pkelo-db-server:
         condition: service_healthy

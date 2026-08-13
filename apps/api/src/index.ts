@@ -125,6 +125,44 @@ const allowedOrigins = new Set([
   ...additionalAllowedOrigins,
 ]);
 
+type RuntimeNoticeResponse =
+  | { enabled: false }
+  | { enabled: true; title: string; message: string };
+
+const disabledRuntimeNotice = (): RuntimeNoticeResponse => ({ enabled: false });
+
+const parseRuntimeNotice = (value: unknown): RuntimeNoticeResponse => {
+  if (!value || typeof value !== "object") {
+    return disabledRuntimeNotice();
+  }
+
+  const { enabled, title, message } = value as Record<string, unknown>;
+  if (
+    enabled !== true ||
+    typeof title !== "string" ||
+    !title.trim() ||
+    typeof message !== "string" ||
+    !message.trim()
+  ) {
+    return disabledRuntimeNotice();
+  }
+
+  return { enabled: true, title: title.trim(), message: message.trim() };
+};
+
+const getRuntimeNotice = async (): Promise<RuntimeNoticeResponse> => {
+  const noticeFile = process.env.PKELO_RUNTIME_NOTICE_FILE?.trim();
+  if (!noticeFile) {
+    return disabledRuntimeNotice();
+  }
+
+  try {
+    return parseRuntimeNotice(JSON.parse(await fs.readFile(noticeFile, "utf8")));
+  } catch {
+    return disabledRuntimeNotice();
+  }
+};
+
 app.use(
   cors({
     origin(origin, callback) {
@@ -152,6 +190,11 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/ping", (_req, res) => {
   res.json({ message: "pong" });
+});
+
+app.get("/api/runtime-notice", async (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json(await getRuntimeNotice());
 });
 
 const authService = new AuthService();

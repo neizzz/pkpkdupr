@@ -8,7 +8,9 @@ import React, {
   useState,
 } from "react";
 import { buildApiUrl } from "@/lib/api";
-import PkeloTemporaryNotice from "@/pages/PkeloTemporaryNotice";
+import PkeloTemporaryNotice, {
+  PkeloNoticeLoading,
+} from "@/pages/PkeloTemporaryNotice";
 
 const RUNTIME_NOTICE_PATH = "/api/runtime-notice";
 const NOTICE_HEADER = "x-pkelo-notice";
@@ -89,8 +91,10 @@ const fetchRuntimeNotice = async (): Promise<PkeloNotice | null> => {
 export const PkeloNoticeProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
-  const [notice, setNotice] = useState<PkeloNotice | null>(null);
   const isPkeloHost = isPkeloAppHost();
+  const [notice, setNotice] = useState<PkeloNotice | null>(null);
+  const [isInitialNoticeCheckPending, setIsInitialNoticeCheckPending] =
+    useState(isPkeloHost);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
 
   const refreshNotice = useCallback(async () => {
@@ -111,6 +115,7 @@ export const PkeloNoticeProvider: React.FC<React.PropsWithChildren> = ({
       })
       .finally(() => {
         refreshInFlightRef.current = null;
+        setIsInitialNoticeCheckPending(false);
       });
     refreshInFlightRef.current = request;
     return request;
@@ -181,7 +186,13 @@ export const PkeloNoticeProvider: React.FC<React.PropsWithChildren> = ({
 
   return (
     <PkeloNoticeContext.Provider value={value}>
-      {notice ? <PkeloTemporaryNotice {...notice} /> : children}
+      {isInitialNoticeCheckPending ? (
+        <PkeloNoticeLoading />
+      ) : notice ? (
+        <PkeloTemporaryNotice {...notice} />
+      ) : (
+        children
+      )}
     </PkeloNoticeContext.Provider>
   );
 };
