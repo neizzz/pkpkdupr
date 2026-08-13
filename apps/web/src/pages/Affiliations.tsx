@@ -39,9 +39,7 @@ import MatchCard, {
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import RightDrawer from "@/components/RightDrawer";
 import SessionDetail from "@/components/SessionDetail";
-import TabPanelHeader, {
-  TabPanelHeaderGradientExtension,
-} from "@/components/TabPanelHeader";
+import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelEmptyState from "@/components/TabPanelEmptyState";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
@@ -109,9 +107,6 @@ const Affiliations: React.FC = () => {
   const [dashboard, setDashboard] = useState<ClubDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDashboardLoading, setIsDashboardLoading] = useState(false);
-  const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [clubName, setClubName] = useState("");
@@ -724,7 +719,6 @@ const Affiliations: React.FC = () => {
     <div className="flex h-full min-h-full flex-col">
       <TabPanelHeader
         title="Clubs"
-        onHeaderElementChange={setHeaderElement}
         footer={
           activeClubs.length ? (
             <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -760,10 +754,6 @@ const Affiliations: React.FC = () => {
       </TabPanelHeader>
 
       <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
-        <TabPanelHeaderGradientExtension
-          headerElement={headerElement}
-          className="z-20"
-        />
         {isLoading ? (
           <TabPanelStatus isLoading ariaLabel="클럽을 불러오는 중" message="클럽을 불러오는 중이에요." />
         ) : error && !activeClubs.length ? (
@@ -790,25 +780,27 @@ const Affiliations: React.FC = () => {
           </TabPanelEmptyState>
         ) : (
           <div className="relative z-30 mx-auto w-full min-h-full shrink-0">
-            <div className="relative z-10 mx-1.5 mt-1 overflow-hidden rounded-3xl bg-white pt-1">
-              <div className="space-y-3 pb-[calc(7rem+var(--safe-bottom))]">
+            <div className="relative z-10">
+              <div className="divide-y-[6px] divide-pkpk-section-border">
                 {error ? (
-                  <div className="rounded-3xl border border-error/20 bg-white px-4 py-3 text-sm font-medium text-error">
-                    {error}
-                  </div>
+                  <section className="px-4 py-4">
+                    <div className="rounded-2xl border border-error/20 bg-white px-4 py-3 text-sm font-medium text-error">
+                      {error}
+                    </div>
+                  </section>
                 ) : null}
 
                 {isDashboardLoading || !dashboard ? (
                   <TabPanelStatus isLoading ariaLabel="클럽 정보를 불러오는 중" message="클럽 정보를 불러오는 중이에요." />
                 ) : (
                   <>
-                    <section className="space-y-3 rounded-3xl border-x border-b border-border bg-white p-3">
+                    <section className="space-y-3 px-4 py-4">
                       <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="다가오는 경기 & 세션" />
                       {renderSchedule()}
                     </section>
 
                     {!hasUpcomingSchedule ? (
-                      <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
+                      <section className="space-y-3 px-4 py-4">
                         <SectionTitle
                           icon={<IoCalendarOutline className="size-5" />}
                           title="최근에 끝난 매치"
@@ -820,7 +812,7 @@ const Affiliations: React.FC = () => {
                     <button
                       type="button"
                       onClick={openClubMatchHistory}
-                      className="flex w-full items-center gap-3 rounded-3xl border border-border bg-white px-4 py-4 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                      className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
                     >
                       <span className="flex size-11 items-center justify-center rounded-2xl bg-pkpk-session-bg text-pkpk-primary-bg">
                         <IoCalendarOutline className="size-6" />
@@ -831,7 +823,7 @@ const Affiliations: React.FC = () => {
                       <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
                     </button>
 
-                    <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
+                    <section className="space-y-3 px-4 py-4">
                       <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
                       {dashboard.announcements.length ? (
                         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
@@ -856,7 +848,7 @@ const Affiliations: React.FC = () => {
                       )}
                     </section>
 
-                    <section className="space-y-3 rounded-3xl border border-border bg-white p-3">
+                    <section className="space-y-3 px-4 py-4">
                       <SectionTitle
                         icon={<PiRankingLight className="size-5" />}
                         title="랭킹"
@@ -884,7 +876,7 @@ const Affiliations: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setIsManagementOpen(true)}
-                        className="flex w-full items-center gap-3 rounded-3xl border border-pkpk-primary-bg/15 bg-pkpk-session-bg px-4 py-4 text-left"
+                        className="flex w-full items-center gap-3 bg-pkpk-session-bg px-4 py-4 text-left"
                       >
                         <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-pkpk-primary-bg shadow-sm">
                           <IoShieldCheckmarkOutline className="size-6" />

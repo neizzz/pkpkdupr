@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Button, Modal, useOverlayState } from "@heroui/react";
 import { IoLogOutOutline } from "react-icons/io5";
-import TabPanelHeader, {
-  TabPanelHeaderGradientExtension,
-} from "@/components/TabPanelHeader";
+import ActionChipButton from "@/components/ActionChipButton";
+import TabPanelHeader from "@/components/TabPanelHeader";
 import {
   APP_UPDATE_APPLIED_AT_STORAGE_KEY,
   useAppUpdate,
@@ -26,9 +25,6 @@ const Settings: React.FC = () => {
   } = useAppUpdate();
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
-    null,
-  );
   const [nextUpdateCheckAt, setNextUpdateCheckAt] = useState<number | null>(
     () => {
       if (typeof window === "undefined") return null;
@@ -98,10 +94,7 @@ const Settings: React.FC = () => {
 
   return (
     <div className="flex min-h-full flex-col">
-      <TabPanelHeader
-        title="Settings"
-        onHeaderElementChange={setHeaderElement}
-      >
+      <TabPanelHeader title="Settings">
         <button
           type="button"
           className="flex h-9 items-center gap-1 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80"
@@ -112,18 +105,16 @@ const Settings: React.FC = () => {
         </button>
       </TabPanelHeader>
       <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
-        <TabPanelHeaderGradientExtension
-          headerElement={headerElement}
-          className="z-20"
-        />
-        <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col gap-4 px-4 py-4">
+        <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col">
           {!isOnline ? (
-            <div className="rounded-2xl bg-amber-50 px-3 py-2 text-base leading-5 text-pkpk-sub-font">
-              오프라인에서는 업데이트 확인이 제한됩니다.
-            </div>
+            <section className="border-b-[6px] border-pkpk-section-border px-4 py-4">
+              <div className="rounded-2xl bg-amber-50 px-3 py-2 text-base leading-5 text-pkpk-sub-font">
+                오프라인에서는 업데이트 확인이 제한됩니다.
+              </div>
+            </section>
           ) : null}
 
-          <section className="flex flex-col gap-4 rounded-3xl border border-border bg-white p-4">
+          <section className="flex flex-col gap-4 border-b-[6px] border-pkpk-section-border px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg leading-5 font-semibold text-pkpk-sub-font">
@@ -133,16 +124,14 @@ const Settings: React.FC = () => {
                   {appVersion}
                 </p>
               </div>
-              <Button
-                type="button"
-                className="app-action-button shrink-0 rounded-2xl bg-[#409eff] px-4 text-white disabled:bg-slate-200 disabled:text-slate-400"
-                isDisabled={
+              <ActionChipButton
+                disabled={
                   !isOnline ||
                   isCheckingForUpdate ||
                   isApplyingUpdate ||
                   (nextUpdateCheckAt !== null && !isUpdateAvailable)
                 }
-                onPress={() => void handleUpdateAction()}
+                onClick={() => void handleUpdateAction()}
               >
                 {isApplyingUpdate
                   ? "업데이트 중..."
@@ -153,7 +142,7 @@ const Settings: React.FC = () => {
                       : isPostUpdateCooldown
                         ? "업데이트됨"
                         : "업데이트 확인"}
-              </Button>
+              </ActionChipButton>
             </div>
 
             {(message || error || isPostUpdateCooldown) && (

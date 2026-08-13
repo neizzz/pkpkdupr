@@ -15,6 +15,7 @@ import {
 } from "@pkpkdupr/shared/match";
 import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
+import ActionChipButton from "./ActionChipButton";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
 import BottomSheet from "./BottomSheet";
@@ -348,8 +349,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 <div>
                   <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
                 </div>
-                <button
-                  type="button"
+                <ActionChipButton
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.preventDefault();
@@ -357,11 +357,11 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                     openQrScanner();
                   }}
                   disabled={!canAddMatchMember || isQrScannerOpen}
-                  className="absolute right-0 -top-2 flex shrink-0 items-center gap-1 rounded-full bg-[#409eff] px-4 py-2 text-sm font-medium text-white disabled:bg-slate-200 disabled:text-slate-400"
+                  className="absolute right-0 -top-2"
                 >
                   <IoQrCodeSharp className="size-4" />
                   멤버 추가
-                </button>
+                </ActionChipButton>
               </div>
 
               {selectedMatchType ? (
