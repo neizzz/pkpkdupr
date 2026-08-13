@@ -95,7 +95,7 @@ compose_primary() {
 }
 
 compose_pkelo() {
-  docker compose --project-name pkelo \
+  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" docker compose --project-name pkelo \
     --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" \
     -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml -f docker-compose.pkelo.build.yml "$@"
 }
@@ -267,6 +267,7 @@ assert_all_services_running() {
   assert_services_running compose_primary web admin-web api mysql db-server adminer
   if is_notice_enabled; then
     assert_services_running compose_notice pkelo-notice-web
+    assert_services_running compose_pkelo pkelo-api pkelo-mysql pkelo-db-server
   else
     assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
   fi
@@ -304,7 +305,8 @@ set_build_version
 echo "🚀 기존 앱 스택 배포 중..."
 compose_primary up -d --build
 if is_notice_enabled; then
-  echo "🚀 PKELO 안내 web을 유지·갱신 중..."
+  echo "🚀 PKELO 안내 web과 runtime-notice API를 유지·갱신 중..."
+  compose_pkelo up -d --build pkelo-api pkelo-mysql pkelo-db-server
   compose_notice up -d --build
 else
   echo "🚀 pkelo.app 스택 배포 중..."

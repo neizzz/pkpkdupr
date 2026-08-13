@@ -30,7 +30,7 @@ PKELO 첫 공개를 안내 페이지로 전환하거나, 안내를 해제해 실
 이미지 태그는 반드시 PKELO 소스 ref에서 만든 태그를 사용합니다.
 
 명령:
-  notice                  notice JSON·상태를 생성하고 PKELO notice web만 배포
+  notice                  notice JSON·상태를 생성하고 PKELO notice web·API를 배포
   open                    같은 PKELO 태그로 notice를 해제하고 앱 스택 기동
 
 옵션:
@@ -89,6 +89,31 @@ write_notice_json() {
     "$(json_escape "${NOTICE_MESSAGE}")" > "${temporary_file}"
   chmod 644 "${temporary_file}"
   mv -f "${temporary_file}" "${NOTICE_JSON_FILE}"
+}
+
+backup_notice_files() {
+  local backup_dir="$1" path name
+  for path in "${NOTICE_JSON_FILE}" "${NOTICE_STATE_FILE}"; do
+    name="$(basename "${path}")"
+    if [[ -f "${path}" ]]; then
+      cp -p "${path}" "${backup_dir}/${name}"
+    else
+      : > "${backup_dir}/${name}.absent"
+    fi
+  done
+}
+
+restore_notice_files() {
+  local backup_dir="$1" path name
+  for path in "${NOTICE_JSON_FILE}" "${NOTICE_STATE_FILE}"; do
+    name="$(basename "${path}")"
+    if [[ -f "${backup_dir}/${name}" ]]; then
+      mkdir -p "$(dirname "${path}")"
+      cp -p "${backup_dir}/${name}" "${path}"
+    else
+      rm -f "${path}"
+    fi
+  done
 }
 
 write_notice_state() {
@@ -204,9 +229,16 @@ case "${ACTION}" in
       exit 1
     fi
 
+    notice_backup_dir="$(mktemp -d)"
+    backup_notice_files "${notice_backup_dir}"
     write_notice_json
     write_notice_state
-    run_notice_deploy
+    if ! run_notice_deploy; then
+      restore_notice_files "${notice_backup_dir}"
+      rm -rf "${notice_backup_dir}"
+      exit 1
+    fi
+    rm -rf "${notice_backup_dir}"
     echo "✅ PKELO 안내 모드를 배포했습니다: ${NOTICE_MESSAGE}"
     ;;
   open)

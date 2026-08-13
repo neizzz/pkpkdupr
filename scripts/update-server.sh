@@ -252,7 +252,7 @@ compose_primary() {
 }
 
 compose_pkelo() {
-  docker compose --project-name pkelo --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
+  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" docker compose --project-name pkelo --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
 }
 
 compose_notice() {
@@ -385,6 +385,7 @@ assert_target_services_running() {
     pkelo)
       if is_notice_enabled; then
         assert_services_running compose_notice pkelo-notice-web
+        assert_services_running compose_pkelo pkelo-api pkelo-mysql pkelo-db-server
       else
         assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
       fi
@@ -393,6 +394,7 @@ assert_target_services_running() {
       assert_services_running compose_primary web admin-web api mysql db-server adminer
       if is_notice_enabled; then
         assert_services_running compose_notice pkelo-notice-web
+        assert_services_running compose_pkelo pkelo-api pkelo-mysql pkelo-db-server
       else
         assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
       fi
@@ -451,6 +453,8 @@ case "${TARGET_STACK}" in
     mkdir -p "${DEPLOY_ROOT}/data/uploads/pkelo/avatars"
     if is_notice_enabled; then
       compose_notice pull pkelo-notice-web
+      compose_pkelo pull pkelo-api pkelo-mysql pkelo-db-server
+      compose_pkelo up -d pkelo-api pkelo-mysql pkelo-db-server
       compose_notice up -d pkelo-notice-web
     else
       compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
@@ -462,6 +466,8 @@ case "${TARGET_STACK}" in
     compose_primary up -d web admin-web api mysql db-server adminer
     if is_notice_enabled; then
       compose_notice pull pkelo-notice-web
+      compose_pkelo pull pkelo-api pkelo-mysql pkelo-db-server
+      compose_pkelo up -d pkelo-api pkelo-mysql pkelo-db-server
       compose_notice up -d pkelo-notice-web
     else
       compose_pkelo pull pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
@@ -470,6 +476,7 @@ case "${TARGET_STACK}" in
     ;;
 esac
 
+assert_target_services_running "${TARGET_STACK}"
 apply_proxy_site_configs "${TARGET_STACK}"
 assert_target_services_running "${TARGET_STACK}"
 echo "🎉 ${TARGET_STACK} 업데이트 완료 (tag=${IMAGE_TAG}, 컨테이너 기동 상태 확인 완료)"

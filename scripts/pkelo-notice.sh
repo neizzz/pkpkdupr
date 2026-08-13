@@ -39,11 +39,11 @@ usage() {
   cat <<'EOF'
 usage: bash scripts/pkelo-notice.sh <enable|disable|status> [options]
 
-PKELO의 외부 트래픽을 임시 안내 페이지로 무중단 전환하거나 복구합니다.
+PKELO의 외부 트래픽을 임시 안내 페이지로 전환하거나 복구합니다. 안내 중에도 runtime-notice용 API·DB·MySQL은 유지합니다.
 안내 문구 기본값은 /opt/pkpkdupr/env/pkelo-notice.env에서 읽습니다.
 
 명령:
-  enable                  안내 페이지를 활성화하고 PKELO 앱 스택만 중지합니다.
+  enable                  안내 페이지를 활성화하고 web·admin web·Adminer만 중지합니다.
   disable                 일반 PKELO 앱 스택과 프록시 라우팅을 복구합니다.
   status                  현재 안내 모드와 설정 문구를 표시합니다.
 
@@ -152,7 +152,7 @@ load_environment() {
 }
 
 compose_pkelo() {
-  docker compose --project-name pkelo \
+  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" docker compose --project-name pkelo \
     --env-file "${SHARED_ENV_FILE}" --env-file "${PKELO_ENV_FILE}" \
     -f docker-compose.pkelo.yml -f docker-compose.pkelo-gateway.yml "$@"
 }
@@ -164,7 +164,7 @@ compose_notice() {
     notice_image="$(docker inspect --format '{{.Config.Image}}' pkelo-web-app 2>/dev/null || true)"
   fi
 
-  PKELO_NOTICE_DATA_PATH="${NOTICE_DATA_PATH}" PKELO_NOTICE_IMAGE="${notice_image}" docker compose --project-name pkelo-notice \
+  PKELO_NOTICE_IMAGE="${notice_image}" docker compose --project-name pkelo-notice \
     --env-file "${SHARED_ENV_FILE}" --env-file "${NOTICE_ENV_FILE}" \
     -f docker-compose.pkelo-notice.yml "$@"
 }
@@ -175,7 +175,7 @@ is_notice_enabled() {
 
 write_notice_json() {
   if [[ "${DRY_RUN}" == true ]]; then
-    echo "[dry-run] ${NOTICE_JSON_FILE}에 안내 JSON을 원자적으로 생성합니다."
+    echo "[dry-run] ${NOTICE_JSON_FILE}에 활성 안내 JSON을 원자적으로 생성합니다."
     return
   fi
 
@@ -188,6 +188,20 @@ write_notice_json() {
       const message = process.env.PKELO_NOTICE_MESSAGE;
       process.stdout.write(`${JSON.stringify({ enabled: true, title, message })}\n`);
     ' > "${temp_file}"
+  chmod 644 "${temp_file}"
+  mv -f "${temp_file}" "${NOTICE_JSON_FILE}"
+}
+
+write_disabled_notice_json() {
+  if [[ "${DRY_RUN}" == true ]]; then
+    echo "[dry-run] ${NOTICE_JSON_FILE}에 비활성 안내 JSON을 원자적으로 생성합니다."
+    return
+  fi
+
+  mkdir -p "${NOTICE_PUBLIC_DIR}"
+  local temp_file
+  temp_file="$(mktemp "${NOTICE_PUBLIC_DIR}/notice.json.XXXXXX")"
+  printf '{"enabled":false}\n' > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${NOTICE_JSON_FILE}"
 }
@@ -212,6 +226,31 @@ clear_notice_state() {
     return
   fi
   rm -f "${NOTICE_STATE_FILE}"
+}
+
+backup_notice_files() {
+  local backup_dir="$1" path name
+  for path in "${NOTICE_JSON_FILE}" "${NOTICE_STATE_FILE}"; do
+    name="$(basename "${path}")"
+    if [[ -f "${path}" ]]; then
+      cp -p "${path}" "${backup_dir}/${name}"
+    else
+      : > "${backup_dir}/${name}.absent"
+    fi
+  done
+}
+
+restore_notice_files() {
+  local backup_dir="$1" path name
+  for path in "${NOTICE_JSON_FILE}" "${NOTICE_STATE_FILE}"; do
+    name="$(basename "${path}")"
+    if [[ -f "${backup_dir}/${name}" ]]; then
+      mkdir -p "$(dirname "${path}")"
+      cp -p "${backup_dir}/${name}" "${path}"
+    else
+      rm -f "${path}"
+    fi
+  done
 }
 
 render_template() {
@@ -353,42 +392,62 @@ assert_services_running() {
   done
 }
 
+ensure_notice_api_stack_running() {
+  compose_pkelo up -d pkelo-mysql pkelo-db-server pkelo-api
+  assert_services_running compose_pkelo pkelo-mysql pkelo-db-server pkelo-api
+}
+
 enable_notice() {
-  write_notice_json
-
-  if is_notice_enabled; then
-    if [[ "${DRY_RUN}" == true ]]; then
-      echo "[dry-run] 실행 중인 안내 web을 확인하고 JSON만 갱신합니다."
-      return
-    fi
-    compose_notice up -d pkelo-notice-web
-    assert_services_running compose_notice pkelo-notice-web
-    echo "✅ PKELO 안내 문구를 갱신했습니다."
-    return
-  fi
-
   if [[ "${DRY_RUN}" == true ]]; then
     cat <<'EOF'
-[dry-run] 1. pkelo-notice-web을 기동하고 컨테이너 상태를 확인합니다.
-[dry-run] 2. 안내 SWAG 설정을 생성·nginx -t·graceful reload 합니다.
-[dry-run] 3. 성공 후 PKELO web/admin/API/db-server/MySQL/Adminer를 중지합니다.
+[dry-run] 1. 활성 안내 JSON을 생성하고 pkelo-notice-web을 기동합니다.
+[dry-run] 2. pkelo-api·db-server·MySQL을 유지하거나 기동해 runtime-notice를 제공합니다.
+[dry-run] 3. 안내 SWAG 설정을 생성·nginx -t·graceful reload 합니다.
+[dry-run] 4. 성공 후 PKELO web/admin web/Adminer만 중지합니다.
 EOF
     return
   fi
 
-  compose_notice up -d pkelo-notice-web
-  assert_services_running compose_notice pkelo-notice-web
-  write_notice_state
+  local backup_dir was_notice_enabled=false
+  backup_dir="$(mktemp -d)"
+  backup_notice_files "${backup_dir}"
+  if is_notice_enabled; then
+    was_notice_enabled=true
+  fi
 
-  if ! sync_and_reload_proxy; then
-    clear_notice_state
-    compose_notice stop pkelo-notice-web || true
+  write_notice_json
+  if ! compose_notice up -d pkelo-notice-web || ! ensure_notice_api_stack_running; then
+    restore_notice_files "${backup_dir}"
+    if [[ "${was_notice_enabled}" == false ]]; then
+      compose_notice stop pkelo-notice-web || true
+    fi
+    rm -rf "${backup_dir}"
     exit 1
   fi
 
-  compose_pkelo stop \
-    pkelo-web pkelo-admin-web pkelo-api pkelo-adminer pkelo-db-server pkelo-mysql
+  if [[ "${was_notice_enabled}" == true ]]; then
+    if ! sync_and_reload_proxy; then
+      restore_notice_files "${backup_dir}"
+      rm -rf "${backup_dir}"
+      exit 1
+    fi
+    rm -rf "${backup_dir}"
+    echo "✅ PKELO 안내 문구를 갱신했습니다."
+    return
+  fi
+
+  write_notice_state
+  if ! sync_and_reload_proxy; then
+    restore_notice_files "${backup_dir}"
+    compose_notice stop pkelo-notice-web || true
+    rm -rf "${backup_dir}"
+    exit 1
+  fi
+
+  compose_pkelo stop pkelo-web pkelo-admin-web pkelo-adminer
   assert_services_running compose_notice pkelo-notice-web
+  assert_services_running compose_pkelo pkelo-api pkelo-db-server pkelo-mysql
+  rm -rf "${backup_dir}"
   echo "✅ PKELO 안내 모드를 활성화했습니다: ${NOTICE_MESSAGE}"
 }
 
@@ -400,8 +459,8 @@ disable_notice() {
 
   if [[ "${DRY_RUN}" == true ]]; then
     cat <<'EOF'
-[dry-run] 1. 일반 PKELO 앱 스택을 기동하고 API 준비를 확인합니다.
-[dry-run] 2. 일반 SWAG 설정을 생성·nginx -t·graceful reload 합니다.
+[dry-run] 1. 일반 PKELO web/admin web/Adminer를 기동하고 API·DB·MySQL을 확인합니다.
+[dry-run] 2. 비활성 안내 JSON을 생성한 뒤 일반 SWAG 설정을 생성·nginx -t·graceful reload 합니다.
 [dry-run] 3. 성공 후 pkelo-notice-web을 중지합니다.
 EOF
     return
@@ -410,15 +469,22 @@ EOF
   compose_pkelo up -d \
     pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
   assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+
+  local backup_dir
+  backup_dir="$(mktemp -d)"
+  backup_notice_files "${backup_dir}"
+  write_disabled_notice_json
   clear_notice_state
 
   if ! sync_and_reload_proxy; then
-    write_notice_state
+    restore_notice_files "${backup_dir}"
+    rm -rf "${backup_dir}"
     exit 1
   fi
 
   compose_notice stop pkelo-notice-web || true
   assert_services_running compose_pkelo pkelo-web pkelo-admin-web pkelo-api pkelo-mysql pkelo-db-server pkelo-adminer
+  rm -rf "${backup_dir}"
   echo "✅ PKELO 일반 서비스를 복구했습니다."
 }
 
