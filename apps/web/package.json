@@ -7,7 +7,8 @@
         "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+        "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+        "test:e2e:visual": "playwright test -c playwright.config.ts"
     },
     "dependencies": {
         "@heroui/react": "^3.0.0",
@@ -24,6 +25,7 @@
         "react-router-dom": "^6.21.1"
     },
     "devDependencies": {
+        "@playwright/test": "1.55.0",
         "@tailwindcss/cli": "^4.3.1",
         "@tailwindcss/vite": "^4.3.1",
         "@types/react": "^19.1.0",
