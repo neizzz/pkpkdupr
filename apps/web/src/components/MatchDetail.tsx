@@ -140,7 +140,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 
         <section>
           <p
-            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
           >
             Score
           </p>
@@ -162,7 +162,7 @@ export const MatchDetailSkeleton: React.FC = () => (
 
         <section>
           <p
-            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
           >
             Rating Change
           </p>
@@ -181,7 +181,7 @@ export const MatchDetailSkeleton: React.FC = () => (
         <section>
           <div className="flex items-center justify-between gap-3">
             <p
-              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
             >
               Approval
             </p>
@@ -209,7 +209,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     </span>
     <section>
       <p
-        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
       >
         Score
       </p>
@@ -231,7 +231,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 
     <section>
       <p
-        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
       >
         Rating Change
       </p>
@@ -250,7 +250,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <section>
       <div className="flex items-center justify-between gap-3">
         <p
-          className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font"
+          className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
         >
           Approval
         </p>
@@ -586,7 +586,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           >
             <section>
             <p
-              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-dark"
+              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
             >
               스코어
             </p>
@@ -683,7 +683,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
             <section>
             <p
-              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-dark"
+              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
             >
               평점 변동
             </p>
@@ -743,7 +743,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <section>
             <div className="flex items-center gap-1.5">
               <p
-                className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-dark"
+                className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
               >
                 합의
               </p>
