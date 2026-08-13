@@ -10,6 +10,7 @@ import {
   Button,
   CloseButton,
   Tabs,
+  useOverlayState,
 } from "@heroui/react";
 import {
   IoPeople,
@@ -22,9 +23,10 @@ import {
 } from "react-icons/io5";
 import { TbAffiliate, TbAffiliateFilled } from "react-icons/tb";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
+import AppModal from "@/components/AppModal";
 import BottomSheet from "@/components/BottomSheet";
 import CreateMatchDrawerBody from "@/components/CreateMatchDrawerBody";
-import PlayerQrSheetBody from "@/components/PlayerQrSheetBody";
+import PlayerQrModalContent from "@/components/PlayerQrModalContent";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import PullToRefreshIndicator, {
   type PullToRefreshStatus,
@@ -130,8 +132,8 @@ const BottomNav: React.FC = () => {
     useState<Record<TabKey, boolean>>(initiallyVisitedTabs);
   const [depthStacks, setDepthStacks] =
     useState<TabDepthStacks>(emptyDepthStacks);
-  const [isQrOpen, setIsQrOpen] = useState(false);
-  const [qrTabKey, setQrTabKey] = useState<TabKey>("members");
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [qrModalTabKey, setQrModalTabKey] = useState<TabKey>("members");
   const [isCreateMatchOpen, setIsCreateMatchOpen] = useState(false);
   const [createMatchTabKey, setCreateMatchTabKey] = useState<TabKey>("members");
   const [deepLinkMatchId, setDeepLinkMatchId] = useState<string | null>(
@@ -509,15 +511,15 @@ const BottomNav: React.FC = () => {
     [getScrollTop, requestCloseTopDepth, scrollToTop],
   );
 
-  const openQrSheet = useCallback(() => {
+  const openQrModal = useCallback(() => {
     const tabKey = selectedTabRef.current;
-    setQrTabKey(tabKey);
+    setQrModalTabKey(tabKey);
     pushDepth(tabKey, {
-      id: "qr-sheet",
-      kind: "bottom-sheet",
-      onClose: () => setIsQrOpen(false),
+      id: "qr-modal",
+      kind: "modal",
+      onClose: () => setIsQrModalOpen(false),
     });
-    setIsQrOpen(true);
+    setIsQrModalOpen(true);
   }, [pushDepth]);
 
   const openCreateMatchSheet = useCallback(() => {
@@ -532,18 +534,23 @@ const BottomNav: React.FC = () => {
     setIsCreateMatchOpen(true);
   }, [pushDepth]);
 
-  const handleQrOpenChange = useCallback(
+  const handleQrModalOpenChange = useCallback(
     (isOpen: boolean) => {
       if (isOpen) {
-        openQrSheet();
+        openQrModal();
         return;
       }
 
-      closeDepth(qrTabKey, "qr-sheet");
-      setIsQrOpen(false);
+      closeDepth(qrModalTabKey, "qr-modal");
+      setIsQrModalOpen(false);
     },
-    [closeDepth, openQrSheet, qrTabKey],
+    [closeDepth, openQrModal, qrModalTabKey],
   );
+
+  const qrModalState = useOverlayState({
+    isOpen: isQrModalOpen,
+    onOpenChange: handleQrModalOpenChange,
+  });
 
   const handleCreateMatchOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -650,13 +657,13 @@ const BottomNav: React.FC = () => {
   }, [removeDepthEntry]);
 
   useEffect(() => {
-    if (isQrOpen) {
+    if (isQrModalOpen) {
       void loadPlayerQrToken();
     }
-  }, [isQrOpen, loadPlayerQrToken]);
+  }, [isQrModalOpen, loadPlayerQrToken]);
 
   useEffect(() => {
-    if (!isQrOpen || !qrToken) {
+    if (!isQrModalOpen || !qrToken) {
       return;
     }
 
@@ -673,7 +680,7 @@ const BottomNav: React.FC = () => {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [isQrOpen, qrToken]);
+  }, [isQrModalOpen, qrToken]);
 
   const handleCreateMatch = () => {
     isCreateMatchQrScannerOpenRef.current = false;
@@ -696,30 +703,33 @@ const BottomNav: React.FC = () => {
     [],
   );
 
-  const hasActiveBottomSheet = depthEntriesRef.current[selectedTab].some(
-    (entry) => entry.kind === "bottom-sheet",
+  const hasActiveOverlay = depthEntriesRef.current[selectedTab].some(
+    (entry) => entry.kind === "bottom-sheet" || entry.kind === "modal",
   );
   const isDimmedOverlayVisible =
-    hasActiveBottomSheet ||
-    (isQrOpen && qrTabKey === selectedTab) ||
+    hasActiveOverlay ||
+    (isQrModalOpen && qrModalTabKey === selectedTab) ||
     (isCreateMatchOpen && createMatchTabKey === selectedTab);
   const hasBlockingLayer = useMemo(() => {
     const activeDepthEntries = depthEntriesRef.current[selectedTab];
     const hasBlockingDepth = activeDepthEntries.some(
-      (entry) => entry.kind === "bottom-sheet" || entry.kind === "dropdown",
+      (entry) =>
+        entry.kind === "bottom-sheet" ||
+        entry.kind === "modal" ||
+        entry.kind === "dropdown",
     );
 
     return (
       hasBlockingDepth ||
-      (isQrOpen && qrTabKey === selectedTab) ||
+      (isQrModalOpen && qrModalTabKey === selectedTab) ||
       (isCreateMatchOpen && createMatchTabKey === selectedTab)
     );
   }, [
     createMatchTabKey,
     depthStacks,
     isCreateMatchOpen,
-    isQrOpen,
-    qrTabKey,
+    isQrModalOpen,
+    qrModalTabKey,
     selectedTab,
   ]);
 
@@ -1104,20 +1114,20 @@ const BottomNav: React.FC = () => {
             isIconOnly
             aria-label="내 QR 코드 열기"
             isDisabled={!isOnline}
-            onPress={openQrSheet}
-            className="player-qr-trigger absolute right-3 bottom-[calc(100%+0.75rem)] shrink-0 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-bg/90 disabled:bg-slate-200 disabled:text-slate-400"
+            onPress={openQrModal}
+            className="player-qr-trigger absolute bottom-[calc(50%+0.375rem-(var(--player-qr-trigger-size)/2))] left-1/2 z-10 shrink-0 -translate-x-1/2 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-bg/90 disabled:bg-slate-200 disabled:text-slate-400"
           >
             <IoQrCodeSharp className="player-qr-trigger-icon" />
           </Button>
           <Tabs.ListContainer className="min-w-0 w-full border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-4 gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(4.75rem,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
               <Tabs.Tab
                 id="match"
                 onPointerDownCapture={() => handleActiveTabPointerDown("match")}
-                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="col-start-1 min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "match" ? (
@@ -1136,7 +1146,7 @@ const BottomNav: React.FC = () => {
                 onPointerDownCapture={() =>
                   handleActiveTabPointerDown("members")
                 }
-                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="col-start-2 min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "members" ? (
@@ -1153,7 +1163,7 @@ const BottomNav: React.FC = () => {
                 onPointerDownCapture={() =>
                   handleActiveTabPointerDown("affiliations")
                 }
-                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="col-start-4 min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "affiliations" ? (
@@ -1170,7 +1180,7 @@ const BottomNav: React.FC = () => {
                 onPointerDownCapture={() =>
                   handleActiveTabPointerDown("settings")
                 }
-                className="min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
+                className="col-start-5 min-h-[3.2rem] w-full text-default-500 data-[selected=true]:text-pkpk-primary-bg"
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "settings" ? (
@@ -1259,20 +1269,20 @@ const BottomNav: React.FC = () => {
         />
 
       </Tabs>
-      <BottomSheet
-        isOpen={isQrOpen}
-        isActive={qrTabKey === selectedTab}
-        onOpenChange={handleQrOpenChange}
-        ariaLabel="Player QR code"
+      <AppModal
+        state={qrModalState}
+        ariaLabel="내 QR 코드"
+        title="QR 코드"
+        bodyClassName="flex flex-col items-center"
       >
-        <PlayerQrSheetBody
+        <PlayerQrModalContent
           qrToken={qrToken}
           qrRemainingSeconds={qrRemainingSeconds}
           qrError={qrError}
           isQrLoading={isQrLoading}
           onRefresh={handleRefreshPlayerQrToken}
         />
-      </BottomSheet>
+      </AppModal>
 
       <BottomSheet
         isOpen={isCreateMatchOpen}

@@ -1,10 +1,10 @@
 import React from "react";
 import { Button } from "@heroui/react";
+import { IoRefreshOutline } from "react-icons/io5";
 import type { PlayerQrTokenResponse } from "@pkpkdupr/shared/qr";
 import QrCode from "react-qr-code";
-import BottomSheet from "./BottomSheet";
 
-interface PlayerQrSheetBodyProps {
+interface PlayerQrModalContentProps {
   qrToken: PlayerQrTokenResponse | null;
   qrRemainingSeconds: number;
   qrError: string | null;
@@ -19,7 +19,7 @@ const formatRemainingTime = (seconds: number) => {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
-const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
+const PlayerQrModalContent: React.FC<PlayerQrModalContentProps> = ({
   qrToken,
   qrRemainingSeconds,
   qrError,
@@ -27,18 +27,30 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
   onRefresh,
 }) => {
   const canRefresh = !isQrLoading && (!qrToken || qrRemainingSeconds <= 60);
+  const refreshButton = canRefresh ? (
+    <Button
+      type="button"
+      isIconOnly
+      size="sm"
+      aria-label="QR 코드 새로고침"
+      onPress={() => {
+        if (!canRefresh) return;
+        void onRefresh();
+      }}
+      className="size-8 rounded-full bg-[#409eff] text-white hover:bg-[#2587db]"
+    >
+      <IoRefreshOutline aria-hidden="true" className="size-4" />
+    </Button>
+  ) : null;
 
   return (
     <>
-      <BottomSheet.Header>
-        <h2 className="bs-text-head text-left text-pkpk-main-font">
-          QR 코드
-        </h2>
-      </BottomSheet.Header>
-      <BottomSheet.Body className="items-center justify-center text-center">
+      <p className="w-full text-pkpk-sub-font">
+        매치 참가, 소속 참여, 친구 추가에 사용할 수 있어요.
+      </p>
       {qrToken ? (
         <>
-          <div className="rounded-2xl bg-white p-3 ring-1 ring-border">
+          <div className="my-5 flex w-full justify-center">
             <QrCode
               value={qrToken.payload}
               size={180}
@@ -46,15 +58,18 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
               fgColor="#000000"
             />
           </div>
-          <p
-            className={`bs-text-title ${
-              qrRemainingSeconds > 0 ? "text-pkpk-sub-font" : "text-error"
-            }`}
-          >
-            {qrRemainingSeconds > 0
-              ? `남은 시간 ${formatRemainingTime(qrRemainingSeconds)}`
-              : "QR 코드가 만료되었습니다."}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p
+              className={`bs-text-title ${
+                qrRemainingSeconds > 0 ? "text-pkpk-sub-font" : "text-error"
+              }`}
+            >
+              {qrRemainingSeconds > 0
+                ? `남은 시간 ${formatRemainingTime(qrRemainingSeconds)}`
+                : "QR 코드가 만료되었습니다."}
+            </p>
+            {refreshButton}
+          </div>
         </>
       ) : (
         <div className="flex min-h-[220px] items-center justify-center">
@@ -70,22 +85,9 @@ const PlayerQrSheetBody: React.FC<PlayerQrSheetBodyProps> = ({
         <p className="bs-text-caption text-error">{qrError}</p>
       ) : null}
 
-      {canRefresh && (
-        <Button
-          size="sm"
-          onPress={() => {
-            if (!canRefresh) return;
-            void onRefresh();
-          }}
-          isDisabled={!canRefresh}
-          className="rounded-full bg-[#409eff] px-4 text-white disabled:bg-slate-200 disabled:text-slate-400"
-        >
-          {isQrLoading ? "갱신 중..." : "새로고침"}
-        </Button>
-      )}
-      </BottomSheet.Body>
+      {!qrToken ? refreshButton : null}
     </>
   );
 };
 
-export default PlayerQrSheetBody;
+export default PlayerQrModalContent;

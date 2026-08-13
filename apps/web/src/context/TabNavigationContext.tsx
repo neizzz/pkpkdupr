@@ -8,6 +8,7 @@ export type TabDepthKind =
   | "session-detail"
   | "member-profile"
   | "bottom-sheet"
+  | "modal"
   | "dropdown";
 
 export interface TabDepthEntry {

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Button, Modal, useOverlayState } from "@heroui/react";
+import { Button, useOverlayState } from "@heroui/react";
 import { IoLogOutOutline } from "react-icons/io5";
 import ActionChipButton from "@/components/ActionChipButton";
+import AppModal from "@/components/AppModal";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import {
   APP_UPDATE_APPLIED_AT_STORAGE_KEY,
@@ -161,39 +162,25 @@ const Settings: React.FC = () => {
 
         </div>
       </div>
-      <Modal.Root state={logoutConfirmation}>
-        <Modal.Backdrop variant="blur">
-          <Modal.Container placement="center" size="sm">
-            <Modal.Dialog aria-label="로그아웃 확인">
-              <Modal.CloseTrigger
-                aria-label="로그아웃 확인 닫기"
-                className="!size-8 !rounded-full !bg-slate-100 !text-pkpk-dark hover:!bg-slate-200"
-              />
-              <Modal.Header>
-                <Modal.Icon className="bg-slate-100 text-pkpk-dark">
-                  <IoLogOutOutline aria-hidden="true" className="size-6" />
-                </Modal.Icon>
-                <Modal.Heading>로그아웃할까요?</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <p>현재 기기에서 로그아웃됩니다.</p>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button
-                  type="button"
-                  className="bg-[#f8626c] text-white hover:bg-[#e9545e]"
-                  onPress={() => {
-                    logoutConfirmation.close();
-                    logout();
-                  }}
-                >
-                  로그아웃
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal.Root>
+      <AppModal
+        state={logoutConfirmation}
+        ariaLabel="로그아웃 확인"
+        title="로그아웃할까요?"
+        footer={
+          <Button
+            type="button"
+            className="bg-[#f8626c] text-white hover:bg-[#e9545e]"
+            onPress={() => {
+              logoutConfirmation.close();
+              logout();
+            }}
+          >
+            로그아웃
+          </Button>
+        }
+      >
+        <p>현재 기기에서 로그아웃됩니다.</p>
+      </AppModal>
     </div>
   );
 };

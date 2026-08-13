@@ -30,9 +30,9 @@
   --app-keyboard-offset: 0px;
   --safe-bottom: max(12px, env(safe-area-inset-bottom));
   --player-qr-trigger-size: clamp(
-    3.84912rem,
-    calc(4.2768vw + 2.99376rem),
-    4.2768rem
+    4.234032rem,
+    calc(4.70448vw + 3.293136rem),
+    4.70448rem
   );
 }
 
