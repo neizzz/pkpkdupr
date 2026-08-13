@@ -397,7 +397,7 @@ const Affiliations: React.FC = () => {
         setSessionError(
           loadError instanceof Error
             ? loadError.message
-            : "세션 경기를 불러오지 못했어요.",
+            : "세션 매치를 불러오지 못했어요.",
         );
       } finally {
         setIsLoadingSession(false);
@@ -586,7 +586,7 @@ const Affiliations: React.FC = () => {
     if (!sessions.length && !standaloneMatches.length) {
       return (
         <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
-          예정된 경기와 세션이 없어요.
+          예정된 매치와 세션이 없어요.
         </p>
       );
     }
@@ -624,7 +624,7 @@ const Affiliations: React.FC = () => {
             className="flex items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3"
           >
             <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
-              경기
+              매치
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-pkpk-main-font">
@@ -640,12 +640,6 @@ const Affiliations: React.FC = () => {
       </div>
     );
   };
-
-  const hasUpcomingSchedule = Boolean(
-    dashboard &&
-      (dashboard.upcomingSessions.length ||
-        dashboard.upcomingMatches.some((match) => !match.session)),
-  );
 
   const renderRecentCompletedMatches = () => {
     if (!dashboard) return null;
@@ -787,34 +781,32 @@ const Affiliations: React.FC = () => {
                   <TabPanelStatus isLoading ariaLabel="클럽 정보를 불러오는 중" message="클럽 정보를 불러오는 중이에요." />
                 ) : (
                   <>
-                    <section className="space-y-3 px-4 py-4">
-                      <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="다가오는 경기 & 세션" />
-                      {renderSchedule()}
-                    </section>
-
-                    {!hasUpcomingSchedule ? (
-                      <section className="space-y-3 px-4 py-4">
+                    <section className="space-y-5 px-4 py-4">
+                      <div className="space-y-3">
+                        <SectionTitle
+                          icon={<IoCalendarOutline className="size-5" />}
+                          title="다가오는 매치 & 세션"
+                        />
+                        {renderSchedule()}
+                      </div>
+                      <div className="space-y-3">
                         <SectionTitle
                           icon={<IoCalendarOutline className="size-5" />}
                           title="최근에 끝난 매치"
                         />
                         {renderRecentCompletedMatches()}
-                      </section>
-                    ) : null}
-
-                    <button
-                      type="button"
-                      onClick={openClubMatchHistory}
-                      className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
-                    >
-                      <span className="flex size-11 items-center justify-center rounded-2xl bg-pkpk-session-bg text-pkpk-primary-bg">
-                        <IoCalendarOutline className="size-6" />
-                      </span>
-                      <span className="min-w-0 flex-1 text-sm font-bold text-pkpk-main-font">
-                        {dashboard.club.name}의 매치 전체 보기
-                      </span>
-                      <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
-                    </button>
+                      </div>
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={openClubMatchHistory}
+                          className="flex items-center gap-0.5 px-1 py-1 text-sm text-pkpk-primary-bg transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                        >
+                          {dashboard.club.name}의 매치 전체 보기
+                          <IoChevronForward className="size-4" />
+                        </button>
+                      </div>
+                    </section>
 
                     <section className="space-y-3 px-4 py-4">
                       <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
@@ -869,7 +861,7 @@ const Affiliations: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setIsManagementOpen(true)}
-                        className="flex w-full items-center gap-3 bg-pkpk-session-bg px-4 py-4 text-left"
+                        className="flex w-full items-center gap-3 border-b-[6px] border-pkpk-section-border bg-white px-4 py-4 text-left"
                       >
                         <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-pkpk-primary-bg shadow-sm">
                           <IoShieldCheckmarkOutline className="size-6" />

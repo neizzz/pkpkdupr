@@ -9,6 +9,7 @@ type FixtureOptions = {
   profileEmpty?: boolean;
   qrError?: boolean;
   sessionEmpty?: boolean;
+  useFixedClock?: boolean;
 };
 
 const fixedNow = new Date("2026-08-13T10:00:00.000+09:00");
@@ -281,7 +282,9 @@ const fulfillJson = (route: Route, body: unknown, status = 200) =>
   });
 
 const installFixture = async (page: Page, options: FixtureOptions = {}) => {
-  await page.clock.install({ time: fixedNow });
+  if (options.useFixedClock !== false) {
+    await page.clock.install({ time: fixedNow });
+  }
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
   await page.addInitScript((authenticated) => {
     window.localStorage.clear();
@@ -548,6 +551,31 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
   await expect(page.getByRole("dialog", { name: "클럽 만들기" })).toBeVisible();
   await capture(page, "club-create-sheet.png");
+});
+
+test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async ({ page }) => {
+  await openApp(page, { useFixedClock: false });
+  await page.getByRole("tab", { name: "클럽" }).click();
+
+  const clubManagementDrawer = page.getByRole("dialog", {
+    name: "클럽 운영진 관리",
+  });
+  const clubManagementDrawerElement = page.locator(
+    '[role="dialog"][aria-label="클럽 운영진 관리"]',
+  );
+  const clubManagementButton = page.getByRole("button", {
+    name: "운영진 관리",
+  });
+  await clubManagementButton.click({ position: { x: 20, y: 20 } });
+  await expect(clubManagementDrawer).toBeVisible();
+
+  await page.getByRole("button", { name: "닫기" }).click();
+  await expect(clubManagementDrawerElement).toHaveCount(0);
+
+  await clubManagementButton.click({ position: { x: 20, y: 20 } });
+  await expect(clubManagementDrawer).toBeVisible();
+  await expect(clubManagementDrawerElement).toHaveCount(1);
+  await expect(clubManagementDrawer.getByText("클럽 QR")).toBeVisible();
 });
 
 test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) => {

@@ -91,14 +91,19 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
       setShouldRender(true);
       setIsTransitionEnabled(true);
       setIsVisible(false);
+      // Keep the drawer off-screen for a painted frame before entering. A
+      // single frame can be coalesced with mounting, which skips the visible
+      // transition for drawers that remain mounted between opens.
       animationFrameRef.current = window.requestAnimationFrame(() => {
-        setIsVisible(true);
-        animationFrameRef.current = null;
+        animationFrameRef.current = window.requestAnimationFrame(() => {
+          setIsVisible(true);
+          animationFrameRef.current = null;
 
-        transitionTimeoutRef.current = window.setTimeout(() => {
-          setIsTransitionEnabled(false);
-          transitionTimeoutRef.current = null;
-        }, TRANSITION_DURATION_MS);
+          transitionTimeoutRef.current = window.setTimeout(() => {
+            setIsTransitionEnabled(false);
+            transitionTimeoutRef.current = null;
+          }, TRANSITION_DURATION_MS);
+        });
       });
       return undefined;
     }
@@ -120,7 +125,7 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
     });
 
     return undefined;
-  }, [isOpen, shouldRender]);
+  }, [isOpen]);
 
   useEffect(
     () => () => {
