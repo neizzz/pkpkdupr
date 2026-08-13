@@ -594,8 +594,8 @@ test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) =
 test("설정 탭과 로그아웃 확인 modal", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "설정" }).click();
-  await expect(page.getByRole("heading", { name: "패스워드 변경" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "앱 버전" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "계정" })).toBeHidden();
   await capture(page, "settings.png");
   await page.getByRole("button", { name: "로그아웃" }).click();
   await expect(page.getByRole("dialog", { name: "로그아웃 확인" })).toBeVisible();
