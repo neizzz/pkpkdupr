@@ -770,7 +770,7 @@ const Matches: React.FC<MatchesProps> = ({
 
   return (
     <>
-      <div className="flex min-h-full flex-col">
+      <div className="flex h-full min-h-full flex-col">
       <TabPanelHeader
         title="My Matches"
         onHeaderElementChange={setHeaderElement}

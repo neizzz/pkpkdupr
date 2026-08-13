@@ -20,6 +20,7 @@ import MemberProfile from "@/components/MemberProfile";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
+import ProfileIdentityLabel from "@/components/ProfileIdentityLabel";
 import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader, {
@@ -709,18 +710,16 @@ const Members: React.FC = () => {
         >
           <button
             type="button"
-            className="flex h-9 items-center gap-1.5 rounded-full pl-1 pr-0 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80"
+            className="rounded-full text-pkpk-primary-font transition-opacity hover:opacity-80"
             onClick={openMyProfile}
           >
-            <Avatar
-              size="xs"
+            <ProfileIdentityLabel
               avatarUrl={player?.avatarUrl}
               name={player?.username}
-            />
-            <span>내 프로필</span>
-            <IoChevronForward
-              aria-hidden="true"
-              className="-mr-1.5 size-4 text-pkpk-primary-font/70"
+              label="내 프로필"
+              showChevron
+              chevronClassName="text-pkpk-primary-font/70"
+              className="pl-1 pr-0"
             />
           </button>
         </TabPanelHeader>
@@ -881,6 +880,8 @@ const Members: React.FC = () => {
           isOpen={isMemberMatchHistoryDrawerOpen}
           isActive={selectedTab === "members"}
           tabKey="members"
+          profileName={selectedMember.username ?? selectedMember.id}
+          profileAvatarUrl={selectedMember.avatarUrl}
           matches={selectedMemberProfileMatches}
           isLoading={isSelectedMemberMatchHistoryLoading}
           hasMore={

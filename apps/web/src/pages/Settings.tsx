@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Button, useOverlayState } from "@heroui/react";
 import { IoLogOutOutline } from "react-icons/io5";
+import { useNavigate } from "react-router-dom";
 import ActionChipButton from "@/components/ActionChipButton";
 import AppModal from "@/components/AppModal";
+import PasswordChangeForm from "@/components/PasswordChangeForm";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import {
   APP_UPDATE_APPLIED_AT_STORAGE_KEY,
@@ -10,12 +12,14 @@ import {
 } from "@/context/AppUpdateContext";
 import { useAuth } from "@/context/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { PASSWORD_CHANGED_LOGIN_NOTICE } from "@/lib/authMessages";
 
 const Settings: React.FC = () => {
   const UPDATE_CHECK_COOLDOWN_MS = 10_000;
   const UPDATE_APPLIED_COOLDOWN_MS = 10 * 60_000;
   const isOnline = useOnlineStatus();
-  const { logout } = useAuth();
+  const { logout, player } = useAuth();
+  const navigate = useNavigate();
   const {
     appVersion,
     isUpdateAvailable,
@@ -43,6 +47,14 @@ const Settings: React.FC = () => {
     nextUpdateCheckAt !== null,
   );
   const logoutConfirmation = useOverlayState();
+
+  const handlePasswordChangeSuccess = async () => {
+    logout();
+    navigate("/login", {
+      replace: true,
+      state: { notice: PASSWORD_CHANGED_LOGIN_NOTICE },
+    });
+  };
 
   useEffect(() => {
     if (!nextUpdateCheckAt) return;
@@ -114,6 +126,22 @@ const Settings: React.FC = () => {
               </div>
             </section>
           ) : null}
+
+          <section className="flex flex-col gap-4 border-b-[6px] border-pkpk-section-border px-4 py-4">
+            <h3 className="text-lg leading-5 font-semibold text-pkpk-sub-font">
+              계정
+            </h3>
+            {player?.authProvider === "password" || !player?.authProvider ? (
+              <PasswordChangeForm
+                title="패스워드 변경"
+                onSuccess={handlePasswordChangeSuccess}
+              />
+            ) : (
+              <p className="rounded-xl bg-default-100 px-4 py-3 text-center text-sm text-default-600">
+                카카오 로그인 계정은 비밀번호를 변경할 수 없습니다.
+              </p>
+            )}
+          </section>
 
           <section className="flex flex-col gap-4 border-b-[6px] border-pkpk-section-border px-4 py-4">
             <div className="flex items-center justify-between gap-3">

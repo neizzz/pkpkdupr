@@ -1,4 +1,5 @@
 import React from "react";
+import ProfileIdentityLabel from "@/components/ProfileIdentityLabel";
 import type { MatchInfo } from "@/components/Match";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import LoadMoreButton from "@/components/LoadMoreButton";
@@ -12,6 +13,8 @@ interface ProfileMatchHistoryDrawerProps {
   isOpen: boolean;
   isActive: boolean;
   tabKey: TabKey;
+  profileName?: string;
+  profileAvatarUrl?: string;
   matches: ProfileMatchListItem[];
   isLoading?: boolean;
   hasMore?: boolean;
@@ -28,6 +31,8 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
   isOpen,
   isActive,
   tabKey,
+  profileName,
+  profileAvatarUrl,
   matches,
   isLoading = false,
   hasMore = false,
@@ -54,6 +59,13 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
         title="전체 매치"
         tabKey={tabKey}
         backgroundClassName="bg-white"
+        leftContent={
+          <ProfileIdentityLabel
+            avatarUrl={profileAvatarUrl}
+            name={profileName}
+            className="text-pkpk-primary-bg"
+          />
+        }
       />
       <div className="p-2">
         <ProfileMatchList

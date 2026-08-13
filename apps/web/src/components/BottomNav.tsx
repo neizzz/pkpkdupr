@@ -1236,21 +1236,21 @@ const BottomNav: React.FC = () => {
           <Tabs.Panel
             id="match"
             shouldForceMount={visitedTabs.match}
-            className="min-h-full bg-white p-0 pb-[calc(6.333rem+var(--safe-bottom)+var(--app-keyboard-offset))] data-[inert=true]:hidden"
+            className="h-full min-h-full bg-white p-0 pb-[calc(6.333rem+var(--safe-bottom)+var(--app-keyboard-offset))] data-[inert=true]:hidden"
           >
             <Matches onRequestCreateMatch={openCreateMatchSheet} />
           </Tabs.Panel>
           <Tabs.Panel
             id="members"
             shouldForceMount={visitedTabs.members}
-            className="min-h-full bg-white p-0 pb-[calc(6.333rem+var(--safe-bottom)+var(--app-keyboard-offset))] data-[inert=true]:hidden"
+            className="h-full min-h-full bg-white p-0 pb-[calc(6.333rem+var(--safe-bottom)+var(--app-keyboard-offset))] data-[inert=true]:hidden"
           >
             <Members />
           </Tabs.Panel>
           <Tabs.Panel
             id="affiliations"
             shouldForceMount={visitedTabs.affiliations}
-            className="min-h-full bg-white p-0 pb-[calc(6.333rem+var(--safe-bottom)+var(--app-keyboard-offset))] data-[inert=true]:hidden"
+            className="h-full min-h-full bg-white p-0 pb-[calc(6.333rem+var(--safe-bottom)+var(--app-keyboard-offset))] data-[inert=true]:hidden"
           >
             <Affiliations />
           </Tabs.Panel>

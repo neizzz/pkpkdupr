@@ -477,7 +477,11 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
   await expect(page.getByText("최근 매치")).toBeVisible();
   await capture(page, "member-profile--with-data.png");
   await page.getByRole("button", { name: "전체 보기" }).click();
-  await expect(page.getByRole("dialog", { name: "전체 매치" })).toBeVisible();
+  const profileMatchHistoryDrawer = page.getByRole("dialog", {
+    name: "전체 매치",
+  });
+  await expect(profileMatchHistoryDrawer).toBeVisible();
+  await expect(profileMatchHistoryDrawer.getByText("박지우", { exact: true })).toBeVisible();
   await capture(page, "profile-match-history--with-data.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -485,7 +489,19 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
   await expect(page.getByText("최근 완료된 매치가 없어요.")).toBeVisible();
   await capture(page, "member-profile--empty.png");
   await page.getByRole("button", { name: "전체 보기" }).click();
+  const emptyProfileMatchHistoryDrawer = page.getByRole("dialog", {
+    name: "전체 매치",
+  });
   await expect(page.getByText("완료된 매치가 없어요.", { exact: true })).toBeVisible();
+  await emptyProfileMatchHistoryDrawer.evaluate((element) => {
+    const spacer = document.createElement("div");
+    spacer.style.height = "1000px";
+    element.append(spacer);
+    element.scrollTo({ top: 120 });
+  });
+  await expect
+    .poll(() => emptyProfileMatchHistoryDrawer.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
   await capture(page, "profile-match-history--empty.png");
 });
 
@@ -498,9 +514,12 @@ test("내 프로필과 데이터 독립 바텀시트", async ({ page }) => {
   await capture(page, "status-message-sheet--with-data.png");
 
   await page.getByRole("button", { name: "Close" }).click();
-  await page.getByRole("button", { name: "설정" }).click();
-  await expect(page.getByRole("dialog", { name: "설정" })).toBeVisible();
-  await capture(page, "profile-settings-sheet.png");
+  await page.getByRole("button", { name: "전체 보기" }).click();
+  const myProfileMatchHistoryDrawer = page.getByRole("dialog", {
+    name: "전체 매치",
+  });
+  await expect(myProfileMatchHistoryDrawer).toBeVisible();
+  await expect(myProfileMatchHistoryDrawer.getByText("김하늘", { exact: true })).toBeVisible();
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openMyProfile(page, { profileEmpty: true });
@@ -547,6 +566,7 @@ test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) =
 test("설정 탭과 로그아웃 확인 modal", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "설정" }).click();
+  await expect(page.getByRole("heading", { name: "패스워드 변경" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "앱 버전" })).toBeVisible();
   await capture(page, "settings.png");
   await page.getByRole("button", { name: "로그아웃" }).click();
