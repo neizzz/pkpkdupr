@@ -5,8 +5,12 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { LiaUserFriendsSolid } from "react-icons/lia";
 import { IoChevronForward } from "react-icons/io5";
+import { TbAffiliate } from "react-icons/tb";
+import type { Club, ClubMembership } from "@pkpkdupr/shared/club";
 import Avatar from "@/components/Avatar";
+import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import type {
   MatchInfo,
   MatchListResponse,
@@ -47,10 +51,17 @@ const OFFLINE_FALLBACK_MESSAGE =
 const noop = () => {};
 const MEMBER_MATCH_HISTORY_PAGE_SIZE = 20;
 const MY_PROFILE_DEPTH_ID = "my-profile";
+const FRIENDS_MEMBER_FILTER_ID = "friends";
 
 type MemberListPlayerInfo = PlayerInfo & {
   lastPlayedAt: string | null;
 };
+
+type ClubListItem = { club: Club; membership: ClubMembership };
+
+type MemberFilter =
+  | { id: typeof FRIENDS_MEMBER_FILTER_ID; label: "친구" }
+  | { id: string; label: string; clubId: string };
 
 const MemberListSkeleton: React.FC = () => (
   <div role="status" aria-label="멤버 목록 로딩 중">
@@ -126,9 +137,11 @@ const formatLastPlayedAt = (lastPlayedAt: string | null) => {
   return `${getCalendarDayDifference(lastPlayedAtMs, nowMs)}일전 마지막 플레이`;
 };
 
-const readCachedMembers = (): MemberListPlayerInfo[] | null => {
+const readCachedMembers = (
+  cacheKey: string = CACHED_MEMBERS_KEY,
+): MemberListPlayerInfo[] | null => {
   try {
-    const cachedMembers = localStorage.getItem(CACHED_MEMBERS_KEY);
+    const cachedMembers = localStorage.getItem(cacheKey);
     return cachedMembers
       ? (JSON.parse(cachedMembers) as MemberListPlayerInfo[])
       : null;
@@ -151,6 +164,10 @@ const Members: React.FC = () => {
     registerPullToRefresh,
   } = useTabNavigation();
   const [members, setMembers] = useState<MemberListPlayerInfo[]>([]);
+  const [clubs, setClubs] = useState<ClubListItem[]>([]);
+  const [selectedMemberFilterId, setSelectedMemberFilterId] = useState(
+    FRIENDS_MEMBER_FILTER_ID,
+  );
   const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
     null,
   );
@@ -187,6 +204,49 @@ const Members: React.FC = () => {
   const isMemberListLoading = useMinimumLoading(isLoading);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
+  const memberFilters = useMemo<MemberFilter[]>(() => {
+    return [
+      { id: FRIENDS_MEMBER_FILTER_ID, label: "친구" },
+      ...clubs
+        .filter((item) => item.membership.status === "active")
+        .map((item) => ({
+          id: `club:${item.club.id}`,
+          label: item.club.name,
+          clubId: item.club.id,
+        })),
+    ];
+  }, [clubs]);
+  const selectedMemberFilter =
+    memberFilters.find((filter) => filter.id === selectedMemberFilterId) ??
+    memberFilters[0];
+  const selectedClubId =
+    selectedMemberFilter && "clubId" in selectedMemberFilter
+      ? selectedMemberFilter.clubId
+      : null;
+  const previousSelectedClubIdRef = useRef<string | null>(selectedClubId);
+
+  const loadMemberClubs = useCallback(async (throwOnError = false) => {
+    if (!token) {
+      setClubs([]);
+      return;
+    }
+
+    try {
+      const res = await fetch(buildApiUrl("/api/clubs"), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "가입한 클럽을 불러오지 못했습니다.");
+      }
+
+      setClubs((await res.json()) as ClubListItem[]);
+    } catch (error) {
+      if (throwOnError) {
+        throw error;
+      }
+    }
+  }, [token]);
 
   const loadMembers = useCallback(
     async (preserveVisibleData = false, throwOnError = false) => {
@@ -204,7 +264,15 @@ const Members: React.FC = () => {
           setNotice(null);
         }
 
-        const res = await fetch(buildApiUrl("/api/players"), {
+        const searchParams = new URLSearchParams();
+        if (selectedClubId) {
+          searchParams.set("clubId", selectedClubId);
+        }
+        const query = searchParams.toString();
+        const cacheKey = selectedClubId
+          ? `${CACHED_MEMBERS_KEY}:${selectedClubId}`
+          : CACHED_MEMBERS_KEY;
+        const res = await fetch(buildApiUrl(`/api/players${query ? `?${query}` : ""}`), {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -217,13 +285,16 @@ const Members: React.FC = () => {
 
         const data = (await res.json()) as MemberListPlayerInfo[];
         setMembers(data);
-        localStorage.setItem(CACHED_MEMBERS_KEY, JSON.stringify(data));
+        localStorage.setItem(cacheKey, JSON.stringify(data));
         lastSuccessfulLoadAtRef.current = Date.now();
         setError(null);
         setNotice(null);
       } catch (err) {
         if (!isOnline) {
-          const cachedMembers = readCachedMembers();
+          const cacheKey = selectedClubId
+            ? `${CACHED_MEMBERS_KEY}:${selectedClubId}`
+            : CACHED_MEMBERS_KEY;
+          const cachedMembers = readCachedMembers(cacheKey);
           if (cachedMembers) {
             setMembers(cachedMembers);
             if (!preserveVisibleData) {
@@ -251,7 +322,7 @@ const Members: React.FC = () => {
         }
       }
     },
-    [isOnline, token],
+    [isOnline, selectedClubId, token],
   );
 
   const loadSelectedMemberMatchStats = useCallback(
@@ -360,10 +431,27 @@ const Members: React.FC = () => {
     if (wasTabActiveRef.current) return;
 
     wasTabActiveRef.current = true;
+    void loadMemberClubs();
     if (!isTabRefreshDue(lastSuccessfulLoadAtRef.current)) return;
 
     void loadMembers(members.length > 0);
-  }, [loadMembers, members.length, selectedTab]);
+  }, [loadMemberClubs, loadMembers, members.length, selectedTab]);
+
+  useEffect(() => {
+    if (memberFilters.some((filter) => filter.id === selectedMemberFilterId)) {
+      return;
+    }
+
+    setSelectedMemberFilterId(FRIENDS_MEMBER_FILTER_ID);
+  }, [memberFilters, selectedMemberFilterId]);
+
+  useEffect(() => {
+    if (selectedTab !== "members") return;
+    if (previousSelectedClubIdRef.current === selectedClubId) return;
+
+    previousSelectedClubIdRef.current = selectedClubId;
+    void loadMembers(members.length > 0);
+  }, [loadMembers, members.length, selectedClubId, selectedTab]);
 
   useEffect(() => {
     if (!token || !selectedMemberId) {
@@ -381,12 +469,14 @@ const Members: React.FC = () => {
   useEffect(
     () =>
       registerPullToRefresh("members", async () => {
+        await loadMemberClubs();
         await loadMembers(true, true);
         if (selectedMemberId) {
           await loadSelectedMemberMatchStats(selectedMemberId, true, true);
         }
       }),
     [
+      loadMemberClubs,
       loadMembers,
       loadSelectedMemberMatchStats,
       registerPullToRefresh,
@@ -583,6 +673,15 @@ const Members: React.FC = () => {
       }),
     [members],
   );
+  const selectMemberFilter = useCallback(
+    (filterId: string) => {
+      if (filterId === selectedMemberFilterId) return;
+
+      setSelectedMemberFilterId(filterId);
+      scrollToTop("auto");
+    },
+    [scrollToTop, selectedMemberFilterId],
+  );
 
   return (
     <>
@@ -590,6 +689,23 @@ const Members: React.FC = () => {
         <TabPanelHeader
           title="Players"
           onHeaderElementChange={setHeaderElement}
+          footer={
+            <HeaderFilterTabs
+              ariaLabel="플레이어 범위"
+              selectedId={selectedMemberFilterId}
+              onSelect={selectMemberFilter}
+              tabs={memberFilters.map((filter) => ({
+                id: filter.id,
+                label: filter.label,
+                icon:
+                  filter.id === FRIENDS_MEMBER_FILTER_ID ? (
+                    <LiaUserFriendsSolid aria-hidden="true" className="size-3.5" />
+                  ) : (
+                    <TbAffiliate aria-hidden="true" className="size-3.5" />
+                  ),
+              }))}
+            />
+          }
         >
           <button
             type="button"
@@ -613,7 +729,7 @@ const Members: React.FC = () => {
             headerElement={headerElement}
             className="z-20"
           />
-          <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col">
+        <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col">
             <div>
               {notice ? (
                 <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
@@ -628,13 +744,15 @@ const Members: React.FC = () => {
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
             ) : sortedMembers.length === 0 ? (
-              <TabPanelStatus message="현재 표시할 멤버가 없어요." />
+              <TabPanelStatus
+                message={
+                  selectedClubId
+                    ? `현재 표시할 ${selectedMemberFilter.label} 소속 멤버가 없어요.`
+                    : "현재 표시할 친구가 없어요."
+                }
+              />
             ) : (
               <div>
-                <TabPanelHeaderGradientExtension
-                  headerElement={headerElement}
-                  className="z-0"
-                />
                 <div className="relative z-10 overflow-hidden rounded-3xl bg-white mx-1.5 mt-1 pt-1">
                   {sortedMembers.map((member, index) => {
                     const doublesRating = getCompositeDoublesRating(

@@ -31,6 +31,7 @@ import QrCode from "react-qr-code";
 import BottomSheet from "@/components/BottomSheet";
 import ClubQrScannerSheetBody from "@/components/ClubQrScannerSheetBody";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import MatchCard, {
   type MatchInfo,
   type MatchListResponse,
@@ -721,25 +722,17 @@ const Affiliations: React.FC = () => {
         title="Clubs"
         footer={
           activeClubs.length ? (
-            <div className="-mx-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <div className="flex w-max gap-1">
-                {activeClubs.map((item) => (
-                  <button
-                    key={item.club.id}
-                    type="button"
-                    onClick={() => selectClub(item.club.id)}
-                    className={`flex items-center gap-1 rounded-xl border px-2 py-1 text-xs font-bold transition-colors ${
-                      item.club.id === selectedClubId
-                        ? "border-pkpk-primary-bg bg-pkpk-primary-bg text-white shadow-sm"
-                        : "border-border bg-white text-pkpk-sub-font"
-                    }`}
-                  >
-                    <TbAffiliate aria-hidden="true" className="size-3.5" />
-                    <span className="max-w-24 truncate">{item.club.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <HeaderFilterTabs
+              ariaLabel="클럽 범위"
+              selectedId={selectedClubId}
+              onSelect={selectClub}
+              tabs={activeClubs.map((item) => ({
+                id: item.club.id,
+                label: item.club.name,
+                icon: <TbAffiliate aria-hidden="true" className="size-3.5" />,
+                labelClassName: "max-w-24 truncate",
+              }))}
+            />
           ) : null
         }
       >

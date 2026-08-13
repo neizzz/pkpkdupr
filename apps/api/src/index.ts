@@ -1272,14 +1272,32 @@ app.get("/api/players", async (req, res) => {
       return;
     }
 
+    const clubId = req.query.clubId;
+    if (clubId !== undefined && typeof clubId !== "string") {
+      return res.status(400).json({ error: "유효한 클럽 ID가 필요합니다." });
+    }
+
+    let clubMemberIds: Set<string> | null = null;
+    if (clubId) {
+      const access = await getClubAccess(clubId, decoded.playerId, res);
+      if (!access) {
+        return;
+      }
+      clubMemberIds = new Set(
+        (await clubRepository.listMembers(clubId)).map((member) => member.id),
+      );
+    }
+
     const [players, lastPlayedAtByPlayerId] = await Promise.all([
       authService.getPublicPlayers(),
       matchRepository.getLastPlayedAtByPlayerId(),
     ]);
-    const memberList: MemberListPlayer[] = players.map((player) => ({
-      ...player,
-      lastPlayedAt: lastPlayedAtByPlayerId[player.id] ?? null,
-    }));
+    const memberList: MemberListPlayer[] = players
+      .filter((player) => !clubMemberIds || clubMemberIds.has(player.id))
+      .map((player) => ({
+        ...player,
+        lastPlayedAt: lastPlayedAtByPlayerId[player.id] ?? null,
+      }));
     res.json(memberList);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
