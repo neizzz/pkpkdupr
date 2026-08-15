@@ -366,7 +366,11 @@ export class MatchRepository {
     const allMatches = await this.db
       .select()
       .from(matches)
-      .orderBy(desc(matches.createdAt))
+      .orderBy(
+        desc(matches.matchStartsAt),
+        desc(matches.createdAt),
+        desc(matches.id),
+      )
       .all();
     const hydratedMatches: Match[] = await Promise.all(
       allMatches.map((match: StoredMatch) => this.hydrateMatch(match)),
@@ -1585,7 +1589,11 @@ export class MatchRepository {
     const storedMatches = await this.db
       .select()
       .from(matches)
-      .orderBy(desc(matches.createdAt))
+      .orderBy(
+        desc(matches.matchStartsAt),
+        desc(matches.createdAt),
+        desc(matches.id),
+      )
       .all();
     return await Promise.all(
       storedMatches.map((match: StoredMatch) => this.hydrateMatch(match)),
