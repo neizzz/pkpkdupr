@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { AutoApprovalService } from "../services/AutoApprovalService";
 
-const completedMatch = { id: "match-auto" } as any;
+const evaluatingMatch = { id: "match-auto", status: "evaluating" } as any;
 
 describe("AutoApprovalService", () => {
-  it("만료 경기를 완료하고 평점을 반영한 뒤 반영 완료 시각을 저장한다", async () => {
+  it("만료·수동 합의 매치의 평점을 반영한 뒤 완료로 전환한다", async () => {
     const repository = {
-      completeExpiredAutoApprovals: vi.fn().mockResolvedValue([completedMatch]),
-      findAutoApprovedMatchesAwaitingRating: vi
+      completeExpiredAutoApprovals: vi.fn().mockResolvedValue([evaluatingMatch]),
+      findMatchesAwaitingRating: vi
         .fn()
-        .mockResolvedValue([completedMatch]),
-      markAutoApprovalRatingApplied: vi.fn().mockResolvedValue(undefined),
+        .mockResolvedValue([evaluatingMatch]),
+      markRatingApplied: vi.fn().mockResolvedValue(undefined),
     };
     const authService = {
       applyMatchResultToRatings: vi.fn().mockResolvedValue([]),
@@ -24,22 +24,25 @@ describe("AutoApprovalService", () => {
 
     expect(repository.completeExpiredAutoApprovals).toHaveBeenCalledWith(now);
     expect(authService.applyMatchResultToRatings).toHaveBeenCalledWith(
-      completedMatch,
+      evaluatingMatch,
     );
-    expect(repository.markAutoApprovalRatingApplied).toHaveBeenCalledWith(
-      completedMatch.id,
+    expect(repository.markRatingApplied).toHaveBeenCalledWith(
+      evaluatingMatch.id,
       now,
     );
-    expect(result).toEqual({ completedMatches: [completedMatch], appliedRatingCount: 1 });
+    expect(result).toEqual({
+      completedMatches: [evaluatingMatch],
+      appliedRatingCount: 1,
+    });
   });
 
   it("평점 반영에 실패하면 완료 시각을 기록하지 않아 다음 주기에 재시도한다", async () => {
     const repository = {
       completeExpiredAutoApprovals: vi.fn().mockResolvedValue([]),
-      findAutoApprovedMatchesAwaitingRating: vi
+      findMatchesAwaitingRating: vi
         .fn()
-        .mockResolvedValue([completedMatch]),
-      markAutoApprovalRatingApplied: vi.fn().mockResolvedValue(undefined),
+        .mockResolvedValue([evaluatingMatch]),
+      markRatingApplied: vi.fn().mockResolvedValue(undefined),
     };
     const authService = {
       applyMatchResultToRatings: vi.fn().mockRejectedValue(new Error("failed")),
@@ -51,7 +54,7 @@ describe("AutoApprovalService", () => {
       authService as any,
     ).process();
 
-    expect(repository.markAutoApprovalRatingApplied).not.toHaveBeenCalled();
+    expect(repository.markRatingApplied).not.toHaveBeenCalled();
     expect(result.appliedRatingCount).toBe(0);
     errorSpy.mockRestore();
   });

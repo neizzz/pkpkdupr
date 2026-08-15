@@ -1391,7 +1391,7 @@ export class MatchRepository {
     const nowSeconds = toUnixTimestampSeconds(now);
     const transaction = await this.client.transaction("write");
     let committed = false;
-    const completedIds: string[] = [];
+    const evaluatingIds: string[] = [];
 
     try {
       const candidates = await transaction.execute({
@@ -1411,7 +1411,7 @@ export class MatchRepository {
           sql: `
             UPDATE matches
             SET
-              status = 'completed',
+              status = 'evaluating',
               completed_at = ?,
               auto_approval_due_at = NULL,
               auto_approved_at = ?,
@@ -1432,7 +1432,7 @@ export class MatchRepository {
         });
 
         if (updateResult.rowsAffected) {
-          completedIds.push(matchId);
+          evaluatingIds.push(matchId);
         }
       }
 
@@ -1445,7 +1445,7 @@ export class MatchRepository {
     }
 
     return await Promise.all(
-      completedIds.map(async (matchId) => {
+      evaluatingIds.map(async (matchId) => {
         const match = await this.findById(matchId);
         if (!match) {
           throw new Error("자동 합의 처리한 매치를 찾을 수 없습니다.");
@@ -1455,39 +1455,47 @@ export class MatchRepository {
     );
   }
 
-  async findAutoApprovedMatchesAwaitingRating(): Promise<Match[]> {
+  async findMatchesAwaitingRating(): Promise<Match[]> {
     const result = await this.client.execute(`
       SELECT id
       FROM matches
-      WHERE status = 'completed'
-        AND auto_approved_at IS NOT NULL
-        AND auto_approval_rating_applied_at IS NULL
+      WHERE status = 'evaluating'
+      ORDER BY completed_at ASC, id ASC
     `);
 
     return await Promise.all(
       result.rows.map(async (row: { id: unknown }) => {
         const match = await this.findById(String(row.id));
         if (!match) {
-          throw new Error("자동 합의 매치를 찾을 수 없습니다.");
+          throw new Error("평점 반영 대기 매치를 찾을 수 없습니다.");
         }
         return match;
       }),
     );
   }
 
-  async markAutoApprovalRatingApplied(
+  async markRatingApplied(
     matchId: string,
     appliedAt: Date = new Date(),
   ): Promise<void> {
     await this.client.execute({
       sql: `
         UPDATE matches
-        SET auto_approval_rating_applied_at = ?
+        SET
+          status = 'completed',
+          auto_approval_rating_applied_at = CASE
+            WHEN auto_approved_at IS NOT NULL THEN ?
+            ELSE auto_approval_rating_applied_at
+          END,
+          updated_at = ?
         WHERE id = ?
-          AND status = 'completed'
-          AND auto_approved_at IS NOT NULL
+          AND status = 'evaluating'
       `,
-      args: [toUnixTimestampSeconds(appliedAt), matchId],
+      args: [
+        toUnixTimestampSeconds(appliedAt),
+        toUnixTimestampSeconds(appliedAt),
+        matchId,
+      ],
     });
   }
 
@@ -1867,7 +1875,7 @@ export class MatchRepository {
       sql: `
         UPDATE matches
         SET
-          status = 'completed',
+          status = 'evaluating',
           completed_at = ?,
           auto_approval_due_at = NULL,
           updated_at = ?

@@ -414,6 +414,82 @@ describe("GET /api/players/:playerId/profile-summary", () => {
     expect(response.body.recentMatches).toHaveLength(1);
     expect(response.body).not.toHaveProperty("matches");
   });
+
+  it("평가중 매치는 최근 매치에 포함하지만 통계와 평점 변동에는 반영하지 않는다", async () => {
+    const evaluatingMatch: Match = {
+      ...match,
+      status: "evaluating",
+      scores: [{ scoreA: 11, scoreB: 8 }],
+      completedAt: now,
+    };
+    vi.spyOn(MatchRepository.prototype, "findByPlayerId").mockResolvedValue({
+      matches: [evaluatingMatch],
+      total: 1,
+    });
+    vi.spyOn(
+      MatchRepository.prototype,
+      "getPlayerRatingChangeLogs",
+    ).mockResolvedValue([]);
+    vi.spyOn(
+      PlayerRatingChartProjectionService.prototype,
+      "getOrRebuild",
+    ).mockResolvedValue({
+      history: { singles: [], doubles: [] },
+      generatedAt: now,
+    });
+
+    const response = await request(app)
+      .get(`/api/players/${player.id}/profile-summary`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body.recentMatches).toEqual([
+      expect.objectContaining({ id: evaluatingMatch.id, status: "evaluating" }),
+    ]);
+    expect(response.body.matchStats.singles).toEqual({
+      matchWins: 0,
+      matchLosses: 0,
+      setWins: 0,
+      setLosses: 0,
+    });
+    expect(response.body.ratingDelta.singles).toEqual({
+      last7Days: 0,
+      last30Days: 0,
+    });
+  });
+});
+
+describe("POST /api/matches/:matchId/approval", () => {
+  beforeEach(() => {
+    vi.spyOn(
+      AuthService.prototype,
+      "authenticateAccessToken",
+    ).mockResolvedValue(session);
+    vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("마지막 합의는 평가중 상태를 반환하고 요청 중 평점 반영을 실행하지 않는다", async () => {
+    const approveResult = vi
+      .spyOn(MatchRepository.prototype, "approveResult")
+      .mockResolvedValue({ ...match, status: "evaluating", completedAt: now });
+    const applyMatchResultToRatings = vi.spyOn(
+      AuthService.prototype,
+      "applyMatchResultToRatings",
+    );
+
+    const response = await request(app)
+      .post(`/api/matches/${match.id}/approval`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe("evaluating");
+    expect(approveResult).toHaveBeenCalledWith(match.id, player.id);
+    expect(applyMatchResultToRatings).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/match-feed", () => {

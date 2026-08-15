@@ -162,6 +162,7 @@ const ProfileMatchList: React.FC<ProfileMatchListProps> = ({
             <RatingDeltaChip
               delta={item.ratingDelta ?? 0}
               hasData={item.ratingDelta !== null}
+              isEvaluating={item.match.status === "evaluating"}
             />
             <IoChevronForward
               aria-hidden="true"

@@ -5,12 +5,14 @@ import { IoArrowDown, IoArrowUp } from "react-icons/io5";
 interface RatingDeltaChipProps {
   delta: number;
   hasData?: boolean;
+  isEvaluating?: boolean;
   appearance?: "default" | "rating";
 }
 
 const RatingDeltaChip: React.FC<RatingDeltaChipProps> = ({
   delta,
   hasData = true,
+  isEvaluating = false,
   appearance = "default",
 }) => {
   const chipClassName =
@@ -38,6 +40,27 @@ const RatingDeltaChip: React.FC<RatingDeltaChipProps> = ({
           : "text-white"
       : "";
   const iconClassName = appearance === "rating" ? "size-4" : "size-3";
+
+  if (isEvaluating) {
+    return (
+      <Chip
+        size="sm"
+        variant="soft"
+        color="warning"
+        className={`${chipClassName} ${
+          appearance === "rating" ? "!bg-amber-400/80" : ""
+        }`}
+      >
+        <span
+          className={`flex items-center font-semibold ${textSizeClassName} ${
+            appearance === "rating" ? "text-white" : "text-amber-700"
+          }`}
+        >
+          평가중
+        </span>
+      </Chip>
+    );
+  }
 
   if (!hasData) {
     return (

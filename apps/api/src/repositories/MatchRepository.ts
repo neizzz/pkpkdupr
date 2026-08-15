@@ -458,19 +458,19 @@ export class MatchRepository {
     return records.map(hydrateMatch);
   }
 
-  async findAutoApprovedMatchesAwaitingRating(): Promise<Match[]> {
+  async findMatchesAwaitingRating(): Promise<Match[]> {
     const records = await this.dbRequest<any[]>(
-      "/internal/matches/auto-approvals/awaiting-rating",
+      "/internal/matches/ratings/awaiting",
     );
     return records.map(hydrateMatch);
   }
 
-  async markAutoApprovalRatingApplied(
+  async markRatingApplied(
     matchId: string,
     appliedAt: Date,
   ): Promise<void> {
     await this.dbRequest<void>(
-      `/internal/matches/${matchId}/auto-approval-rating-applied`,
+      `/internal/matches/${matchId}/rating-applied`,
       {
         method: "POST",
         body: JSON.stringify({ appliedAt }),

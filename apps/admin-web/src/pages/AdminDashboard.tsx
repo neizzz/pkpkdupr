@@ -156,6 +156,7 @@ const statusBadgeClassMap: Record<PlayerStatus, string> = {
 const matchStatusLabelMap: Record<MatchStatus, string> = {
   created: "예정",
   "pending-approval": "합의중",
+  evaluating: "평가중",
   completed: "완료",
   cancelled: "취소",
 };
@@ -163,6 +164,7 @@ const matchStatusLabelMap: Record<MatchStatus, string> = {
 const matchStatusBadgeClassMap: Record<MatchStatus, string> = {
   created: "bg-sky-100 text-sky-700",
   "pending-approval": "bg-violet-100 text-violet-700",
+  evaluating: "bg-amber-100 text-amber-700",
   completed: "bg-emerald-100 text-emerald-700",
   cancelled: "bg-slate-200 text-slate-700",
 };

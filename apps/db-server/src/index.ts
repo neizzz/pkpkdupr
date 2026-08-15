@@ -903,16 +903,16 @@ app.post("/internal/matches/auto-approvals/complete-expired", async (req, res) =
   }
 });
 
-app.get("/internal/matches/auto-approvals/awaiting-rating", async (_req, res) => {
+app.get("/internal/matches/ratings/awaiting", async (_req, res) => {
   try {
-    res.json(await matchRepository.findAutoApprovedMatchesAwaitingRating());
+    res.json(await matchRepository.findMatchesAwaitingRating());
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
 });
 
 app.post(
-  "/internal/matches/:id/auto-approval-rating-applied",
+  "/internal/matches/:id/rating-applied",
   async (req, res) => {
     try {
       const appliedAt = req.body?.appliedAt
@@ -921,7 +921,7 @@ app.post(
       if (Number.isNaN(appliedAt.getTime())) {
         return res.status(400).json({ error: "유효한 평점 반영 시각이 필요합니다." });
       }
-      await matchRepository.markAutoApprovalRatingApplied(req.params.id, appliedAt);
+      await matchRepository.markRatingApplied(req.params.id, appliedAt);
       res.status(204).end();
     } catch (error) {
       res.status(400).json({ error: (error as Error).message });

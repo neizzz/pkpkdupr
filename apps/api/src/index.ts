@@ -2246,10 +2246,6 @@ app.post("/api/matches/:matchId/approval", async (req, res) => {
       decoded.playerId,
     );
 
-    if (match.status === "completed") {
-      await authService.applyMatchResultToRatings(match);
-    }
-
     res.json(match);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });

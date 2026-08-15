@@ -302,6 +302,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
     team.players.some((teamPlayer) => teamPlayer.id === currentPlayerId),
   );
   const isPendingApprovalMatch = match.status === "pending-approval";
+  const isEvaluatingMatch = match.status === "evaluating";
   const autoApprovalDueAtMs = match.autoApprovalDueAt
     ? new Date(match.autoApprovalDueAt).getTime()
     : Number.NaN;
@@ -734,7 +735,9 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 })()
               ) : (
                 <p className="text-sm text-pkpk-sub-font">
-                  결과 합의 후 평점 변경 내역이 표시돼요.
+                  {isEvaluatingMatch
+                    ? "평점을 계산하고 있어요. 잠시만 기다려주세요."
+                    : "결과 합의 후 평점 변경 내역이 표시돼요."}
                 </p>
               )}
             </Card>

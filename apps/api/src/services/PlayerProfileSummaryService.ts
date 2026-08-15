@@ -129,7 +129,10 @@ export const buildPlayerProfileSummary = (
   }
 
   const recentMatches = matches
-    .filter((match) => match.status === "completed")
+    .filter(
+      (match) =>
+        match.status === "completed" || match.status === "evaluating",
+    )
     .sort((left, right) => getMatchStartsAtMs(right) - getMatchStartsAtMs(left))
     .slice(0, 5);
 

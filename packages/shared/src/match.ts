@@ -119,6 +119,7 @@ export const getAutoApprovalDueAt = (
 export type MatchStatus =
   | "created"
   | "pending-approval"
+  | "evaluating"
   | "completed"
   | "cancelled";
 

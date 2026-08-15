@@ -5,13 +5,13 @@ import type { AuthService } from "./AuthService";
 type AutoApprovalMatchRepository = Pick<
   MatchRepository,
   | "completeExpiredAutoApprovals"
-  | "findAutoApprovedMatchesAwaitingRating"
-  | "markAutoApprovalRatingApplied"
+  | "findMatchesAwaitingRating"
+  | "markRatingApplied"
 >;
 
 type AutoApprovalRatingService = Pick<AuthService, "applyMatchResultToRatings">;
 
-/** 만료된 합의를 완료하고, 실패한 평점 반영도 다음 주기에 다시 시도합니다. */
+/** 만료된 합의를 평가중으로 전환하고, 모든 평가중 매치의 평점을 반영합니다. */
 export class AutoApprovalService {
   private isProcessing = false;
 
@@ -33,13 +33,13 @@ export class AutoApprovalService {
       const completedMatches =
         await this.matchRepository.completeExpiredAutoApprovals(now);
       const awaitingRating =
-        await this.matchRepository.findAutoApprovedMatchesAwaitingRating();
+        await this.matchRepository.findMatchesAwaitingRating();
       let appliedRatingCount = 0;
 
       for (const match of awaitingRating) {
         try {
           await this.authService.applyMatchResultToRatings(match);
-          await this.matchRepository.markAutoApprovalRatingApplied(match.id, now);
+          await this.matchRepository.markRatingApplied(match.id, now);
           appliedRatingCount += 1;
         } catch (error) {
           console.error(

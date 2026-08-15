@@ -102,7 +102,9 @@ export const buildProfileMatchList = (
 ): ProfileMatchListItem[] =>
   matches
     .flatMap((match) => {
-      if (match.status !== "completed") return [];
+      if (match.status !== "completed" && match.status !== "evaluating") {
+        return [];
+      }
 
       const playerTeamIndex = getPlayerTeamIndex(match, playerId);
       if (playerTeamIndex === null) return [];
