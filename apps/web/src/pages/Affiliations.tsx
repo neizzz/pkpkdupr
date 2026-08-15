@@ -21,6 +21,8 @@ import {
   IoChevronForward,
   IoMegaphoneOutline,
   IoPeopleOutline,
+  IoPeople,
+  IoPerson,
   IoPersonAddOutline,
   IoQrCodeOutline,
   IoRefreshOutline,
@@ -116,7 +118,7 @@ const Affiliations: React.FC = () => {
   const [scannerTarget, setScannerTarget] = useState<ScannerTarget>(null);
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [rankingCategory, setRankingCategory] =
-    useState<RankingCategory>("singles");
+    useState<RankingCategory>("doubles");
   const [managementError, setManagementError] = useState<string | null>(null);
   const [invite, setInvite] = useState<ClubInvite | null>(null);
   const [announcementTitle, setAnnouncementTitle] = useState("");
@@ -839,20 +841,30 @@ const Affiliations: React.FC = () => {
                         title="랭킹"
                       />
                       <div className="grid grid-cols-2 rounded-xl bg-pkpk-session-bg p-1">
-                        {(["singles", "doubles"] as RankingCategory[]).map((category) => (
-                          <button
-                            key={category}
-                            type="button"
-                            onClick={() => setRankingCategory(category)}
-                            className={`rounded-lg py-2 text-sm font-bold transition-colors ${
-                              rankingCategory === category
-                                ? "bg-white text-pkpk-primary-bg shadow-sm"
-                                : "text-pkpk-sub-font"
-                            }`}
-                          >
-                            {category === "singles" ? "싱글" : "복식"}
-                          </button>
-                        ))}
+                        {(["doubles", "singles"] as RankingCategory[]).map((category) => {
+                          const Icon =
+                            category === "doubles" ? IoPeople : IoPerson;
+                          return (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => setRankingCategory(category)}
+                              className={`flex items-center justify-center gap-1 rounded-lg py-2 text-sm font-bold transition-colors ${
+                                rankingCategory === category
+                                  ? "bg-white text-pkpk-primary-bg shadow-sm"
+                                  : "text-pkpk-sub-font"
+                              }`}
+                            >
+                              <Icon
+                                aria-hidden="true"
+                                className={
+                                  category === "singles" ? "size-3" : "size-3.5"
+                                }
+                              />
+                              {category === "singles" ? "Singles" : "Doubles"}
+                            </button>
+                          );
+                        })}
                       </div>
                       {renderRankings(dashboard.rankings[rankingCategory])}
                     </section>
