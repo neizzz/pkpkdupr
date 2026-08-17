@@ -1,5 +1,15 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Spinner, Tabs } from "@heroui/react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { Tabs } from "@heroui/react";
+import {
+  measureNaturalWidth,
+  prepareWithSegments,
+} from "@chenglou/pretext";
 import type { PlayerAffiliation } from "@pkpkdupr/shared/player";
 import type { MatchTopLevelType } from "@pkpkdupr/shared/match";
 import { matchTopLevelTypeLabels } from "@pkpkdupr/shared/match";
@@ -10,7 +20,6 @@ import BottomSheet from "@/components/BottomSheet";
 import CopyableId from "@/components/CopyableId";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import RatingDeltaChip from "@/components/RatingDeltaChip";
-import RatingHistoryChart from "@/components/RatingHistoryChart";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import ProfileMatchList, {
   type ProfileMatchListItem,
@@ -59,6 +68,190 @@ export type MemberProfileRatingHistory = Record<
   MatchTopLevelType,
   MemberProfileRatingHistoryPoint[]
 >;
+
+type RatingExtremum = MemberProfileRatingHistoryPoint;
+
+const ratingHistoryDateFormatter = new Intl.DateTimeFormat("ko-KR", {
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  timeZone: "Asia/Seoul",
+});
+
+const formatRatingHistoryDate = (value?: string) => {
+  if (!value) return "기록 없음";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "기록 없음"
+    : ratingHistoryDateFormatter.format(date);
+};
+
+const getRatingExtremum = (
+  history: MemberProfileRatingHistoryPoint[],
+  kind: "highest" | "lowest",
+): RatingExtremum | null =>
+  history.reduce<RatingExtremum | null>((selected, point) => {
+    if (!selected) return point;
+
+    const isMoreExtreme =
+      kind === "highest"
+        ? point.rating > selected.rating
+        : point.rating < selected.rating;
+    const isSameRatingWithMoreRecentRecord =
+      point.rating === selected.rating &&
+      new Date(point.createdAt).getTime() > new Date(selected.createdAt).getTime();
+
+    return isMoreExtreme || isSameRatingWithMoreRecentRecord ? point : selected;
+  }, null);
+
+const RatingExtremumRow: React.FC<{
+  label: "최고 평점" | "최저 평점";
+  extremum: RatingExtremum | null;
+}> = ({ label, extremum }) => (
+  <section
+    aria-label={label}
+    className="min-w-0 px-4 py-3"
+  >
+    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+      {label}
+    </p>
+    <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+      <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+        {extremum ? formatRating(extremum.rating) : "-"}
+      </p>
+      <p className="shrink-0 text-[clamp(0.625rem,2.7cqw,0.8rem)] text-pkpk-secondary-font/70">
+        {formatRatingHistoryDate(extremum?.createdAt)}
+      </p>
+    </div>
+  </section>
+);
+
+const ELLIPSIS = "…";
+
+const getGraphemes = (value: string) =>
+  "Segmenter" in Intl
+    ? Array.from(
+        new Intl.Segmenter("ko", { granularity: "grapheme" }).segment(value),
+        ({ segment }) => segment,
+      )
+    : Array.from(value);
+
+const getLetterSpacing = (value: string) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const measureProfileNameWidth = (
+  value: string,
+  font: string,
+  letterSpacing: number,
+) =>
+  measureNaturalWidth(
+    prepareWithSegments(value, font, { letterSpacing }),
+  );
+
+const truncateProfileName = (
+  value: string,
+  maxWidth: number,
+  font: string,
+  letterSpacing: number,
+) => {
+  if (maxWidth <= 0) return value;
+  if (measureProfileNameWidth(value, font, letterSpacing) <= maxWidth) {
+    return value;
+  }
+  if (measureProfileNameWidth(ELLIPSIS, font, letterSpacing) > maxWidth) {
+    return value;
+  }
+
+  const graphemes = getGraphemes(value);
+  let start = 0;
+  let end = graphemes.length;
+
+  while (start < end) {
+    const middle = Math.ceil((start + end) / 2);
+    const candidate = `${graphemes.slice(0, middle).join("")}${ELLIPSIS}`;
+    if (measureProfileNameWidth(candidate, font, letterSpacing) <= maxWidth) {
+      start = middle;
+    } else {
+      end = middle - 1;
+    }
+  }
+
+  return `${graphemes.slice(0, start).join("")}${ELLIPSIS}`;
+};
+
+const useTruncatedProfileName = (name: string, isEnabled: boolean) => {
+  const nameRef = useRef<HTMLHeadingElement | null>(null);
+  const nameRowRef = useRef<HTMLDivElement | null>(null);
+  const [truncation, setTruncation] = useState({
+    name,
+    width: null as number | null,
+  });
+
+  const updateTruncatedName = useCallback(() => {
+    const element = nameRef.current;
+    const row = nameRowRef.current;
+    if (!isEnabled || !element || !row) {
+      setTruncation({ name, width: null });
+      return;
+    }
+
+    const computedStyle = window.getComputedStyle(element);
+    const rowStyle = window.getComputedStyle(row);
+    const gap = getLetterSpacing(rowStyle.columnGap);
+    const reservedWidth = Array.from(row.children)
+      .filter((child) => child !== element)
+      .reduce((total, child) => total + child.getBoundingClientRect().width, 0);
+    const width =
+      row.getBoundingClientRect().width -
+      reservedWidth -
+      gap * Math.max(0, row.children.length - 1);
+    const font = computedStyle.font;
+    if (!width || !font) return;
+
+    const nextName = truncateProfileName(
+      name,
+      width,
+      font,
+      getLetterSpacing(computedStyle.letterSpacing),
+    );
+    const nextWidth = Math.min(
+      width,
+      Math.ceil(
+        measureProfileNameWidth(
+          nextName,
+          font,
+          getLetterSpacing(computedStyle.letterSpacing),
+        ),
+      ),
+    );
+    setTruncation((current) =>
+      current.name === nextName && current.width === nextWidth
+        ? current
+        : { name: nextName, width: nextWidth },
+    );
+  }, [isEnabled, name]);
+
+  useLayoutEffect(() => {
+    setTruncation({ name, width: null });
+    if (!isEnabled || !nameRowRef.current) return;
+
+    const observer = new ResizeObserver(updateTruncatedName);
+    observer.observe(nameRowRef.current);
+    updateTruncatedName();
+    void document.fonts.ready.then(updateTruncatedName);
+
+    return () => observer.disconnect();
+  }, [isEnabled, name, updateTruncatedName]);
+
+  return {
+    nameRef,
+    nameRowRef,
+    truncatedName: truncation.name,
+    truncatedNameWidth: truncation.width,
+  };
+};
 
 interface MemberProfileProps {
   player: PlayerInfo | null;
@@ -115,6 +308,9 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   const [profileOverride, setProfileOverride] = useState<PlayerInfo | null>(null);
   const displayName =
     memberName || player?.username || player?.id || "Unknown Member";
+  const isProfileNameTruncationEnabled = showPlayerId && !!player?.id;
+  const { nameRef, nameRowRef, truncatedName, truncatedNameWidth } =
+    useTruncatedProfileName(displayName, isProfileNameTruncationEnabled);
   const [expandedType, setExpandedType] = useState<MatchTopLevelType | null>(
     "doubles",
   );
@@ -182,6 +378,11 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
   };
 
   const expandedItem = duprItems.find((item) => item.type === expandedType);
+  const expandedRatingHistory = expandedItem
+    ? ratingHistory?.[expandedItem.type] ?? []
+    : [];
+  const highestRating = getRatingExtremum(expandedRatingHistory, "highest");
+  const lowestRating = getRatingExtremum(expandedRatingHistory, "lowest");
 
   const handleAvatarEditClick = () => {
     avatarInputRef.current?.click();
@@ -320,7 +521,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
       {showDetailHeader ? <DetailPageHeader title="Member Profile" /> : null}
       <div className="p-2">
         <div className="mx-auto flex w-full flex-col gap-3">
-          <div className="flex items-start justify-center gap-4 pt-5 pb-5">
+          <div className="flex items-start justify-center gap-4 pt-5 pb-5 pl-[clamp(0px,calc(25%-3.6875rem),2.8125rem)]">
             <Avatar
               size="lg"
               avatarUrl={displayedPlayer?.avatarUrl}
@@ -338,17 +539,35 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 className="hidden"
               />
             ) : null}
-            <div className="flex min-w-[180px] w-full max-w-[50%] flex-1 flex-col items-start gap-0.5">
-              <div className="flex min-w-0 max-w-full flex-nowrap items-baseline gap-2">
-                <h2 className="min-w-0 flex-1 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font">
-                  {displayName}
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+              <div
+                ref={nameRowRef}
+                className={`flex min-w-0 max-w-full flex-nowrap items-baseline ${
+                  isProfileNameTruncationEnabled ? "w-full gap-1" : "gap-2"
+                }`}
+              >
+                <h2
+                  ref={nameRef}
+                  aria-label={displayName}
+                  className={`min-w-0 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font ${
+                    truncatedNameWidth == null ? "flex-1" : "shrink-0"
+                  }`}
+                  style={
+                    truncatedNameWidth == null
+                      ? undefined
+                      : { width: truncatedNameWidth }
+                  }
+                >
+                  {truncatedName}
                 </h2>
                 {showPlayerId && player?.id ? (
-                  <CopyableId
-                    label="Player ID"
-                    value={displayedPlayer?.id ?? player.id}
-                    showLabel={false}
-                  />
+                  <div className="shrink-0">
+                    <CopyableId
+                      label="Player ID"
+                      value={displayedPlayer?.id ?? player.id}
+                      showLabel={false}
+                    />
+                  </div>
                 ) : null}
                 {headerAction}
               </div>
@@ -417,87 +636,83 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </Tabs>
 
             {isProfileStatsLoading ? (
-              <>
-                <div className="mt-2 h-36 min-w-0">
-                  <div className="flex h-full items-center justify-center">
-                    <Spinner
-                      aria-label="평점 이력 로딩 중"
-                      className="text-pkpk-accent-bg"
-                      color="current"
-                      size="md"
-                    />
-                  </div>
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3 px-4">
+                  {Array.from({ length: 2 }, (_, index) => (
+                    <SkeletonBlock key={index} className="h-5 rounded" />
+                  ))}
                 </div>
-                <div className="mt-3 h-36">
+                <div className="h-36">
                   <ProfileStatsSkeleton />
                 </div>
-              </>
+              </div>
             ) : expandedItem ? (
-              <>
-                <div className="mt-2 h-36 min-w-0">
-                  <RatingHistoryChart
-                    key={expandedItem.type}
-                    history={ratingHistory?.[expandedItem.type] ?? []}
-                    label={expandedItem.label}
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <RatingExtremumRow
+                    label="최고 평점"
+                    extremum={highestRating}
+                  />
+                  <RatingExtremumRow
+                    label="최저 평점"
+                    extremum={lowestRating}
                   />
                 </div>
-                <div className="mt-3 flex h-36 flex-col">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl px-4 py-3">
-                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
-                        매치 승률
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl px-4 py-3">
+                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                      매치 승률
+                    </p>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+                        {expandedItem.matchWinRate}
                       </p>
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
-                          {expandedItem.matchWinRate}
-                        </p>
-                        <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
-                          {expandedItem.matchWinLoss}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="rounded-xl px-4 py-3">
-                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
-                        세트 승률
+                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
+                        {expandedItem.matchWinLoss}
                       </p>
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
-                          {expandedItem.setWinRate}
-                        </p>
-                        <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
-                          {expandedItem.setWinLoss}
-                        </p>
-                      </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl px-4 py-3">
-                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
-                        최근 7일 변동
+                  <div className="rounded-xl px-4 py-3">
+                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                      세트 승률
+                    </p>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+                        {expandedItem.setWinRate}
                       </p>
-                      <div className="mt-1">
-                        <RatingDeltaChip
-                          delta={expandedItem.delta7d}
-                          hasData={expandedItem.hasDelta7d}
-                          appearance="rating"
-                        />
-                      </div>
-                    </div>
-                    <div className="rounded-xl px-4 py-3">
-                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
-                        최근 30일 변동
+                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
+                        {expandedItem.setWinLoss}
                       </p>
-                      <div className="mt-1">
-                        <RatingDeltaChip
-                          delta={expandedItem.delta30d}
-                          hasData={expandedItem.hasDelta30d}
-                          appearance="rating"
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
-              </>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl px-4 py-3">
+                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                      최근 7일 변동
+                    </p>
+                    <div className="mt-1">
+                      <RatingDeltaChip
+                        delta={expandedItem.delta7d}
+                        hasData={expandedItem.hasDelta7d}
+                        appearance="rating"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl px-4 py-3">
+                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                      최근 30일 변동
+                    </p>
+                    <div className="mt-1">
+                      <RatingDeltaChip
+                        delta={expandedItem.delta30d}
+                        hasData={expandedItem.hasDelta30d}
+                        appearance="rating"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : null}
           </div>
 

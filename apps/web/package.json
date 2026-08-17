@@ -11,6 +11,7 @@
         "test:e2e:visual": "playwright test -c playwright.config.ts"
     },
     "dependencies": {
+        "@chenglou/pretext": "0.0.8",
         "@heroui/react": "^3.0.0",
         "@heroui/styles": "^3.0.0",
         "@zxing/browser": "^0.2.0",

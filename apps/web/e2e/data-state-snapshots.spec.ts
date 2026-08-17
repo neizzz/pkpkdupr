@@ -4,6 +4,7 @@ type FixtureOptions = {
   authenticated?: boolean;
   clubEmpty?: boolean;
   historyEmpty?: boolean;
+  longProfileName?: boolean;
   matchFeedEmpty?: boolean;
   memberEmpty?: boolean;
   profileEmpty?: boolean;
@@ -305,6 +306,9 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
     if (path === "/api/me") {
       return fulfillJson(route, {
         ...me,
+        username: options.longProfileName
+          ? "김하늘🎾Alice피클볼이름이길어도아이디옆에서최대한길게표시합니다"
+          : me.username,
         isFirstLogin: false,
       });
     }
@@ -478,6 +482,9 @@ test("플레이어 목록의 with-data와 empty 상태", async ({ page }) => {
 test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", async ({ page }) => {
   await openMemberProfile(page);
   await expect(page.getByText("최근 매치")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "최고 평점" }),
+  ).toContainText("4.120");
   await capture(page, "member-profile--with-data.png");
   await page.getByRole("button", { name: "전체 보기" }).click();
   const profileMatchHistoryDrawer = page.getByRole("dialog", {
@@ -489,6 +496,9 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openMemberProfile(page, { historyEmpty: true, profileEmpty: true });
+  await expect(
+    page.getByRole("region", { name: "최고 평점" }),
+  ).toContainText("기록 없음");
   await expect(page.getByText("최근 완료된 매치가 없어요.")).toBeVisible();
   await capture(page, "member-profile--empty.png");
   await page.getByRole("button", { name: "전체 보기" }).click();
@@ -511,7 +521,26 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
 test("내 프로필과 데이터 독립 바텀시트", async ({ page }) => {
   await openMyProfile(page);
   await expect(page.getByText("김하늘")).toBeVisible();
+  await expect(page.getByText("70%")).toBeVisible();
+  const myProfile = page.getByRole("dialog", { name: "내 프로필" });
+  await expect(
+    myProfile.getByRole("region", { name: "최고 평점" }),
+  ).toContainText("4.120");
+  await expect(
+    myProfile.getByRole("region", { name: "최저 평점" }),
+  ).toContainText("3.840");
+  await expect(myProfile.getByText("2026. 8. 10.")).toBeVisible();
+  await expect(myProfile.locator("canvas")).toHaveCount(0);
   await capture(page, "my-profile--with-data.png");
+
+  await myProfile.getByRole("tab", { name: "Singles" }).click();
+  await expect(
+    myProfile.getByRole("region", { name: "최고 평점" }),
+  ).toContainText("3.880");
+  await expect(
+    myProfile.getByRole("region", { name: "최저 평점" }),
+  ).toContainText("3.720");
+  await myProfile.getByRole("tab", { name: "Doubles" }).click();
   await page.getByRole("button", { name: "상태메시지 수정" }).click();
   await expect(page.getByRole("dialog", { name: "상태메시지 수정" })).toBeVisible();
   await capture(page, "status-message-sheet--with-data.png");
@@ -528,6 +557,46 @@ test("내 프로필과 데이터 독립 바텀시트", async ({ page }) => {
   await openMyProfile(page, { profileEmpty: true });
   await expect(page.getByText("최근 완료된 매치가 없어요.")).toBeVisible();
   await capture(page, "my-profile--empty.png");
+});
+
+test("내 프로필 긴 이름은 Rating 카드 경계 안에서 ID와 함께 표시된다", async ({
+  page,
+}) => {
+  const longProfileName =
+    "김하늘🎾Alice피클볼이름이길어도아이디옆에서최대한길게표시합니다";
+  await openMyProfile(page, { longProfileName: true });
+
+  const profileDialog = page.getByRole("dialog", { name: "내 프로필" });
+  const profileName = profileDialog.getByRole("heading", {
+    name: longProfileName,
+  });
+  const playerIdButton = profileDialog.getByRole("button", {
+    name: "Player ID 복사",
+  });
+  const ratingCard = profileDialog
+    .getByRole("heading", { name: "Rating" })
+    .locator("..");
+
+  await expect(profileName).toBeVisible();
+  await expect(playerIdButton).toBeVisible();
+  await expect(profileDialog.getByText("70%")).toBeVisible();
+  await expect
+    .poll(() => profileName.textContent())
+    .toMatch(/^김하늘🎾.*…$/);
+  const [nameBox, playerIdBox, ratingCardBox] = await Promise.all([
+    profileName.boundingBox(),
+    playerIdButton.boundingBox(),
+    ratingCard.boundingBox(),
+  ]);
+  if (!nameBox || !playerIdBox || !ratingCardBox) {
+    throw new Error("프로필 헤더 또는 Rating 카드의 위치를 측정할 수 없습니다.");
+  }
+
+  const ratingCardRight = ratingCardBox.x + ratingCardBox.width;
+  expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(ratingCardRight);
+  expect(playerIdBox.x + playerIdBox.width).toBeLessThanOrEqual(
+    ratingCardRight,
+  );
 });
 
 test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async ({ page }) => {
