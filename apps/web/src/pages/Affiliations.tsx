@@ -15,13 +15,12 @@ import type {
   Match as SharedMatch,
   ManagedMatchSession,
 } from "@pkpkdupr/shared/match";
+import { AiOutlineNotification } from "react-icons/ai";
 import { PiRankingLight } from "react-icons/pi";
 import { TbAffiliate } from "react-icons/tb";
 import {
   IoCalendarOutline,
-  IoChevronDown,
   IoChevronForward,
-  IoMegaphoneOutline,
   IoPeopleOutline,
   IoPeople,
   IoPerson,
@@ -92,42 +91,6 @@ const SectionTitle: React.FC<{
   </div>
 );
 
-const ExpandableAnnouncementBody: React.FC<{
-  body: string;
-  className?: string;
-}> = ({ body, className }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <div>
-      <p
-        className={[
-          isExpanded ? "whitespace-pre-wrap" : "line-clamp-2",
-          className,
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        {body}
-      </p>
-      <button
-        type="button"
-        aria-expanded={isExpanded}
-        onClick={() => setIsExpanded((current) => !current)}
-        className="mt-1 inline-flex items-center gap-0.5 text-xs font-semibold text-pkpk-primary-bg"
-      >
-        {isExpanded ? "접기" : "펼치기"}
-        <IoChevronDown
-          aria-hidden="true"
-          className={`size-3 transition-transform ${
-            isExpanded ? "rotate-180" : ""
-          }`}
-        />
-      </button>
-    </div>
-  );
-};
-
 const Affiliations: React.FC = () => {
   const { token, player } = useAuth();
   const isOnline = useOnlineStatus();
@@ -161,6 +124,8 @@ const Affiliations: React.FC = () => {
   const [announcementToDelete, setAnnouncementToDelete] =
     useState<ClubAnnouncement | null>(null);
   const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
+  const [selectedAnnouncement, setSelectedAnnouncement] =
+    useState<ClubAnnouncement | null>(null);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
   const [sessionName, setSessionName] = useState("");
@@ -501,6 +466,20 @@ const Affiliations: React.FC = () => {
     [pushDepth, saveScrollPosition, scrollToTop],
   );
 
+  const openAnnouncementDetail = useCallback(
+    (announcement: ClubAnnouncement) => {
+      saveScrollPosition("affiliations");
+      pushDepth("affiliations", {
+        id: `club-announcement-detail:${announcement.id}`,
+        kind: "announcement-detail",
+        onClose: noop,
+      });
+      setSelectedAnnouncement(announcement);
+      window.requestAnimationFrame(() => scrollToTop("auto"));
+    },
+    [pushDepth, saveScrollPosition, scrollToTop],
+  );
+
   const openClubMatchHistory = useCallback(() => {
     if (!dashboard) return;
 
@@ -582,6 +561,11 @@ const Affiliations: React.FC = () => {
     restoreScrollTop("affiliations");
   }, [restoreScrollTop]);
 
+  const completeAnnouncementDetailClose = useCallback(() => {
+    setSelectedAnnouncement(null);
+    restoreScrollTop("affiliations");
+  }, [restoreScrollTop]);
+
   const sessionDepthId = selectedSession
     ? `club-session-detail:${selectedSession.id}`
     : null;
@@ -591,6 +575,9 @@ const Affiliations: React.FC = () => {
   const clubMatchHistoryDepthId = clubMatchHistoryClub
     ? `club-match-history:${clubMatchHistoryClub.id}`
     : null;
+  const announcementDetailDepthId = selectedAnnouncement
+    ? `club-announcement-detail:${selectedAnnouncement.id}`
+    : null;
   const isSessionDrawerOpen =
     !!sessionDepthId && depthStacks.affiliations.includes(sessionDepthId);
   const isMatchDrawerOpen =
@@ -598,6 +585,9 @@ const Affiliations: React.FC = () => {
   const isClubMatchHistoryDrawerOpen =
     !!clubMatchHistoryDepthId &&
     depthStacks.affiliations.includes(clubMatchHistoryDepthId);
+  const isAnnouncementDetailDrawerOpen =
+    !!announcementDetailDepthId &&
+    depthStacks.affiliations.includes(announcementDetailDepthId);
 
   const registerSessionScrollContainer = useCallback(
     (element: HTMLDivElement | null) => {
@@ -621,6 +611,18 @@ const Affiliations: React.FC = () => {
       registerScrollContainer("affiliations", clubMatchHistoryDepthId, element);
     },
     [clubMatchHistoryDepthId, registerScrollContainer],
+  );
+
+  const registerAnnouncementDetailScrollContainer = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!announcementDetailDepthId) return;
+      registerScrollContainer(
+        "affiliations",
+        announcementDetailDepthId,
+        element,
+      );
+    },
+    [announcementDetailDepthId, registerScrollContainer],
   );
 
   const renderSchedule = () => {
@@ -837,24 +839,29 @@ const Affiliations: React.FC = () => {
                     </section>
 
                     <section className="space-y-3 px-4 py-4">
-                      <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
+                      <SectionTitle icon={<AiOutlineNotification className="size-5" />} title="공지" />
                       {dashboard.announcements.length ? (
                         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
                           {dashboard.announcements
                             .slice(0, CLUB_ANNOUNCEMENT_MAX_COUNT)
                             .map((announcement) => (
-                            <div key={announcement.id} className="flex gap-3 px-4 py-3">
-                              <IoMegaphoneOutline className="mt-0.5 size-4 shrink-0 text-pkpk-primary-bg" />
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-pkpk-main-font">
-                                  {announcement.title}
-                                </p>
-                                <ExpandableAnnouncementBody
-                                  body={announcement.body}
-                                  className="mt-1 text-xs leading-5 text-pkpk-sub-font"
-                                />
-                              </div>
-                            </div>
+                              <button
+                                key={announcement.id}
+                                type="button"
+                                aria-label={`${announcement.title} 공지 상세 보기`}
+                                onClick={() => openAnnouncementDetail(announcement)}
+                                className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-semibold text-pkpk-main-font">
+                                    {announcement.title}
+                                  </span>
+                                  <span className="mt-1 block line-clamp-1 whitespace-pre-wrap text-xs leading-5 text-pkpk-sub-font">
+                                    {announcement.body}
+                                  </span>
+                                </span>
+                                <IoChevronForward className="mt-0.5 size-4 shrink-0 text-pkpk-sub-font" />
+                              </button>
                           ))}
                         </div>
                       ) : (
@@ -1058,7 +1065,7 @@ const Affiliations: React.FC = () => {
               <div className="divide-y-[6px] divide-pkpk-section-border">
               <section className="space-y-3 px-4 py-4">
                 <SectionTitle
-                  icon={<IoMegaphoneOutline className="size-5" />}
+                  icon={<AiOutlineNotification className="size-5" />}
                   title="공지 관리"
                   action={
                     <ActionChipButton
@@ -1082,15 +1089,22 @@ const Affiliations: React.FC = () => {
                     {dashboard.announcements.map((announcement) => (
                       <article key={announcement.id} className="px-3 py-3">
                         <div className="flex items-start gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-pkpk-main-font">
-                              {announcement.title}
-                            </p>
-                            <ExpandableAnnouncementBody
-                              body={announcement.body}
-                              className="mt-1 text-xs leading-5 text-pkpk-sub-font"
-                            />
-                          </div>
+                          <button
+                            type="button"
+                            aria-label={`${announcement.title} 공지 상세 보기`}
+                            onClick={() => openAnnouncementDetail(announcement)}
+                            className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-pkpk-main-font">
+                                {announcement.title}
+                              </span>
+                              <span className="mt-1 block line-clamp-2 whitespace-pre-wrap text-xs leading-5 text-pkpk-sub-font">
+                                {announcement.body}
+                              </span>
+                            </span>
+                            <IoChevronForward className="mt-0.5 size-4 shrink-0 text-pkpk-sub-font" />
+                          </button>
                           <Button
                             type="button"
                             variant="secondary"
@@ -1344,6 +1358,39 @@ const Affiliations: React.FC = () => {
                 </>
               )}
             </div>
+          </div>
+        </RightDrawer>
+      ) : null}
+
+      {selectedAnnouncement && announcementDetailDepthId ? (
+        <RightDrawer
+          isOpen={isAnnouncementDetailDrawerOpen}
+          isActive={selectedTab === "affiliations"}
+          ariaLabel="공지 상세"
+          onExited={completeAnnouncementDetailClose}
+          onScrollContainerChange={registerAnnouncementDetailScrollContainer}
+          layer={50}
+          className="!bg-white"
+        >
+          <div className="min-h-full bg-white">
+            <DetailPageHeader
+              title="공지 상세"
+              tabKey="affiliations"
+              backgroundClassName="bg-white"
+              rightContent={
+                <p className="text-lg font-bold text-pkpk-primary-bg">
+                  공지 상세
+                </p>
+              }
+            />
+            <article className="space-y-4 px-4 py-5">
+              <h2 className="break-words text-[1.5rem] font-bold text-pkpk-main-font">
+                {selectedAnnouncement.title}
+              </h2>
+              <p className="whitespace-pre-wrap break-words text-[1.1rem] leading-7 text-pkpk-sub-font">
+                {selectedAnnouncement.body}
+              </p>
+            </article>
           </div>
         </RightDrawer>
       ) : null}

@@ -3,6 +3,7 @@ import React, { createContext, useContext } from "react";
 export type TabKey = "match" | "members" | "affiliations" | "settings" | "me";
 
 export type TabDepthKind =
+  | "announcement-detail"
   | "match-detail"
   | "match-history"
   | "session-detail"

@@ -646,7 +646,7 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await page.getByRole("button", { name: "운영진 관리" }).click();
   await expect(page.getByRole("dialog", { name: "클럽 운영진 관리" })).toBeVisible();
   await capture(page, "club-management--with-data.png");
-  await page.getByRole("button", { name: "닫기" }).click();
+  await page.getByRole("button", { name: "뒤로가기" }).click();
   await page.getByRole("button", { name: "한강 피클볼의 매치 전체 보기" }).click();
   await expect(page.getByRole("dialog", { name: "한강 피클볼의 매치 전체" })).toBeVisible();
   await capture(page, "club-match-history--with-data.png");
@@ -661,6 +661,43 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
   await expect(page.getByRole("dialog", { name: "클럽 만들기" })).toBeVisible();
   await capture(page, "club-create-sheet.png");
+});
+
+test("클럽 공지는 drawer에서 전체 내용을 보여준다", async ({ page }) => {
+  await openApp(page);
+  await page.getByRole("tab", { name: "클럽" }).click();
+
+  const announcementButton = page.getByRole("button", {
+    name: "토요일 오픈플레이 안내 공지 상세 보기",
+  });
+  await expect(announcementButton).toBeVisible();
+  await expect(page.getByText("펼치기")).toHaveCount(0);
+  await expect(page.getByText("접기")).toHaveCount(0);
+  await announcementButton.click();
+
+  const announcementDetail = page.getByRole("dialog", { name: "공지 상세" });
+  await expect(announcementDetail).toBeVisible();
+  await expect(
+    announcementDetail.getByText("오전 10시에 A 코트에서 만나요."),
+  ).toBeVisible();
+  await capture(page, "club-announcement-detail--with-data.png");
+  await announcementDetail.getByRole("button", { name: "뒤로가기" }).click();
+  await expect(announcementDetail).toHaveCount(0);
+
+  await page.getByRole("button", { name: "운영진 관리" }).click();
+  const managementDrawer = page.getByRole("dialog", {
+    name: "클럽 운영진 관리",
+  });
+  const managementAnnouncementButton = managementDrawer.getByRole("button", {
+    name: "토요일 오픈플레이 안내 공지 상세 보기",
+  });
+  await expect(managementAnnouncementButton).toBeVisible();
+  await managementAnnouncementButton.click();
+
+  await expect(announcementDetail).toBeVisible();
+  await expect(
+    announcementDetail.getByText("오전 10시에 A 코트에서 만나요."),
+  ).toBeVisible();
 });
 
 test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async ({ page }) => {
@@ -679,13 +716,13 @@ test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async
   await clubManagementButton.click({ position: { x: 20, y: 20 } });
   await expect(clubManagementDrawer).toBeVisible();
 
-  await page.getByRole("button", { name: "닫기" }).click();
+  await page.getByRole("button", { name: "뒤로가기" }).click();
   await expect(clubManagementDrawerElement).toHaveCount(0);
 
   await clubManagementButton.click({ position: { x: 20, y: 20 } });
   await expect(clubManagementDrawer).toBeVisible();
   await expect(clubManagementDrawerElement).toHaveCount(1);
-  await expect(clubManagementDrawer.getByText("공지 작성")).toBeVisible();
+  await expect(clubManagementDrawer.getByText("공지 관리")).toBeVisible();
 });
 
 test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) => {
@@ -695,7 +732,7 @@ test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) =
   await expect(page.getByRole("button", { name: "멤버 초대" })).toBeVisible();
   await capture(page, "club-management--empty.png");
 
-  await page.getByRole("button", { name: "닫기" }).click();
+  await page.getByRole("button", { name: "뒤로가기" }).click();
   await page.getByRole("button", { name: "한강 피클볼의 매치 전체 보기" }).click();
   await expect(page.getByText("표시할 소속 매치가 없어요.")).toBeVisible();
   await capture(page, "club-match-history--empty.png");
