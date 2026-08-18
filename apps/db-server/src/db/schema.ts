@@ -50,6 +50,27 @@ export const players = mysqlTable("players", {
   updatedAt: unixTimestamp("updated_at").notNull(),
 });
 
+export const playerFriendships = mysqlTable(
+  "player_friendships",
+  {
+    id: id("id").primaryKey(),
+    playerOneId: id("player_one_id").notNull(),
+    playerTwoId: id("player_two_id").notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+  },
+  (table) => ({
+    playerPairUnique: uniqueIndex(
+      "player_friendships_player_pair_unique",
+    ).on(table.playerOneId, table.playerTwoId),
+    playerOneIndex: index("player_friendships_player_one_id_idx").on(
+      table.playerOneId,
+    ),
+    playerTwoIndex: index("player_friendships_player_two_id_idx").on(
+      table.playerTwoId,
+    ),
+  }),
+);
+
 export const playerAuthIdentities = mysqlTable(
   "player_auth_identities",
   {
@@ -246,23 +267,6 @@ export const clubMemberships = mysqlTable(
   }),
 );
 
-export const clubJoinRequests = mysqlTable(
-  "club_join_requests",
-  {
-    id: id("id").primaryKey(),
-    clubId: id("club_id").notNull(),
-    playerId: id("player_id").notNull(),
-    requestedAt: unixTimestamp("requested_at").notNull(),
-  },
-  (table) => ({
-    clubPlayerUnique: uniqueIndex("club_join_requests_club_player_unique").on(
-      table.clubId,
-      table.playerId,
-    ),
-    clubIndex: index("club_join_requests_club_id_idx").on(table.clubId),
-  }),
-);
-
 export const clubAnnouncements = mysqlTable(
   "club_announcements",
   {
@@ -279,21 +283,6 @@ export const clubAnnouncements = mysqlTable(
       table.clubId,
       table.createdAt,
     ),
-  }),
-);
-
-export const clubInvites = mysqlTable(
-  "club_invites",
-  {
-    id: id("id").primaryKey(),
-    clubId: id("club_id").notNull(),
-    token: varchar("token", { length: 128 }).notNull(),
-    createdAt: unixTimestamp("created_at").notNull(),
-    revokedAt: unixTimestamp("revoked_at"),
-  },
-  (table) => ({
-    tokenUnique: uniqueIndex("club_invites_token_unique").on(table.token),
-    clubIndex: index("club_invites_club_id_idx").on(table.clubId),
   }),
 );
 

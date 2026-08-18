@@ -44,6 +44,7 @@ import {
   MatchRepository,
 } from "./repositories/MatchRepository";
 import { ClubRepository } from "./repositories/ClubRepository";
+import { FriendRepository } from "./repositories/FriendRepository";
 import {
   AuthService,
   InvalidAccessTokenError,
@@ -205,6 +206,7 @@ const kakaoAuthService = isExternalUserAuthProvider(userAuthProvider)
   : null;
 const matchRepository = new MatchRepository();
 const clubRepository = new ClubRepository();
+const friendRepository = new FriendRepository();
 const playerRatingChartProjectionService =
   new PlayerRatingChartProjectionService(matchRepository, authService);
 authService.setPlayerRatingChartProjectionRefresher(
@@ -872,56 +874,11 @@ app.get("/api/clubs/:clubId/matches", async (req, res) => {
   }
 });
 
-app.post("/api/club-invites/join-requests", async (req, res) => {
-  try {
-    const decoded = await getAuthPayload(req, res);
-    if (!decoded) return;
-    const token =
-      typeof req.body?.token === "string"
-        ? req.body.token.trim()
-        : typeof req.body?.payload === "string"
-          ? req.body.payload.trim()
-          : "";
-    if (!token) return res.status(400).json({ error: "클럽 QR이 필요합니다." });
-    res.status(201).json(
-      await clubRepository.requestJoinByInvite(token, decoded.playerId),
-    );
-  } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
-  }
-});
-
-app.get("/api/clubs/:clubId/invite", async (req, res) => {
-  try {
-    const decoded = await getAuthPayload(req, res);
-    if (!decoded) return;
-    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
-      return;
-    }
-    res.json(await clubRepository.getInvite(req.params.clubId));
-  } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
-  }
-});
-
-app.post("/api/clubs/:clubId/invite/rotate", async (req, res) => {
-  try {
-    const decoded = await getAuthPayload(req, res);
-    if (!decoded) return;
-    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
-      return;
-    }
-    res.json(await clubRepository.rotateInvite(req.params.clubId));
-  } catch (err) {
-    res.status(400).json({ error: (err as Error).message });
-  }
-});
-
 app.post("/api/clubs/:clubId/player-qr-members", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
     if (!decoded) return;
-    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
+    if (!(await getClubAccess(req.params.clubId, decoded.playerId, res))) {
       return;
     }
     const payload = req.body?.payload;
@@ -939,44 +896,6 @@ app.post("/api/clubs/:clubId/player-qr-members", async (req, res) => {
     res.status(400).json({ error: (err as Error).message });
   }
 });
-
-app.post(
-  "/api/clubs/:clubId/join-requests/:playerId/approve",
-  async (req, res) => {
-    try {
-      const decoded = await getAuthPayload(req, res);
-      if (!decoded) return;
-      if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
-        return;
-      }
-      res.json(
-        await clubRepository.approveJoinRequest(
-          req.params.clubId,
-          req.params.playerId,
-        ),
-      );
-    } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
-    }
-  },
-);
-
-app.delete(
-  "/api/clubs/:clubId/join-requests/:playerId",
-  async (req, res) => {
-    try {
-      const decoded = await getAuthPayload(req, res);
-      if (!decoded) return;
-      if (!(await getClubAccess(req.params.clubId, decoded.playerId, res, "manager"))) {
-        return;
-      }
-      await clubRepository.rejectJoinRequest(req.params.clubId, req.params.playerId);
-      res.status(204).end();
-    } catch (err) {
-      res.status(400).json({ error: (err as Error).message });
-    }
-  },
-);
 
 app.patch("/api/clubs/:clubId/members/:playerId/role", async (req, res) => {
   try {
@@ -1273,8 +1192,12 @@ app.get("/api/players", async (req, res) => {
     }
 
     const clubId = req.query.clubId;
+    const scope = req.query.scope;
     if (clubId !== undefined && typeof clubId !== "string") {
       return res.status(400).json({ error: "유효한 클럽 ID가 필요합니다." });
+    }
+    if (scope !== undefined && scope !== "friends") {
+      return res.status(400).json({ error: "유효한 플레이어 목록 범위가 필요합니다." });
     }
 
     let clubMemberIds: Set<string> | null = null;
@@ -1288,12 +1211,22 @@ app.get("/api/players", async (req, res) => {
       );
     }
 
-    const [players, lastPlayedAtByPlayerId] = await Promise.all([
+    const [players, lastPlayedAtByPlayerId, friendPlayerIds] = await Promise.all([
       authService.getPublicPlayers(),
       matchRepository.getLastPlayedAtByPlayerId(),
+      scope === "friends"
+        ? friendRepository.listFriendPlayerIds(decoded.playerId)
+        : Promise.resolve<string[] | null>(null),
     ]);
+    const friendPlayerIdSet = friendPlayerIds
+      ? new Set(friendPlayerIds)
+      : null;
     const memberList: MemberListPlayer[] = players
-      .filter((player) => !clubMemberIds || clubMemberIds.has(player.id))
+      .filter(
+        (player) =>
+          (!clubMemberIds || clubMemberIds.has(player.id)) &&
+          (!friendPlayerIdSet || friendPlayerIdSet.has(player.id)),
+      )
       .map((player) => ({
         ...player,
         lastPlayedAt: lastPlayedAtByPlayerId[player.id] ?? null,
@@ -1301,6 +1234,26 @@ app.get("/api/players", async (req, res) => {
     res.json(memberList);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.post("/api/friends/player-qr", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) return;
+    const payload = req.body?.payload;
+    if (typeof payload !== "string" || !payload.trim()) {
+      return res.status(400).json({ error: "플레이어 QR이 필요합니다." });
+    }
+    const result = await authService.verifyPlayerQrToken(payload);
+    res.status(201).json(
+      await friendRepository.addFriendship(
+        decoded.playerId,
+        result.player.id,
+      ),
+    );
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
   }
 });
 

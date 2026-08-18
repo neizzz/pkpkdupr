@@ -6,6 +6,7 @@ import MatchDetail, {
   MatchDetailSkeleton,
 } from "@/components/MatchDetail";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import ProfileIdentityLabel from "@/components/ProfileIdentityLabel";
 import RightDrawer from "@/components/RightDrawer";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import { useAuth } from "@/context/AuthContext";
@@ -20,6 +21,8 @@ interface ProfileMatchDetailDrawerProps {
   match?: MatchInfo | null;
   matchId?: string;
   currentPlayerId?: string;
+  profileName?: string;
+  profileAvatarUrl?: string;
   onExited: () => void;
   onScrollContainerChange: (element: HTMLDivElement | null) => void;
   layer: number;
@@ -32,6 +35,8 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
   match,
   matchId,
   currentPlayerId,
+  profileName,
+  profileAvatarUrl,
   onExited,
   onScrollContainerChange,
   layer,
@@ -136,6 +141,14 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
   }, [isOpen, loadMatchDetail, match, targetMatchId]);
 
   const retryMatchId = displayedMatch?.id ?? targetMatchId;
+  const headerLeftContent =
+    profileName || profileAvatarUrl ? (
+      <ProfileIdentityLabel
+        avatarUrl={profileAvatarUrl}
+        name={profileName}
+        className="text-pkpk-primary-bg"
+      />
+    ) : undefined;
 
   let content: React.ReactNode;
   if (displayedMatch) {
@@ -158,6 +171,7 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
         <MatchDetail
           match={displayedMatch}
           tabKey={tabKey}
+          headerLeftContent={headerLeftContent}
           currentPlayerId={currentPlayerId}
           onSubmitResult={handleSubmitResult}
           onAutoApprovalDue={() => {
@@ -170,11 +184,20 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
       </>
     );
   } else if (isLoading) {
-    content = <MatchDetailSkeleton />;
+    content = (
+      <MatchDetailSkeleton
+        tabKey={tabKey}
+        headerLeftContent={headerLeftContent}
+      />
+    );
   } else {
     content = (
       <div className="min-h-full">
-        <DetailPageHeader title="Match Detail" tabKey={tabKey} />
+        <DetailPageHeader
+          title="Match Detail"
+          tabKey={tabKey}
+          leftContent={headerLeftContent}
+        />
         <TabPanelStatus
           message={error ?? "매치를 불러오지 못했습니다."}
           tone="error"

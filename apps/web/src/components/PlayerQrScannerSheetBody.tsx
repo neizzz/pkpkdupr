@@ -4,15 +4,21 @@ import { BrowserQRCodeReader, type IScannerControls } from "@zxing/browser";
 import BottomSheet from "./BottomSheet";
 import { getCameraErrorMessage } from "./CreateMatchDrawerBody.utils";
 
-interface ClubQrScannerSheetBodyProps {
+interface PlayerQrScannerSheetBodyProps {
   successMessage: string;
   onScanned: (payload: string) => Promise<void>;
   onClose: () => void;
 }
 
-type ClubQrScannerStatus = "scanning" | "verifying" | "success" | "error";
+type PlayerQrScannerStatus =
+  | "scanning"
+  | "verifying"
+  | "success"
+  | "error";
 
-const ClubQrScannerSheetBody: React.FC<ClubQrScannerSheetBodyProps> = ({
+const PlayerQrScannerSheetBody: React.FC<
+  PlayerQrScannerSheetBodyProps
+> = ({
   successMessage,
   onScanned,
   onClose,
@@ -21,7 +27,7 @@ const ClubQrScannerSheetBody: React.FC<ClubQrScannerSheetBodyProps> = ({
   const controlsRef = useRef<IScannerControls | null>(null);
   const handledRef = useRef(false);
   const [scannerStatus, setScannerStatus] =
-    useState<ClubQrScannerStatus>("scanning");
+    useState<PlayerQrScannerStatus>("scanning");
   const [scannerError, setScannerError] = useState<string | null>(null);
 
   const stopScanner = useCallback(() => {
@@ -212,4 +218,4 @@ const ClubQrScannerSheetBody: React.FC<ClubQrScannerSheetBodyProps> = ({
   );
 };
 
-export default ClubQrScannerSheetBody;
+export default PlayerQrScannerSheetBody;

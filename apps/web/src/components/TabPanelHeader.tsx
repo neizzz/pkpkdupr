@@ -125,7 +125,7 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
   return (
     <div
       ref={handleHeaderElementChange}
-      className="tab-panel-header-gradient-base sticky top-0 z-20 isolate"
+      className="tab-panel-header-container tab-panel-header-gradient-base sticky top-0 z-20 isolate"
     >
       <div className="relative z-10">
         <div className="flex min-h-12 items-center justify-between px-4">

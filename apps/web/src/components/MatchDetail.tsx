@@ -32,6 +32,7 @@ import { formatRating } from "@/utils/dupr";
 interface MatchDetailProps {
   match: MatchInfo;
   tabKey?: TabKey;
+  headerLeftContent?: React.ReactNode;
   currentPlayerId?: string;
   onSubmitResult?: (matchId: string, scores: MatchScore[]) => Promise<void>;
   onApproveResult?: (matchId: string) => Promise<void>;
@@ -112,13 +113,25 @@ const formatAutoApprovalRemaining = (remainingMs: number) => {
   return `${hours}시간 ${minutes}분 ${seconds}초`;
 };
 
-export const MatchDetailSkeleton: React.FC = () => (
+interface MatchDetailSkeletonProps {
+  tabKey?: TabKey;
+  headerLeftContent?: React.ReactNode;
+}
+
+export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
+  tabKey = "match",
+  headerLeftContent,
+}) => (
   <div
     className="min-h-full"
     role="status"
     aria-label="매치 상세 로딩 중"
   >
-    <DetailPageHeader title="Match Detail" tabKey="match" />
+    <DetailPageHeader
+      title="Match Detail"
+      tabKey={tabKey}
+      leftContent={headerLeftContent}
+    />
     <div className="p-2">
       <div className="mx-auto flex w-full flex-col gap-3">
         <Card className="rounded-3xl bg-white p-4">
@@ -272,6 +285,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 const MatchDetail: React.FC<MatchDetailProps> = ({
   match,
   tabKey = "match",
+  headerLeftContent,
   currentPlayerId,
   onSubmitResult,
   onApproveResult,
@@ -554,7 +568,11 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
   return (
     <div className="min-h-full">
-      <DetailPageHeader title="Match Detail" tabKey={tabKey} />
+      <DetailPageHeader
+        title="Match Detail"
+        tabKey={tabKey}
+        leftContent={headerLeftContent}
+      />
       <div className="p-2">
         <div className="mx-auto flex w-full flex-col gap-3">
           <Match

@@ -6,10 +6,11 @@ import React, {
   useState,
 } from "react";
 import { LiaUserFriendsSolid } from "react-icons/lia";
-import { IoChevronForward } from "react-icons/io5";
+import { IoAdd, IoChevronForward, IoPerson } from "react-icons/io5";
 import { TbAffiliate } from "react-icons/tb";
 import type { Club, ClubMembership } from "@pkpkdupr/shared/club";
 import Avatar from "@/components/Avatar";
+import BottomSheet from "@/components/BottomSheet";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import type {
   MatchInfo,
@@ -21,6 +22,7 @@ import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
 import ProfileIdentityLabel from "@/components/ProfileIdentityLabel";
+import PlayerQrScannerSheetBody from "@/components/PlayerQrScannerSheetBody";
 import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader, {
@@ -175,6 +177,7 @@ const Members: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isFriendQrScannerOpen, setIsFriendQrScannerOpen] = useState(false);
   const [isMyProfileRequested, setIsMyProfileRequested] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedMemberMatchStats, setSelectedMemberMatchStats] = useState(
@@ -250,7 +253,11 @@ const Members: React.FC = () => {
   }, [token]);
 
   const loadMembers = useCallback(
-    async (preserveVisibleData = false, throwOnError = false) => {
+    async (
+      preserveVisibleData = false,
+      throwOnError = false,
+      clubIdOverride: string | null = selectedClubId,
+    ) => {
       if (!token) {
         setMembers([]);
         setIsLoading(false);
@@ -266,12 +273,14 @@ const Members: React.FC = () => {
         }
 
         const searchParams = new URLSearchParams();
-        if (selectedClubId) {
-          searchParams.set("clubId", selectedClubId);
+        if (clubIdOverride) {
+          searchParams.set("clubId", clubIdOverride);
+        } else {
+          searchParams.set("scope", "friends");
         }
         const query = searchParams.toString();
-        const cacheKey = selectedClubId
-          ? `${CACHED_MEMBERS_KEY}:${selectedClubId}`
+        const cacheKey = clubIdOverride
+          ? `${CACHED_MEMBERS_KEY}:${clubIdOverride}`
           : CACHED_MEMBERS_KEY;
         const res = await fetch(buildApiUrl(`/api/players${query ? `?${query}` : ""}`), {
           headers: { Authorization: `Bearer ${token}` },
@@ -292,8 +301,8 @@ const Members: React.FC = () => {
         setNotice(null);
       } catch (err) {
         if (!isOnline) {
-          const cacheKey = selectedClubId
-            ? `${CACHED_MEMBERS_KEY}:${selectedClubId}`
+          const cacheKey = clubIdOverride
+            ? `${CACHED_MEMBERS_KEY}:${clubIdOverride}`
             : CACHED_MEMBERS_KEY;
           const cachedMembers = readCachedMembers(cacheKey);
           if (cachedMembers) {
@@ -515,6 +524,34 @@ const Members: React.FC = () => {
     window.requestAnimationFrame(() => scrollToTop("auto"));
   };
 
+  const addFriendByQr = useCallback(
+    async (payload: string) => {
+      if (!token) {
+        throw new Error("로그인이 필요합니다.");
+      }
+      if (!isOnline) {
+        throw new Error("인터넷에 연결된 후 다시 시도해 주세요.");
+      }
+
+      const res = await fetch(buildApiUrl("/api/friends/player-qr"), {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ payload }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "친구를 추가하지 못했어요.");
+      }
+
+      setSelectedMemberFilterId(FRIENDS_MEMBER_FILTER_ID);
+      await loadMembers(true, true, null);
+    },
+    [isOnline, loadMembers, token],
+  );
+
   const completeMyProfileClose = useCallback(() => {
     setIsMyProfileRequested(false);
     restoreScrollTop("members");
@@ -708,20 +745,35 @@ const Members: React.FC = () => {
             />
           }
         >
-          <button
-            type="button"
-            className="rounded-full text-pkpk-primary-font transition-opacity hover:opacity-80"
-            onClick={openMyProfile}
-          >
-            <ProfileIdentityLabel
-              avatarUrl={player?.avatarUrl}
-              name={player?.username}
-              label="내 프로필"
-              showChevron
-              chevronClassName="text-pkpk-primary-font/70"
-              className="pl-1 pr-0"
-            />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label="친구 추가"
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!isOnline}
+              onClick={() => setIsFriendQrScannerOpen(true)}
+            >
+              <span aria-hidden="true" className="flex items-center -space-x-1.5">
+                <IoAdd className="size-4" />
+                <IoPerson className="size-4" />
+              </span>
+              <span className="members-add-friend-label">친구 추가</span>
+            </button>
+            <button
+              type="button"
+              className="rounded-full text-pkpk-primary-font transition-opacity hover:opacity-80"
+              onClick={openMyProfile}
+            >
+              <ProfileIdentityLabel
+                avatarUrl={player?.avatarUrl}
+                name={player?.username}
+                label="내 프로필"
+                showChevron
+                chevronClassName="text-pkpk-primary-font/70"
+                className="pl-1 pr-0"
+              />
+            </button>
+          </div>
         </TabPanelHeader>
         <div className="tab-panel-header-content flex min-h-0 flex-1 flex-col bg-white">
           <TabPanelHeaderGradientExtension
@@ -742,14 +794,16 @@ const Members: React.FC = () => {
               <MemberListSkeleton />
             ) : error ? (
               <TabPanelStatus message={error} tone="error" />
-            ) : sortedMembers.length === 0 ? (
+            ) : sortedMembers.length === 0 ? selectedClubId ? (
               <TabPanelStatus
-                message={
-                  selectedClubId
-                    ? `현재 표시할 ${selectedMemberFilter.label} 소속 멤버가 없어요.`
-                    : "현재 표시할 친구가 없어요."
-                }
+                message={`현재 표시할 ${selectedMemberFilter.label} 소속 멤버가 없어요.`}
               />
+            ) : (
+              <div className="members-friends-empty-state flex items-center justify-center px-6 py-12 text-center">
+                <p className="text-sm font-medium text-pkpk-sub-font">
+                  현재 표시할 친구가 없어요.
+                </p>
+              </div>
             ) : (
               <div>
                 <div className="relative z-10 overflow-hidden rounded-3xl bg-white mx-1.5 mt-1 pt-1">
@@ -832,6 +886,18 @@ const Members: React.FC = () => {
           </div>
         </div>
       </div>
+      <BottomSheet
+        isOpen={isFriendQrScannerOpen}
+        isActive={selectedTab === "members"}
+        onOpenChange={setIsFriendQrScannerOpen}
+        ariaLabel="친구 QR 스캔"
+      >
+        <PlayerQrScannerSheetBody
+          successMessage="친구로 추가했어요."
+          onScanned={addFriendByQr}
+          onClose={() => setIsFriendQrScannerOpen(false)}
+        />
+      </BottomSheet>
       {isMyProfileRequested ? (
         <RightDrawer
           isOpen={isMyProfileDrawerOpen}
@@ -918,6 +984,8 @@ const Members: React.FC = () => {
           tabKey="members"
           match={selectedMemberProfileMatch}
           currentPlayerId={player?.id}
+          profileName={selectedMember?.username ?? selectedMember?.id}
+          profileAvatarUrl={selectedMember?.avatarUrl}
           onExited={completeMemberProfileMatchDetailClose}
           onScrollContainerChange={
             registerMemberProfileMatchDetailScrollContainer

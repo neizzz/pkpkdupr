@@ -2,7 +2,7 @@ import type { ManagedMatchSession, Match } from "./match";
 import type { Player, PlayerDuprCategory, PublicPlayerDupr } from "./player";
 
 export type ClubRole = "owner" | "manager" | "member";
-export type ClubMembershipStatus = "active" | "pending";
+export type ClubMembershipStatus = "active";
 
 export const CLUB_DESCRIPTION_MAX_LENGTH = 500;
 
@@ -48,13 +48,6 @@ export interface ClubAnnouncement {
   createdByPlayerId: string;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface ClubInvite {
-  clubId: string;
-  token: string;
-  createdAt: Date;
-  revokedAt?: Date;
 }
 
 export interface ClubRankingEntry {
@@ -103,20 +96,11 @@ export interface ClubDashboard {
   announcements: ClubAnnouncement[];
   rankings: ClubRankings;
   members: ClubMember[];
-  pendingRequests: ClubMembership[];
 }
 
 export interface ClubMatchList {
   matches: Match[];
   total: number;
-}
-
-export interface ClubInvitePayload {
-  token: string;
-}
-
-export interface ClubPlayerQrJoinRequest {
-  payload: string;
 }
 
 export type ClubMemberRating = Pick<Player, "id" | "username" | "avatarUrl"> & {

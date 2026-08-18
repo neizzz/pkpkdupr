@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import {
   CLUB_DESCRIPTION_MAX_LENGTH,
   getRecentCompletedMatches,
@@ -9,7 +8,6 @@ import type {
   Club,
   ClubAnnouncement,
   ClubDashboard,
-  ClubInvite,
   ClubMatchList,
   ClubMember,
   ClubMembership,
@@ -22,11 +20,9 @@ import {
   normalizeNullablePlayerDupr,
   type Player,
 } from "@pkpkdupr/shared/player";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   clubAnnouncements,
-  clubInvites,
-  clubJoinRequests,
   clubMemberships,
   clubs,
   players,
@@ -35,9 +31,7 @@ import { MatchRepository } from "./MatchRepository";
 
 type StoredClub = typeof clubs.$inferSelect;
 type StoredMembership = typeof clubMemberships.$inferSelect;
-type StoredJoinRequest = typeof clubJoinRequests.$inferSelect;
 type StoredAnnouncement = typeof clubAnnouncements.$inferSelect;
-type StoredInvite = typeof clubInvites.$inferSelect;
 type StoredPlayer = typeof players.$inferSelect;
 
 const toDate = (value: Date | string | number) => new Date(value);
@@ -61,14 +55,6 @@ const toActiveMembership = (record: StoredMembership): ClubMembership => ({
   joinedAt: toDate(record.joinedAt),
 });
 
-const toPendingMembership = (record: StoredJoinRequest): ClubMembership => ({
-  clubId: record.clubId,
-  playerId: record.playerId,
-  role: "member",
-  status: "pending",
-  requestedAt: toDate(record.requestedAt),
-});
-
 const toAnnouncement = (record: StoredAnnouncement): ClubAnnouncement => ({
   id: record.id,
   clubId: record.clubId,
@@ -77,13 +63,6 @@ const toAnnouncement = (record: StoredAnnouncement): ClubAnnouncement => ({
   createdByPlayerId: record.createdByPlayerId,
   createdAt: toDate(record.createdAt),
   updatedAt: toDate(record.updatedAt),
-});
-
-const toInvite = (record: StoredInvite): ClubInvite => ({
-  clubId: record.clubId,
-  token: record.token,
-  createdAt: toDate(record.createdAt),
-  revokedAt: record.revokedAt ? toDate(record.revokedAt) : undefined,
 });
 
 const toClubMember = (
@@ -141,35 +120,15 @@ export class ClubRepository {
   async findMyClubs(playerId: string): Promise<
     Array<{ club: Club; membership: ClubMembership }>
   > {
-    const [activeRecords, pendingRecords] = await Promise.all([
-      this.db
-        .select()
-        .from(clubMemberships)
-        .where(eq(clubMemberships.playerId, playerId))
-        .all(),
-      this.db
-        .select()
-        .from(clubJoinRequests)
-        .where(eq(clubJoinRequests.playerId, playerId))
-        .all(),
-    ]);
-    const records = [
-      ...activeRecords.map((record: StoredMembership) => ({
-        clubId: record.clubId,
-        membership: toActiveMembership(record),
-      })),
-      ...pendingRecords.map((record: StoredJoinRequest) => ({
-        clubId: record.clubId,
-        membership: toPendingMembership(record),
-      })),
-    ];
-    const seenClubIds = new Set<string>();
+    const records = (await this.db
+      .select()
+      .from(clubMemberships)
+      .where(eq(clubMemberships.playerId, playerId))
+      .all()) as StoredMembership[];
     const result: Array<{ club: Club; membership: ClubMembership }> = [];
     for (const record of records) {
-      if (seenClubIds.has(record.clubId)) continue;
-      seenClubIds.add(record.clubId);
       const club = await this.findById(record.clubId);
-      if (club) result.push({ club, membership: record.membership });
+      if (club) result.push({ club, membership: toActiveMembership(record) });
     }
     return result.sort(
       (left, right) =>
@@ -236,89 +195,17 @@ export class ClubRepository {
     return club;
   }
 
-  async createJoinRequestByInvite(
-    token: string,
-    playerId: string,
-  ): Promise<ClubMembership> {
-    const invite = await this.db
-      .select()
-      .from(clubInvites)
-      .where(and(eq(clubInvites.token, token), isNull(clubInvites.revokedAt)))
-      .get();
-    if (!invite) throw new Error("유효하지 않거나 만료된 클럽 QR입니다.");
-
-    const active = await this.findMembership(invite.clubId, playerId);
-    if (active) throw new Error("이미 이 클럽의 멤버입니다.");
-
-    const existing = await this.db
-      .select()
-      .from(clubJoinRequests)
-      .where(
-        and(
-          eq(clubJoinRequests.clubId, invite.clubId),
-          eq(clubJoinRequests.playerId, playerId),
-        ),
-      )
-      .get();
-    if (existing) return toPendingMembership(existing);
-
-    const now = new Date();
-    await this.db.insert(clubJoinRequests).values({
-      id: `${invite.clubId}-${playerId}`,
-      clubId: invite.clubId,
-      playerId,
-      requestedAt: now,
-    });
-    return {
-      clubId: invite.clubId,
-      playerId,
-      role: "member",
-      status: "pending",
-      requestedAt: now,
-    };
-  }
-
-  async approveJoinRequest(
-    clubId: string,
-    playerId: string,
-  ): Promise<ClubMembership> {
-    const request = await this.db
-      .select()
-      .from(clubJoinRequests)
-      .where(
-        and(
-          eq(clubJoinRequests.clubId, clubId),
-          eq(clubJoinRequests.playerId, playerId),
-        ),
-      )
-      .get();
-    if (!request) throw new Error("가입 요청을 찾을 수 없습니다.");
-    return await this.upsertActiveMember(clubId, playerId, "member", true);
-  }
-
-  async rejectJoinRequest(clubId: string, playerId: string): Promise<void> {
-    await this.db
-      .delete(clubJoinRequests)
-      .where(
-        and(
-          eq(clubJoinRequests.clubId, clubId),
-          eq(clubJoinRequests.playerId, playerId),
-        ),
-      );
-  }
-
   async addMemberByPlayerQr(
     clubId: string,
     playerId: string,
   ): Promise<ClubMembership> {
-    return await this.upsertActiveMember(clubId, playerId, "member", true);
+    return await this.upsertActiveMember(clubId, playerId, "member");
   }
 
   private async upsertActiveMember(
     clubId: string,
     playerId: string,
     role: ClubRole,
-    deleteJoinRequest: boolean,
   ): Promise<ClubMembership> {
     const existing = await this.findMembership(clubId, playerId);
     if (existing) return existing;
@@ -327,12 +214,6 @@ export class ClubRepository {
     const transaction = await this.client.transaction("write");
     let committed = false;
     try {
-      if (deleteJoinRequest) {
-        await transaction.execute({
-          sql: "DELETE FROM club_join_requests WHERE club_id = ? AND player_id = ?",
-          args: [clubId, playerId],
-        });
-      }
       await transaction.execute({
         sql: `INSERT INTO club_memberships
                 (id, club_id, player_id, role, joined_at, created_at, updated_at)
@@ -410,34 +291,6 @@ export class ClubRepository {
     }
   }
 
-  async getOrCreateInvite(clubId: string): Promise<ClubInvite> {
-    const existing = await this.db
-      .select()
-      .from(clubInvites)
-      .where(and(eq(clubInvites.clubId, clubId), isNull(clubInvites.revokedAt)))
-      .orderBy(desc(clubInvites.createdAt))
-      .get();
-    if (existing) return toInvite(existing);
-    return await this.rotateInvite(clubId);
-  }
-
-  async rotateInvite(clubId: string): Promise<ClubInvite> {
-    const now = new Date();
-    await this.db
-      .update(clubInvites)
-      .set({ revokedAt: now })
-      .where(and(eq(clubInvites.clubId, clubId), isNull(clubInvites.revokedAt)));
-    const record = {
-      id: randomUUID(),
-      clubId,
-      token: randomUUID().split("-").join(""),
-      createdAt: now,
-      revokedAt: null,
-    };
-    await this.db.insert(clubInvites).values(record);
-    return toInvite(record as StoredInvite);
-  }
-
   async listMembers(clubId: string): Promise<ClubMember[]> {
     const memberships = await this.db
       .select()
@@ -459,35 +312,6 @@ export class ClubRepository {
       (left, right) =>
         clubRoleOrder[left.role] - clubRoleOrder[right.role] ||
         left.username.localeCompare(right.username, "ko"),
-    );
-  }
-
-  async listPendingRequests(clubId: string): Promise<ClubMembership[]> {
-    const records = await this.db
-      .select()
-      .from(clubJoinRequests)
-      .where(eq(clubJoinRequests.clubId, clubId))
-      .orderBy(desc(clubJoinRequests.requestedAt))
-      .all();
-    return await Promise.all(
-      records.map(async (record: StoredJoinRequest) => {
-        const pending = toPendingMembership(record);
-        const player = await this.db
-          .select()
-          .from(players)
-          .where(eq(players.id, record.playerId))
-          .get();
-        return player
-          ? {
-              ...pending,
-              player: {
-                id: player.id,
-                username: player.username,
-                avatarUrl: player.avatarUrl ?? undefined,
-              },
-            }
-          : pending;
-      }),
     );
   }
 
@@ -623,11 +447,6 @@ export class ClubRepository {
         (left, right) => left.matchStartsAt.getTime() - right.matchStartsAt.getTime(),
       );
     const recentCompletedMatches = getRecentCompletedMatches(clubMatches);
-    const pendingRequests =
-      membership.role === "owner" || membership.role === "manager"
-        ? await this.listPendingRequests(clubId)
-        : [];
-
     return {
       club,
       membership,
@@ -637,7 +456,6 @@ export class ClubRepository {
       announcements,
       rankings: await this.getRankings(members),
       members,
-      pendingRequests,
     };
   }
 

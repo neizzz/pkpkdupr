@@ -394,3 +394,19 @@
   position: relative;
   z-index: 10;
 }
+
+.tab-panel-header-container {
+  container-type: inline-size;
+}
+
+.members-friends-empty-state {
+  min-height: calc(
+    100dvh - 13rem - var(--safe-bottom) - var(--app-keyboard-offset)
+  );
+}
+
+@container (max-width: 24.9375rem) {
+  .members-add-friend-label {
+    display: none;
+  }
+}

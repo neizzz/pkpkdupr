@@ -2,7 +2,6 @@ import type {
   Club,
   ClubAnnouncement,
   ClubDashboard,
-  ClubInvite,
   ClubMatchList,
   ClubMember,
   ClubMembership,
@@ -52,13 +51,6 @@ const hydrateAnnouncement = (record: any): ClubAnnouncement => ({
   updatedAt: toDate(record.updatedAt),
 });
 
-const hydrateInvite = (record: any): ClubInvite => ({
-  clubId: record.clubId,
-  token: record.token,
-  createdAt: toDate(record.createdAt),
-  revokedAt: record.revokedAt ? toDate(record.revokedAt) : undefined,
-});
-
 const hydrateMember = (record: any): ClubMember => ({
   id: record.id,
   username: record.username,
@@ -80,7 +72,6 @@ const hydrateDashboard = (record: any): ClubDashboard => ({
     doubles: record.rankings?.doubles ?? [],
   },
   members: (record.members ?? []).map(hydrateMember),
-  pendingRequests: (record.pendingRequests ?? []).map(hydrateMembership),
 });
 
 export class ClubRepository {
@@ -189,31 +180,6 @@ export class ClubRepository {
     };
   }
 
-  async requestJoinByInvite(token: string, playerId: string) {
-    return hydrateMembership(
-      await this.dbRequest<any>("/internal/clubs/invite-join-requests", {
-        method: "POST",
-        body: JSON.stringify({ token, playerId }),
-      }),
-    );
-  }
-
-  async approveJoinRequest(clubId: string, playerId: string) {
-    return hydrateMembership(
-      await this.dbRequest<any>(
-        `/internal/clubs/${encodeURIComponent(clubId)}/join-requests/${encodeURIComponent(playerId)}/approve`,
-        { method: "POST" },
-      ),
-    );
-  }
-
-  async rejectJoinRequest(clubId: string, playerId: string) {
-    await this.dbRequest<void>(
-      `/internal/clubs/${encodeURIComponent(clubId)}/join-requests/${encodeURIComponent(playerId)}`,
-      { method: "DELETE" },
-    );
-  }
-
   async addMemberByPlayerQr(clubId: string, playerId: string) {
     return hydrateMembership(
       await this.dbRequest<any>(
@@ -240,23 +206,6 @@ export class ClubRepository {
     await this.dbRequest<void>(
       `/internal/clubs/${encodeURIComponent(clubId)}/ownership-transfer`,
       { method: "POST", body: JSON.stringify({ playerId }) },
-    );
-  }
-
-  async getInvite(clubId: string) {
-    return hydrateInvite(
-      await this.dbRequest<any>(
-        `/internal/clubs/${encodeURIComponent(clubId)}/invite`,
-      ),
-    );
-  }
-
-  async rotateInvite(clubId: string) {
-    return hydrateInvite(
-      await this.dbRequest<any>(
-        `/internal/clubs/${encodeURIComponent(clubId)}/invite/rotate`,
-        { method: "POST" },
-      ),
     );
   }
 

@@ -62,7 +62,6 @@ const dashboard: ClubDashboard = {
   announcements: [],
   rankings: { singles: [], doubles: [] },
   members: [],
-  pendingRequests: [],
 };
 
 describe("club API", () => {
@@ -126,12 +125,12 @@ describe("club API", () => {
     expect(createClub).not.toHaveBeenCalled();
   });
 
-  it("운영진이 플레이어 QR을 스캔하면 즉시 멤버로 추가한다", async () => {
+  it("클럽 멤버가 플레이어 QR을 스캔하면 즉시 멤버로 추가한다", async () => {
     vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
-      buildSession(manager),
+      buildSession(member),
     );
     vi.spyOn(ClubRepository.prototype, "findMembership").mockResolvedValue(
-      buildMembership(manager.id, "manager"),
+      buildMembership(member.id, "member"),
     );
     vi.spyOn(AuthService.prototype, "verifyPlayerQrToken").mockResolvedValue({
       player: scanned,
@@ -147,46 +146,6 @@ describe("club API", () => {
 
     expect(response.status).toBe(201);
     expect(addMember).toHaveBeenCalledWith(clubId, scanned.id);
-  });
-
-  it("멤버가 클럽 QR을 스캔하면 가입 요청을 생성한다", async () => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
-      buildSession(member),
-    );
-    const requestJoin = vi
-      .spyOn(ClubRepository.prototype, "requestJoinByInvite")
-      .mockResolvedValue({
-        clubId,
-        playerId: member.id,
-        role: "member",
-        status: "pending",
-        requestedAt: now,
-      });
-
-    const response = await request(app)
-      .post("/api/club-invites/join-requests")
-      .set("Authorization", "Bearer test-token")
-      .send({ payload: "club-invite-token" });
-
-    expect(response.status).toBe(201);
-    expect(requestJoin).toHaveBeenCalledWith("club-invite-token", member.id);
-  });
-
-  it("일반 멤버는 가입 요청을 승인할 수 없다", async () => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
-      buildSession(member),
-    );
-    vi.spyOn(ClubRepository.prototype, "findMembership").mockResolvedValue(
-      buildMembership(member.id, "member"),
-    );
-    const approve = vi.spyOn(ClubRepository.prototype, "approveJoinRequest");
-
-    const response = await request(app)
-      .post(`/api/clubs/${clubId}/join-requests/${scanned.id}/approve`)
-      .set("Authorization", "Bearer test-token");
-
-    expect(response.status).toBe(403);
-    expect(approve).not.toHaveBeenCalled();
   });
 
   it("운영진은 다른 멤버의 운영진 권한을 위임할 수 없다", async () => {

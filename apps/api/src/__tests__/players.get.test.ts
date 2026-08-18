@@ -4,6 +4,7 @@ import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { ClubRepository } from "../repositories/ClubRepository";
+import { FriendRepository } from "../repositories/FriendRepository";
 import { MatchRepository } from "../repositories/MatchRepository";
 import {
   AuthService,
@@ -111,6 +112,33 @@ describe("GET /api/players", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual([
       expect.objectContaining({ id: player.id, lastPlayedAt: null }),
+    ]);
+  });
+
+  it("친구 범위에서는 현재 사용자의 친구만 반환한다", async () => {
+    vi.spyOn(AuthService.prototype, "getPublicPlayers").mockResolvedValue([
+      player,
+      playerWithoutCompletedMatch,
+    ]);
+    vi.spyOn(
+      MatchRepository.prototype,
+      "getLastPlayedAtByPlayerId",
+    ).mockResolvedValue({});
+    const listFriendPlayerIds = vi
+      .spyOn(FriendRepository.prototype, "listFriendPlayerIds")
+      .mockResolvedValue([playerWithoutCompletedMatch.id]);
+
+    const response = await request(app)
+      .get("/api/players?scope=friends")
+      .set("Authorization", "Bearer test-token");
+
+    expect(response.status).toBe(200);
+    expect(listFriendPlayerIds).toHaveBeenCalledWith(player.id);
+    expect(response.body).toEqual([
+      expect.objectContaining({
+        id: playerWithoutCompletedMatch.id,
+        lastPlayedAt: null,
+      }),
     ]);
   });
 

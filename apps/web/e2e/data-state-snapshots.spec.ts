@@ -261,18 +261,6 @@ const clubDashboard = (empty = false) => ({
     role: index === 0 ? "owner" : index === 1 ? "manager" : "member",
     joinedAt: "2026-01-01T00:00:00.000Z",
   })),
-  pendingRequests: empty
-    ? []
-    : [
-        {
-          clubId: club.id,
-          playerId: seojoon.id,
-          role: "member",
-          status: "pending",
-          requestedAt: "2026-08-12T00:00:00.000Z",
-          player: { id: seojoon.id, username: seojoon.username, avatarUrl: seojoon.avatarUrl },
-        },
-      ],
 });
 
 const fulfillJson = (route: Route, body: unknown, status = 200) =>
@@ -470,13 +458,34 @@ test("매치 생성 바텀시트와 내 QR modal", async ({ page }) => {
 
 test("플레이어 목록의 with-data와 empty 상태", async ({ page }) => {
   await openApp(page);
+  const addFriendButton = page.getByRole("button", { name: "친구 추가" });
+  await expect(addFriendButton).toBeVisible();
+  await expect(addFriendButton.getByText("친구 추가", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "박지우 프로필 보기" })).toBeVisible();
   await capture(page, "members--with-data.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openApp(page, { memberEmpty: true });
-  await expect(page.getByText("현재 표시할 친구가 없어요.")).toBeVisible();
+  const emptyFriendsMessage = page.getByText("현재 표시할 친구가 없어요.");
+  await expect(emptyFriendsMessage).toBeVisible();
+  const emptyFriendsMessageBox = await emptyFriendsMessage.boundingBox();
+  expect(emptyFriendsMessageBox).not.toBeNull();
+  expect(
+    (emptyFriendsMessageBox?.y ?? 0) +
+      (emptyFriendsMessageBox?.height ?? 0) / 2,
+  ).toBeGreaterThan(400);
   await capture(page, "members--empty.png");
+});
+
+test("좁은 플레이어 헤더에서는 친구 추가 문구를 숨긴다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openApp(page);
+
+  const addFriendButton = page.getByRole("button", { name: "친구 추가" });
+  await expect(addFriendButton).toBeVisible();
+  await expect(
+    addFriendButton.getByText("친구 추가", { exact: true }),
+  ).toBeHidden();
 });
 
 test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", async ({ page }) => {
@@ -516,6 +525,36 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
     .poll(() => emptyProfileMatchHistoryDrawer.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
   await capture(page, "profile-match-history--empty.png");
+});
+
+test("프로필 매치 상세 헤더의 프로필 식별 표시", async ({ page }) => {
+  await openMemberProfile(page);
+  const memberProfile = page.getByRole("dialog", { name: "멤버 프로필" });
+  await memberProfile
+    .getByRole("button", { name: /매치 상세 보기$/ })
+    .first()
+    .click();
+  const memberMatchDetail = page.getByRole("dialog", { name: "매치 상세" });
+  await expect(memberMatchDetail).toBeVisible();
+  await expect(
+    memberMatchDetail.locator(".sticky").getByText("박지우", { exact: true }),
+  ).toBeVisible();
+  await expect(memberMatchDetail.getByText("스코어", { exact: true })).toBeVisible();
+  await capture(page, "profile-match-detail--member.png");
+
+  await openMyProfile(page);
+  const myProfile = page.getByRole("dialog", { name: "내 프로필" });
+  await myProfile
+    .getByRole("button", { name: /매치 상세 보기$/ })
+    .first()
+    .click();
+  const myMatchDetail = page.getByRole("dialog", { name: "매치 상세" });
+  await expect(myMatchDetail).toBeVisible();
+  await expect(
+    myMatchDetail.locator(".sticky").getByText("김하늘", { exact: true }),
+  ).toBeVisible();
+  await expect(myMatchDetail.getByText("스코어", { exact: true })).toBeVisible();
+  await capture(page, "profile-match-detail--my.png");
 });
 
 test("내 프로필과 데이터 독립 바텀시트", async ({ page }) => {
@@ -615,7 +654,9 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openApp(page, { clubEmpty: true });
   await page.getByRole("tab", { name: "클럽" }).click();
-  await expect(page.getByText("클럽을 만들거나 주변 클럽에 가입해보세요.")).toBeVisible();
+  await expect(
+    page.getByText("클럽을 만들거나 클럽 구성원에게 초대받아보세요."),
+  ).toBeVisible();
   await capture(page, "affiliations--empty.png");
   await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
   await expect(page.getByRole("dialog", { name: "클럽 만들기" })).toBeVisible();
@@ -644,14 +685,14 @@ test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async
   await clubManagementButton.click({ position: { x: 20, y: 20 } });
   await expect(clubManagementDrawer).toBeVisible();
   await expect(clubManagementDrawerElement).toHaveCount(1);
-  await expect(clubManagementDrawer.getByText("클럽 QR")).toBeVisible();
+  await expect(clubManagementDrawer.getByText("공지 작성")).toBeVisible();
 });
 
 test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) => {
   await openApp(page, { historyEmpty: true, profileEmpty: true });
   await page.getByRole("tab", { name: "클럽" }).click();
   await page.getByRole("button", { name: "운영진 관리" }).click();
-  await expect(page.getByText("대기 중인 가입 요청이 없어요.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "멤버 초대" })).toBeVisible();
   await capture(page, "club-management--empty.png");
 
   await page.getByRole("button", { name: "닫기" }).click();

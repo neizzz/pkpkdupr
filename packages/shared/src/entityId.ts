@@ -4,6 +4,7 @@ export const entityIdPrefixes = {
   player: "P",
   club: "C",
   clubAnnouncement: "A",
+  friendship: "F",
 } as const;
 
 export type EntityIdKind = keyof typeof entityIdPrefixes;

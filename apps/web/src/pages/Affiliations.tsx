@@ -6,7 +6,6 @@ import {
   truncateToUnicodeCodePoints,
   type Club,
   ClubDashboard,
-  ClubInvite,
   ClubMembership,
   ClubRankingEntry,
 } from "@pkpkdupr/shared/club";
@@ -24,14 +23,10 @@ import {
   IoPeople,
   IoPerson,
   IoPersonAddOutline,
-  IoQrCodeOutline,
-  IoRefreshOutline,
-  IoScanOutline,
   IoShieldCheckmarkOutline,
 } from "react-icons/io5";
-import QrCode from "react-qr-code";
 import BottomSheet from "@/components/BottomSheet";
-import ClubQrScannerSheetBody from "@/components/ClubQrScannerSheetBody";
+import PlayerQrScannerSheetBody from "@/components/PlayerQrScannerSheetBody";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import MatchCard, {
@@ -51,7 +46,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
 
 type ClubListItem = { club: Club; membership: ClubMembership };
-type ScannerTarget = "invite" | "player" | null;
+type ScannerTarget = "player" | null;
 type RankingCategory = "singles" | "doubles";
 
 const noop = () => {};
@@ -120,7 +115,6 @@ const Affiliations: React.FC = () => {
   const [rankingCategory, setRankingCategory] =
     useState<RankingCategory>("doubles");
   const [managementError, setManagementError] = useState<string | null>(null);
-  const [invite, setInvite] = useState<ClubInvite | null>(null);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
   const [sessionName, setSessionName] = useState("");
@@ -248,10 +242,6 @@ const Affiliations: React.FC = () => {
     () => clubs.filter((item) => item.membership.status === "active"),
     [clubs],
   );
-  const pendingClubs = useMemo(
-    () => clubs.filter((item) => item.membership.status === "pending"),
-    [clubs],
-  );
   const isManager =
     dashboard?.membership.role === "owner" ||
     dashboard?.membership.role === "manager";
@@ -283,17 +273,6 @@ const Affiliations: React.FC = () => {
     }
   };
 
-  const handleInviteScan = useCallback(
-    async (payload: string) => {
-      await request("/api/club-invites/join-requests", {
-        method: "POST",
-        body: JSON.stringify({ payload }),
-      });
-      await loadClubs();
-    },
-    [loadClubs, request],
-  );
-
   const handlePlayerScan = useCallback(
     async (payload: string) => {
       if (!selectedClubId) throw new Error("클럽을 선택해주세요.");
@@ -305,27 +284,6 @@ const Affiliations: React.FC = () => {
     },
     [loadDashboard, request, selectedClubId],
   );
-
-  const loadInvite = useCallback(async () => {
-    if (!selectedClubId || !isManager) return;
-    try {
-      setInvite(
-        await request<ClubInvite>(
-          `/api/clubs/${encodeURIComponent(selectedClubId)}/invite`,
-        ),
-      );
-    } catch (inviteError) {
-      setManagementError(
-        inviteError instanceof Error
-          ? inviteError.message
-          : "클럽 QR을 불러오지 못했어요.",
-      );
-    }
-  }, [isManager, request, selectedClubId]);
-
-  useEffect(() => {
-    if (isManagementOpen) void loadInvite();
-  }, [isManagementOpen, loadInvite]);
 
   const reloadManagement = async () => {
     setManagementError(null);
@@ -748,25 +706,7 @@ const Affiliations: React.FC = () => {
         ) : error && !activeClubs.length ? (
           <TabPanelStatus tone="error" message={error} />
         ) : !activeClubs.length ? (
-          <TabPanelEmptyState message="클럽을 만들거나 주변 클럽에 가입해보세요.">
-            <Button
-              variant="secondary"
-              className="mt-2 rounded-full px-4 font-semibold text-pkpk-primary-bg"
-              isDisabled={!isOnline}
-              onPress={() => setScannerTarget("invite")}
-            >
-              <IoScanOutline className="mr-1 size-4" />
-              클럽 QR 스캔
-            </Button>
-            {pendingClubs.length ? (
-              <div className="mt-3 w-full max-w-sm rounded-2xl border border-pkpk-primary-bg/15 bg-white px-4 py-3 text-left">
-                <p className="text-sm font-bold text-pkpk-main-font">가입 요청 대기</p>
-                <p className="mt-1 text-sm text-pkpk-sub-font">
-                  {pendingClubs.map((item) => item.club.name).join(", ")}
-                </p>
-              </div>
-            ) : null}
-          </TabPanelEmptyState>
+          <TabPanelEmptyState message="클럽을 만들거나 클럽 구성원에게 초대받아보세요." />
         ) : (
           <div className="relative z-30 mx-auto w-full min-h-full shrink-0">
             <div className="relative z-10">
@@ -869,6 +809,24 @@ const Affiliations: React.FC = () => {
                       {renderRankings(dashboard.rankings[rankingCategory])}
                     </section>
 
+                    <button
+                      type="button"
+                      disabled={!isOnline}
+                      onClick={() => setScannerTarget("player")}
+                      className="flex w-full items-center gap-3 border-b-[6px] border-pkpk-section-border bg-white px-4 py-4 text-left transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-pkpk-primary-bg shadow-sm">
+                        <IoPersonAddOutline className="size-6" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-bold text-pkpk-main-font">멤버 초대</span>
+                        <span className="mt-0.5 block text-xs text-pkpk-sub-font">
+                          초대할 사람의 QR을 스캔하면 바로 멤버로 추가돼요.
+                        </span>
+                      </span>
+                      <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
+                    </button>
+
                     {isManager ? (
                       <button
                         type="button"
@@ -881,7 +839,7 @@ const Affiliations: React.FC = () => {
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-bold text-pkpk-main-font">운영진 관리</span>
                           <span className="mt-0.5 block text-xs text-pkpk-sub-font">
-                            가입 요청, 공지, 세션, 멤버 권한을 관리해요.
+                            공지, 세션, 멤버 권한을 관리해요.
                           </span>
                         </span>
                         <IoChevronForward className="size-5 shrink-0 text-pkpk-sub-font" />
@@ -957,19 +915,13 @@ const Affiliations: React.FC = () => {
         isOpen={scannerTarget !== null}
         isActive={selectedTab === "affiliations"}
         onOpenChange={(open) => !open && setScannerTarget(null)}
-        ariaLabel="클럽 QR 스캔"
+        ariaLabel="멤버 QR 스캔"
       >
         {scannerTarget ? (
-          <ClubQrScannerSheetBody
+          <PlayerQrScannerSheetBody
             key={scannerTarget}
-            successMessage={
-              scannerTarget === "invite"
-                ? "클럽 가입 요청을 보냈어요."
-                : "클럽 멤버로 추가했어요."
-            }
-            onScanned={
-              scannerTarget === "invite" ? handleInviteScan : handlePlayerScan
-            }
+            successMessage="클럽 멤버로 추가했어요."
+            onScanned={handlePlayerScan}
             onClose={() => setScannerTarget(null)}
           />
         ) : (
@@ -984,7 +936,7 @@ const Affiliations: React.FC = () => {
         layer={40}
         onExited={() => setManagementError(null)}
         onPullToRefresh={async () => {
-          await Promise.all([loadDashboard(), loadInvite()]);
+          await loadDashboard();
         }}
       >
         <div className="min-h-full p-3">
@@ -1010,97 +962,6 @@ const Affiliations: React.FC = () => {
 
           {dashboard ? (
             <div className="space-y-5">
-              <section className="space-y-3">
-                <SectionTitle icon={<IoQrCodeOutline className="size-5" />} title="클럽 QR" />
-                <div className="rounded-2xl border border-border bg-white p-4">
-                  {invite ? (
-                    <div className="flex flex-col items-center gap-3 text-center">
-                      <div className="rounded-2xl border border-border p-3">
-                        <QrCode value={invite.token} size={148} />
-                      </div>
-                      <p className="text-xs leading-5 text-pkpk-sub-font">
-                        멤버가 이 QR을 스캔하면 가입 요청이 생성됩니다.
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="py-8 text-center text-sm text-pkpk-sub-font">QR을 불러오는 중이에요.</p>
-                  )}
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <Button
-                      variant="secondary"
-                      className="rounded-xl font-semibold"
-                      onPress={() => setScannerTarget("player")}
-                    >
-                      <IoScanOutline className="mr-1 size-4" />
-                      멤버 QR 스캔
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      className="rounded-xl font-semibold text-pkpk-primary-bg"
-                      onPress={() =>
-                        void runManagementAction(async () => {
-                          if (!selectedClubId) return;
-                          setInvite(
-                            await request<ClubInvite>(
-                              `/api/clubs/${encodeURIComponent(selectedClubId)}/invite/rotate`,
-                              { method: "POST" },
-                            ),
-                          );
-                        })
-                      }
-                    >
-                      <IoRefreshOutline className="mr-1 size-4" />
-                      QR 재발급
-                    </Button>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <SectionTitle icon={<IoPersonAddOutline className="size-5" />} title="가입 요청" />
-                {dashboard.pendingRequests.length ? (
-                  <div className="space-y-2">
-                    {dashboard.pendingRequests.map((pending) => (
-                      <div key={pending.playerId} className="rounded-2xl border border-border bg-white p-3">
-                        <p className="truncate text-sm font-bold text-pkpk-main-font">{pending.player?.username ?? pending.playerId}</p>
-                        <p className="mt-0.5 text-xs text-pkpk-sub-font">가입 요청 대기 중</p>
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                          <Button
-                            className="rounded-xl bg-pkpk-primary-bg font-semibold text-white"
-                            onPress={() =>
-                              void runManagementAction(() =>
-                                request(
-                                  `/api/clubs/${encodeURIComponent(dashboard.club.id)}/join-requests/${encodeURIComponent(pending.playerId)}/approve`,
-                                  { method: "POST" },
-                                ),
-                              )
-                            }
-                          >
-                            승인
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            className="rounded-xl font-semibold text-pkpk-sub-font"
-                            onPress={() =>
-                              void runManagementAction(() =>
-                                request(
-                                  `/api/clubs/${encodeURIComponent(dashboard.club.id)}/join-requests/${encodeURIComponent(pending.playerId)}`,
-                                  { method: "DELETE" },
-                                ),
-                              )
-                            }
-                          >
-                            거절
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">대기 중인 가입 요청이 없어요.</p>
-                )}
-              </section>
-
               <section className="space-y-3">
                 <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지 작성" />
                 <div className="space-y-2 rounded-2xl border border-border bg-white p-3">

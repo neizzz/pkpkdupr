@@ -164,14 +164,6 @@ const migrations: Migration[] = [
         UNIQUE KEY club_memberships_club_player_unique (club_id, player_id),
         INDEX club_memberships_player_id_idx (player_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE club_join_requests (
-        id VARCHAR(255) PRIMARY KEY,
-        club_id VARCHAR(255) NOT NULL,
-        player_id VARCHAR(255) NOT NULL,
-        requested_at BIGINT NOT NULL,
-        UNIQUE KEY club_join_requests_club_player_unique (club_id, player_id),
-        INDEX club_join_requests_club_id_idx (club_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
       `CREATE TABLE club_announcements (
         id VARCHAR(255) PRIMARY KEY,
         club_id VARCHAR(255) NOT NULL,
@@ -181,15 +173,6 @@ const migrations: Migration[] = [
         created_at BIGINT NOT NULL,
         updated_at BIGINT NOT NULL,
         INDEX club_announcements_club_created_at_idx (club_id, created_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-      `CREATE TABLE club_invites (
-        id VARCHAR(255) PRIMARY KEY,
-        club_id VARCHAR(255) NOT NULL,
-        token VARCHAR(128) NOT NULL,
-        created_at BIGINT NOT NULL,
-        revoked_at BIGINT NULL,
-        UNIQUE KEY club_invites_token_unique (token),
-        INDEX club_invites_club_id_idx (club_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
@@ -268,6 +251,27 @@ const migrations: Migration[] = [
     },
     statements: [
       "ALTER TABLE players MODIFY COLUMN status_message VARCHAR(20) NULL",
+    ],
+  },
+  {
+    id: "0007_remove_club_invite_join_requests",
+    statements: [
+      "DROP TABLE IF EXISTS club_join_requests",
+      "DROP TABLE IF EXISTS club_invites",
+    ],
+  },
+  {
+    id: "0008_player_friendships",
+    statements: [
+      `CREATE TABLE player_friendships (
+        id VARCHAR(255) PRIMARY KEY,
+        player_one_id VARCHAR(255) NOT NULL,
+        player_two_id VARCHAR(255) NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY player_friendships_player_pair_unique (player_one_id, player_two_id),
+        INDEX player_friendships_player_one_id_idx (player_one_id),
+        INDEX player_friendships_player_two_id_idx (player_two_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
 ];

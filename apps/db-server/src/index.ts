@@ -36,6 +36,7 @@ import {
   type UpdateMatchMetadataInput,
 } from "./repositories/MatchRepository";
 import { ClubRepository } from "./repositories/ClubRepository";
+import { FriendRepository } from "./repositories/FriendRepository";
 import { AuthRepository } from "./repositories/AuthRepository";
 import {
   getDevMockUsernames,
@@ -57,6 +58,7 @@ const officialDuprAdjustmentLogRepository =
   new OfficialDuprAdjustmentLogRepository(db);
 const matchRepository = new MatchRepository(db, client);
 const clubRepository = new ClubRepository(db, client, matchRepository);
+const friendRepository = new FriendRepository(db);
 const authRepository = new AuthRepository(client);
 const testDataRepository = new TestDataRepository(
   db,
@@ -67,6 +69,27 @@ const testDataRepository = new TestDataRepository(
 );
 
 app.use(express.json());
+
+app.post("/internal/friends", async (req, res) => {
+  try {
+    res.status(201).json(
+      await friendRepository.addFriendship(
+        req.body.playerId,
+        req.body.friendPlayerId,
+      ),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/friends/:playerId", async (req, res) => {
+  try {
+    res.json(await friendRepository.listFriendPlayerIds(req.params.playerId));
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
 const initSchema = async () => {
   await runMigrations();
@@ -162,11 +185,10 @@ const seedDevClubData = async () => {
     }
   }
 
-  const weekendClub = devClubs[1];
-  const invite = await clubRepository.getOrCreateInvite(weekendClub.id);
-  await clubRepository.createJoinRequestByInvite(invite.token, "Pdev0004").catch(
-    () => undefined,
-  );
+  await friendRepository
+    .addFriendship("Pdev0001", "Pdev0002")
+    .catch(() => undefined);
+
 };
 
 app.get("/health", (_req, res) => {
@@ -442,47 +464,6 @@ app.get("/internal/clubs/:clubId/matches", async (req, res) => {
   }
 });
 
-app.post("/internal/clubs/invite-join-requests", async (req, res) => {
-  try {
-    res.status(201).json(
-      await clubRepository.createJoinRequestByInvite(
-        req.body.token,
-        req.body.playerId,
-      ),
-    );
-  } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
-  }
-});
-
-app.post(
-  "/internal/clubs/:clubId/join-requests/:playerId/approve",
-  async (req, res) => {
-    try {
-      res.json(
-        await clubRepository.approveJoinRequest(
-          req.params.clubId,
-          req.params.playerId,
-        ),
-      );
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
-    }
-  },
-);
-
-app.delete(
-  "/internal/clubs/:clubId/join-requests/:playerId",
-  async (req, res) => {
-    try {
-      await clubRepository.rejectJoinRequest(req.params.clubId, req.params.playerId);
-      res.status(204).end();
-    } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
-    }
-  },
-);
-
 app.post("/internal/clubs/:clubId/members/:playerId", async (req, res) => {
   try {
     res.json(
@@ -519,33 +500,9 @@ app.post("/internal/clubs/:clubId/ownership-transfer", async (req, res) => {
   }
 });
 
-app.get("/internal/clubs/:clubId/invite", async (req, res) => {
-  try {
-    res.json(await clubRepository.getOrCreateInvite(req.params.clubId));
-  } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
-  }
-});
-
-app.post("/internal/clubs/:clubId/invite/rotate", async (req, res) => {
-  try {
-    res.json(await clubRepository.rotateInvite(req.params.clubId));
-  } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
-  }
-});
-
 app.get("/internal/clubs/:clubId/members", async (req, res) => {
   try {
     res.json(await clubRepository.listMembers(req.params.clubId));
-  } catch (error) {
-    res.status(500).json({ error: (error as Error).message });
-  }
-});
-
-app.get("/internal/clubs/:clubId/join-requests", async (req, res) => {
-  try {
-    res.json(await clubRepository.listPendingRequests(req.params.clubId));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
