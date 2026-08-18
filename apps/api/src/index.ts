@@ -952,6 +952,9 @@ app.post("/api/clubs/:clubId/announcements", async (req, res) => {
       }),
     );
   } catch (err) {
+    if (err instanceof DbRequestError && err.status === 409) {
+      return res.status(409).json({ error: err.message });
+    }
     res.status(400).json({ error: (err as Error).message });
   }
 });

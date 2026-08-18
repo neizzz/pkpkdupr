@@ -1,4 +1,5 @@
 import {
+  CLUB_ANNOUNCEMENT_MAX_COUNT,
   CLUB_DESCRIPTION_MAX_LENGTH,
   getRecentCompletedMatches,
   getUnicodeCodePointLength,
@@ -82,6 +83,13 @@ const clubRoleOrder: Record<ClubRole, number> = {
   manager: 1,
   member: 2,
 };
+
+export class ClubAnnouncementLimitError extends Error {
+  constructor() {
+    super(`클럽 공지는 최대 ${CLUB_ANNOUNCEMENT_MAX_COUNT}개까지 등록할 수 있습니다.`);
+    this.name = "ClubAnnouncementLimitError";
+  }
+}
 
 export class ClubRepository {
   constructor(
@@ -321,7 +329,7 @@ export class ClubRepository {
       .from(clubAnnouncements)
       .where(eq(clubAnnouncements.clubId, clubId))
       .orderBy(desc(clubAnnouncements.createdAt))
-      .limit(20)
+      .limit(CLUB_ANNOUNCEMENT_MAX_COUNT)
       .all();
     return records.map((record: StoredAnnouncement) => toAnnouncement(record));
   }
@@ -334,15 +342,46 @@ export class ClubRepository {
   }): Promise<ClubAnnouncement> {
     const now = new Date();
     const id = generateEntityId("clubAnnouncement");
-    await this.db.insert(clubAnnouncements).values({
-      id,
-      clubId: input.clubId,
-      title: input.title.trim(),
-      body: input.body.trim(),
-      createdByPlayerId: input.createdByPlayerId,
-      createdAt: now,
-      updatedAt: now,
-    });
+    const nowSeconds = toUnixTimestampSeconds(now);
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+
+    try {
+      const lockedClub = await transaction.execute({
+        sql: "SELECT id FROM clubs WHERE id = ? FOR UPDATE",
+        args: [input.clubId],
+      });
+      if (!lockedClub.rows.length) {
+        throw new Error("클럽을 찾을 수 없습니다.");
+      }
+      const announcementCount = await transaction.execute({
+        sql: `SELECT COUNT(*) AS count
+              FROM club_announcements
+              WHERE club_id = ?`,
+        args: [input.clubId],
+      });
+      if (Number(announcementCount.rows[0]?.count ?? 0) >= CLUB_ANNOUNCEMENT_MAX_COUNT) {
+        throw new ClubAnnouncementLimitError();
+      }
+      await transaction.execute({
+        sql: `INSERT INTO club_announcements
+                (id, club_id, title, body, created_by_player_id, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          id,
+          input.clubId,
+          input.title.trim(),
+          input.body.trim(),
+          input.createdByPlayerId,
+          nowSeconds,
+          nowSeconds,
+        ],
+      });
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) transaction.close();
+    }
     const created = await this.db
       .select()
       .from(clubAnnouncements)

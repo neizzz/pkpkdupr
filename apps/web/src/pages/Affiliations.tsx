@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@heroui/react";
+import { Button, useOverlayState } from "@heroui/react";
 import {
+  CLUB_ANNOUNCEMENT_MAX_COUNT,
   CLUB_DESCRIPTION_MAX_LENGTH,
   getUnicodeCodePointLength,
   truncateToUnicodeCodePoints,
   type Club,
+  type ClubAnnouncement,
   ClubDashboard,
   ClubMembership,
   ClubRankingEntry,
@@ -17,6 +19,7 @@ import { PiRankingLight } from "react-icons/pi";
 import { TbAffiliate } from "react-icons/tb";
 import {
   IoCalendarOutline,
+  IoChevronDown,
   IoChevronForward,
   IoMegaphoneOutline,
   IoPeopleOutline,
@@ -27,6 +30,8 @@ import {
 } from "react-icons/io5";
 import BottomSheet from "@/components/BottomSheet";
 import PlayerQrScannerSheetBody from "@/components/PlayerQrScannerSheetBody";
+import ActionChipButton from "@/components/ActionChipButton";
+import AppModal from "@/components/AppModal";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import MatchCard, {
@@ -87,6 +92,42 @@ const SectionTitle: React.FC<{
   </div>
 );
 
+const ExpandableAnnouncementBody: React.FC<{
+  body: string;
+  className?: string;
+}> = ({ body, className }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div>
+      <p
+        className={[
+          isExpanded ? "whitespace-pre-wrap" : "line-clamp-2",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {body}
+      </p>
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((current) => !current)}
+        className="mt-1 inline-flex items-center gap-0.5 text-xs font-semibold text-pkpk-primary-bg"
+      >
+        {isExpanded ? "접기" : "펼치기"}
+        <IoChevronDown
+          aria-hidden="true"
+          className={`size-3 transition-transform ${
+            isExpanded ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+    </div>
+  );
+};
+
 const Affiliations: React.FC = () => {
   const { token, player } = useAuth();
   const isOnline = useOnlineStatus();
@@ -115,6 +156,11 @@ const Affiliations: React.FC = () => {
   const [rankingCategory, setRankingCategory] =
     useState<RankingCategory>("doubles");
   const [managementError, setManagementError] = useState<string | null>(null);
+  const [isAnnouncementCreateOpen, setIsAnnouncementCreateOpen] = useState(false);
+  const [isCreatingAnnouncement, setIsCreatingAnnouncement] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] =
+    useState<ClubAnnouncement | null>(null);
+  const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
   const [sessionName, setSessionName] = useState("");
@@ -141,6 +187,7 @@ const Affiliations: React.FC = () => {
   >(null);
   const [clubMatchHistoryPage, setClubMatchHistoryPage] = useState(0);
   const [clubMatchHistoryTotal, setClubMatchHistoryTotal] = useState(0);
+  const announcementDeleteConfirmation = useOverlayState();
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -295,27 +342,66 @@ const Affiliations: React.FC = () => {
       setManagementError(null);
       await action();
       await reloadManagement();
+      return true;
     } catch (actionError) {
       setManagementError(
         actionError instanceof Error
           ? actionError.message
           : "관리 작업을 처리하지 못했어요.",
       );
+      return false;
     }
   };
 
+  const closeAnnouncementCreateSheet = (force = false) => {
+    if (isCreatingAnnouncement && !force) return;
+    setIsAnnouncementCreateOpen(false);
+    setAnnouncementTitle("");
+    setAnnouncementBody("");
+  };
+
   const createAnnouncement = async () => {
-    if (!selectedClubId || !announcementTitle.trim() || !announcementBody.trim()) {
+    if (
+      !selectedClubId ||
+      !announcementTitle.trim() ||
+      !announcementBody.trim() ||
+      (dashboard?.announcements.length ?? 0) >= CLUB_ANNOUNCEMENT_MAX_COUNT
+    ) {
       return;
     }
-    await runManagementAction(async () => {
-      await request(`/api/clubs/${encodeURIComponent(selectedClubId)}/announcements`, {
-        method: "POST",
-        body: JSON.stringify({ title: announcementTitle, body: announcementBody }),
+    setIsCreatingAnnouncement(true);
+    try {
+      const isCreated = await runManagementAction(async () => {
+        await request(`/api/clubs/${encodeURIComponent(selectedClubId)}/announcements`, {
+          method: "POST",
+          body: JSON.stringify({ title: announcementTitle, body: announcementBody }),
+        });
       });
-      setAnnouncementTitle("");
-      setAnnouncementBody("");
-    });
+      if (isCreated) {
+        closeAnnouncementCreateSheet(true);
+      }
+    } finally {
+      setIsCreatingAnnouncement(false);
+    }
+  };
+
+  const removeAnnouncement = async () => {
+    if (!announcementToDelete) return;
+    setIsDeletingAnnouncement(true);
+    try {
+      const isRemoved = await runManagementAction(() =>
+        request(
+          `/api/club-announcements/${encodeURIComponent(announcementToDelete.id)}`,
+          { method: "DELETE" },
+        ),
+      );
+      if (isRemoved) {
+        announcementDeleteConfirmation.close();
+        setAnnouncementToDelete(null);
+      }
+    } finally {
+      setIsDeletingAnnouncement(false);
+    }
   };
 
   const createSession = async () => {
@@ -754,16 +840,19 @@ const Affiliations: React.FC = () => {
                       <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지" />
                       {dashboard.announcements.length ? (
                         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
-                          {dashboard.announcements.slice(0, 3).map((announcement) => (
+                          {dashboard.announcements
+                            .slice(0, CLUB_ANNOUNCEMENT_MAX_COUNT)
+                            .map((announcement) => (
                             <div key={announcement.id} className="flex gap-3 px-4 py-3">
                               <IoMegaphoneOutline className="mt-0.5 size-4 shrink-0 text-pkpk-primary-bg" />
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-pkpk-main-font">
                                   {announcement.title}
                                 </p>
-                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-pkpk-sub-font">
-                                  {announcement.body}
-                                </p>
+                                <ExpandableAnnouncementBody
+                                  body={announcement.body}
+                                  className="mt-1 text-xs leading-5 text-pkpk-sub-font"
+                                />
                               </div>
                             </div>
                           ))}
@@ -939,41 +1028,93 @@ const Affiliations: React.FC = () => {
           await loadDashboard();
         }}
       >
-        <div className="min-h-full p-3">
-          <div className="sticky top-0 z-10 -mx-3 mb-4 flex h-12 items-center justify-between border-b border-border bg-pkpk-bg px-4">
-            <div>
-              <p className="text-lg font-bold text-pkpk-secondary-bg">운영진 관리</p>
-              <p className="text-xs text-pkpk-sub-font">{dashboard?.club.name}</p>
-            </div>
-            <Button
-              variant="secondary"
-              className="rounded-full px-3 text-sm font-semibold"
-              onPress={() => setIsManagementOpen(false)}
-            >
-              닫기
-            </Button>
-          </div>
+        <div className="min-h-full">
+          <DetailPageHeader
+            title=""
+            tabKey="affiliations"
+            onBack={() => setIsManagementOpen(false)}
+            rightContent={
+              <div className="min-w-0 translate-y-2 text-right">
+                <p className="whitespace-nowrap text-lg font-bold text-pkpk-primary-bg">
+                  운영진 관리
+                </p>
+                <p className="truncate text-xs text-pkpk-sub-font">
+                  {dashboard?.club.name}
+                </p>
+              </div>
+            }
+          />
 
-          {managementError ? (
-            <p className="mb-3 rounded-xl border border-error/20 bg-white px-3 py-2 text-sm text-error">
-              {managementError}
-            </p>
-          ) : null}
+          <div className="pt-6">
+            {managementError ? (
+              <div className="px-4 py-4">
+                <p className="rounded-xl border border-error/20 bg-white px-3 py-2 text-sm text-error">
+                  {managementError}
+                </p>
+              </div>
+            ) : null}
 
-          {dashboard ? (
-            <div className="space-y-5">
-              <section className="space-y-3">
-                <SectionTitle icon={<IoMegaphoneOutline className="size-5" />} title="공지 작성" />
-                <div className="space-y-2 rounded-2xl border border-border bg-white p-3">
-                  <input value={announcementTitle} maxLength={160} onChange={(event) => setAnnouncementTitle(event.target.value)} placeholder="공지 제목" className="app-mobile-input w-full rounded-xl border border-border px-3 outline-none focus:border-pkpk-primary-bg" />
-                  <textarea value={announcementBody} maxLength={4000} onChange={(event) => setAnnouncementBody(event.target.value)} placeholder="공지 내용" className="min-h-24 w-full rounded-xl border border-border p-3 text-sm outline-none focus:border-pkpk-primary-bg" />
-                  <Button className="w-full rounded-xl bg-pkpk-primary-bg font-semibold text-white" isDisabled={!announcementTitle.trim() || !announcementBody.trim()} onPress={() => void createAnnouncement()}>
-                    공지 등록
-                  </Button>
-                </div>
+            {dashboard ? (
+              <div className="divide-y-[6px] divide-pkpk-section-border">
+              <section className="space-y-3 px-4 py-4">
+                <SectionTitle
+                  icon={<IoMegaphoneOutline className="size-5" />}
+                  title="공지 관리"
+                  action={
+                    <ActionChipButton
+                      disabled={
+                        !isOnline ||
+                        dashboard.announcements.length >=
+                          CLUB_ANNOUNCEMENT_MAX_COUNT
+                      }
+                      onClick={() => setIsAnnouncementCreateOpen(true)}
+                    >
+                      + 공지 추가
+                    </ActionChipButton>
+                  }
+                />
+                <p className="text-xs text-pkpk-sub-font">
+                  현재 {dashboard.announcements.length}/
+                  {CLUB_ANNOUNCEMENT_MAX_COUNT}개 등록됨
+                </p>
+                {dashboard.announcements.length ? (
+                  <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
+                    {dashboard.announcements.map((announcement) => (
+                      <article key={announcement.id} className="px-3 py-3">
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-pkpk-main-font">
+                              {announcement.title}
+                            </p>
+                            <ExpandableAnnouncementBody
+                              body={announcement.body}
+                              className="mt-1 text-xs leading-5 text-pkpk-sub-font"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="shrink-0 rounded-xl px-2 text-xs font-semibold text-error"
+                            isDisabled={!isOnline || isDeletingAnnouncement}
+                            onPress={() => {
+                              setAnnouncementToDelete(announcement);
+                              announcementDeleteConfirmation.open();
+                            }}
+                          >
+                            제거
+                          </Button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
+                    등록된 공지가 없어요.
+                  </p>
+                )}
               </section>
 
-              <section className="space-y-3">
+              <section className="space-y-3 px-4 py-4">
                 <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="세션 만들기" />
                 <div className="space-y-2 rounded-2xl border border-border bg-white p-3">
                   <input value={sessionName} onChange={(event) => setSessionName(event.target.value)} placeholder="세션 이름" className="app-mobile-input w-full rounded-xl border border-border px-3 outline-none focus:border-pkpk-primary-bg" />
@@ -985,7 +1126,7 @@ const Affiliations: React.FC = () => {
                 </div>
               </section>
 
-              <section className="space-y-3">
+              <section className="space-y-3 px-4 py-4">
                 <SectionTitle icon={<IoPeopleOutline className="size-5" />} title="멤버 및 권한" />
                 <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
                   {dashboard.members.map((member) => (
@@ -1045,8 +1186,87 @@ const Affiliations: React.FC = () => {
               </section>
             </div>
           ) : null}
+          </div>
         </div>
       </RightDrawer>
+
+      <BottomSheet
+        isOpen={isAnnouncementCreateOpen}
+        isActive={selectedTab === "affiliations" && isManagementOpen}
+        onOpenChange={(open) =>
+          open ? setIsAnnouncementCreateOpen(true) : closeAnnouncementCreateSheet()
+        }
+        ariaLabel="공지 추가"
+      >
+        <BottomSheet.Header>
+          <h2 className="bs-text-head text-pkpk-main-font">공지 추가</h2>
+          <p className="mt-1 text-sm text-pkpk-sub-font">
+            클럽 공지는 최대 {CLUB_ANNOUNCEMENT_MAX_COUNT}개까지 등록할 수 있어요.
+          </p>
+        </BottomSheet.Header>
+        <BottomSheet.Body>
+          <input
+            value={announcementTitle}
+            maxLength={160}
+            onChange={(event) => setAnnouncementTitle(event.target.value)}
+            placeholder="공지 제목"
+            className="app-mobile-input w-full rounded-2xl border border-border px-4 outline-none focus:border-pkpk-primary-bg"
+          />
+          <textarea
+            value={announcementBody}
+            maxLength={4000}
+            onChange={(event) => setAnnouncementBody(event.target.value)}
+            placeholder="공지 내용"
+            className="min-h-32 w-full resize-none rounded-2xl border border-border p-4 text-sm outline-none focus:border-pkpk-primary-bg"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              className="app-action-button rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
+              isDisabled={isCreatingAnnouncement}
+              onPress={() => closeAnnouncementCreateSheet()}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              className="app-action-button rounded-2xl bg-pkpk-primary-bg font-semibold text-white"
+              isDisabled={
+                !isOnline ||
+                isCreatingAnnouncement ||
+                !announcementTitle.trim() ||
+                !announcementBody.trim()
+              }
+              onPress={() => void createAnnouncement()}
+            >
+              {isCreatingAnnouncement ? "등록 중..." : "공지 등록"}
+            </Button>
+          </div>
+        </BottomSheet.Body>
+      </BottomSheet>
+
+      <AppModal
+        state={announcementDeleteConfirmation}
+        ariaLabel="공지 제거 확인"
+        title="공지를 제거할까요?"
+        footer={
+          <Button
+            type="button"
+            className="bg-error font-semibold text-white hover:bg-error/90"
+            isDisabled={isDeletingAnnouncement}
+            onPress={() => void removeAnnouncement()}
+          >
+            {isDeletingAnnouncement ? "제거 중..." : "제거"}
+          </Button>
+        }
+      >
+        <p className="text-sm leading-6 text-pkpk-sub-font">
+          <span className="font-semibold text-pkpk-main-font">
+            {announcementToDelete?.title}
+          </span>
+          을(를) 제거하면 되돌릴 수 없어요.
+        </p>
+      </AppModal>
 
       {clubMatchHistoryClub && clubMatchHistoryDepthId ? (
         <RightDrawer

@@ -1,9 +1,15 @@
-import type { Club, ClubDashboard, ClubMembership } from "@pkpkdupr/shared/club";
+import type {
+  Club,
+  ClubAnnouncement,
+  ClubDashboard,
+  ClubMembership,
+} from "@pkpkdupr/shared/club";
 import type { Player } from "@pkpkdupr/shared/player";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app } from "../index";
 import { ClubRepository } from "../repositories/ClubRepository";
+import { DbRequestError } from "../repositories/MatchRepository";
 import {
   AuthService,
   type AuthenticatedSession,
@@ -49,6 +55,16 @@ const club: Club = {
   id: clubId,
   name: "테스트 클럽",
   description: "테스트 소개",
+  createdAt: now,
+  updatedAt: now,
+};
+
+const announcement: ClubAnnouncement = {
+  id: "Aannounce1",
+  clubId,
+  title: "클럽 공지",
+  body: "공지 내용",
+  createdByPlayerId: owner.id,
   createdAt: now,
   updatedAt: now,
 };
@@ -179,6 +195,79 @@ describe("club API", () => {
     expect(response.body).toEqual(
       expect.objectContaining({ club: expect.objectContaining({ id: clubId }) }),
     );
+  });
+
+  it("운영진은 공지를 등록할 수 있다", async () => {
+    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
+      buildSession(manager),
+    );
+    vi.spyOn(ClubRepository.prototype, "findMembership").mockResolvedValue(
+      buildMembership(manager.id, "manager"),
+    );
+    const createAnnouncement = vi
+      .spyOn(ClubRepository.prototype, "createAnnouncement")
+      .mockResolvedValue(announcement);
+
+    const response = await request(app)
+      .post(`/api/clubs/${clubId}/announcements`)
+      .set("Authorization", "Bearer test-token")
+      .send({ title: " 클럽 공지 ", body: " 공지 내용 " });
+
+    expect(response.status).toBe(201);
+    expect(createAnnouncement).toHaveBeenCalledWith(clubId, {
+      title: announcement.title,
+      body: announcement.body,
+      createdByPlayerId: manager.id,
+    });
+  });
+
+  it("공지 한도 초과는 409로 반환한다", async () => {
+    vi.spyOn(ClubRepository.prototype, "createAnnouncement").mockRejectedValue(
+      new DbRequestError("클럽 공지는 최대 5개까지 등록할 수 있습니다.", 409),
+    );
+
+    const response = await request(app)
+      .post(`/api/clubs/${clubId}/announcements`)
+      .set("Authorization", "Bearer test-token")
+      .send({ title: announcement.title, body: announcement.body });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      error: "클럽 공지는 최대 5개까지 등록할 수 있습니다.",
+    });
+  });
+
+  it("일반 멤버는 공지를 등록하거나 제거할 수 없다", async () => {
+    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
+      buildSession(member),
+    );
+    vi.spyOn(ClubRepository.prototype, "findMembership").mockResolvedValue(
+      buildMembership(member.id, "member"),
+    );
+    const createAnnouncement = vi.spyOn(
+      ClubRepository.prototype,
+      "createAnnouncement",
+    );
+    vi.spyOn(ClubRepository.prototype, "findAnnouncement").mockResolvedValue(
+      announcement,
+    );
+    const deleteAnnouncement = vi.spyOn(
+      ClubRepository.prototype,
+      "deleteAnnouncement",
+    );
+
+    const createResponse = await request(app)
+      .post(`/api/clubs/${clubId}/announcements`)
+      .set("Authorization", "Bearer test-token")
+      .send({ title: announcement.title, body: announcement.body });
+    const deleteResponse = await request(app)
+      .delete(`/api/club-announcements/${announcement.id}`)
+      .set("Authorization", "Bearer test-token");
+
+    expect(createResponse.status).toBe(403);
+    expect(deleteResponse.status).toBe(403);
+    expect(createAnnouncement).not.toHaveBeenCalled();
+    expect(deleteAnnouncement).not.toHaveBeenCalled();
   });
 
   it("대시보드에 최근 완료 매치를 함께 반환한다", async () => {

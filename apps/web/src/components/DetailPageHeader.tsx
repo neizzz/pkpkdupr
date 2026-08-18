@@ -9,6 +9,7 @@ interface DetailPageHeaderProps {
   backgroundClassName?: string;
   leftContent?: React.ReactNode;
   rightContent?: React.ReactNode;
+  onBack?: () => void;
 }
 
 const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
@@ -17,6 +18,7 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   backgroundClassName = "bg-pkpk-bg",
   leftContent,
   rightContent,
+  onBack,
 }) => {
   const { depthStacks, selectedTab } = useTabNavigation();
   const targetTabKey = tabKey ?? selectedTab;
@@ -29,16 +31,21 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
   const scrolledButtonClassName =
     "!bg-[#EBEEFA]/90 shadow-none hover:!bg-[#EBEEFA]";
   const backButtonClassName = leftContent
-    ? "shrink-0 !bg-transparent !text-pkpk-secondary-bg shadow-none hover:!bg-transparent"
+    ? `absolute left-3 ${
+        rightContent
+          ? "max-w-[calc(100%-7rem)]"
+          : "max-w-[calc(100%-1.5rem)]"
+      } !text-pkpk-secondary-bg shadow-none transition-colors duration-100 ${
+        isScrolled
+          ? scrolledButtonClassName
+          : "!bg-transparent hover:!bg-transparent"
+      }`
     : `absolute left-3 !text-pkpk-secondary-bg shadow-none transition-colors duration-100 ${
         isScrolled
           ? scrolledButtonClassName
           : "!bg-transparent !text-pkpk-secondary-bg hover:!bg-transparent"
       }`;
-  const leftContentClassName = `absolute left-3 flex h-9 min-w-0 items-center rounded-full transition-colors duration-100 ${
-    rightContent ? "max-w-[calc(100%-7rem)]" : "max-w-[calc(100%-1.5rem)]"
-  } ${isScrolled ? scrolledButtonClassName : "bg-transparent"}`;
-  const rightContentClassName = `absolute right-3 flex items-center [&_button]:!px-3 [&_button]:transition-colors [&_button]:duration-100 ${
+  const rightContentClassName = `absolute right-3 flex max-w-[calc(100%-4.5rem)] items-center [&_button]:!px-3 [&_button]:transition-colors [&_button]:duration-100 ${
     isScrolled
       ? "[&_button]:!bg-[#EBEEFA]/90 [&_button]:shadow-none [&_button:hover]:!bg-[#EBEEFA]"
       : ""
@@ -59,7 +66,8 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
 
   if (
     depthStacks[targetTabKey].length === 0 &&
-    !rightDrawerScrollContainer
+    !rightDrawerScrollContainer &&
+    !onBack
   ) {
     return null;
   }
@@ -74,12 +82,19 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
         }`}
       >
         {leftContent ? (
-          <div className={leftContentClassName}>
-            <TabBackButton tabKey={targetTabKey} className={backButtonClassName} />
-            <div className="min-w-0 pr-3">{leftContent}</div>
-          </div>
+          <TabBackButton
+            tabKey={targetTabKey}
+            className={backButtonClassName}
+            onPress={onBack}
+          >
+            {leftContent}
+          </TabBackButton>
         ) : (
-          <TabBackButton tabKey={targetTabKey} className={backButtonClassName} />
+          <TabBackButton
+            tabKey={targetTabKey}
+            className={backButtonClassName}
+            onPress={onBack}
+          />
         )}
         {!isRightDrawerPage ? (
           <h2 className="text-2xl font-bold text-pkpk-secondary-bg">{title}</h2>

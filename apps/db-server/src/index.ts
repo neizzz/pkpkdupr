@@ -35,7 +35,10 @@ import {
   type CreateMatchInput,
   type UpdateMatchMetadataInput,
 } from "./repositories/MatchRepository";
-import { ClubRepository } from "./repositories/ClubRepository";
+import {
+  ClubAnnouncementLimitError,
+  ClubRepository,
+} from "./repositories/ClubRepository";
 import { FriendRepository } from "./repositories/FriendRepository";
 import { AuthRepository } from "./repositories/AuthRepository";
 import {
@@ -527,6 +530,9 @@ app.post("/internal/clubs/:clubId/announcements", async (req, res) => {
       }),
     );
   } catch (error) {
+    if (error instanceof ClubAnnouncementLimitError) {
+      return res.status(409).json({ error: error.message });
+    }
     res.status(400).json({ error: (error as Error).message });
   }
 });
