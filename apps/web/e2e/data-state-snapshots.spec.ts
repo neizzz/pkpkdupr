@@ -5,6 +5,7 @@ const privacyPolicyVersion = "2026-08-18";
 type FixtureOptions = {
   authenticated?: boolean;
   clubEmpty?: boolean;
+  clubSessionEmpty?: boolean;
   clubRole?: "owner" | "manager" | "member";
   historyEmpty?: boolean;
   longProfileName?: boolean;
@@ -231,6 +232,7 @@ const club = {
 const clubDashboard = (
   empty = false,
   membershipRole: NonNullable<FixtureOptions["clubRole"]> = "owner",
+  sessionEmpty = false,
 ) => ({
   club,
   membership: {
@@ -241,7 +243,7 @@ const clubDashboard = (
     requestedAt: "2026-01-01T00:00:00.000Z",
     joinedAt: "2026-01-01T00:00:00.000Z",
   },
-  upcomingSessions: empty
+  upcomingSessions: empty || sessionEmpty
     ? []
     : [
         {
@@ -328,7 +330,11 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
     const profile = profileSummary(options.profileEmpty);
     const match = matchForScenario(options.matchScenario);
     const clubRole = options.clubRole ?? "owner";
-    const dashboard = clubDashboard(options.profileEmpty, clubRole);
+    const dashboard = clubDashboard(
+      options.profileEmpty,
+      clubRole,
+      options.clubSessionEmpty,
+    );
 
     if (path === "/api/runtime-notice") {
       return fulfillJson(route, { enabled: false });
@@ -842,6 +848,24 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await openApp(page);
   await page.getByRole("tab", { name: "클럽" }).click();
   await expect(page.getByText("토요 오픈플레이")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "다가오는 세션" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "토요 오픈플레이 세션 상세 보기" }),
+  ).toBeVisible();
+  await expect(page.getByText("4.120", { exact: true })).toBeVisible();
+  const recentMatchCards = page.getByTestId("club-recent-match-card");
+  const [firstMatchCard, secondMatchCard] = await Promise.all([
+    recentMatchCards.nth(0).boundingBox(),
+    recentMatchCards.nth(1).boundingBox(),
+  ]);
+  if (!firstMatchCard || !secondMatchCard) {
+    throw new Error("최근 완료 매치 카드의 크기를 측정할 수 없습니다.");
+  }
+  expect(firstMatchCard.height).toBe(secondMatchCard.height);
+  expect(firstMatchCard.x + firstMatchCard.width / 2).toBeCloseTo(
+    (page.viewportSize()?.width ?? 0) / 2,
+    0,
+  );
   await capture(page, "affiliations--with-data.png");
   await page.getByRole("button", { name: "운영진 관리" }).click();
   await expect(page.getByRole("dialog", { name: "클럽 운영진 관리" })).toBeVisible();
@@ -861,6 +885,14 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
   await expect(page.getByRole("dialog", { name: "클럽 만들기" })).toBeVisible();
   await capture(page, "club-create-sheet.png");
+});
+
+test("다가오는 세션이 없으면 해당 섹션을 표시하지 않는다", async ({ page }) => {
+  await openApp(page, { clubSessionEmpty: true });
+  await page.getByRole("tab", { name: "클럽" }).click();
+
+  await expect(page.getByRole("heading", { name: "다가오는 세션" })).toHaveCount(0);
+  await expect(page.getByText("예정된 매치와 세션이 없어요.")).toHaveCount(0);
 });
 
 test("클럽 공지는 drawer에서 전체 내용을 보여준다", async ({ page }) => {

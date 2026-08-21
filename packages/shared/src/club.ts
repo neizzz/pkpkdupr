@@ -78,16 +78,27 @@ export const isMatchForClub = (
 
 export const getRecentCompletedMatches = (
   matches: readonly Match[],
-  limit: number = 2,
-) =>
-  matches
-    .filter((match) => match.status === "completed" && match.completedAt !== null)
+  limit: number = 5,
+  now: Date = new Date(),
+) => {
+  const completedAfter = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+  const safeLimit = Math.min(5, Math.max(0, Math.floor(limit)));
+
+  return matches
+    .filter(
+      (match) =>
+        match.status === "completed" &&
+        match.completedAt !== null &&
+        match.completedAt.getTime() >= completedAfter &&
+        match.completedAt.getTime() <= now.getTime(),
+    )
     .sort(
       (left, right) =>
         (right.completedAt?.getTime() ?? 0) -
         (left.completedAt?.getTime() ?? 0),
     )
-    .slice(0, limit);
+    .slice(0, safeLimit);
+};
 
 export interface ClubDashboard {
   club: Club;

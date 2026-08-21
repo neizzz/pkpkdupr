@@ -66,21 +66,21 @@ describe("club match selection", () => {
     expect(selectedIds).toEqual(["Msession01", "Mstandalone"]);
   });
 
-  it("완료 시각이 가장 최근인 완료 매치만 최신순으로 최대 두 건 반환한다", () => {
-    const newest = buildMatch({
-      id: "Mnewest01",
+  it("최근 1주일의 완료 매치만 최신순으로 최대 다섯 건 반환한다", () => {
+    const now = new Date("2026-08-10T09:00:00.000Z");
+    const completedMatches = Array.from({ length: 6 }, (_, index) =>
+      buildMatch({
+        id: `Mrecent0${index + 1}`,
+        status: "completed",
+        completedAt: new Date(
+          now.getTime() - (index + 1) * 24 * 60 * 60 * 1000,
+        ),
+      }),
+    );
+    const stale = buildMatch({
+      id: "Mstale001",
       status: "completed",
-      completedAt: new Date("2026-08-03T09:00:00.000Z"),
-    });
-    const second = buildMatch({
-      id: "Msecond01",
-      status: "completed",
-      completedAt: new Date("2026-08-02T09:00:00.000Z"),
-    });
-    const oldest = buildMatch({
-      id: "Moldest01",
-      status: "completed",
-      completedAt: new Date("2026-08-01T09:00:00.000Z"),
+      completedAt: new Date("2026-08-02T08:59:59.999Z"),
     });
     const pending = buildMatch({
       id: "Mpending1",
@@ -89,9 +89,17 @@ describe("club match selection", () => {
     });
 
     expect(
-      getRecentCompletedMatches([oldest, pending, second, newest]).map(
-        (match) => match.id,
-      ),
-    ).toEqual(["Mnewest01", "Msecond01"]);
+      getRecentCompletedMatches(
+        [...completedMatches, stale, pending],
+        99,
+        now,
+      ).map((match) => match.id),
+    ).toEqual([
+      "Mrecent01",
+      "Mrecent02",
+      "Mrecent03",
+      "Mrecent04",
+      "Mrecent05",
+    ]);
   });
 });

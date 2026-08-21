@@ -12,10 +12,7 @@ import {
   ClubMembership,
   ClubRankingEntry,
 } from "@pkpkdupr/shared/club";
-import type {
-  Match as SharedMatch,
-  ManagedMatchSession,
-} from "@pkpkdupr/shared/match";
+import type { ManagedMatchSession } from "@pkpkdupr/shared/match";
 import { AiOutlineNotification } from "react-icons/ai";
 import { PiRankingLight } from "react-icons/pi";
 import { TbAffiliate } from "react-icons/tb";
@@ -42,6 +39,7 @@ import MatchCard, {
 } from "@/components/Match";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import RightDrawer from "@/components/RightDrawer";
+import SessionCard from "@/components/SessionCard";
 import SessionDetail from "@/components/SessionDetail";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import TabPanelEmptyState from "@/components/TabPanelEmptyState";
@@ -57,27 +55,6 @@ type RankingCategory = "singles" | "doubles";
 
 const noop = () => {};
 const CLUB_MATCH_HISTORY_PAGE_SIZE = 20;
-
-const dateTimeFormatter = new Intl.DateTimeFormat("ko-KR", {
-  month: "numeric",
-  day: "numeric",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-const formatDateTime = (value: Date | string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "일정 미정"
-    : dateTimeFormatter.format(date);
-};
-
-const getMatchName = (match: SharedMatch) =>
-  match.name ||
-  match.teams
-    .flatMap((team) => team.players.map((player) => player.username))
-    .join(" · ");
 
 const announcementUrlPattern = /https?:\/\/[^\s<]+/g;
 const trailingUrlPunctuationPattern = /[),.!;]+$/;
@@ -702,63 +679,36 @@ const Affiliations: React.FC = () => {
   const renderSchedule = () => {
     if (!dashboard) return null;
     const sessions = dashboard.upcomingSessions.slice(0, 2);
-    const standaloneMatches = dashboard.upcomingMatches
-      .filter((match) => !match.session)
-      .slice(0, 2);
-    if (!sessions.length && !standaloneMatches.length) {
-      return (
-        <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
-          예정된 매치와 세션이 없어요.
-        </p>
-      );
-    }
     return (
       <div className="space-y-2">
-        {sessions.map((session: ManagedMatchSession) => (
-          <button
-            key={session.id}
-            type="button"
-            onClick={() => openSessionDetail(session)}
-            className="flex items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3"
-          >
-            <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
-              {formatDateTime(session.date).split(" ").slice(0, 2).join(" ")}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-pkpk-main-font">
-                {session.name}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-pkpk-sub-font">
-                {formatDateTime(session.date)} · {session.location}
-              </p>
-            </div>
-            <span className="shrink-0 rounded-full bg-pkpk-accent-bg px-2 py-1 text-[11px] font-bold text-pkpk-dark">
-              세션
-            </span>
-            <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
-          </button>
-        ))}
-        {standaloneMatches.map((match) => (
-          <button
-            key={match.id}
-            type="button"
-            onClick={() => openMatchDetail(match as unknown as MatchInfo)}
-            className="flex items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3"
-          >
-            <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
-              매치
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-pkpk-main-font">
-                {getMatchName(match)}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-pkpk-sub-font">
-                {formatDateTime(match.matchStartsAt)} · {match.location}
-              </p>
-            </div>
-            <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
-          </button>
-        ))}
+        {sessions.map((session: ManagedMatchSession) => {
+          const sessionSummary: MatchSessionSummaryInfo = {
+            id: session.id,
+            name: session.name,
+            date: new Date(session.date).toISOString(),
+            location: session.location,
+            clubId: session.clubId,
+            affiliationNames: session.affiliationNames,
+            status: "created",
+            matchCount: session.matchCount,
+            participants: dashboard.members
+              .filter((member) => session.participantIds.includes(member.id))
+              .map((member) => ({
+                id: member.id,
+                username: member.username,
+                avatarUrl: member.avatarUrl,
+              })),
+            latestCreatedAt: new Date(session.updatedAt).toISOString(),
+          };
+
+          return (
+            <SessionCard
+              key={session.id}
+              session={sessionSummary}
+              onPress={() => openSessionDetail(session)}
+            />
+          );
+        })}
       </div>
     );
   };
@@ -773,27 +723,20 @@ const Affiliations: React.FC = () => {
       );
     }
     return (
-      <div className="space-y-2">
-        {dashboard.recentCompletedMatches.map((match) => (
-          <button
+      <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {dashboard.recentCompletedMatches.slice(0, 5).map((match) => (
+          <div
             key={match.id}
-            type="button"
-            onClick={() => openMatchDetail(match as unknown as MatchInfo)}
-            className="flex w-full items-center gap-3 rounded-2xl border border-border bg-white px-3 py-3 text-left"
+            data-testid="club-recent-match-card"
+            className="w-[calc(100cqw-2rem)] shrink-0 snap-center"
           >
-            <div className="rounded-xl bg-pkpk-session-bg px-2 py-1.5 text-center text-xs font-bold text-pkpk-primary-bg">
-              완료
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-pkpk-main-font">
-                {getMatchName(match)}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-pkpk-sub-font">
-                {formatDateTime(match.completedAt ?? match.matchStartsAt)} · {match.location}
-              </p>
-            </div>
-            <IoChevronForward className="size-4 shrink-0 text-pkpk-sub-font" />
-          </button>
+            <MatchCard
+              match={match as unknown as MatchInfo}
+              currentPlayerId={player?.id}
+              onPress={openMatchDetail}
+              className="min-h-[13.5rem]"
+            />
+          </div>
         ))}
       </div>
     );
@@ -824,7 +767,7 @@ const Affiliations: React.FC = () => {
               {entry.username}
             </span>
             <span className="text-sm font-bold text-pkpk-primary-bg">
-              {entry.rating.toFixed(2)}
+              {entry.rating.toFixed(3)}
             </span>
           </li>
         ))}
@@ -885,30 +828,34 @@ const Affiliations: React.FC = () => {
                   <TabPanelStatus isLoading ariaLabel="클럽 정보를 불러오는 중" message="클럽 정보를 불러오는 중이에요." />
                 ) : (
                   <>
-                    <section className="space-y-5 px-4 py-4">
-                      <div className="space-y-3">
-                        <SectionTitle
-                          icon={<IoCalendarOutline className="size-5" />}
-                          title="다가오는 매치 & 세션"
-                        />
-                        {renderSchedule()}
-                      </div>
-                      <div className="space-y-3">
-                        <SectionTitle
-                          icon={<IoCalendarOutline className="size-5" />}
-                          title="최근에 끝난 매치"
-                        />
-                        {renderRecentCompletedMatches()}
-                      </div>
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={openClubMatchHistory}
-                          className="flex items-center gap-0.5 px-1 py-1 text-sm text-pkpk-primary-bg transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
-                        >
-                          {dashboard.club.name}의 매치 전체 보기
-                          <IoChevronForward className="size-4" />
-                        </button>
+                    <section className="space-y-5 px-4 pt-4 pb-2">
+                      {dashboard.upcomingSessions.length ? (
+                        <div className="space-y-3">
+                          <SectionTitle
+                            icon={<IoCalendarOutline className="size-5" />}
+                            title="다가오는 세션"
+                          />
+                          {renderSchedule()}
+                        </div>
+                      ) : null}
+                      <div className="space-y-2">
+                        <div className="space-y-3">
+                          <SectionTitle
+                            icon={<IoCalendarOutline className="size-5" />}
+                            title="최근에 끝난 매치"
+                          />
+                          {renderRecentCompletedMatches()}
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={openClubMatchHistory}
+                            className="flex items-center gap-0.5 px-1 py-1 text-sm text-pkpk-primary-bg transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                          >
+                            {dashboard.club.name}의 매치 전체 보기
+                            <IoChevronForward className="size-4" />
+                          </button>
+                        </div>
                       </div>
                     </section>
 
@@ -950,7 +897,7 @@ const Affiliations: React.FC = () => {
                                   <span className="block truncate text-sm font-semibold text-pkpk-main-font">
                                     {announcement.title}
                                   </span>
-                                  <span className="mt-1 block line-clamp-1 whitespace-pre-wrap text-xs leading-5 text-pkpk-sub-font">
+                                  <span className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-xs leading-5 text-pkpk-sub-font">
                                     {announcement.body}
                                   </span>
                                 </span>

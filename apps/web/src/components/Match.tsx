@@ -92,6 +92,7 @@ interface MatchProps {
   onPress?: (match: MatchInfo) => void;
   headerRightContent?: React.ReactNode;
   showChevron?: boolean;
+  className?: string;
 }
 
 const titleChipClassName =
@@ -159,6 +160,7 @@ const Match: React.FC<MatchProps> = ({
   onPress,
   headerRightContent,
   showChevron = true,
+  className,
 }) => {
   const hasResultScores = !!match.scores?.length;
   const teamSetScores = [
@@ -186,7 +188,7 @@ const Match: React.FC<MatchProps> = ({
         onPress
           ? "transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
           : ""
-      }`}
+      } ${className ?? ""}`}
     >
       <div className="relative z-10 min-w-0">
         <MatchCardHeader
