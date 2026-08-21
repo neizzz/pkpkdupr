@@ -22,6 +22,7 @@ export interface PlayerInfo {
   statusMessage?: string;
   statusMessageBackgroundColor?: string;
   authProvider?: "password" | "kakao" | "kakao-mock";
+  privacyPolicyConsentVersion?: string | null;
 }
 
 interface AuthContextType {
@@ -406,9 +407,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(errorData.error || "프로필 변경 실패");
     }
     const data = (await res.json()) as PlayerInfo;
-    setPlayer(data);
-    persistAuthState(data, requiresPasswordChange);
-    return data;
+    const nextPlayer = {
+      ...data,
+      privacyPolicyConsentVersion: player?.privacyPolicyConsentVersion ?? null,
+    };
+    setPlayer(nextPlayer);
+    persistAuthState(nextPlayer, requiresPasswordChange);
+    return nextPlayer;
   };
 
   const uploadAvatar = async (imageDataUrl: string) => {
@@ -432,9 +437,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(errorData.error || "프로필 이미지 업로드 실패");
     }
     const data = (await res.json()) as PlayerInfo;
-    setPlayer(data);
-    persistAuthState(data, requiresPasswordChange);
-    return data;
+    const nextPlayer = {
+      ...data,
+      privacyPolicyConsentVersion: player?.privacyPolicyConsentVersion ?? null,
+    };
+    setPlayer(nextPlayer);
+    persistAuthState(nextPlayer, requiresPasswordChange);
+    return nextPlayer;
   };
 
   const deleteAvatar = async () => {
@@ -454,9 +463,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       throw new Error(errorData.error || "프로필 이미지 삭제 실패");
     }
     const data = (await res.json()) as PlayerInfo;
-    setPlayer(data);
-    persistAuthState(data, requiresPasswordChange);
-    return data;
+    const nextPlayer = {
+      ...data,
+      privacyPolicyConsentVersion: player?.privacyPolicyConsentVersion ?? null,
+    };
+    setPlayer(nextPlayer);
+    persistAuthState(nextPlayer, requiresPasswordChange);
+    return nextPlayer;
   };
 
   const refreshMe = async () => {

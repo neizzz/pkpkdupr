@@ -1,21 +1,34 @@
 import React, { useEffect, useState } from "react";
 import { Button, useOverlayState } from "@heroui/react";
-import { IoLogOutOutline } from "react-icons/io5";
+import { IoChevronForward, IoLogOutOutline } from "react-icons/io5";
 import ActionChipButton from "@/components/ActionChipButton";
 import AppModal from "@/components/AppModal";
+import OperatingPolicyDrawer from "@/components/OperatingPolicyDrawer";
 import TabPanelHeader from "@/components/TabPanelHeader";
 import {
   APP_UPDATE_APPLIED_AT_STORAGE_KEY,
   useAppUpdate,
 } from "@/context/AppUpdateContext";
 import { useAuth } from "@/context/AuthContext";
+import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+
+const OPERATING_POLICY_DEPTH_ID = "operating-policy";
+const noop = () => {};
 
 const Settings: React.FC = () => {
   const UPDATE_CHECK_COOLDOWN_MS = 10_000;
   const UPDATE_APPLIED_COOLDOWN_MS = 10 * 60_000;
   const isOnline = useOnlineStatus();
   const { logout } = useAuth();
+  const {
+    selectedTab,
+    depthStacks,
+    pushDepth,
+    closeDepth,
+    saveScrollPosition,
+    restoreScrollTop,
+  } = useTabNavigation();
   const {
     appVersion,
     isUpdateAvailable,
@@ -43,6 +56,24 @@ const Settings: React.FC = () => {
     nextUpdateCheckAt !== null,
   );
   const logoutConfirmation = useOverlayState();
+  const isOperatingPolicyDrawerOpen = depthStacks.settings.includes(
+    OPERATING_POLICY_DEPTH_ID,
+  );
+
+  const openOperatingPolicyDrawer = () => {
+    saveScrollPosition("settings");
+    pushDepth("settings", {
+      id: OPERATING_POLICY_DEPTH_ID,
+      kind: "modal",
+      onClose: noop,
+    });
+  };
+
+  const closeOperatingPolicyDrawer = () => {
+    if (!closeDepth("settings", OPERATING_POLICY_DEPTH_ID)) {
+      restoreScrollTop("settings");
+    }
+  };
 
   useEffect(() => {
     if (!nextUpdateCheckAt) return;
@@ -160,8 +191,28 @@ const Settings: React.FC = () => {
             )}
           </section>
 
+          <section className="border-b-[6px] border-pkpk-section-border px-4 py-4">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-left text-base font-semibold text-pkpk-sub-font"
+              onClick={openOperatingPolicyDrawer}
+            >
+              운영방침
+              <IoChevronForward
+                aria-hidden="true"
+                className="size-5 text-pkpk-detail-font"
+              />
+            </button>
+          </section>
+
         </div>
       </div>
+      <OperatingPolicyDrawer
+        isOpen={isOperatingPolicyDrawerOpen}
+        isActive={selectedTab === "settings"}
+        onClose={closeOperatingPolicyDrawer}
+        onExited={() => restoreScrollTop("settings")}
+      />
       <AppModal
         state={logoutConfirmation}
         ariaLabel="로그아웃 확인"

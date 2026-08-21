@@ -37,6 +37,7 @@ import type {
 import bcrypt from "bcryptjs";
 import { createHmac, randomUUID } from "crypto";
 import { generateEntityId } from "@pkpkdupr/shared/entityId";
+import { PRIVACY_POLICY_VERSION } from "@pkpkdupr/shared/privacyPolicy";
 import {
   ACCESS_TOKEN_EXPIRES_IN,
   createAccessToken,
@@ -88,6 +89,11 @@ export interface AuthenticatedSession {
   player: Player;
   isFirstLogin: boolean;
   refreshedAccessToken?: string;
+}
+
+export interface PrivacyPolicyConsentStatus {
+  policyVersion: string;
+  agreedAt: Date;
 }
 
 /**
@@ -668,6 +674,61 @@ export class AuthService {
           : ACCESS_TOKEN_EXPIRES_IN,
       },
     );
+  }
+
+  async getCurrentPrivacyPolicyConsent(
+    playerId: string,
+  ): Promise<PrivacyPolicyConsentStatus | null> {
+    const consent = await this.dbRequest<{
+      policyVersion?: unknown;
+      agreedAt?: unknown;
+    } | null>(
+      `/internal/privacy-policy-consents/${encodeURIComponent(playerId)}?policyVersion=${encodeURIComponent(PRIVACY_POLICY_VERSION)}`,
+    );
+    if (
+      !consent ||
+      consent.policyVersion !== PRIVACY_POLICY_VERSION ||
+      typeof consent.agreedAt !== "string"
+    ) {
+      return null;
+    }
+
+    const agreedAt = new Date(consent.agreedAt);
+    if (Number.isNaN(agreedAt.getTime())) {
+      return null;
+    }
+
+    return { policyVersion: consent.policyVersion, agreedAt };
+  }
+
+  async recordCurrentPrivacyPolicyConsent(
+    playerId: string,
+  ): Promise<PrivacyPolicyConsentStatus> {
+    const consent = await this.dbRequest<{
+      policyVersion?: unknown;
+      agreedAt?: unknown;
+    }>("/internal/privacy-policy-consents", {
+      method: "POST",
+      body: JSON.stringify({
+        id: `privacy-policy-consent-${randomUUID()}`,
+        playerId,
+        policyVersion: PRIVACY_POLICY_VERSION,
+        agreedAt: new Date().toISOString(),
+      }),
+    });
+    if (
+      consent.policyVersion !== PRIVACY_POLICY_VERSION ||
+      typeof consent.agreedAt !== "string"
+    ) {
+      throw new Error("개인정보 처리방침 동의 기록이 올바르지 않습니다.");
+    }
+
+    const agreedAt = new Date(consent.agreedAt);
+    if (Number.isNaN(agreedAt.getTime())) {
+      throw new Error("개인정보 처리방침 동의 시각이 올바르지 않습니다.");
+    }
+
+    return { policyVersion: consent.policyVersion, agreedAt };
   }
 
   async authenticateAccessToken(

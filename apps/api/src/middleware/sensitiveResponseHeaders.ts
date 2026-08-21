@@ -16,6 +16,7 @@ const sensitiveRoutes: readonly SensitiveRoute[] = [
   { method: "POST", pathname: /^\/api\/auth\/kakao\/exchange$/ },
   { method: "POST", pathname: /^\/api\/auth\/kakao\/onboarding$/ },
   { method: "GET", pathname: /^\/api\/me$/ },
+  { method: "POST", pathname: /^\/api\/me\/privacy-policy-consent$/ },
   { method: "POST", pathname: /^\/api\/admin\/login$/ },
   { method: "POST", pathname: /^\/api\/register$/ },
   { method: "POST", pathname: /^\/api\/login$/ },

@@ -1164,12 +1164,15 @@ app.get("/api/me", async (req, res) => {
 
   try {
     const session = await authService.authenticateAccessToken(token);
+    const privacyPolicyConsent =
+      await authService.getCurrentPrivacyPolicyConsent(session.player.id);
     res.json({
       ...session.player,
       isFirstLogin: session.isFirstLogin,
       isAdmin: session.payload.isAdmin === true,
       authProvider: session.payload.authProvider ?? "password",
       accessToken: session.refreshedAccessToken,
+      privacyPolicyConsentVersion: privacyPolicyConsent?.policyVersion ?? null,
     });
   } catch (error) {
     if (error instanceof InvalidAccessTokenError) {
@@ -1183,6 +1186,42 @@ app.get("/api/me", async (req, res) => {
     res.status(503).json({
       error: "세션을 일시적으로 확인하지 못했습니다.",
       code: "SESSION_UNAVAILABLE",
+    });
+  }
+});
+
+app.post("/api/me/privacy-policy-consent", async (req, res) => {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
+
+  if (!token) {
+    return res.status(401).json({
+      error: "로그인이 필요합니다.",
+      code: "SESSION_INVALID",
+    });
+  }
+
+  try {
+    const session = await authService.authenticateAccessToken(token);
+    const consent = await authService.recordCurrentPrivacyPolicyConsent(
+      session.player.id,
+    );
+    res.status(201).json({
+      privacyPolicyConsentVersion: consent.policyVersion,
+      privacyPolicyConsentAgreedAt: consent.agreedAt,
+    });
+  } catch (error) {
+    if (error instanceof InvalidAccessTokenError) {
+      return res.status(401).json({
+        error: "세션이 만료되었거나 유효하지 않습니다.",
+        code: "SESSION_INVALID",
+      });
+    }
+
+    console.error("[AUTH] Failed to record privacy policy consent", error);
+    res.status(503).json({
+      error: "개인정보 처리방침 동의를 저장하지 못했습니다.",
+      code: "PRIVACY_POLICY_CONSENT_UNAVAILABLE",
     });
   }
 });

@@ -34,6 +34,13 @@ describe("GET /api/me session contract", () => {
     vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
       session,
     );
+    vi.spyOn(
+      AuthService.prototype,
+      "getCurrentPrivacyPolicyConsent",
+    ).mockResolvedValue({
+      policyVersion: "2026-08-18",
+      agreedAt: new Date("2026-08-18T00:00:00.000Z"),
+    });
 
     const response = await request(app)
       .get("/api/me")
@@ -44,6 +51,7 @@ describe("GET /api/me session contract", () => {
       id: player.id,
       authProvider: "kakao",
       accessToken: "refreshed-token",
+      privacyPolicyConsentVersion: "2026-08-18",
     });
   });
 

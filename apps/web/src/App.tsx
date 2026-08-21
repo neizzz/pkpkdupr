@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
+import PrivacyPolicyConsentGate from "./components/PrivacyPolicyConsentGate";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import PwaUpdatePrompt from "./components/PwaUpdatePrompt";
 import { AppUpdateProvider } from "./context/AppUpdateContext";
@@ -14,6 +15,7 @@ import Login from "./pages/Login";
 import PkeloKakaoCallback from "./pages/PkeloKakaoCallback";
 import PkeloKakaoOnboarding from "./pages/PkeloKakaoOnboarding";
 import PkeloLogin from "./pages/PkeloLogin";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const isPkeloAppHost = () => {
   if (typeof window === "undefined") {
@@ -73,8 +75,17 @@ const isKeyboardInputElement = (
 
 function AppRoutes() {
   const { isAuthenticated, isLoading, requiresPasswordChange } = useAuth();
+  const location = useLocation();
   const authenticatedHome = requiresPasswordChange ? "/force-change-password" : "/";
   const LoginPage = isPkeloAppHost() ? PkeloLogin : Login;
+
+  if (location.pathname === "/privacy") {
+    return (
+      <Routes>
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+      </Routes>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -90,6 +101,7 @@ function AppRoutes() {
   }
 
   return (
+    <PrivacyPolicyConsentGate>
     <Routes>
       <Route
         path="/dev/qrs"
@@ -164,6 +176,7 @@ function AppRoutes() {
         }
       />
     </Routes>
+    </PrivacyPolicyConsentGate>
   );
 }
 

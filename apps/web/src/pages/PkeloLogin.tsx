@@ -1,5 +1,5 @@
 import React from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { buildPublicAuthUrl } from "@/lib/api";
 import PkeloLoginLayout from "@/pages/PkeloLoginLayout";
 
@@ -24,6 +24,14 @@ const PkeloLogin: React.FC = () => {
       </a>
       <p className="mt-4 text-center text-xs leading-5 text-white/75">
         카카오 계정으로만 로그인할 수 있습니다.
+      </p>
+      <p className="mt-3 text-center text-xs leading-5 text-white/75">
+        <Link
+          to="/privacy"
+          className="underline underline-offset-4 hover:text-white"
+        >
+          개인정보 처리방침
+        </Link>
       </p>
     </PkeloLoginLayout>
   );

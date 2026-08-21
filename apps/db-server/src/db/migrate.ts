@@ -274,6 +274,19 @@ const migrations: Migration[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
+  {
+    id: "0009_player_privacy_policy_consents",
+    statements: [
+      `CREATE TABLE player_privacy_policy_consents (
+        id VARCHAR(255) PRIMARY KEY,
+        player_id VARCHAR(255) NOT NULL,
+        policy_version VARCHAR(32) NOT NULL,
+        agreed_at BIGINT NOT NULL,
+        UNIQUE KEY player_privacy_policy_consents_player_version_unique (player_id, policy_version),
+        INDEX player_privacy_policy_consents_player_id_idx (player_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

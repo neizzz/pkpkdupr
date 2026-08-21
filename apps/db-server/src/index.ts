@@ -42,6 +42,10 @@ import {
 import { FriendRepository } from "./repositories/FriendRepository";
 import { AuthRepository } from "./repositories/AuthRepository";
 import {
+  PrivacyPolicyConsentRepository,
+  type PrivacyPolicyConsent,
+} from "./repositories/PrivacyPolicyConsentRepository";
+import {
   getDevMockUsernames,
   isDevMockDataEnabled,
   TestDataRepository,
@@ -63,6 +67,7 @@ const matchRepository = new MatchRepository(db, client);
 const clubRepository = new ClubRepository(db, client, matchRepository);
 const friendRepository = new FriendRepository(db);
 const authRepository = new AuthRepository(client);
+const privacyPolicyConsentRepository = new PrivacyPolicyConsentRepository(client);
 const testDataRepository = new TestDataRepository(
   db,
   client,
@@ -72,6 +77,54 @@ const testDataRepository = new TestDataRepository(
 );
 
 app.use(express.json());
+
+app.get("/internal/privacy-policy-consents/:playerId", async (req, res) => {
+  const policyVersion =
+    typeof req.query.policyVersion === "string" ? req.query.policyVersion : "";
+  if (!policyVersion) {
+    return res.status(400).json({ error: "개인정보 처리방침 버전이 필요합니다." });
+  }
+
+  try {
+    res.json(
+      await privacyPolicyConsentRepository.findByPlayerAndVersion(
+        req.params.playerId,
+        policyVersion,
+      ),
+    );
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/privacy-policy-consents", async (req, res) => {
+  const { id, playerId, policyVersion, agreedAt } = req.body as Partial<
+    PrivacyPolicyConsent
+  >;
+  const parsedAgreedAt = agreedAt ? new Date(agreedAt) : null;
+  if (
+    typeof id !== "string" ||
+    typeof playerId !== "string" ||
+    typeof policyVersion !== "string" ||
+    !parsedAgreedAt ||
+    Number.isNaN(parsedAgreedAt.getTime())
+  ) {
+    return res.status(400).json({ error: "개인정보 처리방침 동의 정보가 올바르지 않습니다." });
+  }
+
+  try {
+    res.status(201).json(
+      await privacyPolicyConsentRepository.createIfMissing({
+        id,
+        playerId,
+        policyVersion,
+        agreedAt: parsedAgreedAt,
+      }),
+    );
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
 app.post("/internal/friends", async (req, res) => {
   try {

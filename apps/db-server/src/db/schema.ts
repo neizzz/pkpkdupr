@@ -90,6 +90,24 @@ export const playerAuthIdentities = mysqlTable(
   }),
 );
 
+export const playerPrivacyPolicyConsents = mysqlTable(
+  "player_privacy_policy_consents",
+  {
+    id: id("id").primaryKey(),
+    playerId: id("player_id").notNull(),
+    policyVersion: varchar("policy_version", { length: 32 }).notNull(),
+    agreedAt: unixTimestamp("agreed_at").notNull(),
+  },
+  (table) => ({
+    playerVersionUnique: uniqueIndex(
+      "player_privacy_policy_consents_player_version_unique",
+    ).on(table.playerId, table.policyVersion),
+    playerIndex: index("player_privacy_policy_consents_player_id_idx").on(
+      table.playerId,
+    ),
+  }),
+);
+
 export const oauthLoginTransactions = mysqlTable(
   "oauth_login_transactions",
   {

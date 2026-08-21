@@ -1,0 +1,2 @@
+export const PRIVACY_POLICY_VERSION = "2026-08-18";
+export const PRIVACY_POLICY_EFFECTIVE_DATE = "2026년 8월 18일";
