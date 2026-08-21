@@ -50,6 +50,9 @@ const MyProfile: React.FC<MyProfileProps> = ({
   const [matchStats, setMatchStats] = useState(createEmptyMatchStats);
   const [ratingDelta, setRatingDelta] = useState(createEmptyRatingDelta);
   const [ratingHistory, setRatingHistory] = useState(createEmptyRatingHistory);
+  const [recentProfileMatchItems, setRecentProfileMatchItems] = useState<
+    MatchInfo[]
+  >([]);
   const [profileMatches, setProfileMatches] = useState<MatchInfo[]>([]);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
   const [isMatchHistoryRequested, setIsMatchHistoryRequested] = useState(false);
@@ -60,6 +63,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
     useState<MatchInfo | null>(null);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
+  const matchHistoryRequestIdRef = useRef(0);
   const playerId = player?.id;
 
   const loadMatchStats = useCallback(
@@ -73,6 +77,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
         setMatchStats(createEmptyMatchStats());
         setRatingDelta(createEmptyRatingDelta());
         setRatingHistory(createEmptyRatingHistory());
+        setRecentProfileMatchItems([]);
         setProfileMatches([]);
         setIsMatchStatsLoading(false);
         return;
@@ -100,10 +105,8 @@ const MyProfile: React.FC<MyProfileProps> = ({
         if (!signal.aborted) {
           setMatchStats(data.matchStats);
           setRatingDelta(data.ratingDelta);
-          setProfileMatches(data.recentMatches);
+          setRecentProfileMatchItems(data.recentMatches);
           setRatingHistory(buildRatingHistory(data.ratingHistory));
-          setMatchHistoryPage(0);
-          setMatchHistoryTotal(0);
           lastSuccessfulLoadAtRef.current = Date.now();
         }
       } catch {
@@ -111,7 +114,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
           setMatchStats(createEmptyMatchStats());
           setRatingDelta(createEmptyRatingDelta());
           setRatingHistory(createEmptyRatingHistory());
-          setProfileMatches([]);
+          setRecentProfileMatchItems([]);
         }
         if (!signal.aborted && throwOnError) {
           throw new Error("내 경기 통계를 새로고침하지 못했습니다.");
@@ -129,6 +132,8 @@ const MyProfile: React.FC<MyProfileProps> = ({
     async (page: number, append = false) => {
       if (!token || !playerId) return;
 
+      const requestId = matchHistoryRequestIdRef.current + 1;
+      matchHistoryRequestIdRef.current = requestId;
       setIsMatchHistoryLoading(true);
       try {
         const searchParams = new URLSearchParams({
@@ -143,6 +148,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
         if (!res.ok) throw new Error("매치 목록을 불러오지 못했습니다.");
 
         const data = (await res.json()) as MatchListResponse;
+        if (matchHistoryRequestIdRef.current !== requestId) return;
         setProfileMatches((current) => {
           if (!append) return data.matches;
           const ids = new Set(current.map((match) => match.id));
@@ -151,7 +157,9 @@ const MyProfile: React.FC<MyProfileProps> = ({
         setMatchHistoryPage(page + 1);
         setMatchHistoryTotal(data.total);
       } finally {
-        setIsMatchHistoryLoading(false);
+        if (matchHistoryRequestIdRef.current === requestId) {
+          setIsMatchHistoryLoading(false);
+        }
       }
     },
     [playerId, token],
@@ -195,6 +203,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
       setMatchStats(createEmptyMatchStats());
       setRatingDelta(createEmptyRatingDelta());
       setRatingHistory(createEmptyRatingHistory());
+      setRecentProfileMatchItems([]);
       setProfileMatches([]);
       setIsMatchStatsLoading(false);
     }
@@ -205,8 +214,11 @@ const MyProfile: React.FC<MyProfileProps> = ({
     [playerId, profileMatches],
   );
   const recentProfileMatches = useMemo(
-    () => (playerId ? buildRecentProfileMatches(profileMatches, playerId) : []),
-    [playerId, profileMatches],
+    () =>
+      playerId
+        ? buildRecentProfileMatches(recentProfileMatchItems, playerId)
+        : [],
+    [playerId, recentProfileMatchItems],
   );
   const isMatchHistoryDrawerOpen =
     isMatchHistoryRequested && depthStacks[tabKey].includes(MATCH_HISTORY_DEPTH_ID);
@@ -238,6 +250,9 @@ const MyProfile: React.FC<MyProfileProps> = ({
       onClose: noop,
     });
     setIsMatchHistoryRequested(true);
+    setProfileMatches(recentProfileMatchItems);
+    setMatchHistoryPage(0);
+    setMatchHistoryTotal(0);
     void loadMatchHistory(0);
     window.requestAnimationFrame(() => scrollToTop("auto"));
   };

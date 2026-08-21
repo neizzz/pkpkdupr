@@ -75,7 +75,7 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
           emptyMessage="완료된 매치가 없어요."
           onPressMatch={onPressMatch}
         />
-        {hasMore ? (
+        {hasMore || isLoadingMore ? (
           <LoadMoreButton isLoading={isLoadingMore} onPress={onLoadMore} />
         ) : null}
       </div>

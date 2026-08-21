@@ -10,7 +10,6 @@ import { IoAdd, IoChevronForward, IoPerson } from "react-icons/io5";
 import { TbAffiliate } from "react-icons/tb";
 import type { Club, ClubMembership } from "@pkpkdupr/shared/club";
 import Avatar from "@/components/Avatar";
-import BottomSheet from "@/components/BottomSheet";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import type {
   MatchInfo,
@@ -22,12 +21,13 @@ import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
 import ProfileIdentityLabel from "@/components/ProfileIdentityLabel";
-import PlayerQrScannerSheetBody from "@/components/PlayerQrScannerSheetBody";
+import PlayerQrScannerModal from "@/components/PlayerQrScannerModal";
 import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
 import TabPanelHeader, {
   TabPanelHeaderGradientExtension,
 } from "@/components/TabPanelHeader";
+import TabPanelEmptyState from "@/components/TabPanelEmptyState";
 import TabPanelStatus from "@/components/TabPanelStatus";
 import type { PlayerInfo } from "@/context/AuthContext";
 import { useAuth } from "@/context/AuthContext";
@@ -188,9 +188,10 @@ const Members: React.FC = () => {
   );
   const [selectedMemberRatingHistory, setSelectedMemberRatingHistory] =
     useState(createEmptyRatingHistory);
-  const [selectedMemberMatches, setSelectedMemberMatches] = useState<
-    MatchInfo[]
-  >([]);
+  const [selectedMemberRecentMatches, setSelectedMemberRecentMatches] =
+    useState<MatchInfo[]>([]);
+  const [selectedMemberMatchHistoryMatches, setSelectedMemberMatchHistoryMatches] =
+    useState<MatchInfo[]>([]);
   const [isSelectedMemberStatsLoading, setIsSelectedMemberStatsLoading] =
     useState(false);
   const [isMemberMatchHistoryRequested, setIsMemberMatchHistoryRequested] =
@@ -208,6 +209,8 @@ const Members: React.FC = () => {
   const isMemberListLoading = useMinimumLoading(isLoading);
   const lastSuccessfulLoadAtRef = useRef<number | null>(null);
   const wasTabActiveRef = useRef(false);
+  const selectedMemberProfileRequestIdRef = useRef(0);
+  const selectedMemberMatchHistoryRequestIdRef = useRef(0);
   const memberFilters = useMemo<MemberFilter[]>(() => {
     return [
       { id: FRIENDS_MEMBER_FILTER_ID, label: "친구" },
@@ -342,19 +345,30 @@ const Members: React.FC = () => {
       throwOnError = false,
     ) => {
       if (!token) {
+        selectedMemberProfileRequestIdRef.current += 1;
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
         setSelectedMemberRatingHistory(createEmptyRatingHistory());
-        setSelectedMemberMatches([]);
+        setSelectedMemberRecentMatches([]);
+        setSelectedMemberMatchHistoryMatches([]);
+        setSelectedMemberMatchHistoryPage(0);
+        setSelectedMemberMatchHistoryTotal(0);
         setIsSelectedMemberStatsLoading(false);
         return;
       }
 
+      const requestId = selectedMemberProfileRequestIdRef.current + 1;
+      selectedMemberProfileRequestIdRef.current = requestId;
+
       if (!preserveVisibleData) {
+        selectedMemberMatchHistoryRequestIdRef.current += 1;
         setSelectedMemberMatchStats(createEmptyMatchStats());
         setSelectedMemberRatingDelta(createEmptyRatingDelta());
         setSelectedMemberRatingHistory(createEmptyRatingHistory());
-        setSelectedMemberMatches([]);
+        setSelectedMemberRecentMatches([]);
+        setSelectedMemberMatchHistoryMatches([]);
+        setSelectedMemberMatchHistoryPage(0);
+        setSelectedMemberMatchHistoryTotal(0);
         setIsSelectedMemberStatsLoading(true);
       }
 
@@ -371,24 +385,32 @@ const Members: React.FC = () => {
         }
 
         const data = (await res.json()) as PlayerProfileSummaryResponse;
+        if (selectedMemberProfileRequestIdRef.current !== requestId) return;
         setSelectedMemberMatchStats(data.matchStats);
         setSelectedMemberRatingDelta(data.ratingDelta);
-        setSelectedMemberMatches(data.recentMatches);
+        setSelectedMemberRecentMatches(data.recentMatches);
         setSelectedMemberRatingHistory(buildRatingHistory(data.ratingHistory));
-        setSelectedMemberMatchHistoryPage(0);
-        setSelectedMemberMatchHistoryTotal(0);
       } catch (err) {
-        if (!preserveVisibleData) {
+        if (
+          selectedMemberProfileRequestIdRef.current === requestId &&
+          !preserveVisibleData
+        ) {
           setSelectedMemberMatchStats(createEmptyMatchStats());
           setSelectedMemberRatingDelta(createEmptyRatingDelta());
           setSelectedMemberRatingHistory(createEmptyRatingHistory());
-          setSelectedMemberMatches([]);
+          setSelectedMemberRecentMatches([]);
         }
-        if (throwOnError) {
+        if (
+          selectedMemberProfileRequestIdRef.current === requestId &&
+          throwOnError
+        ) {
           throw err;
         }
       } finally {
-        if (!preserveVisibleData) {
+        if (
+          selectedMemberProfileRequestIdRef.current === requestId &&
+          !preserveVisibleData
+        ) {
           setIsSelectedMemberStatsLoading(false);
         }
       }
@@ -400,6 +422,8 @@ const Members: React.FC = () => {
     async (memberId: string, page: number, append = false) => {
       if (!token) return;
 
+      const requestId = selectedMemberMatchHistoryRequestIdRef.current + 1;
+      selectedMemberMatchHistoryRequestIdRef.current = requestId;
       setIsSelectedMemberMatchHistoryLoading(true);
       try {
         const searchParams = new URLSearchParams({
@@ -414,7 +438,8 @@ const Members: React.FC = () => {
         if (!res.ok) throw new Error("매치 목록을 불러오지 못했습니다.");
 
         const data = (await res.json()) as MatchListResponse;
-        setSelectedMemberMatches((current) => {
+        if (selectedMemberMatchHistoryRequestIdRef.current !== requestId) return;
+        setSelectedMemberMatchHistoryMatches((current) => {
           if (!append) return data.matches;
           const ids = new Set(current.map((match) => match.id));
           return [
@@ -425,7 +450,9 @@ const Members: React.FC = () => {
         setSelectedMemberMatchHistoryPage(page + 1);
         setSelectedMemberMatchHistoryTotal(data.total);
       } finally {
-        setIsSelectedMemberMatchHistoryLoading(false);
+        if (selectedMemberMatchHistoryRequestIdRef.current === requestId) {
+          setIsSelectedMemberMatchHistoryLoading(false);
+        }
       }
     },
     [token],
@@ -465,11 +492,17 @@ const Members: React.FC = () => {
 
   useEffect(() => {
     if (!token || !selectedMemberId) {
+      selectedMemberProfileRequestIdRef.current += 1;
+      selectedMemberMatchHistoryRequestIdRef.current += 1;
       setSelectedMemberMatchStats(createEmptyMatchStats());
       setSelectedMemberRatingDelta(createEmptyRatingDelta());
       setSelectedMemberRatingHistory(createEmptyRatingHistory());
-      setSelectedMemberMatches([]);
+      setSelectedMemberRecentMatches([]);
+      setSelectedMemberMatchHistoryMatches([]);
+      setSelectedMemberMatchHistoryPage(0);
+      setSelectedMemberMatchHistoryTotal(0);
       setIsSelectedMemberStatsLoading(false);
+      setIsSelectedMemberMatchHistoryLoading(false);
       return;
     }
 
@@ -587,6 +620,11 @@ const Members: React.FC = () => {
       kind: "member-profile",
       onClose: noop,
     });
+    selectedMemberMatchHistoryRequestIdRef.current += 1;
+    setSelectedMemberMatchHistoryMatches([]);
+    setSelectedMemberMatchHistoryPage(0);
+    setSelectedMemberMatchHistoryTotal(0);
+    setIsSelectedMemberMatchHistoryLoading(false);
     setIsSelectedMemberStatsLoading(true);
     setSelectedMemberId(memberId);
     window.requestAnimationFrame(() => scrollToTop("auto"));
@@ -602,16 +640,19 @@ const Members: React.FC = () => {
   const selectedMemberProfileMatches = useMemo(
     () =>
       selectedMemberId
-        ? buildProfileMatchList(selectedMemberMatches, selectedMemberId)
+        ? buildProfileMatchList(
+            selectedMemberMatchHistoryMatches,
+            selectedMemberId,
+          )
         : [],
-    [selectedMemberId, selectedMemberMatches],
+    [selectedMemberId, selectedMemberMatchHistoryMatches],
   );
   const recentSelectedMemberMatches = useMemo(
     () =>
       selectedMemberId
-        ? buildRecentProfileMatches(selectedMemberMatches, selectedMemberId)
+        ? buildRecentProfileMatches(selectedMemberRecentMatches, selectedMemberId)
         : [],
-    [selectedMemberId, selectedMemberMatches],
+    [selectedMemberId, selectedMemberRecentMatches],
   );
   const memberMatchHistoryDepthId = selectedMemberId
     ? `member-match-history:${selectedMemberId}`
@@ -662,6 +703,9 @@ const Members: React.FC = () => {
       onClose: noop,
     });
     setIsMemberMatchHistoryRequested(true);
+    setSelectedMemberMatchHistoryMatches(selectedMemberRecentMatches);
+    setSelectedMemberMatchHistoryPage(0);
+    setSelectedMemberMatchHistoryTotal(0);
     void loadSelectedMemberMatchHistory(selectedMemberId, 0);
     window.requestAnimationFrame(() => scrollToTop("auto"));
   };
@@ -799,11 +843,7 @@ const Members: React.FC = () => {
                 message={`현재 표시할 ${selectedMemberFilter.label} 소속 멤버가 없어요.`}
               />
             ) : (
-              <div className="members-friends-empty-state flex items-center justify-center px-6 py-12 text-center">
-                <p className="text-sm font-medium text-pkpk-sub-font">
-                  현재 표시할 친구가 없어요.
-                </p>
-              </div>
+              <TabPanelEmptyState message="현재 표시할 친구가 없어요." />
             ) : (
               <div>
                 <div className="relative z-10 overflow-hidden rounded-3xl bg-white mx-1.5 mt-1 pt-1">
@@ -886,18 +926,13 @@ const Members: React.FC = () => {
           </div>
         </div>
       </div>
-      <BottomSheet
+      <PlayerQrScannerModal
         isOpen={isFriendQrScannerOpen}
-        isActive={selectedTab === "members"}
         onOpenChange={setIsFriendQrScannerOpen}
         ariaLabel="친구 QR 스캔"
-      >
-        <PlayerQrScannerSheetBody
-          successMessage="친구로 추가했어요."
-          onScanned={addFriendByQr}
-          onClose={() => setIsFriendQrScannerOpen(false)}
-        />
-      </BottomSheet>
+        successMessage="친구로 추가했어요."
+        onScanned={addFriendByQr}
+      />
       {isMyProfileRequested ? (
         <RightDrawer
           isOpen={isMyProfileDrawerOpen}
@@ -951,11 +986,12 @@ const Members: React.FC = () => {
           matches={selectedMemberProfileMatches}
           isLoading={isSelectedMemberMatchHistoryLoading}
           hasMore={
-            selectedMemberMatches.length < selectedMemberMatchHistoryTotal
+            selectedMemberMatchHistoryMatches.length <
+            selectedMemberMatchHistoryTotal
           }
           isLoadingMore={
             isSelectedMemberMatchHistoryLoading &&
-            selectedMemberMatches.length > 0
+            selectedMemberMatchHistoryMatches.length > 0
           }
           onLoadMore={() =>
             selectedMemberId
