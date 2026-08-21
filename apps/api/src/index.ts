@@ -35,6 +35,7 @@ import type {
 } from "@pkpkdupr/shared/player";
 import type { VerifyPlayerQrTokenRequest } from "@pkpkdupr/shared/qr";
 import {
+  CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH,
   CLUB_DESCRIPTION_MAX_LENGTH,
   getUnicodeCodePointLength,
   type ClubRole,
@@ -784,8 +785,13 @@ const normalizeAnnouncementInput = (value: unknown) => {
   if (!title || title.length > 160) {
     throw new Error("공지 제목은 1~160자여야 합니다.");
   }
-  if (!body || body.length > 4000) {
-    throw new Error("공지 내용은 1~4000자여야 합니다.");
+  if (
+    !body ||
+    getUnicodeCodePointLength(body) > CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH
+  ) {
+    throw new Error(
+      `공지 내용은 1~${CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH}자여야 합니다.`,
+    );
   }
   return { title, body };
 };

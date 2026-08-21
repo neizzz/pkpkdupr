@@ -150,14 +150,16 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
         </p>
       ) : null}
 
-      <button
-        type="button"
-        disabled={isSaving}
-        onClick={() => void save()}
-        className="app-action-button rounded-2xl bg-pkpk-primary-bg text-base font-semibold text-white disabled:opacity-50"
-      >
-        {isSaving ? "저장 중..." : "저장"}
-      </button>
+      <BottomSheet.Actions>
+        <button
+          type="button"
+          disabled={isSaving}
+          onClick={() => void save()}
+          className="app-action-button rounded-2xl bg-pkpk-primary-bg text-base font-semibold text-white disabled:opacity-50"
+        >
+          {isSaving ? "저장 중..." : "저장"}
+        </button>
+      </BottomSheet.Actions>
       </BottomSheet.Body>
     </>
   );

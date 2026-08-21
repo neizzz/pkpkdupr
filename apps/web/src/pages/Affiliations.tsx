@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Button, useOverlayState } from "@heroui/react";
 import {
+  CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH,
   CLUB_ANNOUNCEMENT_MAX_COUNT,
   CLUB_DESCRIPTION_MAX_LENGTH,
   getUnicodeCodePointLength,
@@ -23,12 +24,13 @@ import {
   IoChevronForward,
   IoPeopleOutline,
   IoPeople,
+  IoMenuOutline,
   IoPerson,
   IoPersonAddOutline,
   IoShieldCheckmarkOutline,
 } from "react-icons/io5";
 import BottomSheet from "@/components/BottomSheet";
-import PlayerQrScannerSheetBody from "@/components/PlayerQrScannerSheetBody";
+import PlayerQrScannerModal from "@/components/PlayerQrScannerModal";
 import ActionChipButton from "@/components/ActionChipButton";
 import AppModal from "@/components/AppModal";
 import DetailPageHeader from "@/components/DetailPageHeader";
@@ -77,6 +79,47 @@ const getMatchName = (match: SharedMatch) =>
     .flatMap((team) => team.players.map((player) => player.username))
     .join(" · ");
 
+const announcementUrlPattern = /https?:\/\/[^\s<]+/g;
+const trailingUrlPunctuationPattern = /[),.!;]+$/;
+
+const AnnouncementBody: React.FC<{ body: string }> = ({ body }) => {
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+
+  for (const match of body.matchAll(announcementUrlPattern)) {
+    const rawUrl = match[0];
+    const start = match.index ?? 0;
+    const url = rawUrl.replace(trailingUrlPunctuationPattern, "");
+    const trailingText = rawUrl.slice(url.length);
+
+    nodes.push(body.slice(cursor, start));
+    if (url) {
+      nodes.push(
+        <a
+          key={`${start}-${url}`}
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="break-all text-pkpk-primary-bg underline underline-offset-2"
+        >
+          {url}
+        </a>,
+      );
+    } else {
+      nodes.push(rawUrl);
+    }
+    nodes.push(trailingText);
+    cursor = start + rawUrl.length;
+  }
+  nodes.push(body.slice(cursor));
+
+  return (
+    <p className="whitespace-pre-wrap break-words text-[1.1rem] leading-7 text-pkpk-sub-font">
+      {nodes}
+    </p>
+  );
+};
+
 const SectionTitle: React.FC<{
   icon?: React.ReactNode;
   title: string;
@@ -96,6 +139,7 @@ const Affiliations: React.FC = () => {
   const isOnline = useOnlineStatus();
   const {
     depthStacks,
+    closeDepth,
     pushDepth,
     registerPullToRefresh,
     registerScrollContainer,
@@ -124,8 +168,11 @@ const Affiliations: React.FC = () => {
   const [announcementToDelete, setAnnouncementToDelete] =
     useState<ClubAnnouncement | null>(null);
   const [isDeletingAnnouncement, setIsDeletingAnnouncement] = useState(false);
+  const [announcementError, setAnnouncementError] = useState<string | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] =
     useState<ClubAnnouncement | null>(null);
+  const [isAnnouncementActionMenuOpen, setIsAnnouncementActionMenuOpen] =
+    useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
   const [sessionName, setSessionName] = useState("");
@@ -323,20 +370,40 @@ const Affiliations: React.FC = () => {
     setIsAnnouncementCreateOpen(false);
     setAnnouncementTitle("");
     setAnnouncementBody("");
+    setAnnouncementError(null);
+  };
+
+  const runAnnouncementAction = async (action: () => Promise<void>) => {
+    try {
+      setAnnouncementError(null);
+      await action();
+      await reloadManagement();
+      return true;
+    } catch (actionError) {
+      setAnnouncementError(
+        actionError instanceof Error
+          ? actionError.message
+          : "공지 작업을 처리하지 못했어요.",
+      );
+      return false;
+    }
   };
 
   const createAnnouncement = async () => {
     if (
+      !isManager ||
       !selectedClubId ||
       !announcementTitle.trim() ||
       !announcementBody.trim() ||
+      getUnicodeCodePointLength(announcementBody) >
+        CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH ||
       (dashboard?.announcements.length ?? 0) >= CLUB_ANNOUNCEMENT_MAX_COUNT
     ) {
       return;
     }
     setIsCreatingAnnouncement(true);
     try {
-      const isCreated = await runManagementAction(async () => {
+      const isCreated = await runAnnouncementAction(async () => {
         await request(`/api/clubs/${encodeURIComponent(selectedClubId)}/announcements`, {
           method: "POST",
           body: JSON.stringify({ title: announcementTitle, body: announcementBody }),
@@ -351,10 +418,10 @@ const Affiliations: React.FC = () => {
   };
 
   const removeAnnouncement = async () => {
-    if (!announcementToDelete) return;
+    if (!isManager || !announcementToDelete) return;
     setIsDeletingAnnouncement(true);
     try {
-      const isRemoved = await runManagementAction(() =>
+      const isRemoved = await runAnnouncementAction(() =>
         request(
           `/api/club-announcements/${encodeURIComponent(announcementToDelete.id)}`,
           { method: "DELETE" },
@@ -363,6 +430,11 @@ const Affiliations: React.FC = () => {
       if (isRemoved) {
         announcementDeleteConfirmation.close();
         setAnnouncementToDelete(null);
+        setIsAnnouncementActionMenuOpen(false);
+        closeDepth(
+          "affiliations",
+          `club-announcement-detail:${announcementToDelete.id}`,
+        );
       }
     } finally {
       setIsDeletingAnnouncement(false);
@@ -475,6 +547,7 @@ const Affiliations: React.FC = () => {
         onClose: noop,
       });
       setSelectedAnnouncement(announcement);
+      setIsAnnouncementActionMenuOpen(false);
       window.requestAnimationFrame(() => scrollToTop("auto"));
     },
     [pushDepth, saveScrollPosition, scrollToTop],
@@ -563,6 +636,7 @@ const Affiliations: React.FC = () => {
 
   const completeAnnouncementDetailClose = useCallback(() => {
     setSelectedAnnouncement(null);
+    setIsAnnouncementActionMenuOpen(false);
     restoreScrollTop("affiliations");
   }, [restoreScrollTop]);
 
@@ -839,7 +913,27 @@ const Affiliations: React.FC = () => {
                     </section>
 
                     <section className="space-y-3 px-4 py-4">
-                      <SectionTitle icon={<AiOutlineNotification className="size-5" />} title="공지" />
+                      <SectionTitle
+                        icon={<AiOutlineNotification className="size-5" />}
+                        title="공지"
+                        action={
+                          isManager ? (
+                            <ActionChipButton
+                              disabled={
+                                !isOnline ||
+                                dashboard.announcements.length >=
+                                  CLUB_ANNOUNCEMENT_MAX_COUNT
+                              }
+                              onClick={() => {
+                                setAnnouncementError(null);
+                                setIsAnnouncementCreateOpen(true);
+                              }}
+                            >
+                              + 공지 추가
+                            </ActionChipButton>
+                          ) : undefined
+                        }
+                      />
                       {dashboard.announcements.length ? (
                         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
                           {dashboard.announcements
@@ -997,33 +1091,25 @@ const Affiliations: React.FC = () => {
               className="club-description-input min-h-24 w-full resize-none rounded-2xl border border-border bg-white px-4 py-3 text-sm text-pkpk-main-font outline-none focus:border-pkpk-primary-bg"
             />
           </div>
-          <Button
-            className="app-action-button rounded-2xl bg-pkpk-primary-bg font-bold text-white"
-            isDisabled={!clubName.trim() || isCreating || !isOnline}
-            onPress={() => void createClub()}
-          >
-            {isCreating ? "만드는 중..." : "클럽 만들기"}
-          </Button>
+          <BottomSheet.Actions>
+            <Button
+              className="app-action-button rounded-2xl bg-pkpk-primary-bg font-bold text-white"
+              isDisabled={!clubName.trim() || isCreating || !isOnline}
+              onPress={() => void createClub()}
+            >
+              {isCreating ? "만드는 중..." : "클럽 만들기"}
+            </Button>
+          </BottomSheet.Actions>
         </BottomSheet.Body>
       </BottomSheet>
 
-      <BottomSheet
+      <PlayerQrScannerModal
         isOpen={scannerTarget !== null}
-        isActive={selectedTab === "affiliations"}
         onOpenChange={(open) => !open && setScannerTarget(null)}
         ariaLabel="멤버 QR 스캔"
-      >
-        {scannerTarget ? (
-          <PlayerQrScannerSheetBody
-            key={scannerTarget}
-            successMessage="클럽 멤버로 추가했어요."
-            onScanned={handlePlayerScan}
-            onClose={() => setScannerTarget(null)}
-          />
-        ) : (
-          <div />
-        )}
-      </BottomSheet>
+        successMessage="클럽 멤버로 추가했어요."
+        onScanned={handlePlayerScan}
+      />
 
       <RightDrawer
         isOpen={isManagementOpen}
@@ -1063,71 +1149,6 @@ const Affiliations: React.FC = () => {
 
             {dashboard ? (
               <div className="divide-y-[6px] divide-pkpk-section-border">
-              <section className="space-y-3 px-4 py-4">
-                <SectionTitle
-                  icon={<AiOutlineNotification className="size-5" />}
-                  title="공지 관리"
-                  action={
-                    <ActionChipButton
-                      disabled={
-                        !isOnline ||
-                        dashboard.announcements.length >=
-                          CLUB_ANNOUNCEMENT_MAX_COUNT
-                      }
-                      onClick={() => setIsAnnouncementCreateOpen(true)}
-                    >
-                      + 공지 추가
-                    </ActionChipButton>
-                  }
-                />
-                <p className="text-xs text-pkpk-sub-font">
-                  현재 {dashboard.announcements.length}/
-                  {CLUB_ANNOUNCEMENT_MAX_COUNT}개 등록됨
-                </p>
-                {dashboard.announcements.length ? (
-                  <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
-                    {dashboard.announcements.map((announcement) => (
-                      <article key={announcement.id} className="px-3 py-3">
-                        <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            aria-label={`${announcement.title} 공지 상세 보기`}
-                            onClick={() => openAnnouncementDetail(announcement)}
-                            className="flex min-w-0 flex-1 items-start gap-2 text-left"
-                          >
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold text-pkpk-main-font">
-                                {announcement.title}
-                              </span>
-                              <span className="mt-1 block line-clamp-2 whitespace-pre-wrap text-xs leading-5 text-pkpk-sub-font">
-                                {announcement.body}
-                              </span>
-                            </span>
-                            <IoChevronForward className="mt-0.5 size-4 shrink-0 text-pkpk-sub-font" />
-                          </button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="shrink-0 rounded-xl px-2 text-xs font-semibold text-error"
-                            isDisabled={!isOnline || isDeletingAnnouncement}
-                            onPress={() => {
-                              setAnnouncementToDelete(announcement);
-                              announcementDeleteConfirmation.open();
-                            }}
-                          >
-                            제거
-                          </Button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="rounded-2xl border border-dashed border-border bg-white px-4 py-5 text-center text-sm text-pkpk-sub-font">
-                    등록된 공지가 없어요.
-                  </p>
-                )}
-              </section>
-
               <section className="space-y-3 px-4 py-4">
                 <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="세션 만들기" />
                 <div className="space-y-2 rounded-2xl border border-border bg-white p-3">
@@ -1206,9 +1227,11 @@ const Affiliations: React.FC = () => {
 
       <BottomSheet
         isOpen={isAnnouncementCreateOpen}
-        isActive={selectedTab === "affiliations" && isManagementOpen}
+        isActive={selectedTab === "affiliations" && isManager}
         onOpenChange={(open) =>
-          open ? setIsAnnouncementCreateOpen(true) : closeAnnouncementCreateSheet()
+          open && isManager
+            ? setIsAnnouncementCreateOpen(true)
+            : closeAnnouncementCreateSheet()
         }
         ariaLabel="공지 추가"
       >
@@ -1219,6 +1242,11 @@ const Affiliations: React.FC = () => {
           </p>
         </BottomSheet.Header>
         <BottomSheet.Body>
+          {announcementError ? (
+            <p className="text-sm text-error" role="alert">
+              {announcementError}
+            </p>
+          ) : null}
           <input
             value={announcementTitle}
             maxLength={160}
@@ -1228,12 +1256,22 @@ const Affiliations: React.FC = () => {
           />
           <textarea
             value={announcementBody}
-            maxLength={4000}
-            onChange={(event) => setAnnouncementBody(event.target.value)}
+            onChange={(event) =>
+              setAnnouncementBody(
+                truncateToUnicodeCodePoints(
+                  event.target.value,
+                  CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH,
+                ),
+              )
+            }
             placeholder="공지 내용"
             className="min-h-32 w-full resize-none rounded-2xl border border-border p-4 text-sm outline-none focus:border-pkpk-primary-bg"
           />
-          <div className="grid grid-cols-2 gap-2">
+          <p className="text-right text-xs text-pkpk-sub-font">
+            {getUnicodeCodePointLength(announcementBody)}/
+            {CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH}
+          </p>
+          <BottomSheet.Actions>
             <Button
               type="button"
               className="app-action-button rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
@@ -1247,6 +1285,7 @@ const Affiliations: React.FC = () => {
               className="app-action-button rounded-2xl bg-pkpk-primary-bg font-semibold text-white"
               isDisabled={
                 !isOnline ||
+                !isManager ||
                 isCreatingAnnouncement ||
                 !announcementTitle.trim() ||
                 !announcementBody.trim()
@@ -1255,7 +1294,7 @@ const Affiliations: React.FC = () => {
             >
               {isCreatingAnnouncement ? "등록 중..." : "공지 등록"}
             </Button>
-          </div>
+          </BottomSheet.Actions>
         </BottomSheet.Body>
       </BottomSheet>
 
@@ -1280,6 +1319,11 @@ const Affiliations: React.FC = () => {
           </span>
           을(를) 제거하면 되돌릴 수 없어요.
         </p>
+        {announcementError ? (
+          <p className="mt-2 text-sm text-error" role="alert">
+            {announcementError}
+          </p>
+        ) : null}
       </AppModal>
 
       {clubMatchHistoryClub && clubMatchHistoryDepthId ? (
@@ -1384,12 +1428,50 @@ const Affiliations: React.FC = () => {
               }
             />
             <article className="space-y-4 px-4 py-5">
-              <h2 className="break-words text-[1.5rem] font-bold text-pkpk-main-font">
-                {selectedAnnouncement.title}
-              </h2>
-              <p className="whitespace-pre-wrap break-words text-[1.1rem] leading-7 text-pkpk-sub-font">
-                {selectedAnnouncement.body}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="min-w-0 flex-1 break-words text-[1.5rem] font-bold text-pkpk-main-font">
+                  {selectedAnnouncement.title}
+                </h2>
+                {isManager ? (
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      aria-label="공지 메뉴"
+                      aria-haspopup="menu"
+                      aria-expanded={isAnnouncementActionMenuOpen}
+                      onClick={() =>
+                        setIsAnnouncementActionMenuOpen((isOpen) => !isOpen)
+                      }
+                      className="flex size-9 items-center justify-center rounded-full text-pkpk-sub-font transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                    >
+                      <IoMenuOutline aria-hidden="true" className="size-5" />
+                    </button>
+                    {isAnnouncementActionMenuOpen ? (
+                      <div
+                        role="menu"
+                        aria-label="공지 메뉴"
+                        className="absolute right-0 top-10 z-10 w-24 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-lg"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={!isOnline || isDeletingAnnouncement}
+                          onClick={() => {
+                            setAnnouncementError(null);
+                            setAnnouncementToDelete(selectedAnnouncement);
+                            setIsAnnouncementActionMenuOpen(false);
+                            announcementDeleteConfirmation.open();
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm font-semibold text-error transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          제거
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+              <AnnouncementBody body={selectedAnnouncement.body} />
             </article>
           </div>
         </RightDrawer>

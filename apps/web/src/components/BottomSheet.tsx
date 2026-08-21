@@ -25,6 +25,11 @@ interface BottomSheetHeaderProps {
   className?: string;
 }
 
+interface BottomSheetActionsProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
 const BottomSheetHeader: React.FC<BottomSheetHeaderProps> = ({
   children,
   className,
@@ -54,9 +59,31 @@ const BottomSheetBody: React.FC<BottomSheetBodyProps> = ({
   </div>
 );
 
+const BottomSheetActions: React.FC<BottomSheetActionsProps> = ({
+  children,
+  className,
+}) => {
+  const actionCount = React.Children.count(children);
+  const layoutClassName =
+    actionCount === 2
+      ? "grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+      : "grid-cols-1";
+
+  return (
+    <div
+      className={["grid w-full gap-2 [&>*]:w-full", layoutClassName, className]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+    </div>
+  );
+};
+
 type BottomSheetComponent = React.FC<BottomSheetProps> & {
   Header: typeof BottomSheetHeader;
   Body: typeof BottomSheetBody;
+  Actions: typeof BottomSheetActions;
 };
 
 const BottomSheet: BottomSheetComponent = ({
@@ -258,5 +285,6 @@ const BottomSheet: BottomSheetComponent = ({
 
 BottomSheet.Header = BottomSheetHeader;
 BottomSheet.Body = BottomSheetBody;
+BottomSheet.Actions = BottomSheetActions;
 
 export default BottomSheet;

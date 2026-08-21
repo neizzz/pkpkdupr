@@ -227,6 +227,11 @@ describe("admin match metadata", () => {
   });
 
   it("관리자 세션 조회 시 권한과 갱신 토큰을 함께 반환한다", async () => {
+    vi.spyOn(
+      AuthService.prototype,
+      "getCurrentPrivacyPolicyConsent",
+    ).mockResolvedValue(null);
+
     const response = await request(app)
       .get("/api/me")
       .set("Authorization", "Bearer admin-token");

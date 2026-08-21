@@ -27,7 +27,7 @@ const AvatarUploadConfirmSheetBody: React.FC<
     <p className="bs-text-body text-pkpk-sub-font">
       이 사진을 프로필 사진으로 사용할까요?
     </p>
-    <div className="grid w-full grid-cols-2 gap-2">
+    <BottomSheet.Actions>
       <button
         type="button"
         onClick={onCancel}
@@ -44,7 +44,7 @@ const AvatarUploadConfirmSheetBody: React.FC<
       >
         {isSaving ? "적용 중..." : "적용"}
       </button>
-    </div>
+    </BottomSheet.Actions>
     </BottomSheet.Body>
   </>
 );

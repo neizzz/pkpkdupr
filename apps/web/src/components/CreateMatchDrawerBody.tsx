@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Button } from "@heroui/react";
+import { Button, useOverlayState } from "@heroui/react";
 import { IoQrCodeSharp } from "react-icons/io5";
 import type { MatchMode } from "@pkpkdupr/shared/match";
 import { rememberRecentInputValue } from "@pkpkdupr/shared/recentInputHistory";
@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
 import ActionChipButton from "./ActionChipButton";
+import AppModal from "./AppModal";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
 import BottomSheet from "./BottomSheet";
@@ -148,6 +149,14 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     selectedMatchMembersRef,
     onQrScannerOpenChange,
     closeQrScannerRequestKey,
+  });
+  const qrScannerModalState = useOverlayState({
+    isOpen: isQrScannerOpen,
+    onOpenChange: (isOpen) => {
+      if (!isOpen) {
+        closeQrScanner();
+      }
+    },
   });
 
   const handleConfirmQrMember = () => {
@@ -305,7 +314,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
       selectedMatchType={selectedMatchType}
       selectedSwapMemberId={selectedSwapMemberId}
       currentPlayerMemberId={currentPlayerMember?.id}
-      interactive={!isQrScannerOpen}
+      interactive
       onRemoveMember={handleRemoveMatchMember}
       onPressMember={handleTeamMemberPress}
     />
@@ -315,36 +324,11 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     <>
       <BottomSheet.Header>
         <h2 className="bs-text-head text-left text-pkpk-main-font">
-          {isQrScannerOpen ? "QR코드 스캔" : "매치 생성"}
+          매치 생성
         </h2>
       </BottomSheet.Header>
       <BottomSheet.Body className="min-w-0 pb-4">
-        {isQrScannerOpen ? (
-          <CreateMatchQrScannerPanel
-            teamGrid={
-              <CreateMatchTeamGrid
-                previewTeams={previewTeams}
-                teams={teams}
-                selectedMatchType={selectedMatchType}
-                selectedSwapMemberId={selectedSwapMemberId}
-                currentPlayerMemberId={currentPlayerMember?.id}
-                interactive={false}
-                onRemoveMember={handleRemoveMatchMember}
-                onPressMember={handleTeamMemberPress}
-              />
-            }
-            videoRef={videoRef}
-            qrScannerStatus={qrScannerStatus}
-            qrScannerError={qrScannerError}
-            pendingQrMember={pendingQrMember}
-            currentPlayerId={player?.id}
-            onRetry={retryQrScan}
-            onConfirm={handleConfirmQrMember}
-            onClose={closeQrScanner}
-          />
-        ) : (
-          <>
-            <BottomSheetSection>
+        <BottomSheetSection>
               <div className="relative flex items-start justify-between gap-3">
                 <div>
                   <p className="bs-text-title text-pkpk-sub-font">팀 구성</p>
@@ -381,16 +365,16 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   {teamGrid}
                 </>
               )}
-            </BottomSheetSection>
+        </BottomSheetSection>
 
-            <BottomSheetSection>
+        <BottomSheetSection>
               <CreateMatchModeSelector
                 selectedMatchMode={selectedMatchMode}
                 onChange={setSelectedMatchMode}
               />
-            </BottomSheetSection>
+        </BottomSheetSection>
 
-            <BottomSheetSection>
+        <BottomSheetSection>
               <p className="bs-text-title text-pkpk-sub-font">
                 매치 시작(자동)
               </p>
@@ -401,9 +385,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   hour12: true,
                 })}
               </p>
-            </BottomSheetSection>
+        </BottomSheetSection>
 
-            <BottomSheetSection>
+        <BottomSheetSection>
               <p className="bs-text-title text-pkpk-sub-font">매치 이름</p>
               <div
                 role="radiogroup"
@@ -473,9 +457,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                   />
                 </div>
               </div>
-            </BottomSheetSection>
+        </BottomSheetSection>
 
-            <BottomSheetSection>
+        <BottomSheetSection>
               <label
                 htmlFor="create-match-location"
                 className="bs-text-title text-pkpk-sub-font"
@@ -495,15 +479,12 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 className="w-full"
                 inputClassName="app-mobile-input w-full rounded-2xl border border-border bg-white px-4 py-2 text-base text-pkpk-sub-font outline-none"
               />
-            </BottomSheetSection>
-          </>
-        )}
-        {!isQrScannerOpen ? (
-          <div className="flex flex-col gap-2">
+        </BottomSheetSection>
+        <div className="flex flex-col gap-2">
             {createMatchError ? (
               <p className="bs-text-body text-error">{createMatchError}</p>
             ) : null}
-            <div className="grid w-full grid-cols-3 gap-2">
+            <BottomSheet.Actions>
               <Button
                 className="app-action-button w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
                 isDisabled={isCreatingMatch}
@@ -515,7 +496,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 ariaLabel="길게 눌러 매치생성"
                 onComplete={handleCreateMatchPress}
                 isDisabled={!canCreateMatch || isCreatingMatch}
-                className="app-action-button col-span-2 w-full justify-center rounded-2xl bg-[#409eff] px-3 py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+                className="app-action-button w-full justify-center rounded-2xl bg-[#409eff] px-3 py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
                 progressClassName="bg-white/20"
               >
                 {!isOnline
@@ -524,10 +505,40 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                     ? "생성 중..."
                     : "길게 눌러 매치생성"}
               </HoldToConfirmButton>
-            </div>
-          </div>
-        ) : null}
+            </BottomSheet.Actions>
+        </div>
       </BottomSheet.Body>
+      <AppModal
+        state={qrScannerModalState}
+        ariaLabel="매치 멤버 QR 스캔"
+        title="QR 코드 스캔"
+        bodyClassName="flex flex-col"
+      >
+        {isQrScannerOpen ? (
+          <CreateMatchQrScannerPanel
+            teamGrid={
+              <CreateMatchTeamGrid
+                previewTeams={previewTeams}
+                teams={teams}
+                selectedMatchType={selectedMatchType}
+                selectedSwapMemberId={selectedSwapMemberId}
+                currentPlayerMemberId={currentPlayerMember?.id}
+                interactive={false}
+                onRemoveMember={handleRemoveMatchMember}
+                onPressMember={handleTeamMemberPress}
+              />
+            }
+            videoRef={videoRef}
+            qrScannerStatus={qrScannerStatus}
+            qrScannerError={qrScannerError}
+            pendingQrMember={pendingQrMember}
+            currentPlayerId={player?.id}
+            onRetry={retryQrScan}
+            onConfirm={handleConfirmQrMember}
+            onClose={closeQrScanner}
+          />
+        ) : null}
+      </AppModal>
     </>
   );
 };

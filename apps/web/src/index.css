@@ -399,7 +399,7 @@
   container-type: inline-size;
 }
 
-.members-friends-empty-state {
+.tab-panel-empty-state {
   min-height: calc(
     100dvh - 13rem - var(--safe-bottom) - var(--app-keyboard-offset)
   );

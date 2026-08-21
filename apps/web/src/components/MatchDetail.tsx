@@ -1077,7 +1077,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           {resultError ? (
             <p className="text-xs font-medium text-red-500">{resultError}</p>
           ) : null}
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <BottomSheet.Actions className="mt-2">
             <Button
               className="app-action-button w-full rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
               onPress={closeResultSheet}
@@ -1092,7 +1092,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             >
               {isSubmittingResult ? "입력 중..." : resultActionLabel}
             </Button>
-          </div>
+          </BottomSheet.Actions>
         </BottomSheet.Body>
       </BottomSheet>
     </div>

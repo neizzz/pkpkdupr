@@ -1,13 +1,18 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+const privacyPolicyVersion = "2026-08-18";
+
 type FixtureOptions = {
   authenticated?: boolean;
   clubEmpty?: boolean;
+  clubRole?: "owner" | "manager" | "member";
   historyEmpty?: boolean;
   longProfileName?: boolean;
   matchFeedEmpty?: boolean;
+  matchScenario?: "default" | "result-entry" | "result-rejection";
   memberEmpty?: boolean;
   profileEmpty?: boolean;
+  privacyPolicyConsentVersion?: string | null;
   qrError?: boolean;
   sessionEmpty?: boolean;
   useFixedClock?: boolean;
@@ -33,6 +38,7 @@ const me = {
   statusMessage: "오늘도 즐겁게",
   statusMessageBackgroundColor: "#0EA5E9",
   authProvider: "password",
+  privacyPolicyConsentVersion: "2026-08-18",
   isFirstLogin: false,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-08-12T00:00:00.000Z",
@@ -125,6 +131,33 @@ const primaryMatch = {
   ],
 };
 
+const matchForScenario = (scenario: FixtureOptions["matchScenario"] = "default") => {
+  if (scenario === "result-entry") {
+    return {
+      ...primaryMatch,
+      status: "created",
+      scores: [],
+      resultSubmittedByPlayerId: null,
+      resultSubmittedAt: null,
+      approvals: [],
+      completedAt: null,
+      ratingChanges: [],
+    };
+  }
+
+  if (scenario === "result-rejection") {
+    return {
+      ...primaryMatch,
+      status: "pending-approval",
+      approvals: [],
+      completedAt: null,
+      ratingChanges: [],
+    };
+  }
+
+  return primaryMatch;
+};
+
 const secondaryMatch = {
   ...primaryMatch,
   id: "match-2",
@@ -195,12 +228,15 @@ const club = {
   updatedAt: "2026-08-10T00:00:00.000Z",
 };
 
-const clubDashboard = (empty = false) => ({
+const clubDashboard = (
+  empty = false,
+  membershipRole: NonNullable<FixtureOptions["clubRole"]> = "owner",
+) => ({
   club,
   membership: {
     clubId: club.id,
     playerId: me.id,
-    role: "owner",
+    role: membershipRole,
     status: "active",
     requestedAt: "2026-01-01T00:00:00.000Z",
     joinedAt: "2026-01-01T00:00:00.000Z",
@@ -224,7 +260,7 @@ const clubDashboard = (empty = false) => ({
           id: "announcement-1",
           clubId: club.id,
           title: "토요일 오픈플레이 안내",
-          body: "오전 10시에 A 코트에서 만나요.",
+          body: "오전 10시에 A 코트에서 만나요. https://pkelo.app/notice\nhttps://example.com/guide",
           createdByPlayerId: me.id,
           createdAt: "2026-08-12T00:00:00.000Z",
           updatedAt: "2026-08-12T00:00:00.000Z",
@@ -282,11 +318,17 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
       window.localStorage.setItem("token", "visual-snapshot-token");
     }
   }, options.authenticated !== false);
+  let privacyPolicyConsentVersion =
+    options.privacyPolicyConsentVersion === undefined
+      ? privacyPolicyVersion
+      : options.privacyPolicyConsentVersion;
   await page.route("**/api/**", async (route) => {
     const requestUrl = new URL(route.request().url());
     const path = requestUrl.pathname;
     const profile = profileSummary(options.profileEmpty);
-    const dashboard = clubDashboard(options.profileEmpty);
+    const match = matchForScenario(options.matchScenario);
+    const clubRole = options.clubRole ?? "owner";
+    const dashboard = clubDashboard(options.profileEmpty, clubRole);
 
     if (path === "/api/runtime-notice") {
       return fulfillJson(route, { enabled: false });
@@ -298,7 +340,15 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
           ? "김하늘🎾Alice피클볼이름이길어도아이디옆에서최대한길게표시합니다"
           : me.username,
         isFirstLogin: false,
+        privacyPolicyConsentVersion,
       });
+    }
+    if (path === "/api/me/privacy-policy-consent") {
+      privacyPolicyConsentVersion = privacyPolicyVersion;
+      return fulfillJson(route, {
+        privacyPolicyConsentVersion,
+        privacyPolicyConsentAgreedAt: "2026-08-18T00:00:00.000Z",
+      }, 201);
     }
     if (path === "/api/player-qr-token") {
       return options.qrError
@@ -313,7 +363,7 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
         ? []
         : [
             { kind: "session", session },
-            { kind: "match", match: primaryMatch },
+            { kind: "match", match },
           ];
       return fulfillJson(route, { items, total: items.length });
     }
@@ -331,7 +381,7 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
                 membership: {
                   clubId: club.id,
                   playerId: me.id,
-                  role: "owner",
+                  role: clubRole,
                   status: "active",
                   requestedAt: "2026-01-01T00:00:00.000Z",
                   joinedAt: "2026-01-01T00:00:00.000Z",
@@ -354,11 +404,11 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
       return fulfillJson(route, profile);
     }
     if (path === "/api/matches") {
-      const matches = options.historyEmpty ? [] : [primaryMatch, secondaryMatch];
+      const matches = options.historyEmpty ? [] : [match, secondaryMatch];
       return fulfillJson(route, { matches, total: matches.length });
     }
     if (path === `/api/matches/${primaryMatch.id}`) {
-      return fulfillJson(route, primaryMatch);
+      return fulfillJson(route, match);
     }
     if (path === `/api/match-sessions/${session.id}/matches`) {
       return fulfillJson(route, options.sessionEmpty ? [] : [primaryMatch]);
@@ -384,6 +434,14 @@ const capture = (page: Page, name: string) =>
     fullPage: true,
   });
 
+const disableQrCamera = (page: Page) =>
+  page.evaluate(() => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: undefined,
+    });
+  });
+
 const openMemberProfile = async (page: Page, options: FixtureOptions = {}) => {
   await openApp(page, options);
   await page.getByRole("button", { name: "박지우 프로필 보기" }).click();
@@ -401,6 +459,38 @@ test("카카오 로그인 화면", async ({ page }) => {
   await page.goto("http://pkelo.localhost:4173/login");
   await expect(page.getByRole("link", { name: "카카오 로그인" })).toBeVisible();
   await capture(page, "kakao-login.png");
+});
+
+test("로그인 성공 후 개인정보 처리방침 동의 화면", async ({ page }) => {
+  await installFixture(page, { privacyPolicyConsentVersion: null });
+  await page.goto("/");
+
+  await expect(
+    page.getByRole("heading", { name: "개인정보 처리방침 동의" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "동의하고 시작하기" })).toBeDisabled();
+  await capture(page, "privacy-policy-consent.png");
+
+  await page.getByRole("link", { name: "개인정보 처리방침" }).click();
+  await expect(
+    page.getByRole("heading", { name: "개인정보 처리방침" }),
+  ).toBeVisible();
+  await capture(page, "privacy-policy.png");
+});
+
+test("기존 로그인 사용자는 계정별 동의를 저장한 뒤 앱을 연다", async ({
+  page,
+}) => {
+  await installFixture(page, { privacyPolicyConsentVersion: null });
+  await page.goto("/");
+
+  await expect(
+    page.getByRole("heading", { name: "개인정보 처리방침 동의" }),
+  ).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "동의하고 시작하기" }).click();
+
+  await expect(page.getByRole("heading", { name: "Players" })).toBeVisible();
 });
 
 test("매치 탭의 with-data와 empty 상태", async ({ page }) => {
@@ -456,6 +546,47 @@ test("매치 생성 바텀시트와 내 QR modal", async ({ page }) => {
   await capture(page, "player-qr-modal--empty.png");
 });
 
+test("QR 스캔은 모든 진입점에서 modal로 열린다", async ({ page }) => {
+  await openApp(page);
+  await disableQrCamera(page);
+
+  await page.getByRole("button", { name: "친구 추가" }).click();
+  const friendScanner = page.getByRole("dialog", { name: "친구 QR 스캔" });
+  await expect(friendScanner).toBeVisible();
+  await expect(
+    friendScanner.getByText("이 브라우저에서는 카메라 스캔을 사용할 수 없어요."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "친구 QR 스캔 닫기" }).click();
+  await expect(friendScanner).toBeHidden();
+
+  await page.getByRole("tab", { name: "내 매치" }).click();
+  await page.getByRole("button", { name: "+ 매치 만들기" }).click();
+  const createMatchSheet = page.getByRole("dialog", { name: "Create match" });
+  await expect(createMatchSheet).toBeVisible();
+  await createMatchSheet.getByRole("button", { name: "멤버 추가" }).click();
+  const matchScanner = page.getByRole("dialog", {
+    name: "매치 멤버 QR 스캔",
+  });
+  await expect(matchScanner).toBeVisible();
+  await expect(
+    matchScanner.getByText("이 브라우저에서는 카메라 스캔을 사용할 수 없어요."),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "매치 멤버 QR 스캔 닫기" })
+    .click();
+  await expect(matchScanner).toBeHidden();
+  await expect(createMatchSheet).toBeVisible();
+  await page.getByRole("button", { name: "취소" }).click();
+
+  await page.getByRole("tab", { name: "클럽" }).click();
+  await page.getByRole("button", { name: "멤버 초대" }).click();
+  const clubScanner = page.getByRole("dialog", { name: "멤버 QR 스캔" });
+  await expect(clubScanner).toBeVisible();
+  await expect(
+    clubScanner.getByText("이 브라우저에서는 카메라 스캔을 사용할 수 없어요."),
+  ).toBeVisible();
+});
+
 test("플레이어 목록의 with-data와 empty 상태", async ({ page }) => {
   await openApp(page);
   const addFriendButton = page.getByRole("button", { name: "친구 추가" });
@@ -495,11 +626,18 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
     page.getByRole("region", { name: "최고 평점" }),
   ).toContainText("4.120");
   await capture(page, "member-profile--with-data.png");
+  const memberHistoryResponse = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/matches",
+  );
   await page.getByRole("button", { name: "전체 보기" }).click();
   const profileMatchHistoryDrawer = page.getByRole("dialog", {
     name: "전체 매치",
   });
   await expect(profileMatchHistoryDrawer).toBeVisible();
+  await memberHistoryResponse;
+  await expect(
+    profileMatchHistoryDrawer.getByLabel("추가 매치 로딩 중"),
+  ).toBeHidden();
   await expect(profileMatchHistoryDrawer.getByText("박지우", { exact: true })).toBeVisible();
   await capture(page, "profile-match-history--with-data.png");
 
@@ -525,6 +663,61 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
     .poll(() => emptyProfileMatchHistoryDrawer.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
   await capture(page, "profile-match-history--empty.png");
+});
+
+test("프로필 전체 매치는 최근 매치를 유지하며 추가 로딩 상태를 표시한다", async ({
+  page,
+}) => {
+  await openMemberProfile(page);
+
+  let releaseHistoryRequest: (() => void) | undefined;
+  const historyRequestPending = new Promise<void>((resolve) => {
+    releaseHistoryRequest = resolve;
+  });
+  await page.route("**/api/matches?*", async (route) => {
+    await historyRequestPending;
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { name: "전체 보기" }).click();
+  const historyDrawer = page.getByRole("dialog", { name: "전체 매치" });
+  const loadingSpinner = historyDrawer.getByLabel("추가 매치 로딩 중");
+
+  await expect(historyDrawer.getByText("박지우", { exact: true })).toBeVisible();
+  await expect(loadingSpinner).toBeVisible();
+  await expect(
+    historyDrawer.getByText("완료된 매치가 없어요.", { exact: true }),
+  ).toBeHidden();
+
+  releaseHistoryRequest?.();
+  await expect(loadingSpinner).toBeHidden();
+  await expect(historyDrawer.getByText("박지우", { exact: true })).toBeVisible();
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await openMyProfile(page);
+
+  let releaseMyHistoryRequest: (() => void) | undefined;
+  const myHistoryRequestPending = new Promise<void>((resolve) => {
+    releaseMyHistoryRequest = resolve;
+  });
+  await page.route("**/api/matches?*", async (route) => {
+    await myHistoryRequestPending;
+    await route.fallback();
+  });
+
+  await page.getByRole("button", { name: "전체 보기" }).click();
+  const myHistoryDrawer = page.getByRole("dialog", { name: "전체 매치" });
+  const myLoadingSpinner = myHistoryDrawer.getByLabel("추가 매치 로딩 중");
+
+  await expect(myHistoryDrawer.getByText("김하늘", { exact: true })).toBeVisible();
+  await expect(myLoadingSpinner).toBeVisible();
+  await expect(
+    myHistoryDrawer.getByText("완료된 매치가 없어요.", { exact: true }),
+  ).toBeHidden();
+
+  releaseMyHistoryRequest?.();
+  await expect(myLoadingSpinner).toBeHidden();
+  await expect(myHistoryDrawer.getByText("김하늘", { exact: true })).toBeVisible();
 });
 
 test("프로필 매치 상세 헤더의 프로필 식별 표시", async ({ page }) => {
@@ -585,11 +778,18 @@ test("내 프로필과 데이터 독립 바텀시트", async ({ page }) => {
   await capture(page, "status-message-sheet--with-data.png");
 
   await page.getByRole("button", { name: "Close" }).click();
+  const myHistoryResponse = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === "/api/matches",
+  );
   await page.getByRole("button", { name: "전체 보기" }).click();
   const myProfileMatchHistoryDrawer = page.getByRole("dialog", {
     name: "전체 매치",
   });
   await expect(myProfileMatchHistoryDrawer).toBeVisible();
+  await myHistoryResponse;
+  await expect(
+    myProfileMatchHistoryDrawer.getByLabel("추가 매치 로딩 중"),
+  ).toBeHidden();
   await expect(myProfileMatchHistoryDrawer.getByText("김하늘", { exact: true })).toBeVisible();
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -667,6 +867,10 @@ test("클럽 공지는 drawer에서 전체 내용을 보여준다", async ({ pag
   await openApp(page);
   await page.getByRole("tab", { name: "클럽" }).click();
 
+  await page.getByRole("button", { name: "+ 공지 추가" }).click();
+  await expect(page.getByRole("dialog", { name: "공지 추가" })).toBeVisible();
+  await page.getByRole("button", { name: "취소" }).click();
+
   const announcementButton = page.getByRole("button", {
     name: "토요일 오픈플레이 안내 공지 상세 보기",
   });
@@ -680,6 +884,13 @@ test("클럽 공지는 drawer에서 전체 내용을 보여준다", async ({ pag
   await expect(
     announcementDetail.getByText("오전 10시에 A 코트에서 만나요."),
   ).toBeVisible();
+  await expect(
+    announcementDetail.getByRole("link", { name: "https://pkelo.app/notice" }),
+  ).toHaveAttribute("href", "https://pkelo.app/notice");
+  await expect(
+    announcementDetail.getByRole("link", { name: "https://example.com/guide" }),
+  ).toHaveAttribute("target", "_blank");
+  await expect(announcementDetail.getByRole("button", { name: "공지 메뉴" })).toBeVisible();
   await capture(page, "club-announcement-detail--with-data.png");
   await announcementDetail.getByRole("button", { name: "뒤로가기" }).click();
   await expect(announcementDetail).toHaveCount(0);
@@ -688,16 +899,35 @@ test("클럽 공지는 drawer에서 전체 내용을 보여준다", async ({ pag
   const managementDrawer = page.getByRole("dialog", {
     name: "클럽 운영진 관리",
   });
-  const managementAnnouncementButton = managementDrawer.getByRole("button", {
-    name: "토요일 오픈플레이 안내 공지 상세 보기",
-  });
-  await expect(managementAnnouncementButton).toBeVisible();
-  await managementAnnouncementButton.click();
-
-  await expect(announcementDetail).toBeVisible();
   await expect(
-    announcementDetail.getByText("오전 10시에 A 코트에서 만나요."),
-  ).toBeVisible();
+    managementDrawer.getByRole("button", { name: "+ 공지 추가" }),
+  ).toHaveCount(0);
+});
+
+test("운영진은 소속 탭에서 공지를 관리한다", async ({ page }) => {
+  await openApp(page, { clubRole: "manager" });
+  await page.getByRole("tab", { name: "클럽" }).click();
+
+  await expect(page.getByRole("button", { name: "+ 공지 추가" })).toBeVisible();
+  await page
+    .getByRole("button", { name: "토요일 오픈플레이 안내 공지 상세 보기" })
+    .click();
+  const announcementDetail = page.getByRole("dialog", { name: "공지 상세" });
+  await announcementDetail.getByRole("button", { name: "공지 메뉴" }).click();
+  await expect(announcementDetail.getByRole("menuitem", { name: "제거" })).toBeVisible();
+});
+
+test("일반 멤버에게는 공지 관리 제어를 표시하지 않는다", async ({ page }) => {
+  await openApp(page, { clubRole: "member" });
+  await page.getByRole("tab", { name: "클럽" }).click();
+
+  await expect(page.getByRole("button", { name: "+ 공지 추가" })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "토요일 오픈플레이 안내 공지 상세 보기" })
+    .click();
+  const announcementDetail = page.getByRole("dialog", { name: "공지 상세" });
+  await expect(announcementDetail).toBeVisible();
+  await expect(announcementDetail.getByRole("button", { name: "공지 메뉴" })).toHaveCount(0);
 });
 
 test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async ({ page }) => {
@@ -722,7 +952,9 @@ test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async
   await clubManagementButton.click({ position: { x: 20, y: 20 } });
   await expect(clubManagementDrawer).toBeVisible();
   await expect(clubManagementDrawerElement).toHaveCount(1);
-  await expect(clubManagementDrawer.getByText("공지 관리")).toBeVisible();
+  await expect(
+    clubManagementDrawer.getByRole("heading", { name: "세션 만들기" }),
+  ).toBeVisible();
 });
 
 test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) => {
@@ -738,13 +970,127 @@ test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) =
   await capture(page, "club-match-history--empty.png");
 });
 
-test("설정 탭과 로그아웃 확인 modal", async ({ page }) => {
+test("설정 탭 운영방침 drawer와 로그아웃 확인 modal", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "설정" }).click();
   await expect(page.getByRole("heading", { name: "앱 버전" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "계정" })).toBeHidden();
+  await expect(page.getByRole("button", { name: "운영방침" })).toBeVisible();
   await capture(page, "settings.png");
+
+  await page.getByRole("button", { name: "운영방침" }).click();
+  const operatingPolicyDrawer = page.getByRole("dialog", { name: "운영방침" });
+  const policyScrollArea = operatingPolicyDrawer.locator(
+    '[aria-labelledby="privacy-policy-title"] > div',
+  );
+  await expect(operatingPolicyDrawer).toBeVisible();
+  await expect(operatingPolicyDrawer.getByText("상호")).toBeVisible();
+  await expect(operatingPolicyDrawer.getByText("벌스")).toBeVisible();
+  await expect(operatingPolicyDrawer.getByText("163-20-01593")).toBeVisible();
+  await expect(policyScrollArea).toHaveCSS("overflow-y", "auto");
+  await capture(page, "operating-policy-drawer.png");
+
+  await operatingPolicyDrawer.getByRole("button", { name: "뒤로가기" }).click();
+  await expect(operatingPolicyDrawer).toHaveCount(0);
+
   await page.getByRole("button", { name: "로그아웃" }).click();
   await expect(page.getByRole("dialog", { name: "로그아웃 확인" })).toBeVisible();
   await capture(page, "logout-modal.png");
+});
+
+test("QR 스캔 modal의 모든 진입점", async ({ page }) => {
+  await openApp(page);
+  await disableQrCamera(page);
+
+  await page.getByRole("button", { name: "친구 추가" }).click();
+  const friendScanner = page.getByRole("dialog", { name: "친구 QR 스캔" });
+  await expect(friendScanner).toContainText(
+    "이 브라우저에서는 카메라 스캔을 사용할 수 없어요.",
+  );
+  await capture(page, "friend-qr-scanner-modal--camera-unavailable.png");
+  await page.getByRole("button", { name: "친구 QR 스캔 닫기" }).click();
+
+  await page.getByRole("tab", { name: "내 매치" }).click();
+  await page.getByRole("button", { name: "+ 매치 만들기" }).click();
+  const createMatchSheet = page.getByRole("dialog", { name: "Create match" });
+  await createMatchSheet.getByRole("button", { name: "멤버 추가" }).click();
+  const matchScanner = page.getByRole("dialog", {
+    name: "매치 멤버 QR 스캔",
+  });
+  await expect(matchScanner).toContainText(
+    "이 브라우저에서는 카메라 스캔을 사용할 수 없어요.",
+  );
+  await capture(page, "match-member-qr-scanner-modal--camera-unavailable.png");
+  await page
+    .getByRole("button", { name: "매치 멤버 QR 스캔 닫기" })
+    .click();
+  await page.getByRole("button", { name: "취소" }).click();
+
+  await page.getByRole("tab", { name: "클럽" }).click();
+  await page.getByRole("button", { name: "멤버 초대" }).click();
+  const clubScanner = page.getByRole("dialog", { name: "멤버 QR 스캔" });
+  await expect(clubScanner).toContainText(
+    "이 브라우저에서는 카메라 스캔을 사용할 수 없어요.",
+  );
+  await capture(page, "club-member-qr-scanner-modal--camera-unavailable.png");
+});
+
+test("결과 입력 바텀시트와 결과 거부 확인 dialog", async ({ page }) => {
+  await openApp(page, { matchScenario: "result-entry" });
+  await page.getByRole("tab", { name: "내 매치" }).click();
+  await page
+    .getByRole("button", { name: "테스트 복식 매치 상세 보기" })
+    .click();
+  await page.getByRole("button", { name: "결과 입력" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "경기 결과 입력" }),
+  ).toBeVisible();
+  await capture(page, "match-result-entry-sheet.png");
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await openApp(page, { matchScenario: "result-rejection" });
+  await page.getByRole("tab", { name: "내 매치" }).click();
+  await page
+    .getByRole("button", { name: "테스트 복식 매치 상세 보기" })
+    .click();
+  await page.getByText("결과 거부", { exact: true }).last().click();
+  await expect(
+    page.getByRole("alertdialog", { name: "정말 거부하시겠습니까?" }),
+  ).toBeVisible();
+  await capture(page, "match-result-rejection-dialog.png");
+});
+
+test("프로필 사진 확인 바텀시트", async ({ page }) => {
+  await openMyProfile(page);
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jf7sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  await expect(
+    page.getByRole("dialog", { name: "프로필 사진 확인" }),
+  ).toBeVisible();
+  await capture(page, "avatar-confirm-sheet.png");
+});
+
+test("공지 추가 바텀시트와 제거 확인 modal", async ({ page }) => {
+  await openApp(page);
+  await page.getByRole("tab", { name: "클럽" }).click();
+  await page.getByRole("button", { name: "+ 공지 추가" }).click();
+  await expect(page.getByRole("dialog", { name: "공지 추가" })).toBeVisible();
+  await capture(page, "club-announcement-create-sheet.png");
+  await page.getByRole("button", { name: "취소" }).click();
+
+  await page
+    .getByRole("button", { name: "토요일 오픈플레이 안내 공지 상세 보기" })
+    .click();
+  await page.getByRole("button", { name: "공지 메뉴" }).click();
+  await page.getByRole("menuitem", { name: "제거" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "공지 제거 확인" }),
+  ).toBeVisible();
+  await capture(page, "club-announcement-delete-modal.png");
 });

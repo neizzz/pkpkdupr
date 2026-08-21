@@ -221,6 +221,22 @@ describe("club API", () => {
     });
   });
 
+  it("501 코드포인트 공지 내용은 거절한다", async () => {
+    const createAnnouncement = vi.spyOn(
+      ClubRepository.prototype,
+      "createAnnouncement",
+    );
+
+    const response = await request(app)
+      .post(`/api/clubs/${clubId}/announcements`)
+      .set("Authorization", "Bearer test-token")
+      .send({ title: announcement.title, body: "😀".repeat(501) });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "공지 내용은 1~500자여야 합니다." });
+    expect(createAnnouncement).not.toHaveBeenCalled();
+  });
+
   it("공지 한도 초과는 409로 반환한다", async () => {
     vi.spyOn(ClubRepository.prototype, "createAnnouncement").mockRejectedValue(
       new DbRequestError("클럽 공지는 최대 5개까지 등록할 수 있습니다.", 409),

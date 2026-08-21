@@ -6,6 +6,7 @@ export type ClubMembershipStatus = "active";
 
 export const CLUB_DESCRIPTION_MAX_LENGTH = 500;
 export const CLUB_ANNOUNCEMENT_MAX_COUNT = 5;
+export const CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH = 500;
 
 /**
  * Counts Unicode code points instead of UTF-16 code units so astral characters
