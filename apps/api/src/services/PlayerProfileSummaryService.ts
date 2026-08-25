@@ -32,6 +32,7 @@ export interface PlayerProfileSummary {
   ratingDelta: PlayerProfileRatingDelta;
   ratingHistory: PlayerRatingHistory;
   recentMatches: MatchWithRatingChanges[];
+  recentMatchTotal: number;
 }
 
 const createEmptyMatchStats = (): PlayerProfileMatchStats => ({
@@ -128,13 +129,18 @@ export const buildPlayerProfileSummary = (
     if (elapsedMs <= thirtyDaysMs) ratingDelta[category].last30Days += delta;
   }
 
-  const recentMatches = matches
-    .filter(
-      (match) =>
-        match.status === "completed" || match.status === "evaluating",
-    )
+  const profileMatches = matches.filter(
+    (match) => match.status === "completed" || match.status === "evaluating",
+  );
+  const recentMatches = profileMatches
     .sort((left, right) => getMatchStartsAtMs(right) - getMatchStartsAtMs(left))
     .slice(0, 5);
 
-  return { matchStats, ratingDelta, ratingHistory, recentMatches };
+  return {
+    matchStats,
+    ratingDelta,
+    ratingHistory,
+    recentMatches,
+    recentMatchTotal: profileMatches.length,
+  };
 };

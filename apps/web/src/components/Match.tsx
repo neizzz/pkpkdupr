@@ -84,6 +84,7 @@ export interface PlayerProfileSummaryResponse {
   >;
   ratingHistory: PlayerRatingHistory;
   recentMatches: MatchInfo[];
+  recentMatchTotal: number;
 }
 
 interface MatchProps {

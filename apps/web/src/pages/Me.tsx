@@ -53,6 +53,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
   const [recentProfileMatchItems, setRecentProfileMatchItems] = useState<
     MatchInfo[]
   >([]);
+  const [recentProfileMatchTotal, setRecentProfileMatchTotal] = useState(0);
   const [profileMatches, setProfileMatches] = useState<MatchInfo[]>([]);
   const [isMatchStatsLoading, setIsMatchStatsLoading] = useState(true);
   const [isMatchHistoryRequested, setIsMatchHistoryRequested] = useState(false);
@@ -78,6 +79,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
         setRatingDelta(createEmptyRatingDelta());
         setRatingHistory(createEmptyRatingHistory());
         setRecentProfileMatchItems([]);
+        setRecentProfileMatchTotal(0);
         setProfileMatches([]);
         setIsMatchStatsLoading(false);
         return;
@@ -106,6 +108,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
           setMatchStats(data.matchStats);
           setRatingDelta(data.ratingDelta);
           setRecentProfileMatchItems(data.recentMatches);
+          setRecentProfileMatchTotal(data.recentMatchTotal);
           setRatingHistory(buildRatingHistory(data.ratingHistory));
           lastSuccessfulLoadAtRef.current = Date.now();
         }
@@ -115,6 +118,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
           setRatingDelta(createEmptyRatingDelta());
           setRatingHistory(createEmptyRatingHistory());
           setRecentProfileMatchItems([]);
+          setRecentProfileMatchTotal(0);
         }
         if (!signal.aborted && throwOnError) {
           throw new Error("내 경기 통계를 새로고침하지 못했습니다.");
@@ -204,6 +208,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
       setRatingDelta(createEmptyRatingDelta());
       setRatingHistory(createEmptyRatingHistory());
       setRecentProfileMatchItems([]);
+      setRecentProfileMatchTotal(0);
       setProfileMatches([]);
       setIsMatchStatsLoading(false);
     }
@@ -293,7 +298,11 @@ const MyProfile: React.FC<MyProfileProps> = ({
         recentMatches={recentProfileMatches}
         showPlayerId
         onPressRecentMatch={openProfileMatchDetail}
-        onViewAllMatches={openMatchHistory}
+        onViewAllMatches={
+          recentProfileMatchTotal > recentProfileMatches.length
+            ? openMatchHistory
+            : undefined
+        }
       />
 
       <ProfileMatchHistoryDrawer
