@@ -24,14 +24,16 @@ const ProfileIdentityLabel: React.FC<ProfileIdentityLabelProps> = ({
   return (
     <span
       className={[
-        "flex h-9 min-w-0 items-center gap-1.5 text-sm font-semibold",
+        "flex h-9 min-w-0 items-center gap-1 text-sm font-semibold",
         className,
       ]
         .filter(Boolean)
         .join(" ")}
     >
       <Avatar size="xs" avatarUrl={avatarUrl} name={name} />
-      <span className="truncate">{displayLabel}</span>
+      <span className={showChevron ? "translate-x-[3px] truncate" : "truncate"}>
+        {displayLabel}
+      </span>
       {showChevron ? (
         <IoChevronForward
           aria-hidden="true"
