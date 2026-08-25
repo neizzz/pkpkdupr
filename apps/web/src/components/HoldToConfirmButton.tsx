@@ -110,7 +110,6 @@ const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
       onPointerUp={stopHold}
       onPointerLeave={stopHold}
       onPointerCancel={stopHold}
-      onContextMenu={(event) => event.preventDefault()}
       className={[
         "relative flex w-full select-none items-center overflow-hidden rounded-xl px-3 py-2 text-left transition-colors touch-manipulation",
         "disabled:cursor-not-allowed disabled:opacity-50",

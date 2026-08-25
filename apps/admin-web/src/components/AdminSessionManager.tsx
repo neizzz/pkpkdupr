@@ -1814,7 +1814,6 @@ const AdminSessionManager: React.FC<AdminSessionManagerProps> = ({
                                   onPointerUp={cancelDeleteHold}
                                   onPointerLeave={cancelDeleteHold}
                                   onPointerCancel={cancelDeleteHold}
-                                  onContextMenu={(event) => event.preventDefault()}
                                   onKeyDown={(event) => {
                                     if (event.key === "Enter" || event.key === " ") {
                                       event.preventDefault();

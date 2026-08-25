@@ -73,6 +73,10 @@ const isKeyboardInputElement = (
   );
 };
 
+const isClickableContextMenuTarget = (target: EventTarget | null) =>
+  target instanceof Element &&
+  target.closest('button, [role="button"]') !== null;
+
 function AppRoutes() {
   const { isAuthenticated, isLoading, requiresPasswordChange } = useAuth();
   const location = useLocation();
@@ -184,6 +188,23 @@ function App() {
   const location = useLocation();
   const isFullWidthDevPage =
     import.meta.env.DEV && location.pathname === "/dev/qrs";
+
+  useEffect(() => {
+    const preventClickableContextMenu = (event: MouseEvent) => {
+      if (isClickableContextMenuTarget(event.target)) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener("contextmenu", preventClickableContextMenu, true);
+    return () => {
+      document.removeEventListener(
+        "contextmenu",
+        preventClickableContextMenu,
+        true,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !isIosLike()) {
