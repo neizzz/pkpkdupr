@@ -1,5 +1,5 @@
 import express from "express";
-import { type Session } from "@pkpkdupr/shared/match";
+import { matchTypeValues, type MatchType, type Session } from "@pkpkdupr/shared/match";
 import { isEntityId } from "@pkpkdupr/shared/entityId";
 import { getDb, getDbClient } from "./db/client";
 import { runMigrations } from "./db/migrate";
@@ -234,6 +234,27 @@ app.get("/internal/matches/timestamp-unit-audit", async (_req, res) => {
   }
 });
 
+app.get("/internal/matches/previous-completed-at", async (req, res) => {
+  try {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    const before = new Date(String(req.query.before ?? ""));
+    const requestedTypes = String(req.query.types ?? "")
+      .split(",")
+      .filter((type): type is MatchType =>
+        matchTypeValues.includes(type as MatchType),
+      );
+    res.json({
+      completedAt: await matchRepository.findPreviousCompletedAt(
+        playerId,
+        requestedTypes,
+        before,
+      ),
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.get("/internal/match-feed", async (req, res) => {
   try {
     const page = Number(req.query.page ?? 0);
@@ -357,7 +378,11 @@ app.post("/internal/matches/batch", async (req, res) => {
     if (inputs.length === 0) {
       return res.status(400).json({ error: "한 개 이상의 예정 경기가 필요합니다." });
     }
-    res.status(201).json(await matchRepository.createScheduledBatch(inputs));
+    res.status(201).json(
+      await matchRepository.createScheduledBatch(inputs, {
+        allowCompleted: req.body?.allowCompleted === true,
+      }),
+    );
   } catch (error) {
     const message = (error as Error).message;
     if (message.includes("UNIQUE") || message.includes("unique")) {

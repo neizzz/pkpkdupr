@@ -181,6 +181,12 @@ const migrations: Migration[] = [
       "ALTER TABLE players MODIFY COLUMN status_message VARCHAR(20) NULL",
     ],
   },
+  {
+    id: "0006_match_participants_player_match_index",
+    statements: [
+      "CREATE INDEX match_participants_player_match_idx ON match_participants (player_id, match_id)",
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

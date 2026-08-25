@@ -58,7 +58,7 @@ import {
   type RatingServiceContract,
 } from "./RatingService";
 import { ScorePerformanceRatingService } from "./ScorePerformanceRatingService";
-import type { Match } from "@pkpkdupr/shared/match";
+import { matchTypeValues, type Match, type MatchType } from "@pkpkdupr/shared/match";
 
 const SALT_ROUNDS = 10;
 const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
@@ -1709,38 +1709,13 @@ export class AuthService {
     category: PlayerDuprCategory,
     currentMatch: Match,
   ): Promise<Date | null> {
-    const { matches } = await this.dbRequest<{ matches: any[]; total: number }>(
-      `/internal/matches?page=0&limit=10000&playerId=${encodeURIComponent(playerId)}`,
+    const matchTypes = matchTypeValues.filter(
+      (matchType) => getDuprCategoryForMatchType(matchType) === category,
+    ) as MatchType[];
+    const result = await this.dbRequest<{ completedAt: string | null }>(
+      `/internal/matches/previous-completed-at?playerId=${encodeURIComponent(playerId)}&before=${encodeURIComponent(currentMatch.completedAt!.toISOString())}&types=${encodeURIComponent(matchTypes.join(","))}`,
     );
-    const currentCompletedAtMs = currentMatch.completedAt!.getTime();
-
-    const previousCompletedAtMs = matches.reduce<number | null>(
-      (latest, candidate) => {
-        if (
-          candidate.id === currentMatch.id ||
-          candidate.status !== "completed" ||
-          !candidate.completedAt ||
-          getDuprCategoryForMatchType(candidate.type) !== category
-        ) {
-          return latest;
-        }
-
-        const completedAtMs = new Date(candidate.completedAt).getTime();
-        if (
-          !Number.isFinite(completedAtMs) ||
-          completedAtMs >= currentCompletedAtMs
-        ) {
-          return latest;
-        }
-
-        return latest == null ? completedAtMs : Math.max(latest, completedAtMs);
-      },
-      null,
-    );
-
-    return previousCompletedAtMs == null
-      ? null
-      : new Date(previousCompletedAtMs);
+    return result.completedAt ? new Date(result.completedAt) : null;
   }
 
   private buildOfficialDuprImpacts(
@@ -1975,7 +1950,10 @@ export class AuthService {
     };
   }
 
-  async applyMatchResultToRatings(match: Match): Promise<{
+  async applyMatchResultToRatings(
+    match: Match,
+    options: { refreshProjection?: boolean } = {},
+  ): Promise<{
     ratingChangeLogs: PlayerRatingChangeLog[];
     changedPlayerCount: number;
   }> {
@@ -1990,9 +1968,11 @@ export class AuthService {
       )
     ).map(hydratePlayerRatingChangeLog);
     if (existingLogs.length > 0) {
-      await this.refreshPlayerRatingChartProjections(
-        existingLogs.map((log) => log.playerId),
-      );
+      if (options.refreshProjection !== false) {
+        await this.refreshPlayerRatingChartProjections(
+          existingLogs.map((log) => log.playerId),
+        );
+      }
       return {
         ratingChangeLogs: existingLogs,
         changedPlayerCount: existingLogs.filter((log) =>
@@ -2102,14 +2082,49 @@ export class AuthService {
       ),
     );
 
-    await this.refreshPlayerRatingChartProjections(
-      ratingChangeLogs.map((log) => log.playerId),
-    );
+    if (options.refreshProjection !== false) {
+      await this.refreshPlayerRatingChartProjections(
+        ratingChangeLogs.map((log) => log.playerId),
+      );
+    }
 
     return {
       ratingChangeLogs,
       changedPlayerCount: changes.filter((change) => hasDuprChange(change.delta))
         .length,
+    };
+  }
+
+  /**
+   * 관리자 일괄 완료 경기에서는 경기별 chart projection을 반복 재생성하지
+   * 않고, 모든 평점 저장 후 고유 참가자별로 한 번만 갱신한다.
+   */
+  async applyMatchResultsToRatings(matches: Match[]): Promise<{
+    ratingChangeLogs: PlayerRatingChangeLog[];
+    changedPlayerCount: number;
+  }> {
+    const ratingResults = [];
+    for (const match of [...matches].sort(
+      (left, right) =>
+        left.completedAt!.getTime() - right.completedAt!.getTime(),
+    )) {
+      ratingResults.push(
+        await this.applyMatchResultToRatings(match, { refreshProjection: false }),
+      );
+    }
+    const ratingChangeLogs = ratingResults.flatMap(
+      (result) => result.ratingChangeLogs,
+    );
+    await this.refreshPlayerRatingChartProjections(
+      ratingChangeLogs.map((log) => log.playerId),
+    );
+    return {
+      ratingChangeLogs,
+      changedPlayerCount: new Set(
+        ratingChangeLogs
+          .filter((log) => hasDuprChange(log.delta))
+          .map((log) => log.playerId),
+      ).size,
     };
   }
 

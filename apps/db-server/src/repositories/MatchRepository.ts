@@ -363,31 +363,76 @@ export class MatchRepository {
     limit: number = 20,
     playerId?: string,
   ): Promise<{ matches: Match[]; total: number }> {
-    const allMatches = await this.db
-      .select()
-      .from(matches)
-      .orderBy(
-        desc(matches.matchStartsAt),
-        desc(matches.createdAt),
-        desc(matches.id),
-      )
-      .all();
+    // 플레이어별 조회는 이전에는 모든 경기를 hydrate한 뒤 메모리에서
+    // 필터링했다. 평점 반영과 차트 projection은 이 경로를 자주 사용하므로
+    // 참가자 인덱스를 통해 DB에서 먼저 대상을 줄인다.
+    const allMatches = playerId
+      ? (await this.db
+          .select({ match: matches })
+          .from(matches)
+          .innerJoin(
+            matchParticipants,
+            eq(matchParticipants.matchId, matches.id),
+          )
+          .where(eq(matchParticipants.playerId, playerId))
+          .orderBy(
+            desc(matches.matchStartsAt),
+            desc(matches.createdAt),
+            desc(matches.id),
+          )
+          .all()).map((row: { match: StoredMatch }) => row.match)
+      : await this.db
+          .select()
+          .from(matches)
+          .orderBy(
+            desc(matches.matchStartsAt),
+            desc(matches.createdAt),
+            desc(matches.id),
+          )
+          .all();
     const hydratedMatches: Match[] = await Promise.all(
       allMatches.map((match: StoredMatch) => this.hydrateMatch(match)),
     );
-    const filteredMatches = playerId
-      ? hydratedMatches.filter((match) =>
-          match.teams.some((team) =>
-            team.players.some((player) => player.id === playerId),
-          ),
-        )
-      : hydratedMatches;
+    const filteredMatches = hydratedMatches;
     const start = page * limit;
 
     return {
       matches: filteredMatches.slice(start, start + limit),
       total: filteredMatches.length,
     };
+  }
+
+  async findPreviousCompletedAt(
+    playerId: string,
+    matchTypes: MatchType[],
+    before: Date,
+  ): Promise<Date | null> {
+    if (!playerId || !matchTypes.length || Number.isNaN(before.getTime())) {
+      return null;
+    }
+
+    const typePlaceholders = matchTypes.map(() => "?").join(", ");
+    const result = await this.client.execute({
+      sql: `
+        SELECT MAX(matches.completed_at) AS completed_at
+        FROM match_participants
+        INNER JOIN matches ON matches.id = match_participants.match_id
+        WHERE match_participants.player_id = ?
+          AND matches.status = 'completed'
+          AND matches.completed_at IS NOT NULL
+          AND matches.completed_at < ?
+          AND matches.type IN (${typePlaceholders})
+      `,
+      args: [
+        playerId,
+        toUnixTimestampSeconds(before),
+        ...matchTypes,
+      ],
+    });
+    const value = (result.rows[0] as { completed_at?: unknown } | undefined)
+      ?.completed_at;
+    const completedAt = Number(value);
+    return Number.isFinite(completedAt) ? new Date(completedAt * 1000) : null;
   }
 
   async findLastPlayedAtByPlayerId(): Promise<Record<string, Date>> {
@@ -619,7 +664,10 @@ export class MatchRepository {
     return created;
   }
 
-  async createScheduledBatch(data: CreateMatchInput[]): Promise<Match[]> {
+  async createScheduledBatch(
+    data: CreateMatchInput[],
+    options: { allowCompleted?: boolean } = {},
+  ): Promise<Match[]> {
     if (data.length === 0) {
       return [];
     }
@@ -635,8 +683,24 @@ export class MatchRepository {
       if (!match.session || !isEntityId(match.session.id, "session")) {
         throw new Error("유효한 세션 정보가 필요합니다.");
       }
-      if (match.status !== "created" || (match.scores?.length ?? 0) > 0) {
+      if (
+        !match.session.name?.trim() ||
+        !match.session.location?.trim() ||
+        Number.isNaN(new Date(match.session.date).getTime())
+      ) {
+        throw new Error("유효한 세션 정보가 필요합니다.");
+      }
+      if (
+        !options.allowCompleted &&
+        (match.status !== "created" || (match.scores?.length ?? 0) > 0)
+      ) {
         throw new Error("예정 경기만 일괄 생성할 수 있습니다.");
+      }
+      if (
+        options.allowCompleted &&
+        (match.status !== "completed" || (match.scores?.length ?? 0) === 0)
+      ) {
+        throw new Error("완료 경기만 일괄 생성할 수 있습니다.");
       }
       if (!match.courtName?.trim()) {
         throw new Error("코트명이 필요합니다.");
@@ -652,18 +716,39 @@ export class MatchRepository {
     let committed = false;
 
     try {
+      const now = new Date();
+      const nowSeconds = toUnixTimestampSeconds(now);
       for (const sessionId of sessionIds) {
         const session = await transaction.execute({
           sql: "SELECT id FROM match_sessions WHERE id = ?",
           args: [sessionId],
         });
         if (session.rows.length === 0) {
-          throw new Error("세션을 찾을 수 없습니다.");
+          const matchSession = data.find(
+            (match) => match.session?.id === sessionId,
+          )?.session;
+          if (!matchSession) {
+            throw new Error("세션을 찾을 수 없습니다.");
+          }
+          await transaction.execute({
+            sql: `
+              INSERT INTO match_sessions (
+                id, name, date, location, created_at, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?)
+            `,
+            args: [
+              sessionId,
+              matchSession.name?.trim() || "Session",
+              toUnixTimestampSeconds(new Date(matchSession.date)),
+              matchSession.location,
+              nowSeconds,
+              nowSeconds,
+            ],
+          });
         }
       }
 
-      const now = new Date();
-      const nowSeconds = toUnixTimestampSeconds(now);
+      const scoreColumns = await this.getMatchScoreColumns();
       for (const match of data) {
         const session = match.session!;
         const sessionDate = new Date(session.date);
@@ -714,9 +799,13 @@ export class MatchRepository {
             match.location,
             courtName,
             toUnixTimestampSeconds(matchStartsAt),
-            null,
-            null,
-            null,
+            match.completedAt
+              ? toUnixTimestampSeconds(new Date(match.completedAt))
+              : null,
+            match.resultSubmittedByPlayerId ?? null,
+            match.resultSubmittedAt
+              ? toUnixTimestampSeconds(new Date(match.resultSubmittedAt))
+              : null,
             nowSeconds,
             nowSeconds,
           ],
@@ -744,6 +833,15 @@ export class MatchRepository {
               ],
             });
           }
+        }
+        for (const [scoreIndex, score] of (match.scores ?? []).entries()) {
+          await this.insertScore({
+            id: `${match.id}-score-${scoreIndex + 1}`,
+            matchId: match.id,
+            score,
+            columns: scoreColumns,
+            executor: transaction,
+          });
         }
       }
 

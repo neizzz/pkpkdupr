@@ -303,6 +303,26 @@ export class MatchRepository {
     return created.map(hydrateMatch);
   }
 
+  /** 세션이 지정된 완료 경기를 DB 서버의 단일 transaction으로 생성한다. */
+  async createCompletedBatch(
+    matches: Array<
+      Omit<Match, "id" | "createdAt" | "updatedAt"> & { id?: string }
+    >,
+  ): Promise<Match[]> {
+    const inputs = matches.map((match) => ({
+      id: match.id ?? generateEntityId("match"),
+      ...match,
+      resultSubmittedByPlayerId: match.resultSubmittedByPlayerId ?? null,
+      resultSubmittedAt: match.resultSubmittedAt ?? null,
+      approvals: match.approvals ?? [],
+    }));
+    const created = await this.dbRequest<any[]>("/internal/matches/batch", {
+      method: "POST",
+      body: JSON.stringify({ matches: inputs, allowCompleted: true }),
+    });
+    return created.map(hydrateMatch);
+  }
+
   async createSession(
     session: Omit<Session, "id"> & { id?: string },
   ): Promise<Session> {

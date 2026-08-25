@@ -1395,28 +1395,44 @@ app.post("/api/admin/matches/batch", requireAdmin, async (req, res) => {
       };
     });
 
-    const createdMatches = [];
-    for (const matchInput of matchesToCreate) {
-      createdMatches.push(await matchRepository.create(matchInput));
-    }
-
-    const ratingResults = [];
-    for (const match of [...createdMatches].sort(
-      (left, right) =>
-        left.completedAt!.getTime() - right.completedAt!.getTime(),
-    )) {
-      ratingResults.push(await authService.applyMatchResultToRatings(match));
-    }
-    const ratingChangeLogs = ratingResults.flatMap(
-      (result) => result.ratingChangeLogs,
-    );
-    const changedPlayerCount = new Set(
-      ratingChangeLogs
-        .filter(
-          (log) => log.delta.singles !== 0 || log.delta.doubles !== 0,
-        )
-        .map((log) => log.playerId),
+    const recordBatchAttributes = async (
+      attributes: Record<string, string | number | boolean>,
+    ) => {
+      // 테스트와 로컬 개발에서는 New Relic agent를 시작하지 않는다. 운영에서는
+      // start.cjs가 이미 agent를 preload하므로 dynamic import는 기존 agent를 재사용한다.
+      if (!process.env.NEW_RELIC_APP_NAME) return;
+      const { default: newrelic } = await import("newrelic");
+      newrelic.addCustomAttributes(attributes);
+    };
+    const measureBatchStage = async <T>(name: string, operation: () => Promise<T>) => {
+      const startedAt = performance.now();
+      try {
+        return await operation();
+      } finally {
+        await recordBatchAttributes({
+          [`adminMatchBatch.${name}Ms`]: Math.round(performance.now() - startedAt),
+        });
+      }
+    };
+    const uniquePlayerCount = new Set(
+      matchesToCreate.flatMap((match) =>
+        match.teams.flatMap((team) => team.players.map((player) => player.id)),
+      ),
     ).size;
+    await recordBatchAttributes({
+      "adminMatchBatch.matchCount": matchesToCreate.length,
+      "adminMatchBatch.uniquePlayerCount": uniquePlayerCount,
+    });
+
+    const createdMatches = await measureBatchStage("commitBatch", async () =>
+      commonSession
+        ? await matchRepository.createCompletedBatch(matchesToCreate)
+        : await Promise.all(matchesToCreate.map((match) => matchRepository.create(match))),
+    );
+    const ratingResult = await measureBatchStage("ratingAndProjection", async () =>
+      authService.applyMatchResultsToRatings(createdMatches),
+    );
+    const { ratingChangeLogs, changedPlayerCount } = ratingResult;
 
     res.status(201).json({
       matches: createdMatches,
