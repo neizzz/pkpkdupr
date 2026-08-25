@@ -1,0 +1,4 @@
+interface:
+  display_name: "데이터 상태 스냅샷"
+  short_description: "데이터 유무별 전 화면 Playwright 스냅샷 추가"
+  default_prompt: "Use $add-data-state-snapshots to add with-data and empty-state visual snapshots for every screen in this app."
