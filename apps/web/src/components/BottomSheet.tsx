@@ -258,7 +258,7 @@ const BottomSheet: BottomSheetComponent = ({
               event.stopPropagation();
             }}
             onClick={() => onOpenChange(false)}
-            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-50"
+            className="pointer-events-auto flex size-6 items-center justify-center text-2xl leading-none text-white transition-opacity opacity-60 hover:opacity-100"
             style={transitionStyle}
           >
             ×

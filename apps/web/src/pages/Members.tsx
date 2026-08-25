@@ -793,7 +793,7 @@ const Members: React.FC = () => {
             <button
               type="button"
               aria-label="친구 추가"
-              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!isOnline}
               onClick={() => setIsFriendQrScannerOpen(true)}
             >
@@ -805,7 +805,7 @@ const Members: React.FC = () => {
             </button>
             <button
               type="button"
-              className="rounded-full text-pkpk-primary-font transition-opacity hover:opacity-80"
+              className="rounded-full text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font"
               onClick={openMyProfile}
             >
               <ProfileIdentityLabel
@@ -855,7 +855,7 @@ const Members: React.FC = () => {
                     return (
                       <div
                         key={member.id}
-                        className={`relative flex w-full min-w-0 items-center gap-3 px-2.5 py-3 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10 ${
+                        className={`relative flex w-full min-w-0 items-center gap-3 px-2.5 py-3 text-left transition-colors hover:bg-pkpk-hover-surface has-[button:active]:bg-pkpk-pressed-surface ${
                           index < sortedMembers.length - 1
                             ? "after:absolute after:bottom-0 after:left-4 after:right-4 after:h-px after:bg-pkpk-sub-font/10"
                             : ""

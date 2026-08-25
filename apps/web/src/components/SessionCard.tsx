@@ -70,7 +70,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
     <Card
       className={`relative w-full overflow-hidden rounded-3xl border border-pkpk-primary-bg p-3 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-5 before:bg-[linear-gradient(to_bottom,_var(--color-pkpk-primary-bg),_transparent)] before:opacity-5 ${
         onPress
-          ? "transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+          ? "transition-colors hover:bg-pkpk-hover-surface active:bg-pkpk-pressed-surface group-active:bg-pkpk-pressed-surface"
           : ""
       }`}
     >
@@ -125,7 +125,7 @@ const SessionCard: React.FC<SessionCardProps> = ({
     <button
       type="button"
       aria-label={`${session.name} 세션 상세 보기`}
-      className="w-full text-left"
+      className="group w-full text-left"
       onClick={() => onPress(session)}
     >
       {card}

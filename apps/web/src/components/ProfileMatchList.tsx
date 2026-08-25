@@ -177,7 +177,7 @@ const ProfileMatchList: React.FC<ProfileMatchListProps> = ({
               ? "before:absolute before:inset-x-3 before:top-0 before:border-t before:border-border before:content-['']"
               : "border-t border-border"
             : ""
-        } ${onPressMatch ? "hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10" : ""}`;
+        } ${onPressMatch ? "hover:bg-pkpk-hover-surface active:bg-pkpk-pressed-surface" : ""}`;
 
         return onPressMatch ? (
           <button

@@ -140,7 +140,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
                 <TabPanelStatus message={error} tone="error" />
                 <Button
                   type="button"
-                  className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                  className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-pkpk-primary-hover"
                   onPress={onRetry}
                 >
                   다시 시도

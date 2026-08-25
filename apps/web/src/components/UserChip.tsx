@@ -159,7 +159,7 @@ const UserChip: React.FC<UserChipProps> = ({
             event.stopPropagation();
             onRemove();
           }}
-          className="shrink-0 rounded-full pl-0.5 text-current/70 transition-colors hover:bg-white/70 hover:text-current"
+          className="shrink-0 rounded-full pl-0.5 text-current/70 transition-colors hover:bg-white hover:text-current"
         >
           <IoClose className="size-3.5" />
         </button>

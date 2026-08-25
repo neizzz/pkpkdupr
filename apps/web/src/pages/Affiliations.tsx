@@ -797,7 +797,7 @@ const Affiliations: React.FC = () => {
       >
         <button
           type="button"
-          className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!isOnline}
           onClick={() => setIsCreateOpen(true)}
         >
@@ -850,7 +850,7 @@ const Affiliations: React.FC = () => {
                           <button
                             type="button"
                             onClick={openClubMatchHistory}
-                            className="flex items-center gap-0.5 px-1 py-1 text-sm text-pkpk-primary-bg transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                            className="flex items-center gap-0.5 px-1 py-1 text-sm text-pkpk-primary-bg transition-colors hover:bg-pkpk-hover-surface active:bg-pkpk-pressed-surface"
                           >
                             {dashboard.club.name}의 매치 전체 보기
                             <IoChevronForward className="size-4" />
@@ -891,7 +891,7 @@ const Affiliations: React.FC = () => {
                                 type="button"
                                 aria-label={`${announcement.title} 공지 상세 보기`}
                                 onClick={() => openAnnouncementDetail(announcement)}
-                                className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                                className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-pkpk-hover-surface active:bg-pkpk-pressed-surface"
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block truncate text-sm font-semibold text-pkpk-main-font">
@@ -950,7 +950,7 @@ const Affiliations: React.FC = () => {
                       type="button"
                       disabled={!isOnline}
                       onClick={() => setScannerTarget("player")}
-                      className="flex w-full items-center gap-3 border-b-[6px] border-pkpk-section-border bg-white px-4 py-4 text-left transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="flex w-full items-center gap-3 border-b-[6px] border-pkpk-section-border bg-white px-4 py-4 text-left transition-colors hover:bg-pkpk-hover-surface disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-pkpk-primary-bg shadow-sm">
                         <IoPersonAddOutline className="size-6" />
@@ -1252,7 +1252,7 @@ const Affiliations: React.FC = () => {
         footer={
           <Button
             type="button"
-            className="bg-error font-semibold text-white hover:bg-error/90"
+            className="bg-error font-semibold text-white hover:bg-[#e9545e]"
             isDisabled={isDeletingAnnouncement}
             onPress={() => void removeAnnouncement()}
           >
@@ -1389,7 +1389,7 @@ const Affiliations: React.FC = () => {
                       onClick={() =>
                         setIsAnnouncementActionMenuOpen((isOpen) => !isOpen)
                       }
-                      className="flex size-9 items-center justify-center rounded-full text-pkpk-sub-font transition-colors hover:bg-pkpk-primary-bg/5 active:bg-pkpk-primary-bg/10"
+                      className="flex size-9 items-center justify-center rounded-full text-pkpk-sub-font transition-colors hover:bg-pkpk-hover-surface active:bg-pkpk-pressed-surface"
                     >
                       <IoMenuOutline aria-hidden="true" className="size-5" />
                     </button>
@@ -1409,7 +1409,7 @@ const Affiliations: React.FC = () => {
                             setIsAnnouncementActionMenuOpen(false);
                             announcementDeleteConfirmation.open();
                           }}
-                          className="w-full px-3 py-2 text-left text-sm font-semibold text-error transition-colors hover:bg-error/5 disabled:cursor-not-allowed disabled:opacity-40"
+                          className="w-full px-3 py-2 text-left text-sm font-semibold text-error transition-colors hover:bg-pkpk-error-hover disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           제거
                         </button>

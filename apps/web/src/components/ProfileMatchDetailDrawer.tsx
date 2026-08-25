@@ -160,7 +160,7 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
             {isOnline && retryMatchId ? (
               <Button
                 type="button"
-                className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-pkpk-primary-font hover:bg-pkpk-primary-bg/90"
+                className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-pkpk-primary-font hover:bg-pkpk-primary-hover"
                 onPress={() => void loadMatchDetail(retryMatchId)}
               >
                 다시 시도
@@ -206,7 +206,7 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
           <div className="px-2 pt-2">
             <Button
               type="button"
-              className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-pkpk-primary-font hover:bg-pkpk-primary-bg/90"
+              className="app-action-button w-full rounded-2xl bg-pkpk-primary-bg font-semibold text-pkpk-primary-font hover:bg-pkpk-primary-hover"
               onPress={() => void loadMatchDetail(retryMatchId)}
             >
               다시 시도

@@ -7,6 +7,13 @@
   --color-border: #e6e6e6;
   --color-divider: #e6e6e6;
   --color-pkpk-primary-bg: #3b52cc;
+  --color-pkpk-primary-hover: #2d42a8;
+  --color-pkpk-action-hover: #2587db;
+  --color-pkpk-hover-surface: #ebeefa;
+  --color-pkpk-hover-inverse: #5c6880;
+  --color-pkpk-pressed-surface: #d9e0f7;
+  --color-pkpk-pressed-inverse: #748198;
+  --color-pkpk-error-hover: #fee2e2;
   --color-pkpk-section-border: #f2f4ff;
   --color-pkpk-session-bg: #f5f6fc;
   --color-pkpk-secondary-bg: #8b1e77;
@@ -311,7 +318,7 @@
 }
 
 .player-qr-trigger:hover:not(:disabled) {
-  --player-qr-trigger-fill: rgb(59 82 204 / 0.9);
+  --player-qr-trigger-fill: var(--color-pkpk-primary-hover);
 }
 
 .player-qr-trigger:disabled {

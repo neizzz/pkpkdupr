@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 const privacyPolicyVersion = "2026-08-18";
 
@@ -440,6 +440,38 @@ const capture = (page: Page, name: string) =>
     fullPage: true,
   });
 
+const expectPressedBackground = async (
+  page: Page,
+  trigger: Locator,
+  surface: Locator,
+  color: string,
+) => {
+  await trigger.scrollIntoViewIfNeeded();
+  const box = await trigger.boundingBox();
+  if (!box) {
+    throw new Error("pointerdown 대상의 위치를 찾지 못했습니다.");
+  }
+
+  await trigger.evaluate((element) => {
+    element.addEventListener(
+      "click",
+      (event) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      },
+      { capture: true, once: true },
+    );
+  });
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  try {
+    await expect(surface).toHaveCSS("background-color", color);
+    await expect(surface).toHaveCSS("opacity", "1");
+  } finally {
+    await page.mouse.up();
+  }
+};
+
 const disableQrCamera = (page: Page) =>
   page.evaluate(() => {
     Object.defineProperty(navigator, "mediaDevices", {
@@ -531,6 +563,101 @@ test("매치와 세션 상세의 data 상태", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "세션 상세" })).toBeVisible();
   await expect(page.getByText("이 세션에 표시할 내 경기가 없어요.")).toBeVisible();
   await capture(page, "session-detail--empty.png");
+});
+
+test.describe("마우스 hover 피드백", () => {
+  test.use({ hasTouch: false });
+
+  test("hover 피드백은 불투명한 색상을 사용한다", async ({ page }) => {
+    await openApp(page);
+
+    const headerAction = page.getByRole("button", { name: "친구 추가" });
+    await headerAction.hover();
+    await expect(headerAction).toHaveCSS("color", "rgb(234, 255, 25)");
+    await expect(headerAction).toHaveCSS("opacity", "1");
+
+    const clubFilter = page.getByRole("tab", { name: "한강 피클볼" });
+    await clubFilter.hover();
+    await expect(clubFilter).toHaveCSS("background-color", "rgb(92, 104, 128)");
+    await expect(clubFilter).toHaveCSS("opacity", "1");
+
+    const memberProfileButton = page.getByRole("button", {
+      name: "박지우 프로필 보기",
+    });
+    const memberRow = memberProfileButton.locator("..");
+    await memberProfileButton.hover();
+    await expect(memberRow).toHaveCSS("background-color", "rgb(235, 238, 250)");
+    await expect(memberRow).toHaveCSS("opacity", "1");
+
+    await page.getByRole("tab", { name: "내 매치" }).click();
+    await page.getByRole("button", { name: "테스트 복식 매치 상세 보기" }).click();
+    const matchDetail = page.getByRole("dialog", { name: "매치 상세" });
+    const backButton = matchDetail.getByRole("button", { name: "뒤로가기" });
+    await backButton.hover();
+    await expect(backButton).toHaveCSS("background-color", "rgb(235, 238, 250)");
+    await expect(backButton).toHaveCSS("opacity", "1");
+  });
+
+  test("pointerdown 피드백은 불투명한 색상을 사용한다", async ({ page }) => {
+    await openApp(page);
+
+    const memberProfileButton = page.getByRole("button", {
+      name: "박지우 프로필 보기",
+    });
+    await expectPressedBackground(
+      page,
+      memberProfileButton,
+      memberProfileButton.locator(".."),
+      "rgb(217, 224, 247)",
+    );
+    await expectPressedBackground(
+      page,
+      page.getByRole("tab", { name: "한강 피클볼" }),
+      page.getByRole("tab", { name: "한강 피클볼" }),
+      "rgb(116, 129, 152)",
+    );
+
+    await page.getByRole("tab", { name: "내 매치" }).click();
+    const matchCardButton = page.getByRole("button", {
+      name: "테스트 복식 매치 상세 보기",
+    });
+    await expectPressedBackground(
+      page,
+      matchCardButton,
+      matchCardButton.locator("> *").first(),
+      "rgb(217, 224, 247)",
+    );
+    const sessionCardButton = page.getByRole("button", {
+      name: "토요 오픈플레이 세션 상세 보기",
+    });
+    await expectPressedBackground(
+      page,
+      sessionCardButton,
+      sessionCardButton.locator("> *").first(),
+      "rgb(217, 224, 247)",
+    );
+
+    await openMemberProfile(page);
+    const profileMatchButton = page
+      .getByRole("dialog", { name: "멤버 프로필" })
+      .getByRole("button", { name: /매치 상세 보기$/ })
+      .first();
+    await expectPressedBackground(
+      page,
+      profileMatchButton,
+      profileMatchButton,
+      "rgb(217, 224, 247)",
+    );
+
+    await openApp(page);
+    await page.getByRole("tab", { name: "클럽" }).click();
+    const clubMatchHistoryButton = page.getByRole("button", {
+      name: "한강 피클볼의 매치 전체 보기",
+    });
+    await expect(clubMatchHistoryButton).toHaveClass(
+      /active:bg-pkpk-pressed-surface/,
+    );
+  });
 });
 
 test("매치 생성 바텀시트와 내 QR modal", async ({ page }) => {

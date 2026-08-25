@@ -65,7 +65,7 @@ const Home: React.FC = () => {
           <div className="space-y-3">
             <Link
               to="/login"
-              className="app-action-button mx-auto flex w-full max-w-[320px] items-center justify-center rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-[#409eff]/90"
+              className="app-action-button mx-auto flex w-full max-w-[320px] items-center justify-center rounded-lg bg-[#409eff] py-3 font-semibold text-white transition-colors hover:bg-pkpk-action-hover"
             >
               로그인
             </Link>

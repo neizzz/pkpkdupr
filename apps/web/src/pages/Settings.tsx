@@ -129,7 +129,7 @@ const Settings: React.FC = () => {
       <TabPanelHeader title="Settings">
         <button
           type="button"
-          className="flex h-9 items-center gap-1 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80"
+          className="flex h-9 items-center gap-1 px-1 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font"
           onClick={logoutConfirmation.open}
         >
           <IoLogOutOutline aria-hidden="true" className="size-4" />

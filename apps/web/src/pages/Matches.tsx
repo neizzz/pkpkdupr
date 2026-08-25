@@ -710,7 +710,7 @@ const Matches: React.FC<MatchesProps> = ({
             />
             <Button
               type="button"
-              className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+              className="app-action-button w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-pkpk-primary-hover"
               onPress={() => void loadMatchDetail(selectedMatchId)}
             >
               다시 시도
@@ -777,7 +777,7 @@ const Matches: React.FC<MatchesProps> = ({
       >
         <button
           type="button"
-          className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-9 px-1 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!isOnline}
           onClick={onRequestCreateMatch}
         >

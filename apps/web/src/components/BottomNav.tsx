@@ -1115,7 +1115,7 @@ const BottomNav: React.FC = () => {
             aria-label="내 QR 코드 열기"
             isDisabled={!isOnline}
             onPress={openQrModal}
-            className="player-qr-trigger absolute bottom-[calc(50%+0.375rem-(var(--player-qr-trigger-size)/2))] left-1/2 z-10 shrink-0 -translate-x-1/2 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-bg/90 disabled:bg-slate-200 disabled:text-slate-400"
+            className="player-qr-trigger absolute bottom-[calc(50%+0.375rem-(var(--player-qr-trigger-size)/2))] left-1/2 z-10 shrink-0 -translate-x-1/2 rounded-full bg-pkpk-primary-bg text-white shadow-[0_3px_10px_rgba(15,23,42,0.22)] transition-colors hover:bg-pkpk-primary-hover disabled:bg-slate-200 disabled:text-slate-400"
           >
             <IoQrCodeSharp className="player-qr-trigger-icon" />
           </Button>

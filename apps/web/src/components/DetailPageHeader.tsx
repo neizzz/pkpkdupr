@@ -38,12 +38,12 @@ const DetailPageHeader: React.FC<DetailPageHeaderProps> = ({
       } !text-pkpk-secondary-bg shadow-none transition-colors duration-100 ${
         isScrolled
           ? scrolledButtonClassName
-          : "!bg-transparent hover:!bg-transparent"
+          : "!bg-transparent hover:!bg-pkpk-hover-surface"
       }`
     : `absolute left-3 !text-pkpk-secondary-bg shadow-none transition-colors duration-100 ${
         isScrolled
           ? scrolledButtonClassName
-          : "!bg-transparent !text-pkpk-secondary-bg hover:!bg-transparent"
+          : "!bg-transparent !text-pkpk-secondary-bg hover:!bg-pkpk-hover-surface"
       }`;
   const rightContentClassName = `absolute right-3 flex max-w-[calc(100%-4.5rem)] items-center [&_button]:!px-3 [&_button]:transition-colors [&_button]:duration-100 ${
     isScrolled

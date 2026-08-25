@@ -731,7 +731,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 <button
                   type="button"
                   onClick={onViewAllMatches}
-                  className="inline-flex shrink-0 items-center gap-0.5 text-sm font-bold text-pkpk-primary-bg transition-opacity hover:opacity-75"
+                  className="inline-flex shrink-0 items-center gap-0.5 text-sm font-bold text-pkpk-primary-bg transition-colors hover:text-pkpk-primary-hover"
                 >
                   전체 보기
                   <IoChevronForward aria-hidden="true" className="size-4" />
