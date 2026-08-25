@@ -39,7 +39,7 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
               </tr>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">프로필</td>
-                <td className="px-3 py-2 align-top">사용자명, 성별, 프로필 이미지, 소속, 상태 메시지</td>
+                <td className="px-3 py-2 align-top">사용자명, 성별, 생년월일, 프로필 이미지, 소속, 상태 메시지</td>
                 <td className="px-3 py-2 align-top">선수 식별, 프로필 및 커뮤니티 기능 제공</td>
               </tr>
               <tr className="border-t border-border">
@@ -91,10 +91,11 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
       <section className="mt-8">
         <h2 className="text-base font-bold">4. 개인정보의 이용 및 공개 범위</h2>
         <p className="mt-2">
-          사용자명, 프로필 이미지, 소속, 경기 참가·결과 및 평점은 다른
+          사용자명, 성별, 만 나이, 프로필 이미지, 소속, 경기 참가·결과 및 평점은 다른
           서비스 이용자에게 경기 기록, 선수 프로필, 클럽 및 랭킹 화면을
           통해 표시될 수 있습니다. 프로필 이미지, 소속 및 상태 메시지는
-          이용자가 직접 수정하거나 삭제할 수 있습니다.
+          이용자가 직접 수정하거나 삭제할 수 있습니다. 생년월일은 만 나이 계산에만 사용하며,
+          프로필에는 생년월일 자체를 표시하지 않습니다.
         </p>
       </section>
 

@@ -11,6 +11,7 @@ const PkeloKakaoOnboarding: React.FC = () => {
   const { loginWithAccessToken } = useAuth();
   const [username, setUsername] = useState("");
   const [gender, setGender] = useState<"M" | "F" | "">("");
+  const [birthDate, setBirthDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const registrationTicket = (location.state as OnboardingState | null)?.registrationTicket;
@@ -21,8 +22,8 @@ const PkeloKakaoOnboarding: React.FC = () => {
       setError("가입 정보가 만료되었습니다. 카카오 로그인을 다시 시도해주세요.");
       return;
     }
-    if (!gender) {
-      setError("성별을 선택해주세요.");
+    if (!gender || !birthDate) {
+      setError("성별과 생년월일을 입력해주세요.");
       return;
     }
 
@@ -32,7 +33,7 @@ const PkeloKakaoOnboarding: React.FC = () => {
       const res = await fetch(buildApiUrl("/api/auth/kakao/onboarding"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationTicket, username, gender }),
+        body: JSON.stringify({ registrationTicket, username, gender, birthDate }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         accessToken?: string;
@@ -56,7 +57,7 @@ const PkeloKakaoOnboarding: React.FC = () => {
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white/10 p-5 shadow-sm">
         <h1 className="text-xl font-bold">PKELO 프로필 만들기</h1>
         <p className="mt-2 text-sm leading-6 text-white/80">
-          경기 기록에 표시할 사용자명과 성별을 입력해주세요.
+          경기 기록과 프로필에 표시할 사용자명, 성별, 생년월일을 입력해주세요.
         </p>
 
         {error && <p className="mt-4 rounded-lg bg-error/20 px-3 py-2 text-sm">{error}</p>}
@@ -94,6 +95,21 @@ const PkeloKakaoOnboarding: React.FC = () => {
             ))}
           </div>
         </fieldset>
+
+        <label className="mt-5 block text-sm font-semibold">
+          생년월일
+          <input
+            type="date"
+            value={birthDate}
+            onChange={(event) => setBirthDate(event.target.value)}
+            required
+            max={new Date().toISOString().slice(0, 10)}
+            className="app-mobile-input mt-2 w-full rounded-xl border border-transparent bg-white px-4 py-3 text-pkpk-main-font"
+          />
+          <span className="mt-1 block text-xs font-normal text-white/80">
+            프로필에는 만 나이만 표시됩니다.
+          </span>
+        </label>
 
         <button
           type="submit"

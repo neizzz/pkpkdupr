@@ -88,4 +88,29 @@ describe("PATCH /api/me/profile", () => {
     expect(response.body.error).toBe("대표 소속을 하나 지정해 주세요.");
     expect(updateProfile).not.toHaveBeenCalled();
   });
+
+  it("생년월일을 저장하고 미래 날짜를 거부한다", async () => {
+    const updatedPlayer: Player = { ...player, birthDate: "1990-08-25" };
+    const updateProfile = vi
+      .spyOn(AuthService.prototype, "updatePlayerProfile")
+      .mockResolvedValue(updatedPlayer);
+
+    const saved = await request(app)
+      .patch("/api/me/profile")
+      .set("Authorization", "Bearer test-token")
+      .send({ birthDate: "1990-08-25" });
+
+    expect(saved.status).toBe(200);
+    expect(updateProfile).toHaveBeenCalledWith(player.id, {
+      birthDate: "1990-08-25",
+    });
+
+    const rejected = await request(app)
+      .patch("/api/me/profile")
+      .set("Authorization", "Bearer test-token")
+      .send({ birthDate: "2999-01-01" });
+
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error).toBe("생년월일은 오늘 이후일 수 없습니다.");
+  });
 });

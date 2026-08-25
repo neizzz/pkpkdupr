@@ -22,6 +22,7 @@ export interface CreateStoredPlayerInput {
   username: string;
   duprRating: PlayerDupr | null;
   gender: "M" | "F";
+  birthDate?: string | null;
   status: PlayerStatus;
   avatarUrl?: string | null;
   affiliations?: PlayerAffiliation[];
@@ -83,12 +84,14 @@ export class PlayerRepository {
 
     const {
       affiliationsJson: _affiliationsJson,
+      birthDate,
       statusMessage,
       statusMessageBackgroundColor,
       ...player
     } = record;
     return {
       ...player,
+      ...(typeof birthDate === "string" ? { birthDate } : {}),
       affiliations,
       ...(statusMessage ? { statusMessage } : {}),
       ...(statusMessageBackgroundColor ? { statusMessageBackgroundColor } : {}),
@@ -111,6 +114,7 @@ export class PlayerRepository {
     await this.db.insert(players).values({
       ...storedData,
       avatarUrl: storedData.avatarUrl ?? null,
+      birthDate: storedData.birthDate ?? null,
       affiliationsJson: JSON.stringify(affiliations ?? []),
       statusMessage: statusMessage ?? null,
       statusMessageBackgroundColor: statusMessageBackgroundColor ?? null,
@@ -160,6 +164,7 @@ export class PlayerRepository {
     id: string,
     data: {
       avatarUrl?: string | null;
+      birthDate?: string | null;
       affiliations?: PlayerAffiliation[];
       statusMessage?: string | null;
       statusMessageBackgroundColor?: string | null;
@@ -168,6 +173,9 @@ export class PlayerRepository {
     const update: Record<string, unknown> = { updatedAt: new Date() };
     if (Object.prototype.hasOwnProperty.call(data, "avatarUrl")) {
       update.avatarUrl = data.avatarUrl ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "birthDate")) {
+      update.birthDate = data.birthDate ?? null;
     }
     if (Object.prototype.hasOwnProperty.call(data, "affiliations")) {
       update.affiliationsJson = JSON.stringify(data.affiliations ?? []);

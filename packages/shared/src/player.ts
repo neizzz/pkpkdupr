@@ -8,6 +8,37 @@ export interface PlayerAffiliation {
 export const PLAYER_AFFILIATION_MAX_COUNT = 5;
 export const PLAYER_AFFILIATION_NAME_MAX_LENGTH = 30;
 export const PLAYER_STATUS_MESSAGE_MAX_LENGTH = 20;
+export const PLAYER_BIRTH_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** YYYY-MM-DD 형식의 생년월일을 현지 날짜 기준으로 검증합니다. */
+export const isValidPlayerBirthDate = (value: unknown): value is string => {
+  if (typeof value !== "string" || !PLAYER_BIRTH_DATE_PATTERN.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
+
+/** 생년월일이 지나지 않은 해에는 한 살을 빼 만 나이를 계산합니다. */
+export const getPlayerFullAge = (
+  birthDate: string | null | undefined,
+  now: Date = new Date(),
+): number | null => {
+  if (!isValidPlayerBirthDate(birthDate)) return null;
+
+  const [birthYear, birthMonth, birthDay] = birthDate.split("-").map(Number);
+  const age = now.getFullYear() - birthYear;
+  const hasHadBirthday =
+    now.getMonth() + 1 > birthMonth ||
+    (now.getMonth() + 1 === birthMonth && now.getDate() >= birthDay);
+  return Math.max(0, age - Number(!hasHadBirthday));
+};
 
 /**
  * 소속 비교와 매치 스냅샷에 쓰는 정규화된 이름입니다.
@@ -487,6 +518,8 @@ export interface Player {
   username: string;
   duprRating: PublicPlayerDupr | null;
   gender: "M" | "F";
+  /** 만 나이 계산 및 공개 프로필 표시에 쓰는 YYYY-MM-DD 형식의 생년월일입니다. */
+  birthDate?: string;
   status: PlayerStatus;
   avatarUrl?: string;
   affiliations?: PlayerAffiliation[];

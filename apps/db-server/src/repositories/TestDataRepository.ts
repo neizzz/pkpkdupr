@@ -75,6 +75,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-alice",
     username: "dev_alice",
     gender: "F",
+    birthDate: "1992-03-14",
     status: "active",
     duprRating: createDupr(3.62),
     passwordHash: DEV_PASSWORD_HASH,
@@ -86,6 +87,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-bob",
     username: "dev_bob",
     gender: "M",
+    birthDate: "1988-07-22",
     status: "active",
     duprRating: createDupr(4.11),
     passwordHash: DEV_PASSWORD_HASH,
@@ -97,6 +99,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-cara",
     username: "dev_cara",
     gender: "F",
+    birthDate: "1996-11-03",
     status: "active",
     duprRating: createDupr(3.49),
     passwordHash: DEV_PASSWORD_HASH,
@@ -108,6 +111,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-dana",
     username: "dev_dana",
     gender: "F",
+    birthDate: "1990-01-28",
     status: "active",
     duprRating: createDupr(3.77),
     passwordHash: DEV_PASSWORD_HASH,
@@ -119,6 +123,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-ella",
     username: "dev_ella",
     gender: "F",
+    birthDate: "1994-08-19",
     status: "active",
     duprRating: createDupr(3.92),
     passwordHash: DEV_PASSWORD_HASH,
@@ -130,6 +135,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-finn",
     username: "dev_finn",
     gender: "M",
+    birthDate: "1987-05-06",
     status: "active",
     duprRating: createDupr(4.05),
     passwordHash: DEV_PASSWORD_HASH,
@@ -141,6 +147,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-gabe",
     username: "dev_gabe",
     gender: "M",
+    birthDate: "1991-12-11",
     status: "active",
     duprRating: createDupr(3.86),
     passwordHash: DEV_PASSWORD_HASH,
@@ -152,6 +159,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-hugo",
     username: "dev_hugo",
     gender: "M",
+    birthDate: "1985-09-02",
     status: "active",
     duprRating: createDupr(4.21),
     passwordHash: DEV_PASSWORD_HASH,
@@ -163,6 +171,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "dev-player-chris",
     username: "dev_chris_inactive",
     gender: "M",
+    birthDate: "1993-04-30",
     status: "inactive",
     duprRating: createDupr(2.98),
     passwordHash: DEV_PASSWORD_HASH,
@@ -174,6 +183,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "Ptest001",
     username: "test1",
     gender: "F",
+    birthDate: "1995-06-17",
     status: "active",
     affiliations: [{ name: "PKELO Gangnam", isPrimary: true }],
     duprRating: createDupr(3.176),
@@ -186,6 +196,7 @@ const mockPlayers: CreateStoredPlayerInput[] = [
     id: "Ptest002",
     username: "test2",
     gender: "M",
+    birthDate: "1989-10-25",
     status: "active",
     affiliations: [
       { name: "PKELO Jamsil", isPrimary: true },
@@ -1075,6 +1086,11 @@ export class TestDataRepository {
         if (!existing.affiliations?.length && player.affiliations?.length) {
           await this.playerRepository.updateProfile(existing.id, {
             affiliations: player.affiliations,
+          });
+        }
+        if (!existing.birthDate && player.birthDate) {
+          await this.playerRepository.updateProfile(existing.id, {
+            birthDate: player.birthDate,
           });
         }
       }

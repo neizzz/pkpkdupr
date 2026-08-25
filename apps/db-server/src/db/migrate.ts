@@ -14,6 +14,7 @@ const initialSchemaStatements = [
     username VARCHAR(191) NOT NULL UNIQUE,
     dupr_rating TEXT NULL,
     gender VARCHAR(8) NOT NULL,
+    birth_date VARCHAR(10) NULL,
     status VARCHAR(32) NOT NULL,
     avatar_url TEXT NULL,
     affiliations_json TEXT NULL,
@@ -285,6 +286,12 @@ const migrations: Migration[] = [
         UNIQUE KEY player_privacy_policy_consents_player_version_unique (player_id, policy_version),
         INDEX player_privacy_policy_consents_player_id_idx (player_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
+  {
+    id: "0010_player_birth_date",
+    statements: [
+      "ALTER TABLE players ADD COLUMN birth_date VARCHAR(10) NULL AFTER gender",
     ],
   },
 ];

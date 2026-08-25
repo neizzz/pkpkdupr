@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
-const privacyPolicyVersion = "2026-08-18";
+const privacyPolicyVersion = "2026-08-25";
 
 type FixtureOptions = {
   authenticated?: boolean;
@@ -29,6 +29,7 @@ const me = {
   id: "player-me",
   username: "김하늘",
   gender: "F",
+  birthDate: "1990-08-01",
   status: "active",
   duprRating: { singles: 3.88, doubles: 4.12 },
   avatarUrl: avatar("하", "#2563eb"),
@@ -39,7 +40,7 @@ const me = {
   statusMessage: "오늘도 즐겁게",
   statusMessageBackgroundColor: "#0EA5E9",
   authProvider: "password",
-  privacyPolicyConsentVersion: "2026-08-18",
+  privacyPolicyConsentVersion: "2026-08-25",
   isFirstLogin: false,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-08-12T00:00:00.000Z",
@@ -49,6 +50,7 @@ const jiwoo = {
   id: "player-jiwoo",
   username: "박지우",
   gender: "F",
+  birthDate: "1994-08-20",
   status: "active",
   duprRating: { singles: 3.64, doubles: 3.92 },
   avatarUrl: avatar("지", "#db2777"),
@@ -64,6 +66,7 @@ const minsu = {
   id: "player-minsu",
   username: "이민수",
   gender: "M",
+  birthDate: "1988-02-14",
   status: "active",
   duprRating: { singles: 4.18, doubles: 4.05 },
   avatarUrl: avatar("민", "#059669"),
@@ -79,6 +82,7 @@ const seojoon = {
   id: "player-seojoon",
   username: "최서준",
   gender: "M",
+  birthDate: "1992-11-30",
   status: "active",
   duprRating: { singles: 3.42, doubles: 3.68 },
   avatarUrl: avatar("준", "#7c3aed"),
@@ -758,6 +762,7 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
   await expect(
     page.getByRole("region", { name: "최고 평점" }),
   ).toContainText("4.120");
+  await expect(page.getByText("여성 · 만 31세", { exact: true })).toBeVisible();
   await capture(page, "member-profile--with-data.png");
   const memberHistoryResponse = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/matches",

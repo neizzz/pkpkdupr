@@ -199,6 +199,7 @@ export class KakaoAuthService {
     registrationTicket: string;
     username: string;
     gender: "M" | "F";
+    birthDate: string;
   }) {
     try {
       return await this.accounts.registerExternalPlayer({

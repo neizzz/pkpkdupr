@@ -115,6 +115,7 @@ export interface UserCredentials {
   username: string;
   password: string;
   gender: "M" | "F";
+  birthDate?: string;
 }
 
 const buildId = (prefix: string) =>
@@ -123,7 +124,9 @@ const buildId = (prefix: string) =>
 const createPasswordFingerprint = (passwordHash: string) =>
   createHmac("sha256", JWT_SECRET).update(passwordHash).digest("hex");
 
-const createPlayer = (input: Pick<Player, "username" | "gender">): Player => {
+const createPlayer = (
+  input: Pick<Player, "username" | "gender" | "birthDate">,
+): Player => {
   const now = new Date();
 
   return {
@@ -131,6 +134,7 @@ const createPlayer = (input: Pick<Player, "username" | "gender">): Player => {
     username: input.username,
     duprRating: null,
     gender: input.gender,
+    ...(input.birthDate ? { birthDate: input.birthDate } : {}),
     status: "active",
     createdAt: now,
     updatedAt: now,
@@ -880,6 +884,7 @@ export class AuthService {
     username,
     password,
     gender,
+    birthDate,
   }: UserCredentials): Promise<
     Player & { accessToken: string; isFirstLogin: boolean }
   > {
@@ -892,7 +897,7 @@ export class AuthService {
     const isAdmin = username === API_ADMIN_USERNAME;
     let created: any;
     for (let attempt = 0; attempt < 8; attempt += 1) {
-      const player = createPlayer({ username, gender });
+      const player = createPlayer({ username, gender, birthDate });
       try {
         created = await this.dbRequest<any>("/internal/players", {
           method: "POST",
@@ -975,6 +980,7 @@ export class AuthService {
     registrationTicketHash: string;
     username: string;
     gender: "M" | "F";
+    birthDate: string;
     provider: ExternalAuthProvider;
   }): Promise<{ accessToken: string; isFirstLogin: boolean }> {
     const username = input.username.trim();
@@ -986,7 +992,11 @@ export class AuthService {
     }
 
     const now = new Date();
-    const player = createPlayer({ username, gender: input.gender });
+    const player = createPlayer({
+      username,
+      gender: input.gender,
+      birthDate: input.birthDate,
+    });
     const passwordHash = await bcrypt.hash(
       `${randomUUID()}-${randomUUID()}`,
       SALT_ROUNDS,
@@ -2323,6 +2333,7 @@ export class AuthService {
     const player = createPlayer({
       username: credentials.username,
       gender: credentials.gender,
+      birthDate: credentials.birthDate,
     });
 
     const created = hydratePlayer(

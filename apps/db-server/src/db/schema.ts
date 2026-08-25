@@ -35,6 +35,7 @@ export const players = mysqlTable("players", {
   username: varchar("username", { length: 191 }).notNull().unique(),
   duprRating: text("dupr_rating"),
   gender: varchar("gender", { length: 8 }).notNull(),
+  birthDate: varchar("birth_date", { length: 10 }),
   status: varchar("status", { length: 32 }).notNull(),
   avatarUrl: text("avatar_url"),
   affiliationsJson: text("affiliations_json"),

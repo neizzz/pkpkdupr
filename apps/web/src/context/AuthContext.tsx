@@ -17,6 +17,7 @@ export interface PlayerInfo {
   username?: string;
   duprRating?: PublicPlayerDupr | null;
   gender?: "M" | "F";
+  birthDate?: string;
   avatarUrl?: string;
   affiliations?: PlayerAffiliation[];
   statusMessage?: string;
@@ -46,6 +47,7 @@ interface AuthContextType {
   ) => Promise<void>;
   updateProfile: (input: {
     avatarUrl?: string | null;
+    birthDate?: string | null;
     affiliations?: PlayerAffiliation[];
     statusMessage?: string | null;
     statusMessageBackgroundColor?: string | null;

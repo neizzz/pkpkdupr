@@ -37,8 +37,9 @@ import {
   getCompositeDoublesRating,
   getCompositeSinglesRating,
 } from "@/utils/dupr";
-import type {
-  PlayerRatingHistoryPoint,
+import {
+  getPlayerFullAge,
+  type PlayerRatingHistoryPoint,
 } from "@pkpkdupr/shared/player";
 
 export type MemberProfileMatchStats = Record<
@@ -328,6 +329,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
     profileOverride?.id === player?.id && player
       ? { ...player, ...profileOverride }
       : player;
+  const displayedAge = getPlayerFullAge(displayedPlayer?.birthDate);
   const avatarConfirmDepthId = `profile-avatar-confirm:${player?.id ?? "unknown"}`;
   const statusEditorDepthId = `profile-status-editor:${player?.id ?? "unknown"}`;
 
@@ -540,36 +542,46 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               />
             ) : null}
             <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-              <div
-                ref={nameRowRef}
-                className={`flex min-w-0 max-w-full flex-nowrap items-baseline ${
-                  isProfileNameTruncationEnabled ? "w-full gap-1" : "gap-2"
-                }`}
-              >
-                <h2
-                  ref={nameRef}
-                  aria-label={displayName}
-                  className={`min-w-0 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold text-pkpk-main-font ${
-                    truncatedNameWidth == null ? "flex-1" : "shrink-0"
-                  }`}
-                  style={
-                    truncatedNameWidth == null
-                      ? undefined
-                      : { width: truncatedNameWidth }
-                  }
-                >
-                  {truncatedName}
-                </h2>
-                {showPlayerId && player?.id ? (
-                  <div className="shrink-0">
-                    <CopyableId
-                      label="Player ID"
-                      value={displayedPlayer?.id ?? player.id}
-                      showLabel={false}
-                    />
-                  </div>
+              <div className="flex min-w-0 max-w-full flex-col gap-0">
+                {displayedPlayer?.gender ? (
+                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+                    {displayedPlayer.gender === "M" ? "남성" : "여성"}
+                    {displayedAge != null
+                      ? ` · 만 ${displayedAge}세`
+                      : ""}
+                  </p>
                 ) : null}
-                {headerAction}
+                <div
+                  ref={nameRowRef}
+                  className={`flex min-w-0 max-w-full flex-nowrap items-baseline ${
+                    isProfileNameTruncationEnabled ? "w-full gap-1" : "gap-2"
+                  }`}
+                >
+                  <h2
+                    ref={nameRef}
+                    aria-label={displayName}
+                    className={`min-w-0 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold leading-[1.2] text-pkpk-main-font ${
+                      truncatedNameWidth == null ? "flex-1" : "shrink-0"
+                    }`}
+                    style={
+                      truncatedNameWidth == null
+                        ? undefined
+                        : { width: truncatedNameWidth }
+                    }
+                  >
+                    {truncatedName}
+                  </h2>
+                  {showPlayerId && player?.id ? (
+                    <div className="shrink-0">
+                      <CopyableId
+                        label="Player ID"
+                        value={displayedPlayer?.id ?? player.id}
+                        showLabel={false}
+                      />
+                    </div>
+                  ) : null}
+                  {headerAction}
+                </div>
               </div>
               <PlayerProfileMeta
                 affiliations={displayedPlayer?.affiliations}

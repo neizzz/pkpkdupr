@@ -241,14 +241,15 @@ export class AuthRepository {
       const nowSeconds = toUnixSeconds(input.player.createdAt);
       await transaction.execute({
         sql: `INSERT INTO players
-                (id, username, dupr_rating, gender, status, avatar_url, affiliations_json,
+                (id, username, dupr_rating, gender, birth_date, status, avatar_url, affiliations_json,
                  status_message, status_message_background_color, password_hash, is_first_login,
                  created_at, updated_at)
-              VALUES (?, ?, NULL, ?, ?, NULL, '[]', NULL, NULL, ?, ?, ?, ?)`,
+              VALUES (?, ?, NULL, ?, ?, ?, NULL, '[]', NULL, NULL, ?, ?, ?, ?)`,
         args: [
           input.player.id,
           input.player.username,
           input.player.gender,
+          input.player.birthDate ?? null,
           input.player.status,
           input.player.passwordHash,
           input.player.isFirstLogin,

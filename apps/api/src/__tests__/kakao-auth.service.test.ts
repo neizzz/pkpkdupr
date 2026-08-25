@@ -207,6 +207,7 @@ describe("KakaoAuthService", () => {
       registrationTicket: "registration-ticket",
       username: "same-username-can-exist-in-other-domain",
       gender: "F",
+      birthDate: "1990-08-25",
     });
 
     expect(registerExternalPlayer).toHaveBeenCalledWith({
@@ -214,6 +215,7 @@ describe("KakaoAuthService", () => {
       registrationTicketHash: sha256("registration-ticket"),
       username: "same-username-can-exist-in-other-domain",
       gender: "F",
+      birthDate: "1990-08-25",
       provider: "kakao-mock",
     });
   });

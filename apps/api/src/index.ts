@@ -22,6 +22,7 @@ import {
 import { generateEntityId, isEntityId } from "@pkpkdupr/shared/entityId";
 import {
   getCommonAffiliationNames,
+  isValidPlayerBirthDate,
   normalizeAffiliationNames,
   PLAYER_AFFILIATION_MAX_COUNT,
   PLAYER_AFFILIATION_NAME_MAX_LENGTH,
@@ -1043,13 +1044,18 @@ app.post("/api/register", async (req, res) => {
     if (userAuthProvider !== "password") {
       return res.status(404).json({ error: "Kakao 로그인을 사용해주세요." });
     }
-    const { username, password, gender } = req.body;
+    const { username, password, gender, birthDate } = req.body;
     if (!username || !password || !gender) {
       return res
         .status(400)
         .json({ error: "username, password, gender는 필수입니다." });
     }
-    const player = await passwordAuthService.register({ username, password, gender });
+    const player = await passwordAuthService.register({
+      username,
+      password,
+      gender,
+      ...(birthDate == null ? {} : { birthDate: normalizeBirthDate(birthDate) }),
+    });
     res.json(player);
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
@@ -1137,19 +1143,21 @@ app.post("/api/auth/kakao/onboarding", async (req, res) => {
     return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
   }
   try {
-    const { registrationTicket, username, gender } = req.body;
+    const { registrationTicket, username, gender, birthDate } = req.body;
     if (
       typeof registrationTicket !== "string" ||
       typeof username !== "string" ||
-      (gender !== "M" && gender !== "F")
+      (gender !== "M" && gender !== "F") ||
+      !isValidPlayerBirthDate(birthDate)
     ) {
-      return res.status(400).json({ error: "사용자명과 성별을 입력해주세요." });
+      return res.status(400).json({ error: "사용자명, 성별, 생년월일을 입력해주세요." });
     }
     res.json(
       await kakaoAuthService.completeOnboarding({
         registrationTicket,
         username,
         gender,
+        birthDate: normalizeBirthDate(birthDate),
       }),
     );
   } catch (error) {
@@ -2381,6 +2389,20 @@ const normalizeStatusMessageBackgroundColor = (value: unknown): string | null =>
   return value.toUpperCase();
 };
 
+const normalizeBirthDate = (value: unknown): string => {
+  if (!isValidPlayerBirthDate(value)) {
+    throw new Error("생년월일 형식이 올바르지 않습니다.");
+  }
+
+  const today = new Date();
+  const [year, month, day] = value.split("-").map(Number);
+  const birthDate = new Date(year, month - 1, day);
+  if (birthDate > new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+    throw new Error("생년월일은 오늘 이후일 수 없습니다.");
+  }
+  return value;
+};
+
 app.patch("/api/me/profile", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -2391,6 +2413,7 @@ app.patch("/api/me/profile", async (req, res) => {
     const input = req.body as Record<string, unknown>;
     const update: {
       avatarUrl?: string | null;
+      birthDate?: string | null;
       affiliations?: PlayerAffiliation[];
       statusMessage?: string | null;
       statusMessageBackgroundColor?: string | null;
@@ -2410,6 +2433,10 @@ app.patch("/api/me/profile", async (req, res) => {
         typeof avatarUrl === "string" && avatarUrl.trim()
           ? avatarUrl.trim()
           : null;
+    }
+    if (hasOwnProperty(input, "birthDate")) {
+      update.birthDate =
+        input.birthDate == null ? null : normalizeBirthDate(input.birthDate);
     }
     if (hasOwnProperty(input, "affiliations")) {
       update.affiliations = normalizeProfileAffiliations(input.affiliations);
