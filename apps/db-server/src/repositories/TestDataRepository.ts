@@ -1102,6 +1102,17 @@ export class TestDataRepository {
       );
     }
 
+    const kakaoMockVerificationPlayer =
+      await this.playerRepository.findByUsername("pkelo_kakao_mock_verify");
+    if (
+      kakaoMockVerificationPlayer &&
+      !kakaoMockVerificationPlayer.birthDate
+    ) {
+      await this.playerRepository.updateProfile(kakaoMockVerificationPlayer.id, {
+        birthDate: "1990-01-01",
+      });
+    }
+
     await this.repairDevMockPlayerReferences();
 
     for (const log of mockCreationLogs) {

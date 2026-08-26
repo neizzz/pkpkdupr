@@ -762,7 +762,7 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
   await expect(
     page.getByRole("region", { name: "최고 평점" }),
   ).toContainText("4.120");
-  await expect(page.getByText("여성 · 만 31세", { exact: true })).toBeVisible();
+  await expect(page.getByText("여성 · 31세", { exact: true })).toBeVisible();
   await capture(page, "member-profile--with-data.png");
   const memberHistoryResponse = page.waitForResponse(
     (response) => new URL(response.url()).pathname === "/api/matches",

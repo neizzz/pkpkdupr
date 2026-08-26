@@ -547,20 +547,20 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                   <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
                     {displayedPlayer.gender === "M" ? "남성" : "여성"}
                     {displayedAge != null
-                      ? ` · 만 ${displayedAge}세`
+                      ? ` · ${displayedAge}세`
                       : ""}
                   </p>
                 ) : null}
                 <div
                   ref={nameRowRef}
-                  className={`flex min-w-0 max-w-full flex-nowrap items-baseline ${
+                  className={`flex min-w-0 max-w-full flex-nowrap items-baseline pb-1 ${
                     isProfileNameTruncationEnabled ? "w-full gap-1" : "gap-2"
                   }`}
                 >
                   <h2
                     ref={nameRef}
                     aria-label={displayName}
-                    className={`min-w-0 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold leading-[1.2] text-pkpk-main-font ${
+                    className={`min-w-0 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold leading-[1] text-pkpk-main-font ${
                       truncatedNameWidth == null ? "flex-1" : "shrink-0"
                     }`}
                     style={
@@ -648,7 +648,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </Tabs>
 
             {isProfileStatsLoading ? (
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 space-y-0">
                 <div className="grid grid-cols-2 gap-3 px-4">
                   {Array.from({ length: 2 }, (_, index) => (
                     <SkeletonBlock key={index} className="h-5 rounded" />
@@ -659,7 +659,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 </div>
               </div>
             ) : expandedItem ? (
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 space-y-0">
                 <div className="grid grid-cols-2 gap-3">
                   <RatingExtremumRow
                     label="최고 평점"
