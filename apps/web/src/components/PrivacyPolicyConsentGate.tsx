@@ -16,6 +16,8 @@ const PrivacyPolicyConsentGate: React.FC<React.PropsWithChildren> = ({
   const hasCurrentAccountConsent =
     player?.privacyPolicyConsentVersion === PRIVACY_POLICY_VERSION;
   const needsConsent = isAuthenticated && !hasCurrentAccountConsent;
+  const genderLabel =
+    player?.gender === "M" ? "남성" : player?.gender === "F" ? "여성" : "미등록";
 
   const saveAccountConsent = useCallback(async () => {
     if (!token) {
@@ -29,7 +31,7 @@ const PrivacyPolicyConsentGate: React.FC<React.PropsWithChildren> = ({
         buildApiUrl("/api/me/privacy-policy-consent"),
         {
           method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "same-origin",
         },
       );
       const data = (await response.json().catch(() => ({}))) as {
@@ -68,7 +70,7 @@ const PrivacyPolicyConsentGate: React.FC<React.PropsWithChildren> = ({
   }
 
   return (
-    <PkeloLoginLayout>
+    <PkeloLoginLayout variant="consent">
       <section className="text-white" aria-labelledby="privacy-consent-title">
         <h2 id="privacy-consent-title" className="text-xl font-bold">
           개인정보 처리방침 동의
@@ -77,7 +79,30 @@ const PrivacyPolicyConsentGate: React.FC<React.PropsWithChildren> = ({
           PKELO 서비스를 시작하려면 개인정보 처리방침을 확인하고 동의해주세요.
         </p>
 
-        <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold leading-5">
+        <dl className="mt-5 overflow-hidden rounded-xl bg-white/10 text-sm">
+          <div className="flex items-center justify-between gap-4 border-b border-white/15 px-4 py-3">
+            <dt className="text-white/75">이름</dt>
+            <dd className="min-w-0 truncate text-right font-semibold">
+              {player?.username || "미등록"}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 border-b border-white/15 px-4 py-3">
+            <dt className="text-white/75">성별</dt>
+            <dd className="font-semibold">{genderLabel}</dd>
+          </div>
+          <div className="flex items-center justify-between gap-4 px-4 py-3">
+            <dt className="text-white/75">생년월일</dt>
+            <dd className="font-semibold">
+              {player?.age == null ? "미등록" : `만 ${player.age}세`}
+            </dd>
+          </div>
+        </dl>
+
+        <p className="mt-3 text-xs leading-5 text-white/70">
+          위 프로필 정보는 경기 기록과 플레이어 식별에 사용됩니다.
+        </p>
+
+        <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm font-semibold leading-5">
           <input
             type="checkbox"
             checked={isChecked}

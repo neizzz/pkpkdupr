@@ -34,8 +34,8 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
             <tbody>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">카카오 로그인</td>
-                <td className="px-3 py-2 align-top">카카오 계정 식별자</td>
-                <td className="px-3 py-2 align-top">본인 식별 및 로그인 처리</td>
+                <td className="px-3 py-2 align-top">카카오 계정 식별자, 카카오 본인확인정보의 법정 실명·법정 성별·법정 생년월일</td>
+                <td className="px-3 py-2 align-top">본인 식별 및 로그인 처리, 선수 실명 식별, 성별 기반 경기 규칙 및 만 14세 이상 참가 자격 확인</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">프로필</td>
@@ -61,8 +61,9 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
           </table>
         </div>
         <p className="mt-3 text-xs text-pkpk-sub-font">
-          카카오 로그인 과정에서 서비스는 카카오 계정의 식별자만 조회하며,
-          카카오 프로필·친구 목록 등은 수집하지 않습니다.
+          카카오 본인확인정보는 카카오의 사전 제휴 승인 후에만 수집하며,
+          카카오 프로필·친구 목록 등은 수집하지 않습니다. 생년월일 원문은 자격
+          판정에만 사용하고 일반 회원 화면에는 공개하지 않습니다.
         </p>
       </section>
 
@@ -91,10 +92,11 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
       <section className="mt-8">
         <h2 className="text-base font-bold">4. 개인정보의 이용 및 공개 범위</h2>
         <p className="mt-2">
-          사용자명, 성별, 만 나이, 프로필 이미지, 소속, 경기 참가·결과 및 평점은 다른
+          카카오 본인확인정보로 확인된 법정 실명, 성별, 만 나이, 프로필 이미지, 소속, 경기 참가·결과 및 평점은 다른
           서비스 이용자에게 경기 기록, 선수 프로필, 클럽 및 랭킹 화면을
           통해 표시될 수 있습니다. 프로필 이미지, 소속 및 상태 메시지는
-          이용자가 직접 수정하거나 삭제할 수 있습니다. 생년월일은 만 나이 계산에만 사용하며,
+          이용자가 직접 수정하거나 삭제할 수 있습니다. 법정 실명과 성별은 본인확인정보에
+          기반하므로 프로필에서 변경할 수 없으며, 생년월일은 만 나이 계산에만 사용하며,
           프로필에는 생년월일 자체를 표시하지 않습니다.
         </p>
       </section>

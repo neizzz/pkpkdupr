@@ -22,6 +22,7 @@ import {
 import { generateEntityId, isEntityId } from "@pkpkdupr/shared/entityId";
 import {
   getCommonAffiliationNames,
+  getPlayerFullAge,
   isValidPlayerBirthDate,
   normalizeAffiliationNames,
   PLAYER_AFFILIATION_MAX_COUNT,
@@ -118,6 +119,8 @@ const localDevelopmentOrigins =
       : [
           "http://localhost:8080",
           "http://127.0.0.1:8080",
+          "http://localhost:8443",
+          "http://127.0.0.1:8443",
           "http://localhost:3100",
           "http://127.0.0.1:3100",
         ];
@@ -127,6 +130,37 @@ const allowedOrigins = new Set([
   ...localDevelopmentOrigins,
   ...additionalAllowedOrigins,
 ]);
+const USER_SESSION_COOKIE = "pkelo_session";
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+};
+
+const getCookie = (req: express.Request, name: string) =>
+  req.headers.cookie
+    ?.split(";")
+    .map((part) => part.trim().split(/=(.*)/s))
+    .find(([key]) => key === name)?.[1];
+
+const setUserSessionCookie = (
+  res: express.Response,
+  session: { token: string; isPersistent: boolean; expiresAt: Date },
+) => {
+  res.cookie(USER_SESSION_COOKIE, session.token, {
+    ...SESSION_COOKIE_OPTIONS,
+    ...(session.isPersistent ? { expires: session.expiresAt } : {}),
+  });
+};
+
+const clearUserSessionCookie = (res: express.Response) =>
+  res.clearCookie(USER_SESSION_COOKIE, SESSION_COOKIE_OPTIONS);
+
+const hasTrustedCookieOrigin = (req: express.Request) => {
+  const origin = req.get("origin");
+  return !!origin && allowedOrigins.has(origin);
+};
 
 type RuntimeNoticeResponse =
   | { enabled: false }
@@ -721,15 +755,46 @@ const getAuthSession = async (
   req: express.Request,
   res: express.Response,
 ): Promise<AuthenticatedSession | null> => {
+  const cookieToken = getCookie(req, USER_SESSION_COOKIE);
+  if (cookieToken) {
+    if (!["GET", "HEAD", "OPTIONS"].includes(req.method) && !hasTrustedCookieOrigin(req)) {
+      res.status(403).json({ error: "신뢰할 수 없는 Origin입니다." });
+      return null;
+    }
+    try {
+      return await authService.authenticateDeviceSession(cookieToken);
+    } catch (err) {
+      clearUserSessionCookie(res);
+      if (err instanceof InvalidAccessTokenError) {
+        res.status(401).json({
+          error: "세션이 만료되었거나 유효하지 않습니다.",
+          code: "SESSION_INVALID",
+        });
+        return null;
+      }
+      throw err;
+    }
+  }
   const token = getBearerToken(req, res);
   if (!token) {
     return null;
   }
 
   try {
-    return await authService.authenticateAccessToken(token);
+    const session = await authService.authenticateAccessToken(token);
+    if (!session.payload.isAdmin) {
+      throw new InvalidAccessTokenError("사용자 JWT 로그인이 지원되지 않습니다.");
+    }
+    return session;
   } catch (err) {
-    res.status(403).json({ error: (err as Error).message });
+    if (err instanceof InvalidAccessTokenError) {
+      res.status(401).json({
+        error: "세션이 만료되었거나 유효하지 않습니다.",
+        code: "SESSION_INVALID",
+      });
+    } else {
+      res.status(403).json({ error: (err as Error).message });
+    }
     return null;
   }
 };
@@ -1045,16 +1110,16 @@ app.post("/api/register", async (req, res) => {
       return res.status(404).json({ error: "Kakao 로그인을 사용해주세요." });
     }
     const { username, password, gender, birthDate } = req.body;
-    if (!username || !password || !gender) {
+    if (!username || !password || !gender || !birthDate) {
       return res
         .status(400)
-        .json({ error: "username, password, gender는 필수입니다." });
+        .json({ error: "username, password, gender, birthDate는 필수입니다." });
     }
     const player = await passwordAuthService.register({
       username,
       password,
       gender,
-      ...(birthDate == null ? {} : { birthDate: normalizeBirthDate(birthDate) }),
+      birthDate: normalizeEligibleBirthDate(birthDate),
     });
     res.json(player);
   } catch (err) {
@@ -1098,15 +1163,29 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-app.get("/auth/kakao/login", async (_req, res) => {
+app.get("/auth/kakao/login", async (req, res) => {
   if (!kakaoAuthService) {
     return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
   }
+  res.status(410).json({
+    error: "로그인 전 개인정보 동의 후 /api/auth/kakao/start를 사용해주세요.",
+  });
+});
+
+app.post("/api/auth/kakao/start", async (req, res) => {
+  if (!kakaoAuthService) {
+    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
+  }
+  if (!hasTrustedCookieOrigin(req)) {
+    return res.status(403).json({ error: "신뢰할 수 없는 Origin입니다." });
+  }
   try {
-    const { redirectUrl } = await kakaoAuthService.start();
-    res.redirect(302, redirectUrl);
+    const { redirectUrl } = await kakaoAuthService.start({
+      persistentSessionRequested: req.body?.persist === true,
+    });
+    res.json({ redirectUrl });
   } catch (error) {
-    res.status(500).json({ error: (error as Error).message });
+    res.status(400).json({ error: (error as Error).message });
   }
 });
 
@@ -1121,8 +1200,17 @@ app.get("/auth/kakao/callback", async (req, res) => {
       mock: req.query.mock === "1",
     });
     res.redirect(302, redirectUrl);
-  } catch {
-    res.redirect(302, `${(process.env.KAKAO_WEB_ORIGIN ?? webOrigin).replace(/\/+$/, "")}/login?error=kakao_login_failed`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const errorCode = message.includes("만 14세 이상")
+      ? "kakao_age_restricted"
+      : message.includes("본인확인정보")
+        ? "kakao_verified_profile_required"
+        : "kakao_login_failed";
+    res.redirect(
+      302,
+      `${(process.env.KAKAO_WEB_ORIGIN ?? webOrigin).replace(/\/+$/, "")}/login?error=${errorCode}`,
+    );
   }
 });
 
@@ -1132,52 +1220,55 @@ app.post("/api/auth/kakao/exchange", async (req, res) => {
   }
   try {
     const ticket = typeof req.body.ticket === "string" ? req.body.ticket : "";
-    res.json(await kakaoAuthService.exchange(ticket));
+    const result = await kakaoAuthService.exchange(ticket);
+    setUserSessionCookie(res, result.session);
+    return res.json({ status: result.status, isFirstLogin: result.session.isFirstLogin });
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
 });
 
-app.post("/api/auth/kakao/onboarding", async (req, res) => {
-  if (!kakaoAuthService) {
-    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
-  }
+app.get("/api/auth/session", async (req, res) => {
+  const cookieToken = getCookie(req, USER_SESSION_COOKIE);
+  if (!cookieToken) return res.json({ authenticated: false });
   try {
-    const { registrationTicket, username, gender, birthDate } = req.body;
-    if (
-      typeof registrationTicket !== "string" ||
-      typeof username !== "string" ||
-      (gender !== "M" && gender !== "F") ||
-      !isValidPlayerBirthDate(birthDate)
-    ) {
-      return res.status(400).json({ error: "사용자명, 성별, 생년월일을 입력해주세요." });
-    }
-    res.json(
-      await kakaoAuthService.completeOnboarding({
-        registrationTicket,
-        username,
-        gender,
-        birthDate: normalizeBirthDate(birthDate),
-      }),
+    const session = await authService.authenticateDeviceSession(cookieToken);
+    const privacyPolicyConsent = await authService.getCurrentPrivacyPolicyConsent(
+      session.player.id,
     );
+    return res.json({
+      authenticated: true,
+      player: {
+        ...session.player,
+        isFirstLogin: session.isFirstLogin,
+        isAdmin: false,
+        authProvider: session.payload.authProvider ?? "password",
+        privacyPolicyConsentVersion: privacyPolicyConsent?.policyVersion ?? null,
+      },
+    });
   } catch (error) {
-    res.status(400).json({ error: (error as Error).message });
+    if (error instanceof InvalidAccessTokenError) {
+      clearUserSessionCookie(res);
+      return res.json({ authenticated: false });
+    }
+    console.error("[AUTH] Failed to bootstrap session", error);
+    return res.status(503).json({
+      error: "세션을 일시적으로 확인하지 못했습니다.",
+      code: "SESSION_UNAVAILABLE",
+    });
   }
 });
 
 app.get("/api/me", async (req, res) => {
-  const header = req.headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-
-  if (!token) {
-    return res.status(401).json({
-      error: "로그인이 필요합니다.",
-      code: "SESSION_INVALID",
-    });
-  }
-
   try {
-    const session = await authService.authenticateAccessToken(token);
+    if (!getCookie(req, USER_SESSION_COOKIE) && !req.headers.authorization) {
+      return res.status(401).json({
+        error: "세션이 만료되었거나 유효하지 않습니다.",
+        code: "SESSION_INVALID",
+      });
+    }
+    const session = await getAuthSession(req, res);
+    if (!session) return;
     const privacyPolicyConsent =
       await authService.getCurrentPrivacyPolicyConsent(session.player.id);
     res.json({
@@ -1185,7 +1276,6 @@ app.get("/api/me", async (req, res) => {
       isFirstLogin: session.isFirstLogin,
       isAdmin: session.payload.isAdmin === true,
       authProvider: session.payload.authProvider ?? "password",
-      accessToken: session.refreshedAccessToken,
       privacyPolicyConsentVersion: privacyPolicyConsent?.policyVersion ?? null,
     });
   } catch (error) {
@@ -1204,19 +1294,22 @@ app.get("/api/me", async (req, res) => {
   }
 });
 
-app.post("/api/me/privacy-policy-consent", async (req, res) => {
-  const header = req.headers.authorization;
-  const token = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-
-  if (!token) {
-    return res.status(401).json({
-      error: "로그인이 필요합니다.",
-      code: "SESSION_INVALID",
-    });
+app.post("/api/auth/logout", async (req, res) => {
+  const token = getCookie(req, USER_SESSION_COOKIE);
+  if (token) {
+    if (!hasTrustedCookieOrigin(req)) {
+      return res.status(403).json({ error: "신뢰할 수 없는 Origin입니다." });
+    }
+    await authService.revokeDeviceSession(token).catch(() => undefined);
   }
+  clearUserSessionCookie(res);
+  res.status(204).end();
+});
 
+app.post("/api/me/privacy-policy-consent", async (req, res) => {
   try {
-    const session = await authService.authenticateAccessToken(token);
+    const session = await getAuthSession(req, res);
+    if (!session) return;
     const consent = await authService.recordCurrentPrivacyPolicyConsent(
       session.player.id,
     );
@@ -2403,6 +2496,14 @@ const normalizeBirthDate = (value: unknown): string => {
   return value;
 };
 
+const normalizeEligibleBirthDate = (value: unknown): string => {
+  const birthDate = normalizeBirthDate(value);
+  if ((getPlayerFullAge(birthDate) ?? 0) < 14) {
+    throw new Error("PKELO는 만 14세 이상만 가입하고 경기 참여할 수 있습니다.");
+  }
+  return birthDate;
+};
+
 app.patch("/api/me/profile", async (req, res) => {
   try {
     const decoded = await getAuthPayload(req, res);
@@ -2435,8 +2536,16 @@ app.patch("/api/me/profile", async (req, res) => {
           : null;
     }
     if (hasOwnProperty(input, "birthDate")) {
+      if (
+        decoded.authProvider === "kakao" ||
+        decoded.authProvider === "kakao-mock"
+      ) {
+        return res.status(400).json({
+          error: "카카오 본인확인 생년월일은 프로필에서 변경할 수 없습니다.",
+        });
+      }
       update.birthDate =
-        input.birthDate == null ? null : normalizeBirthDate(input.birthDate);
+        input.birthDate == null ? null : normalizeEligibleBirthDate(input.birthDate);
     }
     if (hasOwnProperty(input, "affiliations")) {
       update.affiliations = normalizeProfileAffiliations(input.affiliations);

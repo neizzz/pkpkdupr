@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
-const privacyPolicyVersion = "2026-08-25";
+const privacyPolicyVersion = "2026-08-26";
 
 type FixtureOptions = {
   authenticated?: boolean;
@@ -30,6 +30,7 @@ const me = {
   username: "김하늘",
   gender: "F",
   birthDate: "1990-08-01",
+  age: 36,
   status: "active",
   duprRating: { singles: 3.88, doubles: 4.12 },
   avatarUrl: avatar("하", "#2563eb"),
@@ -343,6 +344,22 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
     if (path === "/api/runtime-notice") {
       return fulfillJson(route, { enabled: false });
     }
+    if (path === "/api/auth/session") {
+      if (options.authenticated === false) {
+        return fulfillJson(route, { authenticated: false });
+      }
+      return fulfillJson(route, {
+        authenticated: true,
+        player: {
+          ...me,
+          username: options.longProfileName
+            ? "김하늘🎾Alice피클볼이름이길어도아이디옆에서최대한길게표시합니다"
+            : me.username,
+          isFirstLogin: false,
+          privacyPolicyConsentVersion,
+        },
+      });
+    }
     if (path === "/api/me") {
       return fulfillJson(route, {
         ...me,
@@ -499,7 +516,7 @@ const openMyProfile = async (page: Page, options: FixtureOptions = {}) => {
 test("카카오 로그인 화면", async ({ page }) => {
   await installFixture(page, { authenticated: false });
   await page.goto("http://pkelo.localhost:4173/login");
-  await expect(page.getByRole("link", { name: "카카오 로그인" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "카카오 로그인" })).toBeVisible();
   await capture(page, "kakao-login.png");
 });
 

@@ -93,7 +93,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
         const res = await fetch(
           buildApiUrl(`/api/players/${encodeURIComponent(playerId)}/profile-summary`),
           {
-            headers: { Authorization: `Bearer ${token}` },
+            credentials: "same-origin",
             signal,
           },
         );
@@ -147,7 +147,7 @@ const MyProfile: React.FC<MyProfileProps> = ({
         });
         const res = await fetch(
           buildApiUrl(`/api/matches?${searchParams.toString()}`),
-          { headers: { Authorization: `Bearer ${token}` } },
+          { credentials: "same-origin" },
         );
         if (!res.ok) throw new Error("매치 목록을 불러오지 못했습니다.");
 

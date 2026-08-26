@@ -592,7 +592,7 @@ const BottomNav: React.FC = () => {
       setQrError(null);
 
       const res = await fetch(buildApiUrl("/api/player-qr-token"), {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "same-origin",
       });
 
       if (!res.ok) {

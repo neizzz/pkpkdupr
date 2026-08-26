@@ -18,6 +18,8 @@ const originalEnvironment = {
   KAKAO_REDIRECT_URI: process.env.KAKAO_REDIRECT_URI,
   KAKAO_WEB_ORIGIN: process.env.KAKAO_WEB_ORIGIN,
   KAKAO_MOCK_SUBJECT: process.env.KAKAO_MOCK_SUBJECT,
+  KAKAO_CONFIDENTIAL_USER_INFO_APPROVED:
+    process.env.KAKAO_CONFIDENTIAL_USER_INFO_APPROVED,
 };
 
 const restoreEnvironment = () => {
@@ -29,12 +31,16 @@ const restoreEnvironment = () => {
 
 const accounts = (overrides: Partial<AuthService> = {}) =>
   ({
-    issueExternalAccessToken: vi.fn().mockResolvedValue({
-      accessToken: "kakao-access-token",
+    issueExternalDeviceSession: vi.fn().mockResolvedValue({
+      token: "session-token",
+      isPersistent: false,
+      expiresAt: new Date("2026-09-08T00:00:00.000Z"),
       isFirstLogin: false,
     }),
     registerExternalPlayer: vi.fn().mockResolvedValue({
-      accessToken: "onboarded-access-token",
+      token: "session-token",
+      isPersistent: false,
+      expiresAt: new Date("2026-09-08T00:00:00.000Z"),
       isFirstLogin: false,
     }),
     ...overrides,
@@ -85,6 +91,7 @@ describe("KakaoAuthService", () => {
     expect(callbackPayload).toMatchObject({
       stateHash: sha256(started.state),
       providerSubject: "mock-subject-1",
+      legalName: "카카오 테스트 사용자",
     });
   });
 
@@ -106,15 +113,39 @@ describe("KakaoAuthService", () => {
     },
   );
 
+  it("신규 가입에 필요한 본인확인정보가 없으면 원인을 안내한다", async () => {
+    const service = new KakaoAuthService(
+      "kakao-mock",
+      accounts(),
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ error: "OAUTH_VERIFIED_PROFILE_REQUIRED" }, 400)) as unknown as typeof fetch,
+    );
+
+    await expect(service.exchange("handoff-ticket")).rejects.toThrow(
+      "카카오 본인확인정보(법정 실명·성별·생년월일)를 받지 못했습니다",
+    );
+  });
+
   it("Kakao authorization code를 서버에서 교환해 subject를 사용한다", async () => {
     process.env.KAKAO_REST_API_KEY = "rest-api-key";
     process.env.KAKAO_CLIENT_SECRET = "client-secret";
     process.env.KAKAO_REDIRECT_URI = "https://pkelo.app/auth/kakao/callback";
     process.env.KAKAO_WEB_ORIGIN = "https://pkelo.app";
+    process.env.KAKAO_CONFIDENTIAL_USER_INFO_APPROVED = "true";
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ access_token: "kakao-token" }))
-      .mockResolvedValueOnce(jsonResponse({ id: 123456789 }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 123456789,
+          kakao_account: {
+            legal_name: "홍길동",
+            legal_gender: "male",
+            legal_birth_date: "19900825",
+          },
+        }),
+      )
       .mockResolvedValueOnce(jsonResponse({}));
     const service = new KakaoAuthService(
       "kakao",
@@ -143,11 +174,11 @@ describe("KakaoAuthService", () => {
     expect(dbPayload.providerSubject).toBe("123456789");
   });
 
-  it("기존 identity는 JWT를 반환하고 새 identity는 onboarding ticket으로 분기한다", async () => {
+  it("기존 identity는 기기 세션을 만들고 신규 identity는 검증정보로 자동 가입한다", async () => {
     const existingAccounts = accounts();
     const existingFetch = vi.fn().mockResolvedValue(
       jsonResponse({
-        transaction: { provider: "kakao-mock" },
+        transaction: { provider: "kakao-mock", persistentSessionRequested: true },
         playerId: "Pexisting",
       }),
     );
@@ -158,65 +189,79 @@ describe("KakaoAuthService", () => {
     );
     await expect(existingService.exchange("handoff-ticket")).resolves.toEqual({
       status: "authenticated",
-      accessToken: "kakao-access-token",
-      isFirstLogin: false,
+      session: expect.objectContaining({ token: "session-token" }),
     });
-    expect(existingAccounts.issueExternalAccessToken).toHaveBeenCalledWith(
+    expect(existingAccounts.issueExternalDeviceSession).toHaveBeenCalledWith(
       "Pexisting",
       "kakao-mock",
+      true,
     );
 
     const newFetch = vi.fn().mockResolvedValue(
       jsonResponse({
-        transaction: { provider: "kakao-mock" },
+        transaction: {
+          provider: "kakao-mock",
+          persistentSessionRequested: false,
+          legalName: "신규 사용자",
+          legalGender: "F",
+          legalBirthDate: "1990-08-25",
+        },
         playerId: null,
       }),
     );
-    const newService = new KakaoAuthService(
+    const newAccounts = accounts();
+    const automaticService = new KakaoAuthService(
       "kakao-mock",
-      accounts(),
+      newAccounts,
       newFetch as unknown as typeof fetch,
     );
-    const result = await newService.exchange("new-handoff-ticket");
-    expect(result.status).toBe("onboarding");
-    if (result.status === "onboarding") {
-      expect(result.registrationTicket).toBeTruthy();
-      const payload = JSON.parse(
-        String(newFetch.mock.calls[0]?.[1]?.body),
-      ) as { handoffHash: string; registrationHash: string };
-      expect(payload.handoffHash).toBe(sha256("new-handoff-ticket"));
-      expect(payload.registrationHash).toBe(sha256(result.registrationTicket));
-    }
+    await expect(automaticService.exchange("new-handoff-ticket")).resolves.toEqual({
+      status: "authenticated",
+      session: expect.objectContaining({ token: "session-token" }),
+    });
+    expect(newAccounts.registerExternalPlayer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        username: "신규 사용자",
+        gender: "F",
+        birthDate: "1990-08-25",
+        provider: "kakao-mock",
+      }),
+    );
   });
 
-  it("onboarding은 원문 ticket 대신 해시와 사용자 프로필만 계정 저장소에 전달한다", async () => {
+  it("신규 가입은 원문 handoff ticket 대신 해시와 카카오 검증 프로필만 전달한다", async () => {
     const registerExternalPlayer = vi.fn().mockResolvedValue({
       accessToken: "onboarded-access-token",
       isFirstLogin: false,
     });
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonResponse({
+        transaction: {
+          provider: "kakao-mock",
+          persistentSessionRequested: false,
+          legalName: "홍길동",
+          legalGender: "F",
+          legalBirthDate: "1990-08-25",
+        },
+        playerId: null,
+      }),
+    );
     const service = new KakaoAuthService(
       "kakao-mock",
       {
-        issueExternalAccessToken: vi.fn(),
+        issueExternalDeviceSession: vi.fn(),
         registerExternalPlayer,
       } as unknown as AuthService,
-      vi.fn() as unknown as typeof fetch,
+      fetchImpl as unknown as typeof fetch,
     );
 
-    await service.completeOnboarding({
-      registrationTicket: "registration-ticket",
-      username: "same-username-can-exist-in-other-domain",
-      gender: "F",
-      birthDate: "1990-08-25",
-    });
+    await service.exchange("handoff-ticket");
 
-    expect(registerExternalPlayer).toHaveBeenCalledWith({
-      registrationTicket: "registration-ticket",
-      registrationTicketHash: sha256("registration-ticket"),
-      username: "same-username-can-exist-in-other-domain",
+    expect(registerExternalPlayer).toHaveBeenCalledWith(expect.objectContaining({
       gender: "F",
       birthDate: "1990-08-25",
       provider: "kakao-mock",
-    });
+      registrationTicketHash: expect.any(String),
+    }));
   });
 });

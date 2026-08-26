@@ -518,8 +518,10 @@ export interface Player {
   username: string;
   duprRating: PublicPlayerDupr | null;
   gender: "M" | "F";
-  /** 만 나이 계산 및 공개 프로필 표시에 쓰는 YYYY-MM-DD 형식의 생년월일입니다. */
+  /** 내부 자격 판정에만 쓰는 YYYY-MM-DD 형식의 생년월일입니다. 공개 API에는 포함하지 않습니다. */
   birthDate?: string;
+  /** 공개 프로필에 표시하는 계산된 만 나이입니다. */
+  age?: number | null;
   status: PlayerStatus;
   avatarUrl?: string;
   affiliations?: PlayerAffiliation[];

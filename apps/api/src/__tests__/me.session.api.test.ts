@@ -22,7 +22,6 @@ const session: AuthenticatedSession = {
   payload: { playerId: player.id, authProvider: "kakao" },
   player,
   isFirstLogin: false,
-  refreshedAccessToken: "refreshed-token",
 };
 
 describe("GET /api/me session contract", () => {
@@ -30,8 +29,8 @@ describe("GET /api/me session contract", () => {
     vi.restoreAllMocks();
   });
 
-  it("유효한 세션은 플레이어 정보와 갱신 토큰을 반환한다", async () => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
+  it("유효한 쿠키 세션은 플레이어 정보를 반환한다", async () => {
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockResolvedValue(
       session,
     );
     vi.spyOn(
@@ -44,25 +43,24 @@ describe("GET /api/me session contract", () => {
 
     const response = await request(app)
       .get("/api/me")
-      .set("Authorization", "Bearer valid-token");
+      .set("Cookie", "pkelo_session=valid-session");
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
       id: player.id,
       authProvider: "kakao",
-      accessToken: "refreshed-token",
       privacyPolicyConsentVersion: "2026-08-18",
     });
   });
 
   it("실제 무효 세션만 SESSION_INVALID와 함께 401을 반환한다", async () => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockRejectedValue(
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockRejectedValue(
       new InvalidAccessTokenError("유효하지 않거나 만료된 토큰입니다."),
     );
 
     const response = await request(app)
       .get("/api/me")
-      .set("Authorization", "Bearer expired-token");
+      .set("Cookie", "pkelo_session=expired-session");
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({
@@ -72,14 +70,14 @@ describe("GET /api/me session contract", () => {
   });
 
   it("저장소 장애는 SESSION_UNAVAILABLE과 함께 503을 반환한다", async () => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockRejectedValue(
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockRejectedValue(
       new Error("DB 서버 요청 실패: 503"),
     );
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     const response = await request(app)
       .get("/api/me")
-      .set("Authorization", "Bearer valid-token");
+      .set("Cookie", "pkelo_session=valid-session");
 
     expect(response.status).toBe(503);
     expect(response.body).toEqual({
@@ -87,5 +85,46 @@ describe("GET /api/me session contract", () => {
       code: "SESSION_UNAVAILABLE",
     });
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it("사용자 Bearer JWT는 SESSION_INVALID로 거부한다", async () => {
+    const response = await request(app)
+      .get("/api/me")
+      .set("Authorization", "Bearer legacy-user-jwt");
+
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe("SESSION_INVALID");
+  });
+});
+
+describe("GET /api/auth/session", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("쿠키가 없으면 401 대신 anonymous bootstrap을 반환한다", async () => {
+    const response = await request(app).get("/api/auth/session");
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ authenticated: false });
+  });
+
+  it("유효한 쿠키는 현재 사용자 정보를 포함한다", async () => {
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockResolvedValue(session);
+    vi.spyOn(AuthService.prototype, "getCurrentPrivacyPolicyConsent").mockResolvedValue({
+      policyVersion: "2026-08-26",
+      agreedAt: new Date("2026-08-26T00:00:00.000Z"),
+    });
+
+    const response = await request(app)
+      .get("/api/auth/session")
+      .set("Cookie", "pkelo_session=valid-session");
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      authenticated: true,
+      player: {
+        id: player.id,
+        privacyPolicyConsentVersion: "2026-08-26",
+      },
+    });
   });
 });

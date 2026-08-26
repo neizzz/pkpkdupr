@@ -368,6 +368,41 @@ app.post("/internal/auth/oauth-transactions/onboarding", async (req, res) => {
   }
 });
 
+app.post("/internal/auth/device-sessions", async (req, res) => {
+  try {
+    res.status(201).json(
+      await authRepository.createDeviceSession({
+        ...req.body,
+        expiresAt: new Date(req.body.expiresAt),
+        createdAt: new Date(req.body.createdAt),
+      }),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/device-sessions/validate", async (req, res) => {
+  try {
+    const tokenHash = typeof req.body.tokenHash === "string" ? req.body.tokenHash : "";
+    res.json(
+      await authRepository.findActiveDeviceSession(tokenHash, new Date(req.body.now)),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/device-sessions/revoke", async (req, res) => {
+  try {
+    const tokenHash = typeof req.body.tokenHash === "string" ? req.body.tokenHash : "";
+    const revoked = await authRepository.revokeDeviceSession(tokenHash, new Date(req.body.now));
+    res.json({ revoked });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
 app.patch("/internal/players/:id/status", async (req, res) => {
   try {
     const player = await playerRepository.updateStatus(

@@ -17,7 +17,7 @@ export interface PlayerInfo {
   username?: string;
   duprRating?: PublicPlayerDupr | null;
   gender?: "M" | "F";
-  birthDate?: string;
+  age?: number | null;
   avatarUrl?: string;
   affiliations?: PlayerAffiliation[];
   statusMessage?: string;
@@ -37,17 +37,13 @@ interface AuthContextType {
     password: string,
     rememberMe?: boolean,
   ) => Promise<void>;
-  loginWithAccessToken: (
-    accessToken: string,
-    isFirstLogin?: boolean,
-  ) => Promise<void>;
+  loginWithSession: () => Promise<void>;
   changePassword: (
     currentPassword: string | undefined,
     newPassword: string,
   ) => Promise<void>;
   updateProfile: (input: {
     avatarUrl?: string | null;
-    birthDate?: string | null;
     affiliations?: PlayerAffiliation[];
     statusMessage?: string | null;
     statusMessageBackgroundColor?: string | null;
@@ -55,21 +51,14 @@ interface AuthContextType {
   uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
   deleteAvatar: () => Promise<PlayerInfo>;
   refreshMe: () => Promise<PlayerInfo>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-const TOKEN_STORAGE_KEY = "token";
 const CACHED_AUTH_STATE_KEY = "pkpkdupr:auth-state";
 const ONLINE_REQUIRED_MESSAGE = "온라인 연결이 필요합니다.";
 
-type LoginResponse = {
-  accessToken: string;
-  isFirstLogin?: boolean;
-};
-
 type MeResponse = PlayerInfo & {
-  accessToken?: string;
   isFirstLogin?: boolean;
 };
 
@@ -83,9 +72,15 @@ type SessionFetchResult =
   | { status: "invalid" }
   | { status: "unavailable" };
 
+type SessionState = "checking" | "anonymous" | "authenticated" | "unavailable";
+
 type MeErrorResponse = {
   code?: string;
 };
+
+type SessionBootstrapResponse =
+  | { authenticated: false }
+  | { authenticated: true; player: MeResponse };
 
 const SESSION_RETRY_DELAYS_MS = [2_000, 5_000, 10_000];
 const SESSION_RETRY_INTERVAL_MS = 30_000;
@@ -119,7 +114,6 @@ const persistAuthState = (
 };
 
 const clearStoredAuthState = () => {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
   localStorage.removeItem(CACHED_AUTH_STATE_KEY);
 };
 
@@ -130,6 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [player, setPlayer] = useState<PlayerInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
+  const [sessionState, setSessionState] = useState<SessionState>("checking");
 
   const retryTimeoutRef = useRef<number | null>(null);
   const retryAttemptRef = useRef(0);
@@ -158,6 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setToken(null);
     setPlayer(null);
     setRequiresPasswordChange(false);
+    setSessionState("anonymous");
   }, [clearSessionRetry]);
 
   const restoreCachedAuthState = useCallback(() => {
@@ -178,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       try {
         const res = await fetch(buildApiUrl("/api/me"), {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          credentials: "same-origin",
         });
 
         if (res.ok) {
@@ -187,6 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             // 새 web 번들이 먼저 반영되어 이전 API의 빈 200 응답을 받더라도
             // 세션을 지우지 않고 배포 완료를 기다립니다.
             restoreCachedAuthState();
+            setSessionState("unavailable");
             return { status: "unavailable" };
           }
 
@@ -194,22 +191,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             return { status: "unavailable" };
           }
 
-          const {
-            accessToken: refreshedAccessToken,
-            isFirstLogin,
-            ...playerInfo
-          } = data;
+          const { isFirstLogin, ...playerInfo } = data;
           const nextRequiresPasswordChange =
             shouldRequirePasswordChange(isFirstLogin);
 
-          if (refreshedAccessToken) {
-            localStorage.setItem(TOKEN_STORAGE_KEY, refreshedAccessToken);
-            activeTokenRef.current = refreshedAccessToken;
-            setToken(refreshedAccessToken);
-          }
           hasSessionProfileRef.current = true;
           setPlayer(playerInfo);
           setRequiresPasswordChange(nextRequiresPasswordChange);
+          setSessionState("authenticated");
           persistAuthState(playerInfo, nextRequiresPasswordChange);
           return { status: "authenticated", player: playerInfo };
         }
@@ -223,15 +212,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         restoreCachedAuthState();
+        setSessionState("unavailable");
         return { status: "unavailable" };
       } catch {
         console.error("Failed to fetch user info");
         restoreCachedAuthState();
+        setSessionState("unavailable");
         return { status: "unavailable" };
       }
     },
     [clearSession, restoreCachedAuthState],
   );
+
+  const bootstrapSession = useCallback(async () => {
+    try {
+      const res = await fetch(buildApiUrl("/api/auth/session"), {
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        restoreCachedAuthState();
+        setSessionState("unavailable");
+        return;
+      }
+
+      const data = (await res.json()) as SessionBootstrapResponse;
+      if (!data.authenticated) {
+        clearSession();
+        setIsLoading(false);
+        return;
+      }
+
+      const { isFirstLogin, ...playerInfo } = data.player;
+      if (!playerInfo.id) {
+        throw new Error("세션 사용자 정보가 없습니다.");
+      }
+      const nextRequiresPasswordChange = shouldRequirePasswordChange(isFirstLogin);
+      activeTokenRef.current = "cookie-session";
+      hasSessionProfileRef.current = true;
+      setToken("cookie-session");
+      setPlayer(playerInfo);
+      setRequiresPasswordChange(nextRequiresPasswordChange);
+      setSessionState("authenticated");
+      persistAuthState(playerInfo, nextRequiresPasswordChange);
+      setIsLoading(false);
+    } catch {
+      restoreCachedAuthState();
+      setSessionState("unavailable");
+    }
+  }, [clearSession, restoreCachedAuthState]);
 
   const validateSession = useCallback(
     async (requestedToken?: string) => {
@@ -278,17 +306,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   sessionValidationRef.current = validateSession;
 
   useEffect(() => {
-    const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!storedToken) {
-      setIsLoading(false);
-      return;
-    }
-
-    activeTokenRef.current = storedToken;
-    setToken(storedToken);
+    activeTokenRef.current = null;
+    setToken(null);
+    setSessionState("checking");
     const cachedAuthState = restoreCachedAuthState();
     setIsLoading(!cachedAuthState);
-    void validateSession(storedToken);
+    void bootstrapSession();
 
     const validateWhenActive = () => {
       void sessionValidationRef.current?.();
@@ -309,26 +332,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       window.removeEventListener("focus", validateWhenActive);
       document.removeEventListener("visibilitychange", validateWhenVisible);
     };
-  }, [clearSessionRetry, restoreCachedAuthState, validateSession]);
+  }, [bootstrapSession, clearSessionRetry, restoreCachedAuthState]);
 
-  const loginWithAccessToken = async (
-    accessToken: string,
-    isFirstLogin?: boolean,
-  ) => {
+  const loginWithSession = async () => {
     clearSessionRetry();
-    activeTokenRef.current = accessToken;
-    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
-    setToken(accessToken);
-    setRequiresPasswordChange(shouldRequirePasswordChange(isFirstLogin));
+    activeTokenRef.current = "cookie-session";
+    setToken("cookie-session");
     setIsLoading(true);
-    const result = await fetchMe(accessToken);
+    const result = await fetchMe("cookie-session");
 
     if (result.status === "unavailable") {
       if (!hasSessionProfileRef.current) {
         setIsLoading(true);
       }
-      void sessionValidationRef.current?.();
-      return;
+      throw new Error("서버 세션을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    }
+
+    if (result.status === "invalid") {
+      throw new Error("세션을 만들지 못했습니다. 카카오 로그인을 다시 시도해주세요.");
     }
 
     setIsLoading(false);
@@ -354,15 +375,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const errorData = await res.json().catch(() => ({}));
       throw new Error(errorData.error || "로그인 실패");
     }
-    const data = (await res.json()) as LoginResponse;
-    await loginWithAccessToken(data.accessToken, data.isFirstLogin);
+    await loginWithSession();
   };
 
   const changePassword = async (
     currentPassword: string | undefined,
     newPassword: string,
   ) => {
-    if (!token) {
+    if (!player) {
       throw new Error("로그인이 필요합니다.");
     }
     if (!isOnline()) {
@@ -373,10 +393,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const res = await fetch(buildApiUrl("/api/change-password"), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({ currentPassword, newPassword }),
     });
 
@@ -389,7 +407,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const updateProfile = async (input: { avatarUrl?: string | null }) => {
-    if (!token) {
+    if (!player) {
       throw new Error("로그인이 필요합니다.");
     }
     if (!isOnline()) {
@@ -398,10 +416,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const res = await fetch(buildApiUrl("/api/me/profile"), {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify(input),
     });
     if (!res.ok) {
@@ -419,7 +435,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const uploadAvatar = async (imageDataUrl: string) => {
-    if (!token) {
+    if (!player) {
       throw new Error("로그인이 필요합니다.");
     }
     if (!isOnline()) {
@@ -428,10 +444,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const res = await fetch(buildApiUrl("/api/me/avatar"), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({ imageDataUrl }),
     });
     if (!res.ok) {
@@ -449,7 +463,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const deleteAvatar = async () => {
-    if (!token) {
+    if (!player) {
       throw new Error("로그인이 필요합니다.");
     }
     if (!isOnline()) {
@@ -458,7 +472,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const res = await fetch(buildApiUrl("/api/me/avatar"), {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "same-origin",
     });
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
@@ -475,11 +489,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const refreshMe = async () => {
-    if (!token) {
+    if (!player) {
       throw new Error("로그인이 필요합니다.");
     }
 
-    const result = await fetchMe(token);
+    const result = await fetchMe("cookie-session");
     if (result.status !== "authenticated") {
       throw new Error("내 정보를 새로고침하지 못했습니다.");
     }
@@ -487,7 +501,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return result.player;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (isOnline()) {
+      await fetch(buildApiUrl("/api/auth/logout"), {
+        method: "POST",
+        credentials: "same-origin",
+      }).catch(() => undefined);
+    }
     clearSession();
   };
 
@@ -497,10 +517,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         token,
         player,
         isLoading,
-        isAuthenticated: !!token,
+        isAuthenticated: sessionState === "authenticated",
         requiresPasswordChange,
         login,
-        loginWithAccessToken,
+        loginWithSession,
         changePassword,
         updateProfile,
         uploadAvatar,

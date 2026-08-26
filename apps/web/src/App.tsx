@@ -13,7 +13,6 @@ import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
 import Login from "./pages/Login";
 import PkeloKakaoCallback from "./pages/PkeloKakaoCallback";
-import PkeloKakaoOnboarding from "./pages/PkeloKakaoOnboarding";
 import PkeloLogin from "./pages/PkeloLogin";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
@@ -146,16 +145,6 @@ function AppRoutes() {
         element={
           isPkeloAppHost() && !isAuthenticated ? (
             <PkeloKakaoCallback />
-          ) : (
-            <Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />
-          )
-        }
-      />
-      <Route
-        path="/login/kakao/onboarding"
-        element={
-          isPkeloAppHost() && !isAuthenticated ? (
-            <PkeloKakaoOnboarding />
           ) : (
             <Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />
           )

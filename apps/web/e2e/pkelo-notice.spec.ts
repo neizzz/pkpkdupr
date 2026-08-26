@@ -13,6 +13,12 @@ const expectStableBrandPosition = async (
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
+      contentType: "application/json; charset=utf-8",
+      body: JSON.stringify({ authenticated: false }),
+    }),
+  );
   await page.route("**/api/runtime-notice", async (route: Route) => {
     await noticeRequestPending;
     await route.fulfill({
@@ -43,7 +49,7 @@ test("공지 확인 후 로그인 버튼이 표시되어도 브랜드 위치가 
   page,
 }) => {
   await expectStableBrandPosition(page, { enabled: false });
-  await expect(page.getByRole("link", { name: "카카오 로그인" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "카카오 로그인" })).toBeVisible();
 });
 
 test("공지 확인 후 안내가 표시되어도 브랜드 위치가 유지된다", async ({

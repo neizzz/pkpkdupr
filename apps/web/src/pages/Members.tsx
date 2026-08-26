@@ -240,7 +240,7 @@ const Members: React.FC = () => {
 
     try {
       const res = await fetch(buildApiUrl("/api/clubs"), {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "same-origin",
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -286,7 +286,7 @@ const Members: React.FC = () => {
           ? `${CACHED_MEMBERS_KEY}:${clubIdOverride}`
           : CACHED_MEMBERS_KEY;
         const res = await fetch(buildApiUrl(`/api/players${query ? `?${query}` : ""}`), {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "same-origin",
         });
 
         if (!res.ok) {
@@ -377,7 +377,7 @@ const Members: React.FC = () => {
           buildApiUrl(
             `/api/players/${encodeURIComponent(memberId)}/profile-summary`,
           ),
-          { headers: { Authorization: `Bearer ${token}` } },
+          { credentials: "same-origin" },
         );
 
         if (!res.ok) {
@@ -433,7 +433,7 @@ const Members: React.FC = () => {
         });
         const res = await fetch(
           buildApiUrl(`/api/matches?${searchParams.toString()}`),
-          { headers: { Authorization: `Bearer ${token}` } },
+          { credentials: "same-origin" },
         );
         if (!res.ok) throw new Error("매치 목록을 불러오지 못했습니다.");
 
@@ -569,7 +569,6 @@ const Members: React.FC = () => {
       const res = await fetch(buildApiUrl("/api/friends/player-qr"), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ payload }),

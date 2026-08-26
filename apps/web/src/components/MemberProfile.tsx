@@ -38,7 +38,6 @@ import {
   getCompositeSinglesRating,
 } from "@/utils/dupr";
 import {
-  getPlayerFullAge,
   type PlayerRatingHistoryPoint,
 } from "@pkpkdupr/shared/player";
 
@@ -329,7 +328,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
     profileOverride?.id === player?.id && player
       ? { ...player, ...profileOverride }
       : player;
-  const displayedAge = getPlayerFullAge(displayedPlayer?.birthDate);
+  const displayedAge = displayedPlayer?.age;
   const avatarConfirmDepthId = `profile-avatar-confirm:${player?.id ?? "unknown"}`;
   const statusEditorDepthId = `profile-status-editor:${player?.id ?? "unknown"}`;
 
@@ -541,7 +540,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 className="hidden"
               />
             ) : null}
-            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
               <div className="flex min-w-0 max-w-full flex-col gap-0">
                 {displayedPlayer?.gender ? (
                   <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">

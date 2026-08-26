@@ -32,10 +32,11 @@ const id = (name: string) => varchar(name, { length: 255 });
 
 export const players = mysqlTable("players", {
   id: id("id").primaryKey(),
-  username: varchar("username", { length: 191 }).notNull().unique(),
+  username: varchar("username", { length: 191 }).notNull(),
   duprRating: text("dupr_rating"),
   gender: varchar("gender", { length: 8 }).notNull(),
   birthDate: varchar("birth_date", { length: 10 }),
+  identityVerifiedAt: unixTimestamp("identity_verified_at"),
   status: varchar("status", { length: 32 }).notNull(),
   avatarUrl: text("avatar_url"),
   affiliationsJson: text("affiliations_json"),
@@ -115,9 +116,18 @@ export const oauthLoginTransactions = mysqlTable(
     id: id("id").primaryKey(),
     provider: varchar("provider", { length: 32 }).notNull(),
     stateHash: varchar("state_hash", { length: 128 }).notNull(),
+    persistentSessionRequested: boolean("persistent_session_requested")
+      .notNull()
+      .default(false),
+    privacyPolicyVersion: varchar("privacy_policy_version", { length: 32 }),
+    privacyPolicyAgreedAt: unixTimestamp("privacy_policy_agreed_at"),
+    profileDisclosureAgreedAt: unixTimestamp("profile_disclosure_agreed_at"),
     handoffHash: varchar("handoff_hash", { length: 128 }),
     registrationHash: varchar("registration_hash", { length: 128 }),
     providerSubject: varchar("provider_subject", { length: 255 }),
+    legalName: varchar("legal_name", { length: 191 }),
+    legalGender: varchar("legal_gender", { length: 8 }),
+    legalBirthDate: varchar("legal_birth_date", { length: 10 }),
     expiresAt: unixTimestamp("expires_at").notNull(),
     stateConsumedAt: unixTimestamp("state_consumed_at"),
     handoffConsumedAt: unixTimestamp("handoff_consumed_at"),
@@ -134,6 +144,29 @@ export const oauthLoginTransactions = mysqlTable(
     registrationHashUnique: uniqueIndex(
       "oauth_login_transactions_registration_hash_unique",
     ).on(table.registrationHash),
+  }),
+);
+
+export const playerDeviceSessions = mysqlTable(
+  "player_device_sessions",
+  {
+    id: id("id").primaryKey(),
+    playerId: id("player_id").notNull(),
+    tokenHash: varchar("token_hash", { length: 128 }).notNull(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    isPersistent: boolean("is_persistent").notNull(),
+    expiresAt: unixTimestamp("expires_at").notNull(),
+    revokedAt: unixTimestamp("revoked_at"),
+    lastSeenAt: unixTimestamp("last_seen_at").notNull(),
+    createdAt: unixTimestamp("created_at").notNull(),
+  },
+  (table) => ({
+    tokenHashUnique: uniqueIndex("player_device_sessions_token_hash_unique").on(
+      table.tokenHash,
+    ),
+    playerPersistentExpiryIndex: index(
+      "player_device_sessions_player_persistent_expiry_idx",
+    ).on(table.playerId, table.isPersistent, table.expiresAt),
   }),
 );
 

@@ -8,13 +8,14 @@ type SensitiveRoute = {
 
 const sensitiveRoutes: readonly SensitiveRoute[] = [
   { method: "GET", pathname: /^\/auth\/kakao\/login$/ },
+  { method: "POST", pathname: /^\/api\/auth\/kakao\/start$/ },
   {
     method: "GET",
     pathname: /^\/auth\/kakao\/callback$/,
     noReferrer: true,
   },
   { method: "POST", pathname: /^\/api\/auth\/kakao\/exchange$/ },
-  { method: "POST", pathname: /^\/api\/auth\/kakao\/onboarding$/ },
+  { method: "GET", pathname: /^\/api\/auth\/session$/ },
   { method: "GET", pathname: /^\/api\/me$/ },
   { method: "POST", pathname: /^\/api\/me\/privacy-policy-consent$/ },
   { method: "POST", pathname: /^\/api\/admin\/login$/ },

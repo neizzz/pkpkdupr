@@ -70,7 +70,7 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
 
       try {
         const res = await fetch(buildApiUrl(`/api/matches/${matchId}`), {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: "same-origin",
         });
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -110,7 +110,6 @@ const ProfileMatchDetailDrawer: React.FC<ProfileMatchDetailDrawerProps> = ({
         const res = await fetch(buildApiUrl(`/api/matches/${matchId}/result`), {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ scores }),

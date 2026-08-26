@@ -1,9 +1,30 @@
 import React from "react";
 
-const PkeloLoginLayout: React.FC<React.PropsWithChildren> = ({ children }) => (
-  <div className="flex h-full w-full flex-col items-center justify-start overflow-y-auto bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg px-4 pt-[calc(env(safe-area-inset-top)+32vh)] pb-[calc(var(--safe-bottom)+var(--app-keyboard-offset)+1.5rem)]">
-    <div className="w-full max-w-sm self-center py-4">
-      <header className="mb-8 text-center text-white">
+type PkeloLoginLayoutProps = React.PropsWithChildren<{
+  variant?: "centered" | "consent";
+}>;
+
+const PkeloLoginLayout: React.FC<PkeloLoginLayoutProps> = ({
+  children,
+  variant = "centered",
+}) => (
+  <div
+    className={`flex h-full w-full flex-col items-center overflow-y-auto bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg px-4 pb-[calc(var(--safe-bottom)+var(--app-keyboard-offset)+1.5rem)] ${
+      variant === "consent"
+        ? "justify-start pt-[calc(env(safe-area-inset-top)+8rem)]"
+        : "justify-center pt-[calc(env(safe-area-inset-top)+1.5rem)]"
+    }`}
+  >
+    <div
+      className={`w-full max-w-sm shrink-0 self-center py-4 ${
+        variant === "centered" ? "h-[320px]" : ""
+      }`}
+    >
+      <header
+        className={`text-center text-white ${
+          variant === "consent" ? "mb-12" : "mb-8"
+        }`}
+      >
         <img
           src="/pkelo-login-brand.png"
           alt="PKELO 피클볼 로고"

@@ -221,9 +221,9 @@ const Settings: React.FC = () => {
           <Button
             type="button"
             className="bg-[#f8626c] text-white hover:bg-[#e9545e]"
-            onPress={() => {
+            onPress={async () => {
               logoutConfirmation.close();
-              logout();
+              await logout();
             }}
           >
             로그아웃

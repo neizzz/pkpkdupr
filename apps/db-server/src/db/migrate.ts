@@ -294,6 +294,39 @@ const migrations: Migration[] = [
       "ALTER TABLE players ADD COLUMN birth_date VARCHAR(10) NULL AFTER gender",
     ],
   },
+  {
+    id: "0011_player_device_sessions",
+    statements: [
+      `ALTER TABLE oauth_login_transactions
+        ADD COLUMN persistent_session_requested BOOLEAN NOT NULL DEFAULT FALSE AFTER state_hash`,
+      `CREATE TABLE player_device_sessions (
+        id VARCHAR(255) PRIMARY KEY,
+        player_id VARCHAR(255) NOT NULL,
+        token_hash VARCHAR(128) NOT NULL,
+        provider VARCHAR(32) NOT NULL,
+        is_persistent BOOLEAN NOT NULL,
+        expires_at BIGINT NOT NULL,
+        revoked_at BIGINT NULL,
+        last_seen_at BIGINT NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY player_device_sessions_token_hash_unique (token_hash),
+        INDEX player_device_sessions_player_persistent_expiry_idx (player_id, is_persistent, expires_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
+  {
+    id: "0012_kakao_verified_profile_and_consent",
+    statements: [
+      "ALTER TABLE players DROP INDEX username",
+      "ALTER TABLE players ADD COLUMN identity_verified_at BIGINT NULL AFTER birth_date",
+      "ALTER TABLE oauth_login_transactions ADD COLUMN privacy_policy_version VARCHAR(32) NULL AFTER persistent_session_requested",
+      "ALTER TABLE oauth_login_transactions ADD COLUMN privacy_policy_agreed_at BIGINT NULL AFTER privacy_policy_version",
+      "ALTER TABLE oauth_login_transactions ADD COLUMN profile_disclosure_agreed_at BIGINT NULL AFTER privacy_policy_agreed_at",
+      "ALTER TABLE oauth_login_transactions ADD COLUMN legal_name VARCHAR(191) NULL AFTER provider_subject",
+      "ALTER TABLE oauth_login_transactions ADD COLUMN legal_gender VARCHAR(8) NULL AFTER legal_name",
+      "ALTER TABLE oauth_login_transactions ADD COLUMN legal_birth_date VARCHAR(10) NULL AFTER legal_gender",
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

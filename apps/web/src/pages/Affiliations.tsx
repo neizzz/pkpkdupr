@@ -185,7 +185,6 @@ const Affiliations: React.FC = () => {
       const res = await fetch(buildApiUrl(path), {
         ...options,
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           ...(options.headers ?? {}),
         },

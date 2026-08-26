@@ -27,6 +27,7 @@ import {
   setDuprMetricByCategory,
   setDuprRatingByCategory,
   toPublicPlayerDupr,
+  getPlayerFullAge,
 } from "@pkpkdupr/shared/player";
 import type {
   DevPlayerQrTokenListResponse,
@@ -35,7 +36,7 @@ import type {
   VerifyPlayerQrTokenResponse,
 } from "@pkpkdupr/shared/qr";
 import bcrypt from "bcryptjs";
-import { createHmac, randomUUID } from "crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "crypto";
 import { generateEntityId } from "@pkpkdupr/shared/entityId";
 import { PRIVACY_POLICY_VERSION } from "@pkpkdupr/shared/privacyPolicy";
 import {
@@ -67,6 +68,11 @@ const DB_SERVER_URL = process.env.DB_SERVER_URL || "http://localhost:5001";
 const DEV_MOCK_DATA_ENABLED = process.env.ENABLE_DEV_MOCK_DATA === "true";
 const API_ADMIN_USERNAME = process.env.API_ADMIN_USERNAME || "admin";
 const API_ADMIN_PASSWORD = process.env.API_ADMIN_PASSWORD || "admin123qwe";
+const TRANSIENT_DEVICE_SESSION_TTL_MS = 3 * 60 * 60 * 1000;
+const PERSISTENT_DEVICE_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+const hashDeviceSessionToken = (token: string) =>
+  createHash("sha256").update(token).digest("hex");
 
 interface StoredPlayerRecord extends Player {
   passwordHash: string;
@@ -89,6 +95,13 @@ export interface AuthenticatedSession {
   player: Player;
   isFirstLogin: boolean;
   refreshedAccessToken?: string;
+}
+
+export interface IssuedDeviceSession {
+  token: string;
+  isPersistent: boolean;
+  expiresAt: Date;
+  isFirstLogin: boolean;
 }
 
 export interface PrivacyPolicyConsentStatus {
@@ -333,13 +346,14 @@ const groupByPlayerId = <T extends { playerId: string }>(items: T[]) =>
 
 const toPublicPlayer = (stored: StoredPlayerRecord): Player => {
   const {
+    birthDate,
     passwordHash: _passwordHash,
     isFirstLogin: _isFirstLogin,
     duprMetrics: _duprMetrics,
     duprState: _duprState,
     ...player
   } = stored;
-  return player;
+  return { ...player, age: getPlayerFullAge(birthDate) };
 };
 
 const toAdminPlayer = (stored: StoredPlayerRecord): AdminPlayer => ({
@@ -976,13 +990,80 @@ export class AuthService {
     };
   }
 
+  async issueExternalDeviceSession(
+    playerId: string,
+    provider: ExternalAuthProvider,
+    isPersistent: boolean,
+  ): Promise<IssuedDeviceSession> {
+    const stored = await this.getStoredPlayerById(playerId);
+    if (!stored) throw new Error("사용자를 찾을 수 없습니다.");
+    if (stored.status === "inactive") {
+      throw new Error("비활성 계정입니다. 관리자에게 문의해주세요.");
+    }
+    const now = new Date();
+    const expiresAt = new Date(
+      now.getTime() +
+        (isPersistent
+          ? PERSISTENT_DEVICE_SESSION_TTL_MS
+          : TRANSIENT_DEVICE_SESSION_TTL_MS),
+    );
+    const token = randomBytes(32).toString("base64url");
+    await this.dbRequest("/internal/auth/device-sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        id: buildId("player-device-session"),
+        playerId,
+        tokenHash: hashDeviceSessionToken(token),
+        provider,
+        isPersistent,
+        expiresAt: expiresAt.toISOString(),
+        createdAt: now.toISOString(),
+      }),
+    });
+    return {
+      token,
+      isPersistent,
+      expiresAt,
+      isFirstLogin: this.shouldRequirePasswordChange(stored),
+    };
+  }
+
+  async authenticateDeviceSession(token: string): Promise<AuthenticatedSession> {
+    const session = await this.dbRequest<{
+      playerId?: string;
+      provider?: ExternalAuthProvider;
+    } | null>("/internal/auth/device-sessions/validate", {
+      method: "POST",
+      body: JSON.stringify({ tokenHash: hashDeviceSessionToken(token), now: new Date().toISOString() }),
+    });
+    if (!session?.playerId || !session.provider) {
+      throw new InvalidAccessTokenError("세션이 만료되었거나 유효하지 않습니다.");
+    }
+    const stored = await this.getStoredPlayerById(session.playerId);
+    if (!stored || stored.status === "inactive") {
+      throw new InvalidAccessTokenError("세션이 만료되었거나 유효하지 않습니다.");
+    }
+    return {
+      payload: { playerId: stored.id, isAdmin: false, authProvider: session.provider },
+      player: toPublicPlayer(stored),
+      isFirstLogin: this.shouldRequirePasswordChange(stored),
+    };
+  }
+
+  async revokeDeviceSession(token: string): Promise<void> {
+    await this.dbRequest("/internal/auth/device-sessions/revoke", {
+      method: "POST",
+      body: JSON.stringify({ tokenHash: hashDeviceSessionToken(token), now: new Date().toISOString() }),
+    });
+  }
+
   async registerExternalPlayer(input: {
     registrationTicketHash: string;
     username: string;
     gender: "M" | "F";
     birthDate: string;
     provider: ExternalAuthProvider;
-  }): Promise<{ accessToken: string; isFirstLogin: boolean }> {
+  }): Promise<IssuedDeviceSession> {
     const username = input.username.trim();
     if (!username || username.length > 191) {
       throw new Error("사용자명은 1~191자여야 합니다.");
@@ -1002,23 +1083,27 @@ export class AuthService {
       SALT_ROUNDS,
     );
     let created: StoredPlayerRecord;
+    let oauthProvider: ExternalAuthProvider;
+    let persistentSessionRequested: boolean;
     try {
-      created = hydratePlayer(
-        await this.dbRequest<any>("/internal/auth/oauth-transactions/onboarding", {
+      const completed = await this.dbRequest<any>("/internal/auth/oauth-transactions/onboarding", {
           method: "POST",
           body: JSON.stringify({
             registrationHash: input.registrationTicketHash,
             now: now.toISOString(),
             identityId: buildId("player-auth-identity"),
             creationLogId: buildId("player-creation-log"),
+            consentId: buildId("player-privacy-policy-consent"),
             player: {
               ...player,
               passwordHash,
               isFirstLogin: false,
             },
           }),
-        }),
-      );
+        });
+      created = hydratePlayer(completed.player);
+      oauthProvider = completed.provider;
+      persistentSessionRequested = completed.persistentSessionRequested === true;
     } catch (error) {
       const message = (error as Error).message;
       if (message.includes("USERNAME_CONFLICT")) {
@@ -1027,10 +1112,14 @@ export class AuthService {
       throw error;
     }
 
-    return {
-      accessToken: this.createAccessTokenForPlayer(created, true, input.provider),
-      isFirstLogin: false,
-    };
+    if (oauthProvider! !== input.provider) {
+      throw new Error("OAuth 제공자 정보가 일치하지 않습니다.");
+    }
+    return await this.issueExternalDeviceSession(
+      created.id,
+      oauthProvider!,
+      persistentSessionRequested!,
+    );
   }
 
   async getPlayerById(playerId: string): Promise<Player | undefined> {

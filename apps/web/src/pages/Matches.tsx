@@ -252,7 +252,7 @@ const Matches: React.FC<MatchesProps> = ({
 
         const res = await fetch(
           buildApiUrl(`/api/match-feed?${searchParams.toString()}`),
-          { headers: { Authorization: `Bearer ${token}` } },
+          { credentials: "same-origin" },
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -322,7 +322,7 @@ const Matches: React.FC<MatchesProps> = ({
       if (!token) throw new Error("로그인이 필요해요.");
 
       const res = await fetch(buildApiUrl(`/api/matches/${matchId}`), {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: "same-origin",
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
@@ -392,7 +392,7 @@ const Matches: React.FC<MatchesProps> = ({
         }
         const res = await fetch(
           buildApiUrl(`/api/match-sessions/${session.id}/matches`),
-          { headers: { Authorization: `Bearer ${token}` } },
+          { credentials: "same-origin" },
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -512,7 +512,6 @@ const Matches: React.FC<MatchesProps> = ({
         const res = await fetch(buildApiUrl(`/api/matches/${matchId}/result`), {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ scores }),
@@ -542,7 +541,7 @@ const Matches: React.FC<MatchesProps> = ({
         setPendingMatchAction({ matchId, type: "approve-result" });
         const res = await fetch(
           buildApiUrl(`/api/matches/${matchId}/approval`),
-          { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+          { method: "POST", credentials: "same-origin" },
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -569,7 +568,7 @@ const Matches: React.FC<MatchesProps> = ({
         setPendingMatchAction({ matchId, type: "cancel-approval" });
         const res = await fetch(
           buildApiUrl(`/api/matches/${matchId}/approval`),
-          { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+          { method: "DELETE", credentials: "same-origin" },
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
@@ -596,7 +595,7 @@ const Matches: React.FC<MatchesProps> = ({
         setPendingMatchAction({ matchId, type: "reject-result" });
         const res = await fetch(
           buildApiUrl(`/api/matches/${matchId}/rejection`),
-          { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+          { method: "POST", credentials: "same-origin" },
         );
         if (!res.ok) {
           const errorData = await res.json().catch(() => ({}));
