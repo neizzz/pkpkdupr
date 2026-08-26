@@ -68,7 +68,9 @@ export default defineConfig({
       registerType: "prompt",
       injectRegister: "auto",
       devOptions: {
-        enabled: true,
+        // OAuth callback은 브라우저가 최신 개발 번들을 직접 받아야 한다.
+        // PWA는 preview/production에서 검증하고 dev 서버에는 등록하지 않는다.
+        enabled: false,
         navigateFallback: "/index.html",
         navigateFallbackAllowlist: [
           /^\/$/,

@@ -5,6 +5,7 @@
     "description": "Pickleball DUPR System - Monorepo with pnpm",
     "scripts": {
     "dev": "bash scripts/dev-pkelo.sh",
+    "dev:real-kakao": "env PKELO_REAL_KAKAO=true PKELO_DEV_ENV_FILE=env/pkelo.real-kakao.env bash scripts/dev-pkelo.sh",
     "dev:db": "bash scripts/dev-pkelo-db.sh",
     "dev:db:down": "bash scripts/dev-pkelo-db.sh down",
     "dev:db-browser": "bash scripts/dev-pkelo-db.sh browser",

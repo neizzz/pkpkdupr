@@ -6,6 +6,7 @@
 
 ```bash
 pnpm dev                 # MySQL 준비 후 web/admin/api/db-server 실행
+pnpm dev:real-kakao      # 별도 카카오 개발 앱으로 실카카오 로그인 실행
 pnpm dev:db              # MySQL만 기동
 pnpm dev:db:down         # MySQL 중지
 pnpm dev:db-browser      # Adminer 기동 (http://localhost:3302/)
@@ -48,15 +49,32 @@ Vite는 `/api`, `/auth`, `/uploads`, `/db`를 각각 API 또는 Adminer 개발 �
 - 서버는 `mysql`, 데이터베이스는 `pkelo_dev`를 입력합니다.
 - 조회에는 `.env`의 `MYSQL_VIEWER_USER` / `MYSQL_VIEWER_PASSWORD`를 사용합니다. 이 계정은 `SELECT`, `SHOW VIEW` 권한만 가집니다.
 
-## HTTPS 프록시와 카카오 로그인
+## 로컬 실카카오 로그인
 
-`neiz-office2.fedev.kakao.com`, `neiz-home2.fedev.kakao.com`은 개발 Vite 허용 host입니다. 실카카오 로그인은 사용할 프록시 도메인을 카카오디벨로퍼스 Redirect URI에 등록한 뒤, `env/pkelo.dev.env`에 같은 origin을 설정합니다.
+`pnpm dev`는 `kakao-mock`을 유지합니다. 실제 카카오 로그인은 운영 앱과 분리한 카카오 개발 앱을 만들고 아래 절차로 실행합니다.
 
 ```env
-PKELO_DEV_WEB_ORIGIN=https://neiz-office2.fedev.kakao.com
-KAKAO_WEB_ORIGIN=https://neiz-office2.fedev.kakao.com
-KAKAO_REDIRECT_URI=https://neiz-office2.fedev.kakao.com/auth/kakao/callback
+# 카카오디벨로퍼스 개발 앱 설정
+# 1. [카카오 로그인] 사용 설정을 ON으로 변경
+# 2. Redirect URI에 아래 값을 정확히 등록
+http://localhost:8443/auth/kakao/callback
 ```
+
+```bash
+cp env/pkelo.real-kakao.env.example env/pkelo.real-kakao.env
+# env/pkelo.real-kakao.env에 개발 앱의 REST API 키와 Client Secret 입력
+pnpm dev:real-kakao
+```
+
+`dev:real-kakao`는 `USER_AUTH_PROVIDER=kakao`, REST API 키, Client Secret, 그리고 callback origin 일치를 확인한 뒤에만 서비스를 시작합니다. 카카오는 로그인 완료 후 서버가 아니라 같은 브라우저를 `localhost` callback으로 이동시키며, Vite가 `/auth`를 로컬 API로 프록시합니다. 따라서 같은 PC 브라우저에서는 동작하지만 휴대폰 같은 다른 기기의 `localhost`는 개발 PC를 가리키지 않습니다.
+
+카카오 본인확인정보(법정 실명·성별·생년월일)를 이용한 자동 가입은 카카오 제휴 승인이 전제입니다. 승인 후에만 `KAKAO_CONFIDENTIAL_USER_INFO_APPROVED=true`를 설정하세요. 승인되지 않은 상태에서는 실카카오 로그인을 시작하지 않도록 서버가 차단합니다.
+
+현재 PKELO의 로그아웃은 PKELO 세션만 삭제하며 카카오계정 로그아웃을 요청하지 않습니다. 따라서 카카오디벨로퍼스의 로그아웃 Redirect URI는 등록하지 않아도 됩니다. 카카오계정 로그아웃을 추가할 때만 별도 URI를 등록합니다.
+
+### 외부 기기 HTTPS 테스트
+
+`neiz-office2.fedev.kakao.com`, `neiz-home2.fedev.kakao.com`은 개발 Vite 허용 host입니다. 외부 기기 테스트가 필요하면 해당 HTTPS 프록시 origin을 카카오디벨로퍼스 Redirect URI에 등록하고, `env/pkelo.real-kakao.env`의 `PKELO_DEV_WEB_ORIGIN`, `KAKAO_WEB_ORIGIN`, `KAKAO_REDIRECT_URI`를 모두 같은 origin으로 변경합니다.
 
 ## SQLite 데이터 이관
 

@@ -20,7 +20,11 @@ export DOMAIN="${DOMAIN:-pkelo.localhost}"
 export JWT_SECRET="${JWT_SECRET:-pkelo-local-dev-jwt-secret}"
 export PKELO_DEV_WEB_PORT="${PKELO_DEV_WEB_PORT:-8443}"
 export PKELO_DEV_WEB_ORIGIN="${PKELO_DEV_WEB_ORIGIN:-http://localhost:${PKELO_DEV_WEB_PORT}}"
-export USER_AUTH_PROVIDER="${USER_AUTH_PROVIDER:-kakao-mock}"
+if [[ "${PKELO_REAL_KAKAO:-false}" == "true" ]]; then
+  export USER_AUTH_PROVIDER="${USER_AUTH_PROVIDER:-kakao}"
+else
+  export USER_AUTH_PROVIDER="${USER_AUTH_PROVIDER:-kakao-mock}"
+fi
 export KAKAO_REDIRECT_URI="${KAKAO_REDIRECT_URI:-${PKELO_DEV_WEB_ORIGIN}/auth/kakao/callback}"
 export KAKAO_WEB_ORIGIN="${KAKAO_WEB_ORIGIN:-${PKELO_DEV_WEB_ORIGIN}}"
 export KAKAO_MOCK_SUBJECT="${KAKAO_MOCK_SUBJECT:-pkelo-local-mock-user}"
@@ -40,6 +44,38 @@ export DB_PASSWORD="${MYSQL_PASSWORD}"
 export AVATAR_UPLOAD_DIR="${ROOT_DIR}/data/pkelo-dev/uploads/avatars"
 export DEV_CORS_ORIGINS="${DEV_CORS_ORIGINS:-${PKELO_DEV_WEB_ORIGIN},http://localhost:${PKELO_DEV_WEB_PORT},http://127.0.0.1:${PKELO_DEV_WEB_PORT},http://pkelo.localhost:${PKELO_DEV_WEB_PORT},https://neiz-office2.fedev.kakao.com,https://neiz-home2.fedev.kakao.com,http://pkelo.localhost:3101}"
 export VITE_DEV_ALLOWED_HOSTS="${VITE_DEV_ALLOWED_HOSTS:-localhost,127.0.0.1,pkelo.localhost,neiz-office2.fedev.kakao.com,neiz-home2.fedev.kakao.com}"
+
+if [[ "${PKELO_REAL_KAKAO:-false}" == "true" ]]; then
+  expected_redirect_uri="${PKELO_DEV_WEB_ORIGIN%/}/auth/kakao/callback"
+  real_kakao_errors=()
+
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    real_kakao_errors+=("${ENV_FILE} 파일이 없습니다. env/pkelo.real-kakao.env.example을 복사해 설정하세요.")
+  fi
+  if [[ "${USER_AUTH_PROVIDER}" != "kakao" ]]; then
+    real_kakao_errors+=("USER_AUTH_PROVIDER=kakao가 필요합니다.")
+  fi
+  if [[ -z "${KAKAO_REST_API_KEY:-}" ]]; then
+    real_kakao_errors+=("KAKAO_REST_API_KEY가 필요합니다.")
+  fi
+  if [[ -z "${KAKAO_CLIENT_SECRET:-}" ]]; then
+    real_kakao_errors+=("KAKAO_CLIENT_SECRET이 필요합니다.")
+  fi
+  if [[ "${KAKAO_WEB_ORIGIN}" != "${PKELO_DEV_WEB_ORIGIN}" ]]; then
+    real_kakao_errors+=("KAKAO_WEB_ORIGIN은 PKELO_DEV_WEB_ORIGIN과 같아야 합니다.")
+  fi
+  if [[ "${KAKAO_REDIRECT_URI}" != "${expected_redirect_uri}" ]]; then
+    real_kakao_errors+=("KAKAO_REDIRECT_URI는 ${expected_redirect_uri}여야 합니다.")
+  fi
+
+  if (( ${#real_kakao_errors[@]} )); then
+    printf '❌ 실카카오 로그인 설정 오류:\n' >&2
+    printf '   - %s\n' "${real_kakao_errors[@]}" >&2
+    exit 1
+  fi
+
+  echo "🔐 실카카오 로그인: ${KAKAO_REDIRECT_URI}"
+fi
 
 mkdir -p "${AVATAR_UPLOAD_DIR}"
 bash scripts/dev-pkelo-db.sh browser
