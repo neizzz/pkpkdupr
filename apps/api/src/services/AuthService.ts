@@ -60,7 +60,7 @@ import {
   type RatingServiceContract,
 } from "./RatingService";
 import { ScorePerformanceRatingService } from "./ScorePerformanceRatingService";
-import type { Match } from "@pkpkdupr/shared/match";
+import { matchTypeValues, type Match, type MatchType } from "@pkpkdupr/shared/match";
 import type { ExternalAuthProvider } from "./authConfig";
 
 const SALT_ROUNDS = 10;
@@ -1943,38 +1943,13 @@ export class AuthService {
     category: PlayerDuprCategory,
     currentMatch: Match,
   ): Promise<Date | null> {
-    const { matches } = await this.dbRequest<{ matches: any[]; total: number }>(
-      `/internal/matches?page=0&limit=10000&playerId=${encodeURIComponent(playerId)}`,
+    const matchTypes = matchTypeValues.filter(
+      (matchType) => getDuprCategoryForMatchType(matchType) === category,
+    ) as MatchType[];
+    const result = await this.dbRequest<{ completedAt: string | null }>(
+      `/internal/matches/previous-completed-at?playerId=${encodeURIComponent(playerId)}&before=${encodeURIComponent(currentMatch.completedAt!.toISOString())}&types=${encodeURIComponent(matchTypes.join(","))}`,
     );
-    const currentCompletedAtMs = currentMatch.completedAt!.getTime();
-
-    const previousCompletedAtMs = matches.reduce<number | null>(
-      (latest, candidate) => {
-        if (
-          candidate.id === currentMatch.id ||
-          candidate.status !== "completed" ||
-          !candidate.completedAt ||
-          getDuprCategoryForMatchType(candidate.type) !== category
-        ) {
-          return latest;
-        }
-
-        const completedAtMs = new Date(candidate.completedAt).getTime();
-        if (
-          !Number.isFinite(completedAtMs) ||
-          completedAtMs >= currentCompletedAtMs
-        ) {
-          return latest;
-        }
-
-        return latest == null ? completedAtMs : Math.max(latest, completedAtMs);
-      },
-      null,
-    );
-
-    return previousCompletedAtMs == null
-      ? null
-      : new Date(previousCompletedAtMs);
+    return result.completedAt ? new Date(result.completedAt) : null;
   }
 
   private buildOfficialDuprImpacts(

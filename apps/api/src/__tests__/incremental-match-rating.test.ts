@@ -110,23 +110,15 @@ describe("incremental match rating", () => {
         if (pathname === `/internal/matches/${match.id}/rating-change-logs`) {
           return jsonResponse(persistedLogs);
         }
-        if (pathname === "/internal/matches") {
+        if (pathname === "/internal/matches/previous-completed-at") {
           const playerId = searchParams.get("playerId");
           return jsonResponse({
-            matches:
+            completedAt:
               playerId === "winner"
-                ? [
-                    {
-                      id: "previous-singles",
-                      status: "completed",
-                      type: "singles",
-                      completedAt: new Date(
-                        completedAt.getTime() - 24 * 60 * 60 * 1000,
-                      ).toISOString(),
-                    },
-                  ]
-                : [],
-            total: playerId === "winner" ? 1 : 0,
+                ? new Date(
+                    completedAt.getTime() - 24 * 60 * 60 * 1000,
+                  ).toISOString()
+                : null,
           });
         }
         if (
@@ -202,9 +194,14 @@ describe("incremental match rating", () => {
     );
     expect(
       fetchMock.mock.calls.some(([input]) =>
-        String(input).endsWith("/internal/matches?page=0&limit=10000"),
+        String(input).includes("/internal/matches?page=0&limit=10000"),
       ),
     ).toBe(false);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes("/internal/matches/previous-completed-at"),
+      ),
+    ).toBe(true);
 
     await service.applyMatchResultToRatings(match);
 

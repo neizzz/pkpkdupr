@@ -417,31 +417,69 @@ export class MatchRepository {
     limit: number = 20,
     playerId?: string,
   ): Promise<{ matches: Match[]; total: number }> {
-    const allMatches = await this.db
-      .select()
-      .from(matches)
-      .orderBy(
-        desc(matches.matchStartsAt),
-        desc(matches.createdAt),
-        desc(matches.id),
-      )
-      .all();
+    const allMatches = playerId
+      ? (await this.db
+          .select({ match: matches })
+          .from(matches)
+          .innerJoin(
+            matchParticipants,
+            eq(matchParticipants.matchId, matches.id),
+          )
+          .where(eq(matchParticipants.playerId, playerId))
+          .orderBy(
+            desc(matches.matchStartsAt),
+            desc(matches.createdAt),
+            desc(matches.id),
+          )
+          .all()).map((row: { match: StoredMatch }) => row.match)
+      : await this.db
+          .select()
+          .from(matches)
+          .orderBy(
+            desc(matches.matchStartsAt),
+            desc(matches.createdAt),
+            desc(matches.id),
+          )
+          .all();
     const hydratedMatches: Match[] = await Promise.all(
       allMatches.map((match: StoredMatch) => this.hydrateMatch(match)),
     );
-    const filteredMatches = playerId
-      ? hydratedMatches.filter((match) =>
-          match.teams.some((team) =>
-            team.players.some((player) => player.id === playerId),
-          ),
-        )
-      : hydratedMatches;
+    const filteredMatches = hydratedMatches;
     const start = page * limit;
 
     return {
       matches: filteredMatches.slice(start, start + limit),
       total: filteredMatches.length,
     };
+  }
+
+  async findPreviousCompletedAt(
+    playerId: string,
+    matchTypes: MatchType[],
+    before: Date,
+  ): Promise<Date | null> {
+    if (!playerId || !matchTypes.length || Number.isNaN(before.getTime())) {
+      return null;
+    }
+
+    const typePlaceholders = matchTypes.map(() => "?").join(", ");
+    const result = await this.client.execute({
+      sql: `
+        SELECT MAX(matches.completed_at) AS completed_at
+        FROM match_participants
+        INNER JOIN matches ON matches.id = match_participants.match_id
+        WHERE match_participants.player_id = ?
+          AND matches.status = 'completed'
+          AND matches.completed_at IS NOT NULL
+          AND matches.completed_at < ?
+          AND matches.type IN (${typePlaceholders})
+      `,
+      args: [playerId, toUnixTimestampSeconds(before), ...matchTypes],
+    });
+    const value = (result.rows[0] as { completed_at?: unknown } | undefined)
+      ?.completed_at;
+    const completedAt = Number(value);
+    return Number.isFinite(completedAt) ? new Date(completedAt * 1000) : null;
   }
 
   async findLastPlayedAtByPlayerId(): Promise<Record<string, Date>> {

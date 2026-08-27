@@ -1,5 +1,5 @@
 import express from "express";
-import { type Session } from "@pkpkdupr/shared/match";
+import { matchTypeValues, type MatchType, type Session } from "@pkpkdupr/shared/match";
 import { isEntityId } from "@pkpkdupr/shared/entityId";
 import { getDb, getDbClient } from "./db/client";
 import { runMigrations } from "./db/migrate";
@@ -681,6 +681,27 @@ app.get("/internal/matches/last-played", async (_req, res) => {
 app.get("/internal/matches/timestamp-unit-audit", async (_req, res) => {
   try {
     res.json(await matchRepository.getTimestampUnitAudit());
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/internal/matches/previous-completed-at", async (req, res) => {
+  try {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    const before = new Date(String(req.query.before ?? ""));
+    const requestedTypes = String(req.query.types ?? "")
+      .split(",")
+      .filter((type): type is MatchType =>
+        matchTypeValues.includes(type as MatchType),
+      );
+    res.json({
+      completedAt: await matchRepository.findPreviousCompletedAt(
+        playerId,
+        requestedTypes,
+        before,
+      ),
+    });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

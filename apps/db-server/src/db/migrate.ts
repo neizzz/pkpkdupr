@@ -327,6 +327,12 @@ const migrations: Migration[] = [
       "ALTER TABLE oauth_login_transactions ADD COLUMN legal_birth_date VARCHAR(10) NULL AFTER legal_gender",
     ],
   },
+  {
+    id: "0013_match_participants_player_match_index",
+    statements: [
+      "CREATE INDEX match_participants_player_match_idx ON match_participants (player_id, match_id)",
+    ],
+  },
 ];
 
 export const runMigrations = async () => {
