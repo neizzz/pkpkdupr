@@ -890,16 +890,14 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                     isOpen={isRejectConfirmationOpen}
                     onOpenChange={setIsRejectConfirmationOpen}
                   >
-                    <AlertDialog.Trigger>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="rounded-2xl text-red-600"
-                        isDisabled={isRejectingResult}
-                      >
-                        결과 거부
-                      </Button>
-                    </AlertDialog.Trigger>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="rounded-2xl text-red-600"
+                      isDisabled={isRejectingResult}
+                    >
+                      결과 거부
+                    </Button>
                     <AlertDialog.Backdrop
                       variant="blur"
                       isDismissable={!isRejectingResult}
