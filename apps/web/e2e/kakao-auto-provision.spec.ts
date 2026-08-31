@@ -59,6 +59,39 @@ test("자동 로그인 한 대 제한 안내를 툴팁으로 표시한다", asyn
   ).toBeVisible();
 });
 
+test("로그인 오류를 화면 상단 prompt로 표시하고 닫을 수 있다", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ authenticated: false }) }),
+  );
+
+  await page.goto("http://pkelo.localhost:4173/login");
+  const brand = page.getByAltText("PKELO 피클볼 로고");
+  const brandPosition = await brand.boundingBox();
+
+  await page.goto("http://pkelo.localhost:4173/login?error=kakao_login_failed");
+  const alert = page.getByRole("alert");
+  await expect(alert.locator("svg").first().locator("..")).toHaveClass(/text-error/);
+  await expect(alert.getByText("로그인을 완료하지 못했어요.")).toHaveClass(/text-error/);
+  await expect(alert).toContainText("카카오 로그인을 완료하지 못했습니다. 다시 시도해주세요.");
+  await expect.poll(async () => (await alert.boundingBox())?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(40);
+  await expect.poll(async () => (await brand.boundingBox())?.y).toBe(brandPosition?.y);
+
+  await page.getByRole("button", { name: "로그인 오류 닫기" }).click();
+  await expect(alert).toBeHidden();
+
+  await page.route("**/api/auth/kakao/start", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "카카오 로그인 점검 중입니다." }),
+    }),
+  );
+  await page.getByRole("button", { name: "카카오 로그인" }).click();
+  await expect(alert).toContainText("카카오 로그인 점검 중입니다.");
+  await page.getByRole("button", { name: "로그인 오류 닫기" }).click();
+  await expect(alert).toBeHidden();
+});
+
 test("신규 카카오 사용자는 자동 가입 뒤 세션으로 메인에 이동한다", async ({ page }) => {
   let sessionCall = 0;
   await page.route("**/api/auth/session", (route) => {

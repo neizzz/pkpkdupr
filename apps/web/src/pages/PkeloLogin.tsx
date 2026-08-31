@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import {
+  Alert,
+  CloseButton,
   TooltipArrow,
   TooltipContent,
   TooltipRoot,
@@ -16,6 +18,7 @@ const PkeloLogin: React.FC = () => {
   const [isAutoLoginTooltipOpen, setIsAutoLoginTooltipOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [dismissedErrorCode, setDismissedErrorCode] = useState<string | null>(null);
   const errorCode = searchParams.get("error");
   const error =
     errorCode === "kakao_age_restricted"
@@ -25,6 +28,8 @@ const PkeloLogin: React.FC = () => {
         : errorCode === "kakao_login_failed"
           ? "카카오 로그인을 완료하지 못했습니다. 다시 시도해주세요."
           : errorCode;
+  const displayedError =
+    startError ?? (errorCode !== dismissedErrorCode ? error : null);
 
   const startKakaoLogin = async () => {
     if (isStarting) return;
@@ -57,16 +62,33 @@ const PkeloLogin: React.FC = () => {
 
   return (
     <PkeloLoginLayout>
-      {error && (
-        <div className="mb-4 w-full rounded-xl border border-error/20 bg-error/10 px-4 py-3 text-sm text-error">
-          {error}
+      {displayedError ? (
+        <div className="fixed left-1/2 top-0 z-[70] app-shell-width -translate-x-1/2 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
+          <Alert
+            status="danger"
+            role="alert"
+            className="items-center rounded-2xl border border-error/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"
+          >
+            <Alert.Indicator className="shrink-0 self-center text-error" />
+            <Alert.Content className="min-w-0 gap-0 self-center">
+              <Alert.Title className="text-sm font-bold text-error">
+                로그인을 완료하지 못했어요.
+              </Alert.Title>
+              <Alert.Description className="text-xs font-semibold text-[#888]">
+                {displayedError}
+              </Alert.Description>
+            </Alert.Content>
+            <CloseButton
+              className="shrink-0 self-center"
+              aria-label="로그인 오류 닫기"
+              onClick={() => {
+                setStartError(null);
+                setDismissedErrorCode(errorCode);
+              }}
+            />
+          </Alert>
         </div>
-      )}
-      {startError && (
-        <div className="mb-4 w-full rounded-xl border border-error/20 bg-error/10 px-4 py-3 text-sm text-error">
-          {startError}
-        </div>
-      )}
+      ) : null}
 
       <button
         type="button"
