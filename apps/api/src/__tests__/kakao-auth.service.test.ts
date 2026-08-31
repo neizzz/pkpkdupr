@@ -15,11 +15,10 @@ const sha256 = (value: string) =>
 const originalEnvironment = {
   KAKAO_REST_API_KEY: process.env.KAKAO_REST_API_KEY,
   KAKAO_CLIENT_SECRET: process.env.KAKAO_CLIENT_SECRET,
+  KAKAO_ADMIN_KEY: process.env.KAKAO_ADMIN_KEY,
   KAKAO_REDIRECT_URI: process.env.KAKAO_REDIRECT_URI,
   KAKAO_WEB_ORIGIN: process.env.KAKAO_WEB_ORIGIN,
   KAKAO_MOCK_SUBJECT: process.env.KAKAO_MOCK_SUBJECT,
-  KAKAO_CONFIDENTIAL_USER_INFO_APPROVED:
-    process.env.KAKAO_CONFIDENTIAL_USER_INFO_APPROVED,
 };
 
 const restoreEnvironment = () => {
@@ -52,7 +51,7 @@ describe("KakaoAuthService", () => {
     vi.restoreAllMocks();
   });
 
-  it("mock provider가 state를 저장하고 callback handoff ticket을 발급한다", async () => {
+  it("mock provider가 state를 저장하고 카카오 식별자만 handoff에 전달한다", async () => {
     process.env.KAKAO_WEB_ORIGIN = "http://localhost:8443";
     process.env.KAKAO_MOCK_SUBJECT = "mock-subject-1";
     const fetchImpl = vi
@@ -78,12 +77,15 @@ describe("KakaoAuthService", () => {
       /^http:\/\/localhost:8443\/login\/kakao\/callback#ticket=/,
     );
 
-    const createPayload = JSON.parse(
-      String(fetchImpl.mock.calls[0]?.[1]?.body),
-    ) as { stateHash: string; provider: string };
-    const callbackPayload = JSON.parse(
-      String(fetchImpl.mock.calls[1]?.[1]?.body),
-    ) as { stateHash: string; providerSubject: string };
+    const createPayload = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body)) as {
+      stateHash: string;
+      provider: string;
+    };
+    const callbackPayload = JSON.parse(String(fetchImpl.mock.calls[1]?.[1]?.body)) as {
+      stateHash: string;
+      providerSubject: string;
+      legalName?: string;
+    };
     expect(createPayload).toMatchObject({
       provider: "kakao-mock",
       stateHash: sha256(started.state),
@@ -91,16 +93,14 @@ describe("KakaoAuthService", () => {
     expect(callbackPayload).toMatchObject({
       stateHash: sha256(started.state),
       providerSubject: "mock-subject-1",
-      legalName: "카카오 테스트 사용자",
     });
+    expect(callbackPayload.legalName).toBeUndefined();
   });
 
   it.each(["OAUTH_STATE_NOT_FOUND", "OAUTH_STATE_INVALID"])(
     "state 불일치·만료·재사용 오류를 callback에서 거부한다: %s",
     async (error) => {
-      const fetchImpl = vi.fn().mockResolvedValue(
-        jsonResponse({ error }, 400),
-      );
+      const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ error }, 400));
       const service = new KakaoAuthService(
         "kakao-mock",
         accounts(),
@@ -113,39 +113,15 @@ describe("KakaoAuthService", () => {
     },
   );
 
-  it("신규 가입에 필요한 본인확인정보가 없으면 원인을 안내한다", async () => {
-    const service = new KakaoAuthService(
-      "kakao-mock",
-      accounts(),
-      vi
-        .fn()
-        .mockResolvedValue(jsonResponse({ error: "OAUTH_VERIFIED_PROFILE_REQUIRED" }, 400)) as unknown as typeof fetch,
-    );
-
-    await expect(service.exchange("handoff-ticket")).rejects.toThrow(
-      "카카오 본인확인정보(법정 실명·성별·생년월일)를 받지 못했습니다",
-    );
-  });
-
-  it("Kakao authorization code를 서버에서 교환해 subject를 사용한다", async () => {
+  it("Kakao authorization code를 서버에서 교환해 식별자만 사용한다", async () => {
     process.env.KAKAO_REST_API_KEY = "rest-api-key";
     process.env.KAKAO_CLIENT_SECRET = "client-secret";
     process.env.KAKAO_REDIRECT_URI = "https://pkelo.app/auth/kakao/callback";
     process.env.KAKAO_WEB_ORIGIN = "https://pkelo.app";
-    process.env.KAKAO_CONFIDENTIAL_USER_INFO_APPROVED = "true";
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ access_token: "kakao-token" }))
-      .mockResolvedValueOnce(
-        jsonResponse({
-          id: 123456789,
-          kakao_account: {
-            legal_name: "홍길동",
-            legal_gender: "male",
-            legal_birth_date: "19900825",
-          },
-        }),
-      )
+      .mockResolvedValueOnce(jsonResponse({ id: 123456789 }))
       .mockResolvedValueOnce(jsonResponse({}));
     const service = new KakaoAuthService(
       "kakao",
@@ -159,22 +135,18 @@ describe("KakaoAuthService", () => {
     });
 
     expect(redirect).toMatch(/^https:\/\/pkelo\.app\/login\/kakao\/callback#ticket=/);
-    expect(fetchImpl.mock.calls[0]?.[0]).toBe(
-      "https://kauth.kakao.com/oauth/token",
-    );
-    expect(String(fetchImpl.mock.calls[0]?.[1]?.body)).toContain(
-      "code=authorization-code",
-    );
-    expect(fetchImpl.mock.calls[1]?.[0]).toBe(
-      "https://kapi.kakao.com/v2/user/me",
-    );
-    const dbPayload = JSON.parse(
-      String(fetchImpl.mock.calls[2]?.[1]?.body),
-    ) as { providerSubject: string };
+    expect(fetchImpl.mock.calls[0]?.[0]).toBe("https://kauth.kakao.com/oauth/token");
+    expect(String(fetchImpl.mock.calls[0]?.[1]?.body)).toContain("code=authorization-code");
+    expect(fetchImpl.mock.calls[1]?.[0]).toBe("https://kapi.kakao.com/v2/user/me");
+    const dbPayload = JSON.parse(String(fetchImpl.mock.calls[2]?.[1]?.body)) as {
+      providerSubject: string;
+      legalName?: string;
+    };
     expect(dbPayload.providerSubject).toBe("123456789");
+    expect(dbPayload.legalName).toBeUndefined();
   });
 
-  it("기존 identity는 기기 세션을 만들고 신규 identity는 검증정보로 자동 가입한다", async () => {
+  it("기존 identity는 기기 세션을 만들고 신규 identity는 PKELO 프로필 만들기로 보낸다", async () => {
     const existingAccounts = accounts();
     const existingFetch = vi.fn().mockResolvedValue(
       jsonResponse({
@@ -197,71 +169,157 @@ describe("KakaoAuthService", () => {
       true,
     );
 
-    const newFetch = vi.fn().mockResolvedValue(
-      jsonResponse({
-        transaction: {
-          provider: "kakao-mock",
-          persistentSessionRequested: false,
-          legalName: "신규 사용자",
-          legalGender: "F",
-          legalBirthDate: "1990-08-25",
-        },
-        playerId: null,
-      }),
-    );
     const newAccounts = accounts();
-    const automaticService = new KakaoAuthService(
+    const newService = new KakaoAuthService(
       "kakao-mock",
       newAccounts,
-      newFetch as unknown as typeof fetch,
+      vi.fn().mockResolvedValue(
+        jsonResponse({
+          transaction: { provider: "kakao-mock", persistentSessionRequested: false },
+          playerId: null,
+        }),
+      ) as unknown as typeof fetch,
     );
-    await expect(automaticService.exchange("new-handoff-ticket")).resolves.toEqual({
-      status: "authenticated",
-      session: expect.objectContaining({ token: "session-token" }),
+    await expect(newService.exchange("new-handoff-ticket")).resolves.toEqual({
+      status: "onboarding",
+      registrationTicket: expect.any(String),
     });
-    expect(newAccounts.registerExternalPlayer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        username: "신규 사용자",
-        gender: "F",
-        birthDate: "1990-08-25",
-        provider: "kakao-mock",
-      }),
-    );
+    expect(newAccounts.registerExternalPlayer).not.toHaveBeenCalled();
   });
 
-  it("신규 가입은 원문 handoff ticket 대신 해시와 카카오 검증 프로필만 전달한다", async () => {
-    const registerExternalPlayer = vi.fn().mockResolvedValue({
-      accessToken: "onboarded-access-token",
-      isFirstLogin: false,
-    });
-    const fetchImpl = vi.fn().mockResolvedValue(
-      jsonResponse({
-        transaction: {
-          provider: "kakao-mock",
-          persistentSessionRequested: false,
-          legalName: "홍길동",
-          legalGender: "F",
-          legalBirthDate: "1990-08-25",
-        },
-        playerId: null,
-      }),
-    );
+  it("PKELO 프로필 값과 해시된 가입 ticket으로 가입을 완료한다", async () => {
+    const registerExternalPlayer = vi.fn().mockResolvedValue({ token: "session-token" });
     const service = new KakaoAuthService(
       "kakao-mock",
-      {
-        issueExternalDeviceSession: vi.fn(),
-        registerExternalPlayer,
-      } as unknown as AuthService,
+      { registerExternalPlayer } as unknown as AuthService,
+      vi.fn() as unknown as typeof fetch,
+    );
+
+    await service.completeOnboarding({
+      registrationTicket: "registration-ticket",
+      username: "홍길동",
+      gender: "F",
+    });
+
+    expect(registerExternalPlayer).toHaveBeenCalledWith({
+      registrationTicket: "registration-ticket",
+      registrationTicketHash: sha256("registration-ticket"),
+      username: "홍길동",
+      gender: "F",
+      provider: "kakao-mock",
+    });
+  });
+
+  it("Admin Key와 카카오 회원번호로 앱 연결을 해제한다", async () => {
+    process.env.KAKAO_ADMIN_KEY = "admin-key";
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ id: 123456789 }));
+    const service = new KakaoAuthService(
+      "kakao",
+      accounts(),
       fetchImpl as unknown as typeof fetch,
     );
 
-    await service.exchange("handoff-ticket");
+    await service.unlinkAccount("kakao", "123456789");
 
-    expect(registerExternalPlayer).toHaveBeenCalledWith(expect.objectContaining({
-      gender: "F",
-      birthDate: "1990-08-25",
-      provider: "kakao-mock",
-      registrationTicketHash: expect.any(String),
-    }));
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://kapi.kakao.com/v1/user/unlink",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Authorization: "KakaoAK admin-key" }),
+      }),
+    );
+    const body = fetchImpl.mock.calls[0]?.[1]?.body as URLSearchParams;
+    expect(body.get("target_id_type")).toBe("user_id");
+    expect(body.get("target_id")).toBe("123456789");
+  });
+
+  it.each([
+    { status: 403, code: -3, msg: "api activation required" },
+    { status: 403, code: -5, msg: "permission denied" },
+    { status: 401, code: -401, msg: "invalid admin-key-secret" },
+    { status: 400, code: -101, msg: "user 123456789 is not registered" },
+  ])(
+    "카카오 연결 해제 HTTP 실패를 진단하고 일반화된 오류로 반환한다: $status/$code",
+    async ({ status, code, msg }) => {
+      process.env.KAKAO_REST_API_KEY = "rest-api-key-secret";
+      process.env.KAKAO_CLIENT_SECRET = "client-secret-value";
+      process.env.KAKAO_ADMIN_KEY = "admin-key-secret";
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const service = new KakaoAuthService(
+        "kakao",
+        accounts(),
+        vi.fn().mockResolvedValue(jsonResponse({ code, msg }, status)) as unknown as typeof fetch,
+      );
+
+      await expect(service.unlinkAccount("kakao", "123456789")).rejects.toMatchObject({
+        message: expect.stringContaining("카카오 연결을 해제하지 못했습니다"),
+        diagnostic: {
+          reason: "http-error",
+          httpStatus: status,
+          kakaoCode: code,
+          kakaoMessage: expect.any(String),
+        },
+      });
+      expect(errorLog).toHaveBeenCalledWith(
+        "[KAKAO] Unlink failed",
+        expect.objectContaining({
+          reason: "http-error",
+          httpStatus: status,
+          kakaoCode: code,
+        }),
+      );
+      const serializedLog = JSON.stringify(errorLog.mock.calls);
+      expect(serializedLog).not.toContain("admin-key-secret");
+      expect(serializedLog).not.toContain("rest-api-key-secret");
+      expect(serializedLog).not.toContain("client-secret-value");
+      expect(serializedLog).not.toContain("123456789");
+    },
+  );
+
+  it("카카오 연결 해제 네트워크 실패를 응답 실패와 구분한다", async () => {
+    process.env.KAKAO_ADMIN_KEY = "admin-key-secret";
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const service = new KakaoAuthService(
+      "kakao",
+      accounts(),
+      vi.fn().mockRejectedValue(new Error("network failed for 123456789")) as unknown as typeof fetch,
+    );
+
+    await expect(service.unlinkAccount("kakao", "123456789")).rejects.toMatchObject({
+      diagnostic: { reason: "network-error" },
+    });
+    expect(errorLog).toHaveBeenCalledWith("[KAKAO] Unlink failed", {
+      reason: "network-error",
+    });
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("123456789");
+  });
+
+  it("카카오 연결 해제 성공 응답의 회원번호가 다르면 거부한다", async () => {
+    process.env.KAKAO_ADMIN_KEY = "admin-key-secret";
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const service = new KakaoAuthService(
+      "kakao",
+      accounts(),
+      vi.fn().mockResolvedValue(jsonResponse({ id: 987654321 })) as unknown as typeof fetch,
+    );
+
+    await expect(service.unlinkAccount("kakao", "123456789")).rejects.toMatchObject({
+      diagnostic: { reason: "invalid-response", httpStatus: 200 },
+    });
+    expect(errorLog).toHaveBeenCalledWith("[KAKAO] Unlink failed", {
+      reason: "invalid-response",
+      httpStatus: 200,
+    });
+  });
+
+  it("mock provider 연결 해제는 외부 API를 호출하지 않는다", async () => {
+    const fetchImpl = vi.fn();
+    const service = new KakaoAuthService(
+      "kakao-mock",
+      accounts(),
+      fetchImpl as unknown as typeof fetch,
+    );
+    await service.unlinkAccount("kakao-mock", "mock-subject");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

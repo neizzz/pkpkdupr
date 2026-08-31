@@ -5,8 +5,7 @@
 | Surface | 진입 흐름 | with-data fixture | empty fixture | 대상 viewport | 저장 basename | 상태 | N/A 근거 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `kakao-login` | `pkelo.localhost/login` | 해당 없음 | 해당 없음 | mobile | `kakao-login.png` | captured | 서버 목록을 렌더하지 않는 카카오 인증 진입 화면 |
-| `privacy-policy-consent` | 로그인 성공 직후 | 동의 전 필수 체크박스 | N/A | mobile | `privacy-policy-consent.png` | captured | 계정별 현재 방침 동의 이력이 없으면 앱 본문을 표시하지 않음 |
-| `privacy-policy` | 최초 동의 화면의 방침 링크 | 현재 방침 전문 | N/A | mobile | `privacy-policy.png` | captured | 공개 라우트이며 데이터 목록 상태가 없음 |
+| `privacy-policy` | `/privacy` 공개 라우트 | 현재 방침 전문 | N/A | mobile | `privacy-policy.png` | captured | 로그인 동선과 분리된 공개 방침 화면 |
 | `matches` | 내 매치 탭 | 매치와 세션 1개씩 | 빈 match-feed | mobile | `matches--{state}.png` | captured | |
 | `match-detail` | 매치 카드 선택 | 완료 매치의 팀·점수·평점 변동 | N/A | mobile | `match-detail--with-data.png` | captured | 상세는 선택된 매치가 있어야만 열림 |
 | `session-detail` | 세션 카드 선택 | 세션 내 매치 1개 | 세션 매치 배열 빈 값 | mobile | `session-detail--{state}.png` | captured | |
@@ -34,4 +33,5 @@
 | `settings` | 설정 탭 | 해당 없음 | 해당 없음 | mobile | `settings.png` | captured | 앱 업데이트 상태는 서버 데이터 목록 surface가 아님 |
 | `operating-policy-drawer` | 설정 탭의 `운영방침` | 사업자 정보와 현재 방침 전문 | N/A | mobile | `operating-policy-drawer.png` | captured | 사업자 정보·정책 상수 기반의 고정 drawer이며 데이터 목록 상태가 없음 |
 | `logout-modal` | 설정 탭의 `로그아웃` | 해당 없음 | 해당 없음 | mobile | `logout-modal.png` | captured | 확인 문구가 고정된 단일 상태 modal |
+| `account-withdrawal-modal` | 설정 탭의 `회원 탈퇴` | 탈퇴 가능한 상태와 확인 문구 입력 | 소유 클럽·진행 경기·예정 세션 blocker | mobile | `settings-withdrawal--{eligible,blocked}.png` | captured | empty 대신 탈퇴 가능 여부에 따른 두 UI 상태를 기준으로 캡처 |
 | `PWA install/update/runtime notice` | 브라우저·운영 이벤트 | N/A | N/A | - | - | N/A | 설치 이벤트·service worker·운영 503 상태는 데이터 유무가 아닌 별도 PWA/운영 검증 범위 |

@@ -23,58 +23,67 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
           서비스는 아래 정보를 서비스 제공에 필요한 범위에서 처리합니다.
         </p>
         <div className="mt-3 overflow-x-auto rounded-xl border border-border">
-          <table className="w-full min-w-[420px] border-collapse text-left text-xs leading-5">
+          <table className="w-full min-w-[480px] border-collapse text-left text-xs leading-5">
             <thead className="bg-pkpk-bg text-pkpk-sub-font">
               <tr>
                 <th scope="col" className="px-3 py-2 font-semibold">구분</th>
                 <th scope="col" className="px-3 py-2 font-semibold">처리 항목</th>
+                <th scope="col" className="px-3 py-2 font-semibold">수집 조건</th>
                 <th scope="col" className="px-3 py-2 font-semibold">처리 목적</th>
               </tr>
             </thead>
             <tbody>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">카카오 로그인</td>
-                <td className="px-3 py-2 align-top">카카오 계정 식별자, 카카오 본인확인정보의 법정 실명·법정 성별·법정 생년월일</td>
-                <td className="px-3 py-2 align-top">본인 식별 및 로그인 처리, 선수 실명 식별, 성별 기반 경기 규칙 및 만 14세 이상 참가 자격 확인</td>
+                <td className="px-3 py-2 align-top">카카오 계정 식별자</td>
+                <td className="px-3 py-2 align-top font-semibold">필수 (카카오 로그인 시)</td>
+                <td className="px-3 py-2 align-top">본인 식별 및 로그인 처리</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">프로필</td>
-                <td className="px-3 py-2 align-top">사용자명, 성별, 생년월일, 프로필 이미지, 소속, 상태 메시지</td>
+                <td className="px-3 py-2 align-top">이름, 성별, 프로필 이미지, 소속, 상태 메시지</td>
+                <td className="px-3 py-2 align-top"><span className="font-semibold">필수:</span> 이름·성별<br /><span className="font-semibold">선택:</span> 프로필 이미지·소속·상태 메시지</td>
                 <td className="px-3 py-2 align-top">선수 식별, 프로필 및 커뮤니티 기능 제공</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">경기 및 클럽 활동</td>
                 <td className="px-3 py-2 align-top">경기 참가자, 일정, 장소·코트, 점수·결과·승인 기록, 평점, 클럽·공지·가입 기록</td>
+                <td className="px-3 py-2 align-top">필수 (관련 기능 이용 시)</td>
                 <td className="px-3 py-2 align-top">경기 기록, 평점 산정, 클럽 운영 및 기록 조회</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">서비스 이용</td>
                 <td className="px-3 py-2 align-top">로그인 세션 정보 및 기기에 저장되는 인증·프로필 캐시</td>
+                <td className="px-3 py-2 align-top">자동 수집</td>
                 <td className="px-3 py-2 align-top">로그인 유지 및 오프라인 상태에서의 화면 제공</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="px-3 py-2 align-top font-semibold">방침 동의</td>
                 <td className="px-3 py-2 align-top">동의한 개인정보 처리방침 버전 및 동의 시각</td>
+                <td className="px-3 py-2 align-top">필수</td>
                 <td className="px-3 py-2 align-top">방침 동의 여부 확인 및 동의 이력 관리</td>
               </tr>
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs text-pkpk-sub-font">
-          카카오 본인확인정보는 카카오의 사전 제휴 승인 후에만 수집하며,
-          카카오 프로필·친구 목록 등은 수집하지 않습니다. 생년월일 원문은 자격
-          판정에만 사용하고 일반 회원 화면에는 공개하지 않습니다.
+          카카오 본인인증의 이름·성별·생년월일은 현재 수집하지 않으며,
+          카카오 프로필·친구 목록도 수집하지 않습니다. PKELO는 생년월일을
+          현재 수집하지 않습니다.
         </p>
       </section>
 
       <section className="mt-8">
         <h2 className="text-base font-bold">2. 개인정보의 처리 및 보유 기간</h2>
         <p className="mt-2">
-          개인정보는 회원 자격이 유지되는 동안 처리합니다. 다만 경기 결과,
-          평점 변동, 클럽 운영 및 관리자 처리 기록은 서비스의 기록 정합성,
-          분쟁 대응 및 관련 법령상 의무 이행에 필요한 범위에서 보관할 수
-          있습니다. 카카오 로그인 과정의 일회성 인증 정보는 인증 완료 또는
-          만료 후 지체 없이 사용할 수 없도록 처리합니다.
+          개인정보는 회원 자격이 유지되는 동안 처리합니다. 회원 탈퇴 시
+          카카오 인증 연결, 기기 세션, 프로필 이미지, 상태 메시지, 소속,
+          생년월일, 친구 관계와 개인정보 처리방침 동의 이력은 즉시
+          삭제합니다. 완료된 경기·점수·승인 기록과 현재·변동 평점은 기록
+          정합성을 위해 선수 ID와 함께 보존하되, 이름은 ‘탈퇴한 사용자’로
+          익명화하고 프로필 이미지와 성별은 공개하지 않습니다. 카카오 로그인
+          과정의 일회성 인증 정보는 인증 완료 또는 만료 후 지체 없이 사용할
+          수 없도록 처리합니다.
         </p>
       </section>
 
@@ -92,12 +101,11 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
       <section className="mt-8">
         <h2 className="text-base font-bold">4. 개인정보의 이용 및 공개 범위</h2>
         <p className="mt-2">
-          카카오 본인확인정보로 확인된 법정 실명, 성별, 만 나이, 프로필 이미지, 소속, 경기 참가·결과 및 평점은 다른
+          PKELO 프로필 만들기에서 입력한 이름, 성별, 프로필 이미지, 소속, 경기 참가·결과 및 평점은 다른
           서비스 이용자에게 경기 기록, 선수 프로필, 클럽 및 랭킹 화면을
           통해 표시될 수 있습니다. 프로필 이미지, 소속 및 상태 메시지는
-          이용자가 직접 수정하거나 삭제할 수 있습니다. 법정 실명과 성별은 본인확인정보에
-          기반하므로 프로필에서 변경할 수 없으며, 생년월일은 만 나이 계산에만 사용하며,
-          프로필에는 생년월일 자체를 표시하지 않습니다.
+          이용자가 직접 수정하거나 삭제할 수 있습니다. 이름과 성별은 현재 프로필에서
+          변경할 수 없습니다.
         </p>
       </section>
 
@@ -108,7 +116,8 @@ const PrivacyPolicyContent: React.FC<PrivacyPolicyContentProps> = ({
           회원 탈퇴를 요청할 수 있습니다. 프로필 정보는 서비스 내에서 직접
           수정할 수 있으며, 직접 처리할 수 없는 요청은 아래 문의처로
           접수할 수 있습니다. 서비스는 관련 법령이 정한 절차에 따라
-          처리합니다.
+          처리합니다. 회원 탈퇴는 설정 화면에서 직접 진행할 수 있으며,
+          완료 즉시 복구할 수 없습니다.
         </p>
       </section>
 

@@ -85,6 +85,7 @@ export class PlayerRepository {
     const {
       affiliationsJson: _affiliationsJson,
       birthDate,
+      withdrawnAt,
       statusMessage,
       statusMessageBackgroundColor,
       ...player
@@ -92,6 +93,7 @@ export class PlayerRepository {
     return {
       ...player,
       ...(typeof birthDate === "string" ? { birthDate } : {}),
+      ...(withdrawnAt ? { withdrawnAt: new Date(withdrawnAt) } : {}),
       affiliations,
       ...(statusMessage ? { statusMessage } : {}),
       ...(statusMessageBackgroundColor ? { statusMessageBackgroundColor } : {}),

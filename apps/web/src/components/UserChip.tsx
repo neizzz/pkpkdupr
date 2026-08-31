@@ -5,7 +5,7 @@ import { IoClose } from "react-icons/io5";
 import Avatar from "@/components/Avatar";
 
 interface UserChipProps {
-  player: Pick<Player, "username" | "avatarUrl" | "gender">;
+  player: Pick<Player, "username" | "avatarUrl" | "gender" | "withdrawnAt">;
   onRemove?: () => void;
   removeLabel?: string;
   isMe?: boolean;
@@ -37,12 +37,14 @@ const UserChip: React.FC<UserChipProps> = ({
   isSelected = false,
   isDisabled = false,
 }) => {
-  const genderBgClass =
-    player.gender === "M"
+  const genderBgClass = player.withdrawnAt
+    ? "bg-slate-100 text-pkpk-sub-font"
+    : player.gender === "M"
       ? "bg-[#409eff]/10 text-[#409eff]"
       : "bg-[#f8626c]/10 text-[#f8626c]";
-  const genderAvatarClass =
-    player.gender === "M"
+  const genderAvatarClass = player.withdrawnAt
+    ? "border-1 border-slate-200 shadow-[0_0_0_1px_rgba(148,163,184,0.16)]"
+    : player.gender === "M"
       ? "border-1 border-[#409eff]/15 shadow-[0_0_0_1px_rgba(64,158,255,0.16)]"
       : "border-1 border-[#f8626c]/15 shadow-[0_0_0_1px_rgba(248,98,108,0.16)]";
   const shouldReserveRemoveSlot = !!onRemove || reserveRemoveSlot;

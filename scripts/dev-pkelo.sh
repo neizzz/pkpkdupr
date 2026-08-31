@@ -61,6 +61,9 @@ if [[ "${PKELO_REAL_KAKAO:-false}" == "true" ]]; then
   if [[ -z "${KAKAO_CLIENT_SECRET:-}" ]]; then
     real_kakao_errors+=("KAKAO_CLIENT_SECRET이 필요합니다.")
   fi
+  if [[ -z "${KAKAO_ADMIN_KEY:-}" ]]; then
+    real_kakao_errors+=("회원 탈퇴 연결 해제를 위해 KAKAO_ADMIN_KEY가 필요합니다.")
+  fi
   if [[ "${KAKAO_WEB_ORIGIN}" != "${PKELO_DEV_WEB_ORIGIN}" ]]; then
     real_kakao_errors+=("KAKAO_WEB_ORIGIN은 PKELO_DEV_WEB_ORIGIN과 같아야 합니다.")
   fi
@@ -75,6 +78,7 @@ if [[ "${PKELO_REAL_KAKAO:-false}" == "true" ]]; then
   fi
 
   echo "🔐 실카카오 로그인: ${KAKAO_REDIRECT_URI}"
+  echo "   회원 탈퇴: Admin Key의 '카카오 로그인 → 연결 해제(Unlink)' 호출 권한이 필요합니다."
 fi
 
 mkdir -p "${AVATAR_UPLOAD_DIR}"

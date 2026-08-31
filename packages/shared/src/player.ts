@@ -1,4 +1,18 @@
 export type PlayerStatus = "active" | "inactive";
+export const WITHDRAWN_PLAYER_DISPLAY_NAME = "탈퇴한 사용자";
+
+export interface WithdrawalEligibility {
+  eligible: boolean;
+  blockers: {
+    ownedClubs: Array<{ id: string; name: string }>;
+    activeMatches: Array<{
+      id: string;
+      name: string | null;
+      status: "created" | "pending-approval" | "evaluating";
+    }>;
+    upcomingSessions: Array<{ id: string; name: string; date: Date }>;
+  };
+}
 
 export interface PlayerAffiliation {
   name: string;
@@ -523,6 +537,8 @@ export interface Player {
   /** 공개 프로필에 표시하는 계산된 만 나이입니다. */
   age?: number | null;
   status: PlayerStatus;
+  /** 탈퇴 완료 시각입니다. 공개 화면에서 익명 tombstone을 판별할 때 사용합니다. */
+  withdrawnAt?: Date;
   avatarUrl?: string;
   affiliations?: PlayerAffiliation[];
   statusMessage?: string;

@@ -81,20 +81,14 @@ const PrivacyPolicyConsentGate: React.FC<React.PropsWithChildren> = ({
 
         <dl className="mt-5 overflow-hidden rounded-xl bg-white/10 text-sm">
           <div className="flex items-center justify-between gap-4 border-b border-white/15 px-4 py-3">
-            <dt className="text-white/75">이름</dt>
+            <dt className="text-white/75">이름 (필수)</dt>
             <dd className="min-w-0 truncate text-right font-semibold">
               {player?.username || "미등록"}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-4 border-b border-white/15 px-4 py-3">
-            <dt className="text-white/75">성별</dt>
+            <dt className="text-white/75">성별 (필수)</dt>
             <dd className="font-semibold">{genderLabel}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <dt className="text-white/75">생년월일</dt>
-            <dd className="font-semibold">
-              {player?.age == null ? "미등록" : `만 ${player.age}세`}
-            </dd>
           </div>
         </dl>
 

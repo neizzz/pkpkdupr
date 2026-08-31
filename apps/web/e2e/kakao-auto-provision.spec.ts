@@ -92,16 +92,14 @@ test("로그인 오류를 화면 상단 prompt로 표시하고 닫을 수 있다
   await expect(alert).toBeHidden();
 });
 
-test("신규 카카오 사용자는 자동 가입 뒤 세션으로 메인에 이동한다", async ({ page }) => {
-  let sessionCall = 0;
-  await page.route("**/api/auth/session", (route) => {
-    sessionCall += 1;
-    return route.fulfill({
+test("신규 카카오 사용자는 PKELO 프로필을 만든 뒤 세션으로 메인에 이동한다", async ({ page }) => {
+  let onboardingCompleted = false;
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({
       contentType: "application/json",
       body: JSON.stringify(
-        sessionCall === 1
-          ? { authenticated: false }
-          : {
+        onboardingCompleted
+          ? {
               authenticated: true,
               player: {
                 id: "player-new-kakao",
@@ -109,16 +107,17 @@ test("신규 카카오 사용자는 자동 가입 뒤 세션으로 메인에 이
                 gender: "F",
                 age: 35,
                 isFirstLogin: false,
-                privacyPolicyConsentVersion: "2026-08-26",
+                privacyPolicyConsentVersion: "2026-08-31",
               },
-            },
+            }
+          : { authenticated: false },
       ),
-    });
-  });
+    }),
+  );
   await page.route("**/api/auth/kakao/exchange", (route) =>
     route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({ status: "authenticated", isFirstLogin: false }),
+      body: JSON.stringify({ status: "onboarding", registrationTicket: "registration-ticket" }),
     }),
   );
   await page.route("**/api/me", (route) =>
@@ -130,11 +129,35 @@ test("신규 카카오 사용자는 자동 가입 뒤 세션으로 메인에 이
         gender: "F",
         age: 35,
         isFirstLogin: false,
-        privacyPolicyConsentVersion: "2026-08-26",
+        privacyPolicyConsentVersion: "2026-08-31",
       }),
     }),
   );
+  await page.route("**/api/auth/kakao/onboarding", async (route) => {
+    expect(route.request().postDataJSON()).toEqual({
+      registrationTicket: "registration-ticket",
+      username: "신규 사용자",
+      gender: "F",
+    });
+    onboardingCompleted = true;
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ status: "authenticated", isFirstLogin: false }),
+    });
+  });
 
   await page.goto("http://pkelo.localhost:4173/login/kakao/callback#ticket=handoff-ticket");
+  await expect(page.getByRole("heading", { name: "PKELO 프로필 만들기" })).toBeVisible();
+  await expect(page.getByText("프로필 이미지 (선택)")).toHaveCount(0);
+  const submitButton = page.getByRole("button", { name: "프로필 만들기" });
+  await expect(submitButton).toBeDisabled();
+  await page.getByLabel(/이름/).fill("신규");
+  await expect(submitButton).toBeDisabled();
+  await page.getByLabel(/이름/).fill("신");
+  await page.getByText("여성", { exact: true }).click();
+  await expect(submitButton).toBeDisabled();
+  await page.getByLabel(/이름/).fill("신규 사용자");
+  await expect(submitButton).toBeEnabled();
+  await submitButton.click();
   await expect(page).toHaveURL("http://pkelo.localhost:4173/");
 });

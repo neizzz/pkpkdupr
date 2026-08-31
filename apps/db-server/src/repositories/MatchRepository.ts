@@ -24,6 +24,7 @@ import {
   getCommonAffiliationNames,
   normalizeAffiliationNames,
   normalizeNullablePlayerDupr,
+  WITHDRAWN_PLAYER_DISPLAY_NAME,
   type Player,
   type PlayerAffiliation,
   type PublicPlayerDupr,
@@ -161,15 +162,24 @@ const parsePlayerAffiliations = (
 
 const toPublicPlayer = (record: StoredPlayer): Player => ({
   id: record.id,
-  username: record.username,
+  username: record.withdrawnAt
+    ? WITHDRAWN_PLAYER_DISPLAY_NAME
+    : record.username,
   duprRating: normalizeNullablePlayerDupr(record.duprRating),
-  gender: record.gender as Player["gender"],
+  ...(record.withdrawnAt
+    ? {}
+    : { gender: record.gender as Player["gender"] }),
   status: record.status as Player["status"],
-  avatarUrl: record.avatarUrl ?? undefined,
-  affiliations: parsePlayerAffiliations(record.affiliationsJson),
+  avatarUrl: record.withdrawnAt ? undefined : record.avatarUrl ?? undefined,
+  affiliations: record.withdrawnAt
+    ? []
+    : parsePlayerAffiliations(record.affiliationsJson),
+  ...(record.withdrawnAt
+    ? { withdrawnAt: toDate(record.withdrawnAt) }
+    : {}),
   createdAt: toDate(record.createdAt),
   updatedAt: toDate(record.updatedAt),
-});
+}) as Player;
 
 const toMatchScore = (score: StoredMatchScore): MatchScore => ({
   scoreA: score.scoreA,

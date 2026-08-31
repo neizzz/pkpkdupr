@@ -1,4 +1,8 @@
-import type { Player } from "@pkpkdupr/shared/player";
+import {
+  WITHDRAWN_PLAYER_DISPLAY_NAME,
+  type Player,
+  type WithdrawalEligibility,
+} from "@pkpkdupr/shared/player";
 import type { RawQueryResult } from "../db/client";
 
 export type ExternalAuthProvider = "kakao" | "kakao-mock";
@@ -34,6 +38,22 @@ export interface PlayerDeviceSession {
   revokedAt: Date | null;
   lastSeenAt: Date;
   createdAt: Date;
+}
+
+export type WithdrawalRequestStatus =
+  | "prepared"
+  | "unlink_failed"
+  | "unlink_succeeded"
+  | "completed";
+
+export interface PlayerWithdrawalRequest {
+  id: string;
+  playerId: string;
+  provider: ExternalAuthProvider | null;
+  providerSubject: string | null;
+  status: WithdrawalRequestStatus;
+  errorCode: string | null;
+  avatarUrl: string | null;
 }
 
 interface DbClient {
@@ -124,6 +144,311 @@ const selectDeviceSessionColumns = `
 
 export class AuthRepository {
   constructor(private readonly client: DbClient) {}
+
+  private async getWithdrawalEligibilityWith(
+    executor: Pick<DbClient, "execute">,
+    playerId: string,
+    now: Date,
+  ): Promise<WithdrawalEligibility> {
+    const [clubsResult, matchesResult, sessionsResult] = await Promise.all([
+      executor.execute({
+        sql: `SELECT c.id, c.name
+              FROM club_memberships cm
+              JOIN clubs c ON c.id = cm.club_id
+              WHERE cm.player_id = ? AND cm.role = 'owner'
+              ORDER BY c.name`,
+        args: [playerId],
+      }),
+      executor.execute({
+        sql: `SELECT DISTINCT m.id, m.name, m.status,
+                     m.match_starts_at AS matchStartsAt
+              FROM match_participants mp
+              JOIN matches m ON m.id = mp.match_id
+              WHERE mp.player_id = ?
+                AND m.status IN ('created', 'pending-approval', 'evaluating')
+              ORDER BY m.match_starts_at, m.id`,
+        args: [playerId],
+      }),
+      executor.execute({
+        sql: `SELECT DISTINCT ms.id, ms.name, ms.\`date\` AS sessionDate
+              FROM match_session_participants msp
+              JOIN match_sessions ms ON ms.id = msp.session_id
+              WHERE msp.player_id = ? AND ms.\`date\` >= ?
+              ORDER BY ms.\`date\`, ms.id`,
+        args: [playerId, toUnixSeconds(now)],
+      }),
+    ]);
+
+    const blockers: WithdrawalEligibility["blockers"] = {
+      ownedClubs: clubsResult.rows.map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+      })),
+      activeMatches: matchesResult.rows.map((row) => ({
+        id: String(row.id),
+        name: row.name == null ? null : String(row.name),
+        status: row.status as WithdrawalEligibility["blockers"]["activeMatches"][number]["status"],
+      })),
+      upcomingSessions: sessionsResult.rows.map((row) => ({
+        id: String(row.id),
+        name: String(row.name),
+        date: new Date(Number(row.sessionDate) * 1000),
+      })),
+    };
+    return {
+      eligible: Object.values(blockers).every((items) => items.length === 0),
+      blockers,
+    };
+  }
+
+  async getWithdrawalEligibility(
+    playerId: string,
+    now: Date,
+  ): Promise<WithdrawalEligibility> {
+    return await this.getWithdrawalEligibilityWith(this.client, playerId, now);
+  }
+
+  async prepareWithdrawal(input: {
+    id: string;
+    playerId: string;
+    now: Date;
+  }): Promise<PlayerWithdrawalRequest> {
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+    try {
+      const playerResult = await transaction.execute({
+        sql: `SELECT username, status, avatar_url AS avatarUrl, withdrawn_at AS withdrawnAt
+              FROM players WHERE id = ? FOR UPDATE`,
+        args: [input.playerId],
+      });
+      const player = playerResult.rows[0];
+      if (!player) throw new Error("PLAYER_NOT_FOUND");
+      if (String(player.username) === "admin") throw new Error("WITHDRAWAL_ADMIN_FORBIDDEN");
+      if (player.withdrawnAt != null || player.status !== "active") {
+        throw new Error("WITHDRAWAL_ALREADY_COMPLETED");
+      }
+      const eligibility = await this.getWithdrawalEligibilityWith(
+        transaction,
+        input.playerId,
+        input.now,
+      );
+      if (!eligibility.eligible) throw new Error("WITHDRAWAL_BLOCKED");
+
+      const existingResult = await transaction.execute({
+        sql: `SELECT id, player_id AS playerId, provider,
+                     provider_subject AS providerSubject, status, error_code AS errorCode
+              FROM player_withdrawal_requests WHERE player_id = ? FOR UPDATE`,
+        args: [input.playerId],
+      });
+      const existing = existingResult.rows[0];
+      let request: PlayerWithdrawalRequest;
+      if (existing) {
+        const currentStatus = existing.status as WithdrawalRequestStatus;
+        const status = currentStatus === "unlink_failed" ? "prepared" : currentStatus;
+        if (status !== currentStatus) {
+          await transaction.execute({
+            sql: `UPDATE player_withdrawal_requests
+                  SET status = 'prepared', error_code = NULL, updated_at = ?
+                  WHERE id = ?`,
+            args: [toUnixSeconds(input.now), existing.id],
+          });
+        }
+        request = {
+          id: String(existing.id),
+          playerId: String(existing.playerId),
+          provider: (existing.provider as ExternalAuthProvider | null) ?? null,
+          providerSubject:
+            existing.providerSubject == null ? null : String(existing.providerSubject),
+          status,
+          errorCode: null,
+          avatarUrl: player.avatarUrl == null ? null : String(player.avatarUrl),
+        };
+      } else {
+        const identityResult = await transaction.execute({
+          sql: `SELECT provider, subject FROM player_auth_identities
+                WHERE player_id = ? ORDER BY created_at LIMIT 1`,
+          args: [input.playerId],
+        });
+        const identity = identityResult.rows[0];
+        const provider = (identity?.provider as ExternalAuthProvider | undefined) ?? null;
+        const providerSubject = identity?.subject == null ? null : String(identity.subject);
+        const status: WithdrawalRequestStatus = provider
+          ? "prepared"
+          : "unlink_succeeded";
+        await transaction.execute({
+          sql: `INSERT INTO player_withdrawal_requests
+                  (id, player_id, provider, provider_subject, status, error_code,
+                   unlink_succeeded_at, completed_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?)`,
+          args: [
+            input.id,
+            input.playerId,
+            provider,
+            providerSubject,
+            status,
+            status === "unlink_succeeded" ? toUnixSeconds(input.now) : null,
+            toUnixSeconds(input.now),
+            toUnixSeconds(input.now),
+          ],
+        });
+        request = {
+          id: input.id,
+          playerId: input.playerId,
+          provider,
+          providerSubject,
+          status,
+          errorCode: null,
+          avatarUrl: player.avatarUrl == null ? null : String(player.avatarUrl),
+        };
+      }
+      await transaction.commit();
+      committed = true;
+      return request;
+    } finally {
+      if (!committed) transaction.close();
+    }
+  }
+
+  async updateWithdrawalUnlinkStatus(input: {
+    requestId: string;
+    succeeded: boolean;
+    errorCode?: string;
+    now: Date;
+  }) {
+    await this.client.execute({
+      sql: `UPDATE player_withdrawal_requests
+            SET status = ?, error_code = ?, unlink_succeeded_at = ?, updated_at = ?
+            WHERE id = ? AND status <> 'completed'`,
+      args: [
+        input.succeeded ? "unlink_succeeded" : "unlink_failed",
+        input.succeeded ? null : input.errorCode ?? "KAKAO_UNLINK_FAILED",
+        input.succeeded ? toUnixSeconds(input.now) : null,
+        toUnixSeconds(input.now),
+        input.requestId,
+      ],
+    });
+  }
+
+  async completeWithdrawal(input: {
+    requestId: string;
+    playerId: string;
+    passwordHash: string;
+    now: Date;
+  }): Promise<void> {
+    const transaction = await this.client.transaction("write");
+    let committed = false;
+    try {
+      const requestResult = await transaction.execute({
+        sql: `SELECT status, provider, provider_subject AS providerSubject
+              FROM player_withdrawal_requests
+              WHERE id = ? AND player_id = ? FOR UPDATE`,
+        args: [input.requestId, input.playerId],
+      });
+      const request = requestResult.rows[0];
+      if (!request) throw new Error("WITHDRAWAL_REQUEST_NOT_FOUND");
+      if (request.status === "completed") {
+        await transaction.commit();
+        committed = true;
+        return;
+      }
+      if (request.status !== "unlink_succeeded") {
+        throw new Error("WITHDRAWAL_UNLINK_REQUIRED");
+      }
+      const eligibility = await this.getWithdrawalEligibilityWith(
+        transaction,
+        input.playerId,
+        input.now,
+      );
+      if (!eligibility.eligible) throw new Error("WITHDRAWAL_BLOCKED");
+
+      const tombstoneUsername = `${WITHDRAWN_PLAYER_DISPLAY_NAME}-${input.playerId}`;
+      await transaction.execute({
+        sql: `UPDATE players
+              SET username = ?, status = 'inactive', withdrawn_at = ?, avatar_url = NULL,
+                  affiliations_json = '[]', status_message = NULL,
+                  status_message_background_color = NULL, birth_date = NULL,
+                  identity_verified_at = NULL, password_hash = ?, is_first_login = FALSE,
+                  updated_at = ?
+              WHERE id = ? AND withdrawn_at IS NULL`,
+        args: [
+          tombstoneUsername,
+          toUnixSeconds(input.now),
+          input.passwordHash,
+          toUnixSeconds(input.now),
+          input.playerId,
+        ],
+      });
+      await transaction.execute({
+        sql: "DELETE FROM player_auth_identities WHERE player_id = ?",
+        args: [input.playerId],
+      });
+      if (request.provider && request.providerSubject) {
+        await transaction.execute({
+          sql: `UPDATE oauth_login_transactions
+                SET provider_subject = NULL, handoff_hash = NULL,
+                    registration_hash = NULL, privacy_policy_version = NULL,
+                    privacy_policy_agreed_at = NULL,
+                    profile_disclosure_agreed_at = NULL,
+                    legal_name = NULL, legal_gender = NULL, legal_birth_date = NULL
+                WHERE provider = ? AND provider_subject = ?`,
+          args: [request.provider, request.providerSubject],
+        });
+      }
+      await transaction.execute({
+        sql: "DELETE FROM player_device_sessions WHERE player_id = ?",
+        args: [input.playerId],
+      });
+      await transaction.execute({
+        sql: `DELETE FROM player_friendships
+              WHERE player_one_id = ? OR player_two_id = ?`,
+        args: [input.playerId, input.playerId],
+      });
+      await transaction.execute({
+        sql: "DELETE FROM player_privacy_policy_consents WHERE player_id = ?",
+        args: [input.playerId],
+      });
+      await transaction.execute({
+        sql: "DELETE FROM club_memberships WHERE player_id = ?",
+        args: [input.playerId],
+      });
+      await transaction.execute({
+        sql: "DELETE FROM match_session_participants WHERE player_id = ?",
+        args: [input.playerId],
+      });
+      for (const table of [
+        "player_creation_logs",
+        "player_status_change_logs",
+        "official_dupr_adjustment_logs",
+      ]) {
+        await transaction.execute({
+          sql: `UPDATE ${table} SET ${
+            table === "player_creation_logs"
+              ? "created_by_username"
+              : "changed_by_username"
+          } = ? WHERE ${
+            table === "player_creation_logs"
+              ? "created_by_player_id"
+              : "changed_by_player_id"
+          } = ?`,
+          args: [WITHDRAWN_PLAYER_DISPLAY_NAME, input.playerId],
+        });
+      }
+      await transaction.execute({
+        sql: `UPDATE player_withdrawal_requests
+              SET status = 'completed', provider_subject = NULL, error_code = NULL,
+                  completed_at = ?, updated_at = ? WHERE id = ?`,
+        args: [
+          toUnixSeconds(input.now),
+          toUnixSeconds(input.now),
+          input.requestId,
+        ],
+      });
+      await transaction.commit();
+      committed = true;
+    } finally {
+      if (!committed) transaction.close();
+    }
+  }
 
   async createOAuthTransaction(input: {
     id: string;
@@ -339,14 +664,6 @@ export class AuthRepository {
         args: [existing.provider, existing.providerSubject],
       });
       const playerId = identityResult.rows[0]?.playerId as string | undefined;
-      if (
-        !playerId &&
-        (!existing.legalName ||
-          !existing.legalGender ||
-          !existing.legalBirthDate)
-      ) {
-        throw new Error("OAUTH_VERIFIED_PROFILE_REQUIRED");
-      }
       await transaction.execute({
         sql: `UPDATE oauth_login_transactions
               SET handoff_consumed_at = ?, registration_hash = ?
@@ -399,20 +716,9 @@ export class AuthRepository {
       if (
         oauth.registrationConsumedAt ||
         oauth.expiresAt <= input.now ||
-        !oauth.providerSubject ||
-        !oauth.legalName ||
-        !oauth.legalGender ||
-        !oauth.legalBirthDate
+        !oauth.providerSubject
       ) {
         throw new Error("OAUTH_REGISTRATION_INVALID");
-      }
-
-      if (
-        input.player.username !== oauth.legalName ||
-        input.player.gender !== oauth.legalGender ||
-        input.player.birthDate !== oauth.legalBirthDate
-      ) {
-        throw new Error("OAUTH_VERIFIED_PROFILE_MISMATCH");
       }
 
       const existingIdentity = await transaction.execute({
@@ -421,6 +727,12 @@ export class AuthRepository {
         args: [oauth.provider, oauth.providerSubject],
       });
       if (existingIdentity.rows.length) throw new Error("OAUTH_IDENTITY_EXISTS");
+
+      const existingUsername = await transaction.execute({
+        sql: "SELECT id FROM players WHERE username = ? FOR UPDATE",
+        args: [input.player.username],
+      });
+      if (existingUsername.rows.length) throw new Error("USERNAME_CONFLICT");
 
       const nowSeconds = toUnixSeconds(input.player.createdAt);
       await transaction.execute({
@@ -437,7 +749,7 @@ export class AuthRepository {
           input.player.status,
           input.player.passwordHash,
           input.player.isFirstLogin,
-          toUnixSeconds(input.now),
+          null,
           nowSeconds,
           toUnixSeconds(input.player.updatedAt),
         ],

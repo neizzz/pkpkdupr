@@ -333,6 +333,25 @@ const migrations: Migration[] = [
       "CREATE INDEX match_participants_player_match_idx ON match_participants (player_id, match_id)",
     ],
   },
+  {
+    id: "0014_player_withdrawals",
+    statements: [
+      "ALTER TABLE players ADD COLUMN withdrawn_at BIGINT NULL AFTER identity_verified_at",
+      `CREATE TABLE player_withdrawal_requests (
+        id VARCHAR(255) PRIMARY KEY,
+        player_id VARCHAR(255) NOT NULL,
+        provider VARCHAR(32) NULL,
+        provider_subject VARCHAR(255) NULL,
+        status VARCHAR(32) NOT NULL,
+        error_code VARCHAR(128) NULL,
+        unlink_succeeded_at BIGINT NULL,
+        completed_at BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        UNIQUE KEY player_withdrawal_requests_player_unique (player_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+    ],
+  },
 ];
 
 export const runMigrations = async () => {

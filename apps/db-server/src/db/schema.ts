@@ -37,6 +37,7 @@ export const players = mysqlTable("players", {
   gender: varchar("gender", { length: 8 }).notNull(),
   birthDate: varchar("birth_date", { length: 10 }),
   identityVerifiedAt: unixTimestamp("identity_verified_at"),
+  withdrawnAt: unixTimestamp("withdrawn_at"),
   status: varchar("status", { length: 32 }).notNull(),
   avatarUrl: text("avatar_url"),
   affiliationsJson: text("affiliations_json"),
@@ -167,6 +168,27 @@ export const playerDeviceSessions = mysqlTable(
     playerPersistentExpiryIndex: index(
       "player_device_sessions_player_persistent_expiry_idx",
     ).on(table.playerId, table.isPersistent, table.expiresAt),
+  }),
+);
+
+export const playerWithdrawalRequests = mysqlTable(
+  "player_withdrawal_requests",
+  {
+    id: id("id").primaryKey(),
+    playerId: id("player_id").notNull(),
+    provider: varchar("provider", { length: 32 }),
+    providerSubject: varchar("provider_subject", { length: 255 }),
+    status: varchar("status", { length: 32 }).notNull(),
+    errorCode: varchar("error_code", { length: 128 }),
+    unlinkSucceededAt: unixTimestamp("unlink_succeeded_at"),
+    completedAt: unixTimestamp("completed_at"),
+    createdAt: unixTimestamp("created_at").notNull(),
+    updatedAt: unixTimestamp("updated_at").notNull(),
+  },
+  (table) => ({
+    playerUnique: uniqueIndex("player_withdrawal_requests_player_unique").on(
+      table.playerId,
+    ),
   }),
 );
 

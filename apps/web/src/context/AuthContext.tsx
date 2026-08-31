@@ -9,6 +9,7 @@ import React, {
 import type {
   PlayerAffiliation,
   PublicPlayerDupr,
+  WithdrawalEligibility,
 } from "@pkpkdupr/shared/player";
 import { buildApiUrl } from "@/lib/api";
 
@@ -51,6 +52,8 @@ interface AuthContextType {
   uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
   deleteAvatar: () => Promise<PlayerInfo>;
   refreshMe: () => Promise<PlayerInfo>;
+  getWithdrawalEligibility: () => Promise<WithdrawalEligibility>;
+  withdrawAccount: (confirmation: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -501,6 +504,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return result.player;
   };
 
+  const getWithdrawalEligibility = async (): Promise<WithdrawalEligibility> => {
+    if (!player) throw new Error("로그인이 필요합니다.");
+    if (!isOnline()) throw new Error(ONLINE_REQUIRED_MESSAGE);
+    const res = await fetch(buildApiUrl("/api/me/withdrawal-eligibility"), {
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || "탈퇴 가능 여부를 확인하지 못했습니다.");
+    }
+    const data = (await res.json()) as WithdrawalEligibility;
+    return {
+      ...data,
+      blockers: {
+        ...data.blockers,
+        upcomingSessions: data.blockers.upcomingSessions.map((session) => ({
+          ...session,
+          date: new Date(session.date),
+        })),
+      },
+    };
+  };
+
+  const withdrawAccount = async (confirmation: string) => {
+    if (!player) throw new Error("로그인이 필요합니다.");
+    if (!isOnline()) throw new Error(ONLINE_REQUIRED_MESSAGE);
+    const res = await fetch(buildApiUrl("/api/me/withdrawal"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ confirmation }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || "회원 탈퇴를 완료하지 못했습니다.");
+    }
+    localStorage.clear();
+    sessionStorage.clear();
+    clearSession();
+  };
+
   const logout = async () => {
     if (isOnline()) {
       await fetch(buildApiUrl("/api/auth/logout"), {
@@ -526,6 +570,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         uploadAvatar,
         deleteAvatar,
         refreshMe,
+        getWithdrawalEligibility,
+        withdrawAccount,
         logout,
       }}
     >

@@ -136,6 +136,9 @@ export const hydrateMatch = (record: any): Match => ({
       ...record.teams[0],
       players: record.teams[0].players.map((player: any) => ({
         ...player,
+        withdrawnAt: player.withdrawnAt
+          ? new Date(player.withdrawnAt)
+          : undefined,
         createdAt: new Date(player.createdAt),
         updatedAt: new Date(player.updatedAt),
       })),
@@ -144,6 +147,9 @@ export const hydrateMatch = (record: any): Match => ({
       ...record.teams[1],
       players: record.teams[1].players.map((player: any) => ({
         ...player,
+        withdrawnAt: player.withdrawnAt
+          ? new Date(player.withdrawnAt)
+          : undefined,
         createdAt: new Date(player.createdAt),
         updatedAt: new Date(player.updatedAt),
       })),

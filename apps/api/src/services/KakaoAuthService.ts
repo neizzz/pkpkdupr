@@ -1,6 +1,4 @@
 import { createHash, randomBytes, randomUUID } from "crypto";
-import type { Player } from "@pkpkdupr/shared/player";
-import { generateEntityId } from "@pkpkdupr/shared/entityId";
 import type { AuthService } from "./AuthService";
 import {
   type ExternalAuthProvider,
@@ -20,40 +18,62 @@ export interface KakaoAuthStart {
 }
 
 export type KakaoAuthExchangeResult =
-  { status: "authenticated"; session: Awaited<ReturnType<AuthService["issueExternalDeviceSession"]>> };
+  | {
+      status: "authenticated";
+      session: Awaited<ReturnType<AuthService["issueExternalDeviceSession"]>>;
+    }
+  | { status: "onboarding"; registrationTicket: string };
 
-type VerifiedKakaoProfile = {
+type KakaoProfile = {
   providerSubject: string;
-  legalName?: string;
-  legalGender?: "M" | "F";
-  legalBirthDate?: string;
 };
+
+export class KakaoUnlinkError extends Error {
+  constructor(readonly diagnostic: KakaoUnlinkDiagnostic) {
+    super("카카오 연결을 해제하지 못했습니다. 잠시 후 다시 시도해주세요.");
+    this.name = "KakaoUnlinkError";
+  }
+}
+
+export type KakaoUnlinkFailureReason =
+  | "provider-mismatch"
+  | "configuration-missing"
+  | "network-error"
+  | "http-error"
+  | "invalid-response";
+
+export interface KakaoUnlinkDiagnostic {
+  reason: KakaoUnlinkFailureReason;
+  detail?: "admin-key" | "provider-subject";
+  httpStatus?: number;
+  kakaoCode?: string | number;
+  kakaoMessage?: string;
+}
 
 const sha256 = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 
 const createSecret = () => randomBytes(32).toString("base64url");
 
-const getFullAge = (birthDate: string, today = new Date()) => {
-  const [year, month, day] = birthDate.split("-").map(Number);
-  let age = today.getFullYear() - year;
-  if (
-    today.getMonth() + 1 < month ||
-    (today.getMonth() + 1 === month && today.getDate() < day)
-  ) {
-    age -= 1;
-  }
-  return age;
-};
-
 const normalizeKakaoError = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
+const sanitizeKakaoDiagnosticMessage = (
+  value: unknown,
+  sensitiveValues: string[],
+) => {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  let sanitized = value.trim().slice(0, 500);
+  for (const sensitiveValue of sensitiveValues) {
+    if (sensitiveValue) {
+      sanitized = sanitized.split(sensitiveValue).join("[redacted]");
+    }
+  }
+  return sanitized;
+};
+
 const normalizeKakaoExchangeError = (error: unknown) => {
   const message = normalizeKakaoError(error, "Kakao 로그인 처리가 실패했습니다.");
-  if (message.includes("OAUTH_VERIFIED_PROFILE_REQUIRED")) {
-    return "카카오 본인확인정보(법정 실명·성별·생년월일)를 받지 못했습니다. 카카오 제휴 승인과 동의항목 설정을 확인해주세요.";
-  }
   if (
     message.includes("OAUTH_HANDOFF_NOT_FOUND") ||
     message.includes("OAUTH_HANDOFF_INVALID")
@@ -70,6 +90,7 @@ export class KakaoAuthService {
   private readonly provider: ExternalAuthProvider;
   private readonly restApiKey: string;
   private readonly clientSecret: string;
+  private readonly adminKey: string;
   private readonly redirectUri: string;
   private readonly webOrigin: string;
   private readonly mockSubject: string;
@@ -85,6 +106,7 @@ export class KakaoAuthService {
     this.provider = provider;
     this.restApiKey = process.env.KAKAO_REST_API_KEY?.trim() ?? "";
     this.clientSecret = process.env.KAKAO_CLIENT_SECRET?.trim() ?? "";
+    this.adminKey = process.env.KAKAO_ADMIN_KEY?.trim() ?? "";
     this.redirectUri =
       process.env.KAKAO_REDIRECT_URI?.trim() ??
       "http://localhost:8443/auth/kakao/callback";
@@ -94,18 +116,77 @@ export class KakaoAuthService {
       process.env.KAKAO_MOCK_SUBJECT?.trim() ?? "mock-kakao-user";
   }
 
+  async unlinkAccount(
+    provider: ExternalAuthProvider,
+    providerSubject: string,
+  ): Promise<void> {
+    const fail = (diagnostic: KakaoUnlinkDiagnostic): never => {
+      console.error("[KAKAO] Unlink failed", diagnostic);
+      throw new KakaoUnlinkError(diagnostic);
+    };
+
+    if (provider !== this.provider) fail({ reason: "provider-mismatch" });
+    if (provider === "kakao-mock") return;
+    if (!this.adminKey) {
+      fail({ reason: "configuration-missing", detail: "admin-key" });
+    }
+    if (!providerSubject) {
+      fail({ reason: "configuration-missing", detail: "provider-subject" });
+    }
+
+    let response: Response | undefined;
+    try {
+      response = await this.fetchImpl("https://kapi.kakao.com/v1/user/unlink", {
+        method: "POST",
+        headers: {
+          Authorization: `KakaoAK ${this.adminKey}`,
+          "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+        },
+        body: new URLSearchParams({
+          target_id_type: "user_id",
+          target_id: providerSubject,
+        }),
+      });
+    } catch {
+      fail({ reason: "network-error" });
+    }
+    if (!response) return fail({ reason: "network-error" });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as {
+        code?: unknown;
+        msg?: unknown;
+      } | null;
+      const kakaoCode =
+        typeof payload?.code === "number" || typeof payload?.code === "string"
+          ? payload.code
+          : undefined;
+      const kakaoMessage = sanitizeKakaoDiagnosticMessage(payload?.msg, [
+        this.adminKey,
+        this.restApiKey,
+        this.clientSecret,
+        providerSubject,
+      ]);
+      fail({
+        reason: "http-error",
+        httpStatus: response.status,
+        ...(kakaoCode === undefined ? {} : { kakaoCode }),
+        ...(kakaoMessage === undefined ? {} : { kakaoMessage }),
+      });
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      id?: string | number;
+    } | null;
+    if (String(result?.id ?? "") !== providerSubject) {
+      fail({ reason: "invalid-response", httpStatus: response.status });
+    }
+  }
+
   assertConfigured() {
     if (this.provider === "kakao" && (!this.restApiKey || !this.clientSecret)) {
       throw new Error(
         "Kakao 로그인에는 KAKAO_REST_API_KEY와 KAKAO_CLIENT_SECRET이 필요합니다.",
-      );
-    }
-    if (
-      this.provider === "kakao" &&
-      process.env.KAKAO_CONFIDENTIAL_USER_INFO_APPROVED !== "true"
-    ) {
-      throw new Error(
-        "카카오 본인확인정보 제휴 승인 후 KAKAO_CONFIDENTIAL_USER_INFO_APPROVED=true를 설정해주세요.",
       );
     }
   }
@@ -157,7 +238,7 @@ export class KakaoAuthService {
     return { state, redirectUrl: authorizationUrl.toString() };
   }
 
-  private async retrieveKakaoProfile(code: string): Promise<VerifiedKakaoProfile> {
+  private async retrieveKakaoProfile(code: string): Promise<KakaoProfile> {
     const tokenResponse = await this.fetchImpl("https://kauth.kakao.com/oauth/token", {
       method: "POST",
       headers: {
@@ -183,43 +264,16 @@ export class KakaoAuthService {
     if (!profileResponse.ok) {
       throw new Error("Kakao 사용자 정보를 조회하지 못했습니다.");
     }
-    const profile = (await profileResponse.json()) as {
-      id?: string | number;
-      kakao_account?: {
-        legal_name?: string;
-        legal_gender?: "male" | "female";
-        legal_birth_date?: string;
-      };
-    };
+    const profile = (await profileResponse.json()) as { id?: string | number };
     if (profile.id == null) throw new Error("Kakao 사용자 식별자가 없습니다.");
-    const legalName = profile.kakao_account?.legal_name?.trim();
-    const legalGender = profile.kakao_account?.legal_gender;
-    const rawBirthDate = profile.kakao_account?.legal_birth_date;
-    const legalBirthDate = rawBirthDate?.match(/^(\d{4})(\d{2})(\d{2})$/)
-      ? `${rawBirthDate.slice(0, 4)}-${rawBirthDate.slice(4, 6)}-${rawBirthDate.slice(6, 8)}`
-      : undefined;
-    if (legalBirthDate && getFullAge(legalBirthDate) < 14) {
-      throw new Error("PKELO는 만 14세 이상만 가입하고 경기 참여할 수 있습니다.");
-    }
-    return {
-      providerSubject: String(profile.id),
-      legalName,
-      legalGender:
-        legalGender === "male" ? "M" : legalGender === "female" ? "F" : undefined,
-      legalBirthDate,
-    };
+    return { providerSubject: String(profile.id) };
   }
 
   async handleCallback(input: { state?: string; code?: string; mock?: boolean }) {
     if (!input.state) throw new Error("Kakao state가 없습니다.");
     const profile =
       this.provider === "kakao-mock" && input.mock
-        ? {
-            providerSubject: this.mockSubject,
-            legalName: "카카오 테스트 사용자",
-            legalGender: "M" as const,
-            legalBirthDate: "1990-01-01",
-          }
+        ? { providerSubject: this.mockSubject }
         : input.code
           ? await this.retrieveKakaoProfile(input.code)
           : (() => {
@@ -244,13 +298,7 @@ export class KakaoAuthService {
     if (!ticket) throw new Error("로그인 ticket이 없습니다.");
     const registrationTicket = createSecret();
     let consumed: {
-      transaction: {
-        provider: ExternalAuthProvider;
-        persistentSessionRequested: boolean;
-        legalName: string | null;
-        legalGender: "M" | "F" | null;
-        legalBirthDate: string | null;
-      };
+      transaction: { provider: ExternalAuthProvider; persistentSessionRequested: boolean };
       playerId: string | null;
     };
     try {
@@ -274,24 +322,23 @@ export class KakaoAuthService {
         ),
       };
     }
-    if (
-      !consumed.transaction.legalName ||
-      !consumed.transaction.legalGender ||
-      !consumed.transaction.legalBirthDate
-    ) {
-      throw new Error("카카오 본인확인정보(법정 실명·성별·생년월일)가 필요합니다.");
-    }
+    return { status: "onboarding", registrationTicket };
+  }
+
+  async completeOnboarding(input: {
+    registrationTicket: string;
+    username: string;
+    gender: "M" | "F";
+    birthDate?: string;
+  }) {
     try {
-      const session = await this.accounts.registerExternalPlayer({
-        registrationTicketHash: sha256(registrationTicket),
-        username: consumed.transaction.legalName,
-        gender: consumed.transaction.legalGender,
-        birthDate: consumed.transaction.legalBirthDate,
-        provider: consumed.transaction.provider,
+      return await this.accounts.registerExternalPlayer({
+        ...input,
+        registrationTicketHash: sha256(input.registrationTicket),
+        provider: this.provider,
       });
-      return { status: "authenticated", session };
     } catch (error) {
-      throw new Error(normalizeKakaoError(error, "Kakao 가입을 완료하지 못했습니다."));
+      throw new Error(normalizeKakaoError(error, "PKELO 프로필을 만들지 못했습니다."));
     }
   }
 }

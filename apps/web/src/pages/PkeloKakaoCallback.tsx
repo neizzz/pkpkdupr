@@ -4,7 +4,9 @@ import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
 import PkeloLoginLayout from "@/pages/PkeloLoginLayout";
 
-type KakaoExchangeResponse = { status: "authenticated"; isFirstLogin: boolean };
+type KakaoExchangeResponse =
+  | { status: "authenticated"; isFirstLogin: boolean }
+  | { status: "onboarding"; registrationTicket: string };
 const kakaoCallbackErrorCodes = [
   "KAKAO_TICKET_MISSING",
   "KAKAO_EXCHANGE_FAILED",
@@ -45,6 +47,16 @@ const PkeloKakaoCallback: React.FC = () => {
       const data = (await res.json().catch(() => ({}))) as Partial<KakaoExchangeResponse>;
       if (!res.ok) {
         throw new Error("KAKAO_EXCHANGE_FAILED");
+      }
+
+      if (data.status === "onboarding" && typeof data.registrationTicket === "string") {
+        if (!cancelled) {
+          navigate("/login/kakao/onboarding", {
+            replace: true,
+            state: { registrationTicket: data.registrationTicket },
+          });
+        }
+        return;
       }
 
       if (data.status !== "authenticated") {

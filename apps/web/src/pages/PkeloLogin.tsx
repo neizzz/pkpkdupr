@@ -23,11 +23,9 @@ const PkeloLogin: React.FC = () => {
   const error =
     errorCode === "kakao_age_restricted"
       ? "PKELO는 만 14세 이상만 가입하고 경기 참여할 수 있습니다."
-      : errorCode === "kakao_verified_profile_required"
-        ? "카카오 본인확인정보(법정 실명·성별·생년월일) 제공 동의가 필요합니다."
-        : errorCode === "kakao_login_failed"
-          ? "카카오 로그인을 완료하지 못했습니다. 다시 시도해주세요."
-          : errorCode;
+      : errorCode === "kakao_login_failed"
+        ? "카카오 로그인을 완료하지 못했습니다. 다시 시도해주세요."
+        : errorCode;
   const displayedError =
     startError ?? (errorCode !== dismissedErrorCode ? error : null);
 

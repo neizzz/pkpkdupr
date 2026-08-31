@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
-import PrivacyPolicyConsentGate from "./components/PrivacyPolicyConsentGate";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import PwaUpdatePrompt from "./components/PwaUpdatePrompt";
 import { AppUpdateProvider } from "./context/AppUpdateContext";
@@ -13,6 +12,7 @@ import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
 import Login from "./pages/Login";
 import PkeloKakaoCallback from "./pages/PkeloKakaoCallback";
+import PkeloKakaoOnboarding from "./pages/PkeloKakaoOnboarding";
 import PkeloLogin from "./pages/PkeloLogin";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
@@ -104,7 +104,6 @@ function AppRoutes() {
   }
 
   return (
-    <PrivacyPolicyConsentGate>
     <Routes>
       <Route
         path="/dev/qrs"
@@ -151,6 +150,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/login/kakao/onboarding"
+        element={
+          isPkeloAppHost() && !isAuthenticated ? (
+            <PkeloKakaoOnboarding />
+          ) : (
+            <Navigate to={isAuthenticated ? authenticatedHome : "/login"} replace />
+          )
+        }
+      />
+      <Route
         path="/force-change-password"
         element={
           !isAuthenticated ? (
@@ -169,7 +178,6 @@ function AppRoutes() {
         }
       />
     </Routes>
-    </PrivacyPolicyConsentGate>
   );
 }
 

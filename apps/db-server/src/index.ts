@@ -403,6 +403,60 @@ app.post("/internal/auth/device-sessions/revoke", async (req, res) => {
   }
 });
 
+app.get("/internal/auth/withdrawal-eligibility/:playerId", async (req, res) => {
+  try {
+    res.json(
+      await authRepository.getWithdrawalEligibility(
+        req.params.playerId,
+        new Date(typeof req.query.now === "string" ? req.query.now : Date.now()),
+      ),
+    );
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/withdrawals/prepare", async (req, res) => {
+  try {
+    res.json(
+      await authRepository.prepareWithdrawal({
+        ...req.body,
+        now: new Date(req.body.now),
+      }),
+    );
+  } catch (error) {
+    const message = (error as Error).message;
+    res.status(message === "WITHDRAWAL_BLOCKED" ? 409 : 400).json({ error: message });
+  }
+});
+
+app.post("/internal/auth/withdrawals/:id/unlink-status", async (req, res) => {
+  try {
+    await authRepository.updateWithdrawalUnlinkStatus({
+      ...req.body,
+      requestId: req.params.id,
+      now: new Date(req.body.now),
+    });
+    res.status(204).end();
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/internal/auth/withdrawals/:id/complete", async (req, res) => {
+  try {
+    await authRepository.completeWithdrawal({
+      ...req.body,
+      requestId: req.params.id,
+      now: new Date(req.body.now),
+    });
+    res.status(204).end();
+  } catch (error) {
+    const message = (error as Error).message;
+    res.status(message === "WITHDRAWAL_BLOCKED" ? 409 : 400).json({ error: message });
+  }
+});
+
 app.patch("/internal/players/:id/status", async (req, res) => {
   try {
     const player = await playerRepository.updateStatus(

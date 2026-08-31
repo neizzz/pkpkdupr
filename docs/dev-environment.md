@@ -62,13 +62,24 @@ http://localhost:8443/auth/kakao/callback
 
 ```bash
 cp env/pkelo.real-kakao.env.example env/pkelo.real-kakao.env
-# env/pkelo.real-kakao.env에 개발 앱의 REST API 키와 Client Secret 입력
+# env/pkelo.real-kakao.env에 개발 앱의 REST API 키, Client Secret, Admin Key 입력
 pnpm dev:real-kakao
 ```
 
-`dev:real-kakao`는 `USER_AUTH_PROVIDER=kakao`, REST API 키, Client Secret, 그리고 callback origin 일치를 확인한 뒤에만 서비스를 시작합니다. 카카오는 로그인 완료 후 서버가 아니라 같은 브라우저를 `localhost` callback으로 이동시키며, Vite가 `/auth`를 로컬 API로 프록시합니다. 따라서 같은 PC 브라우저에서는 동작하지만 휴대폰 같은 다른 기기의 `localhost`는 개발 PC를 가리키지 않습니다.
+`dev:real-kakao`는 `USER_AUTH_PROVIDER=kakao`, REST API 키, Client Secret, Admin Key, 그리고 callback origin 일치를 확인한 뒤에만 서비스를 시작합니다. Admin Key는 회원 탈퇴 시 카카오 앱 연결 해제에만 사용하며 누락되면 시작 단계에서 설정 오류를 표시합니다. 카카오는 로그인 완료 후 서버가 아니라 같은 브라우저를 `localhost` callback으로 이동시키며, Vite가 `/auth`를 로컬 API로 프록시합니다. 따라서 같은 PC 브라우저에서는 동작하지만 휴대폰 같은 다른 기기의 `localhost`는 개발 PC를 가리키지 않습니다.
 
-카카오 본인확인정보(법정 실명·성별·생년월일)를 이용한 자동 가입은 카카오 제휴 승인이 전제입니다. 승인 후에만 `KAKAO_CONFIDENTIAL_USER_INFO_APPROVED=true`를 설정하세요. 승인되지 않은 상태에서는 실카카오 로그인을 시작하지 않도록 서버가 차단합니다.
+회원 탈퇴를 테스트하기 전에는 카카오디벨로퍼스에서 REST API 키와 Admin Key가 같은 개발 앱의 키인지 확인합니다. 또한 `[앱] → [플랫폼 키] → [어드민 키]`에서 사용 중인 키의 호출 허용 API에 `카카오 로그인 → 연결 해제(Unlink)`를 활성화해야 합니다. 설정이나 `env/pkelo.real-kakao.env`를 변경한 뒤에는 `pnpm dev:real-kakao`를 다시 시작합니다.
+
+연결 해제 실패 시 브라우저에는 `KAKAO_UNLINK_FAILED`만 표시되고, 실제 원인은 API 서버의 `[KAKAO] Unlink failed` 로그에서 확인합니다. 로그에는 키와 카카오 회원번호를 남기지 않습니다.
+
+| 카카오 코드 | 의미 | 확인할 항목 |
+| --- | --- | --- |
+| `-3` | 필요한 기능 또는 호출 허용 API가 비활성화됨 | 어드민 키의 `카카오 로그인 → 연결 해제` 허용 여부 |
+| `-5` | API 호출 권한 없음 | 사용 중인 어드민 키의 권한과 앱 설정 |
+| `-101` | 해당 앱에 연결되지 않은 회원번호 | 로그인에 사용한 앱과 어드민 키의 앱이 같은지, 기존 로컬 DB identity가 다른 개발 앱에서 생성되지 않았는지 |
+| `-401` | 인증 키가 유효하지 않음 | Admin Key 값과 재시작 여부 |
+
+현재 카카오 로그인에서는 카카오 계정 식별자만 사용합니다. 이름·성별은 신규 사용자가 로그인 후 표시되는 PKELO 프로필 만들기 화면에서 직접 입력하고 프로필 이미지는 선택할 수 있습니다. 카카오 본인인증 정보와 생년월일 수집은 추후 기능으로 보류했습니다.
 
 현재 PKELO의 로그아웃은 PKELO 세션만 삭제하며 카카오계정 로그아웃을 요청하지 않습니다. 따라서 카카오디벨로퍼스의 로그아웃 Redirect URI는 등록하지 않아도 됩니다. 카카오계정 로그아웃을 추가할 때만 별도 URI를 등록합니다.
 

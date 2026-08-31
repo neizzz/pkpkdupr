@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
-const privacyPolicyVersion = "2026-08-26";
+const privacyPolicyVersion = "2026-08-31";
 
 type FixtureOptions = {
   authenticated?: boolean;
@@ -17,6 +17,9 @@ type FixtureOptions = {
   qrError?: boolean;
   sessionEmpty?: boolean;
   useFixedClock?: boolean;
+  withdrawalBlocked?: boolean;
+  withdrawalEligibilityGate?: Promise<void>;
+  withdrawalTracker?: { confirmations: string[] };
 };
 
 const fixedNow = new Date("2026-08-13T10:00:00.000+09:00");
@@ -370,6 +373,27 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
         privacyPolicyConsentVersion,
       });
     }
+    if (path === "/api/me/withdrawal-eligibility") {
+      await options.withdrawalEligibilityGate;
+      return fulfillJson(route, options.withdrawalBlocked
+        ? {
+            eligible: false,
+            blockers: {
+              ownedClubs: [{ id: club.id, name: club.name }],
+              activeMatches: [{ id: primaryMatch.id, name: primaryMatch.name, status: "evaluating" }],
+              upcomingSessions: [{ id: session.id, name: session.name, date: session.date }],
+            },
+          }
+        : {
+            eligible: true,
+            blockers: { ownedClubs: [], activeMatches: [], upcomingSessions: [] },
+          });
+    }
+    if (path === "/api/me/withdrawal") {
+      const confirmation = route.request().postDataJSON()?.confirmation;
+      options.withdrawalTracker?.confirmations.push(String(confirmation ?? ""));
+      return route.fulfill({ status: 204, body: "" });
+    }
     if (path === "/api/me/privacy-policy-consent") {
       privacyPolicyConsentVersion = privacyPolicyVersion;
       return fulfillJson(route, {
@@ -520,36 +544,24 @@ test("카카오 로그인 화면", async ({ page }) => {
   await capture(page, "kakao-login.png");
 });
 
-test("로그인 성공 후 개인정보 처리방침 동의 화면", async ({ page }) => {
-  await installFixture(page, { privacyPolicyConsentVersion: null });
-  await page.goto("/");
+test("개인정보 처리방침 화면", async ({ page }) => {
+  await installFixture(page, { authenticated: false });
+  await page.goto("/privacy");
 
-  await expect(
-    page.getByRole("heading", { name: "개인정보 처리방침 동의" }),
-  ).toBeVisible();
-  await expect(page.getByRole("button", { name: "동의하고 시작하기" })).toBeDisabled();
-  await capture(page, "privacy-policy-consent.png");
-
-  await page.getByRole("link", { name: "개인정보 처리방침" }).click();
   await expect(
     page.getByRole("heading", { name: "개인정보 처리방침" }),
   ).toBeVisible();
   await capture(page, "privacy-policy.png");
 });
 
-test("기존 로그인 사용자는 계정별 동의를 저장한 뒤 앱을 연다", async ({
-  page,
-}) => {
+test("동의 이력이 없어도 로그인 사용자는 앱을 연다", async ({ page }) => {
   await installFixture(page, { privacyPolicyConsentVersion: null });
   await page.goto("/");
 
+  await expect(page.getByRole("heading", { name: "Players" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "개인정보 처리방침 동의" }),
-  ).toBeVisible();
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "동의하고 시작하기" }).click();
-
-  await expect(page.getByRole("heading", { name: "Players" })).toBeVisible();
+  ).toHaveCount(0);
 });
 
 test("매치 탭의 with-data와 empty 상태", async ({ page }) => {
@@ -1177,6 +1189,88 @@ test("설정 탭 운영방침 drawer와 로그아웃 확인 modal", async ({ pag
   await page.getByRole("button", { name: "로그아웃" }).click();
   await expect(page.getByRole("dialog", { name: "로그아웃 확인" })).toBeVisible();
   await capture(page, "logout-modal.png");
+});
+
+test("회원 탈퇴 가능 상태와 차단 항목 modal", async ({ page }) => {
+  await openApp(page);
+  await page.getByRole("tab", { name: "설정" }).click();
+  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  const eligibleModal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
+  await expect(eligibleModal.getByLabel("탈퇴 확인 문구")).toBeVisible();
+  await expect(
+    eligibleModal.getByRole("button", {
+      name: "길게 눌러 회원탈퇴",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await capture(page, "settings-withdrawal--eligible.png");
+
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await openApp(page, { withdrawalBlocked: true });
+  await page.getByRole("tab", { name: "설정" }).click();
+  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  const blockedModal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
+  await expect(blockedModal.getByText("소유 클럽")).toBeVisible();
+  await expect(blockedModal.getByText("진행 중인 경기")).toBeVisible();
+  await expect(blockedModal.getByText("예정 세션")).toBeVisible();
+  await capture(page, "settings-withdrawal--blocked.png");
+});
+
+test("탈퇴 확인 문구가 일치할 때 한 번만 요청하고 로그인 화면으로 이동한다", async ({ page }) => {
+  const tracker = { confirmations: [] as string[] };
+  await openApp(page, { withdrawalTracker: tracker });
+  await page.getByRole("tab", { name: "설정" }).click();
+  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  const modal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
+  const submit = modal.getByRole("button", {
+    name: "길게 눌러 회원탈퇴",
+    exact: true,
+  });
+  await modal.getByLabel("탈퇴 확인 문구").fill("탈 퇴");
+  await expect(submit).toBeDisabled();
+  await modal.getByLabel("탈퇴 확인 문구").fill("탈퇴");
+  await submit.dispatchEvent("pointerdown", {
+    pointerType: "touch",
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+  });
+  await page.waitForTimeout(200);
+  await submit.dispatchEvent("pointerup", {
+    pointerType: "touch",
+    pointerId: 1,
+    isPrimary: true,
+    button: 0,
+  });
+  expect(tracker.confirmations).toEqual([]);
+
+  await submit.dispatchEvent("pointerdown", {
+    pointerType: "touch",
+    pointerId: 2,
+    isPrimary: true,
+    button: 0,
+  });
+  await expect(page.getByRole("button", { name: "카카오 로그인" })).toBeVisible();
+  expect(tracker.confirmations).toEqual(["탈퇴"]);
+});
+
+test("탈퇴 가능 여부 응답 전후에도 modal 위치와 크기를 유지한다", async ({ page }) => {
+  let releaseEligibility: (() => void) | undefined;
+  const withdrawalEligibilityGate = new Promise<void>((resolve) => {
+    releaseEligibility = resolve;
+  });
+  await openApp(page, { withdrawalEligibilityGate });
+  await page.getByRole("tab", { name: "설정" }).click();
+  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+
+  const modal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
+  await expect(modal.getByText("탈퇴 가능 여부를 확인하고 있습니다...")).toBeVisible();
+  const beforeEligibility = await modal.boundingBox();
+  expect(beforeEligibility).not.toBeNull();
+
+  releaseEligibility?.();
+  await expect(modal.getByLabel("탈퇴 확인 문구")).toBeVisible();
+  await expect.poll(() => modal.boundingBox()).toEqual(beforeEligibility);
 });
 
 test("QR 스캔 modal의 모든 진입점", async ({ page }) => {

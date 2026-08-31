@@ -28,6 +28,8 @@ import {
   setDuprRatingByCategory,
   toPublicPlayerDupr,
   getPlayerFullAge,
+  WITHDRAWN_PLAYER_DISPLAY_NAME,
+  type WithdrawalEligibility,
 } from "@pkpkdupr/shared/player";
 import type {
   DevPlayerQrTokenListResponse,
@@ -109,6 +111,15 @@ export interface PrivacyPolicyConsentStatus {
   agreedAt: Date;
 }
 
+export interface PreparedWithdrawal {
+  id: string;
+  playerId: string;
+  provider: ExternalAuthProvider | null;
+  providerSubject: string | null;
+  status: "prepared" | "unlink_failed" | "unlink_succeeded" | "completed";
+  avatarUrl: string | null;
+}
+
 /**
  * 세션 자체가 더 이상 유효하지 않은 경우에만 사용합니다. DB 연결 같은
  * 일시적인 인프라 오류와 구분해 클라이언트가 저장된 세션을 보존할 수 있게 합니다.
@@ -165,6 +176,7 @@ const hydratePlayer = (record: any): StoredPlayerRecord => {
     duprMetrics: duprState.metrics,
     duprState,
     status: record.status === "deleted" ? "inactive" : record.status,
+    withdrawnAt: record.withdrawnAt ? toDate(record.withdrawnAt) : undefined,
     createdAt: toDate(record.createdAt),
     updatedAt: toDate(record.updatedAt),
   };
@@ -353,6 +365,17 @@ const toPublicPlayer = (stored: StoredPlayerRecord): Player => {
     duprState: _duprState,
     ...player
   } = stored;
+  if (stored.withdrawnAt) {
+    return {
+      ...player,
+      username: WITHDRAWN_PLAYER_DISPLAY_NAME,
+      avatarUrl: undefined,
+      affiliations: [],
+      statusMessage: undefined,
+      statusMessageBackgroundColor: undefined,
+      age: null,
+    };
+  }
   return { ...player, age: getPlayerFullAge(birthDate) };
 };
 
@@ -1057,11 +1080,80 @@ export class AuthService {
     });
   }
 
+  async getWithdrawalEligibility(
+    playerId: string,
+  ): Promise<WithdrawalEligibility> {
+    const eligibility = await this.dbRequest<WithdrawalEligibility>(
+      `/internal/auth/withdrawal-eligibility/${encodeURIComponent(playerId)}?now=${encodeURIComponent(new Date().toISOString())}`,
+    );
+    return {
+      ...eligibility,
+      blockers: {
+        ...eligibility.blockers,
+        upcomingSessions: eligibility.blockers.upcomingSessions.map((session) => ({
+          ...session,
+          date: toDate(session.date as unknown as string),
+        })),
+      },
+    };
+  }
+
+  async prepareWithdrawal(playerId: string): Promise<PreparedWithdrawal> {
+    return await this.dbRequest<PreparedWithdrawal>(
+      "/internal/auth/withdrawals/prepare",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          id: buildId("player-withdrawal"),
+          playerId,
+          now: new Date().toISOString(),
+        }),
+      },
+    );
+  }
+
+  async markWithdrawalUnlinkResult(
+    requestId: string,
+    succeeded: boolean,
+    errorCode?: string,
+  ): Promise<void> {
+    await this.dbRequest(
+      `/internal/auth/withdrawals/${encodeURIComponent(requestId)}/unlink-status`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          succeeded,
+          errorCode,
+          now: new Date().toISOString(),
+        }),
+        retries: 2,
+      },
+    );
+  }
+
+  async completeWithdrawal(requestId: string, playerId: string): Promise<void> {
+    const passwordHash = await bcrypt.hash(
+      randomBytes(32).toString("hex"),
+      SALT_ROUNDS,
+    );
+    await this.dbRequest(
+      `/internal/auth/withdrawals/${encodeURIComponent(requestId)}/complete`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          playerId,
+          passwordHash,
+          now: new Date().toISOString(),
+        }),
+      },
+    );
+  }
+
   async registerExternalPlayer(input: {
     registrationTicketHash: string;
     username: string;
     gender: "M" | "F";
-    birthDate: string;
+    birthDate?: string;
     provider: ExternalAuthProvider;
   }): Promise<IssuedDeviceSession> {
     const username = input.username.trim();

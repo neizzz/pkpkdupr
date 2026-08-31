@@ -240,6 +240,7 @@ const userAuthProvider = resolveUserAuthProvider();
 const kakaoAuthService = isExternalUserAuthProvider(userAuthProvider)
   ? new KakaoAuthService(userAuthProvider, authService)
   : null;
+const withdrawalInProgressPlayerIds = new Set<string>();
 const matchRepository = new MatchRepository();
 const clubRepository = new ClubRepository();
 const friendRepository = new FriendRepository();
@@ -1204,9 +1205,7 @@ app.get("/auth/kakao/callback", async (req, res) => {
     const message = error instanceof Error ? error.message : "";
     const errorCode = message.includes("만 14세 이상")
       ? "kakao_age_restricted"
-      : message.includes("본인확인정보")
-        ? "kakao_verified_profile_required"
-        : "kakao_login_failed";
+      : "kakao_login_failed";
     res.redirect(
       302,
       `${(process.env.KAKAO_WEB_ORIGIN ?? webOrigin).replace(/\/+$/, "")}/login?error=${errorCode}`,
@@ -1221,8 +1220,40 @@ app.post("/api/auth/kakao/exchange", async (req, res) => {
   try {
     const ticket = typeof req.body.ticket === "string" ? req.body.ticket : "";
     const result = await kakaoAuthService.exchange(ticket);
+    if (result.status === "onboarding") {
+      return res.json(result);
+    }
     setUserSessionCookie(res, result.session);
     return res.json({ status: result.status, isFirstLogin: result.session.isFirstLogin });
+  } catch (error) {
+    res.status(400).json({ error: (error as Error).message });
+  }
+});
+
+app.post("/api/auth/kakao/onboarding", async (req, res) => {
+  if (!kakaoAuthService) {
+    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
+  }
+  if (!hasTrustedCookieOrigin(req)) {
+    return res.status(403).json({ error: "신뢰할 수 없는 Origin입니다." });
+  }
+  try {
+    const { registrationTicket, username, gender } = req.body ?? {};
+    if (
+      typeof registrationTicket !== "string" ||
+      typeof username !== "string" ||
+      !username.trim() ||
+      (gender !== "M" && gender !== "F")
+    ) {
+      return res.status(400).json({ error: "이름과 성별을 입력해주세요." });
+    }
+    const session = await kakaoAuthService.completeOnboarding({
+      registrationTicket,
+      username,
+      gender,
+    });
+    setUserSessionCookie(res, session);
+    return res.json({ status: "authenticated", isFirstLogin: session.isFirstLogin });
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });
   }
@@ -1290,6 +1321,110 @@ app.get("/api/me", async (req, res) => {
     res.status(503).json({
       error: "세션을 일시적으로 확인하지 못했습니다.",
       code: "SESSION_UNAVAILABLE",
+    });
+  }
+});
+
+app.get("/api/me/withdrawal-eligibility", async (req, res) => {
+  try {
+    const session = await getAuthSession(req, res);
+    if (!session) return;
+    if (session.payload.isAdmin || session.player.username === PROTECTED_ADMIN_USERNAME) {
+      return res.status(403).json({
+        error: "기본 관리자 계정은 탈퇴할 수 없습니다.",
+        code: "WITHDRAWAL_ADMIN_FORBIDDEN",
+      });
+    }
+    res.json(await authService.getWithdrawalEligibility(session.player.id));
+  } catch (error) {
+    console.error("[AUTH] Failed to check withdrawal eligibility", error);
+    res.status(503).json({
+      error: "탈퇴 가능 여부를 확인하지 못했습니다.",
+      code: "WITHDRAWAL_ELIGIBILITY_UNAVAILABLE",
+    });
+  }
+});
+
+app.post("/api/me/withdrawal", async (req, res) => {
+  try {
+    const session = await getAuthSession(req, res);
+    if (!session) return;
+    if (session.payload.isAdmin || session.player.username === PROTECTED_ADMIN_USERNAME) {
+      return res.status(403).json({
+        error: "기본 관리자 계정은 탈퇴할 수 없습니다.",
+        code: "WITHDRAWAL_ADMIN_FORBIDDEN",
+      });
+    }
+    if (req.body?.confirmation !== "탈퇴") {
+      return res.status(400).json({
+        error: "확인 문구로 '탈퇴'를 정확히 입력해주세요.",
+        code: "WITHDRAWAL_CONFIRMATION_INVALID",
+      });
+    }
+
+    if (withdrawalInProgressPlayerIds.has(session.player.id)) {
+      return res.status(409).json({
+        error: "회원 탈퇴를 처리하고 있습니다.",
+        code: "WITHDRAWAL_IN_PROGRESS",
+      });
+    }
+    withdrawalInProgressPlayerIds.add(session.player.id);
+    try {
+      const prepared = await authService.prepareWithdrawal(session.player.id);
+      if (prepared.status === "completed") {
+        clearUserSessionCookie(res);
+        return res.status(204).end();
+      }
+      if (prepared.status !== "unlink_succeeded") {
+        if (!prepared.provider || !prepared.providerSubject || !kakaoAuthService) {
+          await authService.markWithdrawalUnlinkResult(
+            prepared.id,
+            false,
+            "KAKAO_UNLINK_UNAVAILABLE",
+          );
+          return res.status(502).json({
+            error: "카카오 연결 해제를 준비하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            code: "KAKAO_UNLINK_FAILED",
+          });
+        }
+        try {
+          await kakaoAuthService.unlinkAccount(
+            prepared.provider,
+            prepared.providerSubject,
+          );
+        } catch {
+          await authService.markWithdrawalUnlinkResult(
+            prepared.id,
+            false,
+            "KAKAO_UNLINK_FAILED",
+          );
+          return res.status(502).json({
+            error: "카카오 연결을 해제하지 못했습니다. 잠시 후 다시 시도해주세요.",
+            code: "KAKAO_UNLINK_FAILED",
+          });
+        }
+        await authService.markWithdrawalUnlinkResult(prepared.id, true);
+      }
+
+      await removeLocalAvatarIfExists(prepared.avatarUrl);
+      await authService.completeWithdrawal(prepared.id, session.player.id);
+      clearUserSessionCookie(res);
+      return res.status(204).end();
+    } finally {
+      withdrawalInProgressPlayerIds.delete(session.player.id);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("WITHDRAWAL_BLOCKED")) {
+      return res.status(409).json({
+        error: "먼저 정리해야 하는 클럽, 경기 또는 세션이 있습니다.",
+        code: "WITHDRAWAL_BLOCKED",
+      });
+    }
+    console.error("[AUTH] Failed to withdraw account", error);
+    return res.status(503).json({
+      error: "회원 탈퇴를 완료하지 못했습니다. 잠시 후 다시 시도해주세요.",
+      code: "WITHDRAWAL_UNAVAILABLE",
     });
   }
 });
