@@ -1194,7 +1194,7 @@ test("설정 탭 운영방침 drawer와 로그아웃 확인 modal", async ({ pag
 test("회원 탈퇴 가능 상태와 차단 항목 modal", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "설정" }).click();
-  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  await page.getByRole("button", { name: "회원탈퇴" }).click();
   const eligibleModal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
   await expect(eligibleModal.getByLabel("탈퇴 확인 문구")).toBeVisible();
   await expect(
@@ -1208,7 +1208,7 @@ test("회원 탈퇴 가능 상태와 차단 항목 modal", async ({ page }) => {
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openApp(page, { withdrawalBlocked: true });
   await page.getByRole("tab", { name: "설정" }).click();
-  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  await page.getByRole("button", { name: "회원탈퇴" }).click();
   const blockedModal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
   await expect(blockedModal.getByText("소유 클럽")).toBeVisible();
   await expect(blockedModal.getByText("진행 중인 경기")).toBeVisible();
@@ -1220,7 +1220,7 @@ test("탈퇴 확인 문구가 일치할 때 한 번만 요청하고 로그인 �
   const tracker = { confirmations: [] as string[] };
   await openApp(page, { withdrawalTracker: tracker });
   await page.getByRole("tab", { name: "설정" }).click();
-  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  await page.getByRole("button", { name: "회원탈퇴" }).click();
   const modal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
   const submit = modal.getByRole("button", {
     name: "길게 눌러 회원탈퇴",
@@ -1261,7 +1261,7 @@ test("탈퇴 가능 여부 응답 전후에도 modal 위치와 크기를 유지�
   });
   await openApp(page, { withdrawalEligibilityGate });
   await page.getByRole("tab", { name: "설정" }).click();
-  await page.getByRole("button", { name: "회원 탈퇴" }).click();
+  await page.getByRole("button", { name: "회원탈퇴" }).click();
 
   const modal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
   await expect(modal.getByText("탈퇴 가능 여부를 확인하고 있습니다...")).toBeVisible();

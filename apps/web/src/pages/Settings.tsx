@@ -3,7 +3,6 @@ import { Button, useOverlayState } from "@heroui/react";
 import {
   IoChevronForward,
   IoLogOutOutline,
-  IoTrashOutline,
 } from "react-icons/io5";
 import type { WithdrawalEligibility } from "@pkpkdupr/shared/player";
 import ActionChipButton from "@/components/ActionChipButton";
@@ -255,11 +254,11 @@ const Settings: React.FC = () => {
               className="flex w-full items-center justify-between text-left text-base font-semibold text-error"
               onClick={withdrawalConfirmation.open}
             >
-              <span className="flex items-center gap-2">
-                <IoTrashOutline aria-hidden="true" className="size-5" />
-                회원 탈퇴
-              </span>
-              <IoChevronForward aria-hidden="true" className="size-5" />
+              회원탈퇴
+              <IoChevronForward
+                aria-hidden="true"
+                className="size-5 text-error/70"
+              />
             </button>
           </section>
 
@@ -305,7 +304,7 @@ const Settings: React.FC = () => {
               withdrawalText !== "탈퇴" ||
               isWithdrawing
             }
-            className={`!h-10 !w-[135px] justify-center rounded-xl px-3 py-0 text-sm bg-error font-semibold text-white disabled:opacity-40 ${
+            className={`!h-10 !w-[135px] justify-center !rounded-full px-3 py-0 text-sm bg-error font-semibold text-white disabled:opacity-40 ${
               withdrawalEligibility?.eligible ? "visible" : "invisible"
             }`}
             progressClassName="bg-white/20"
