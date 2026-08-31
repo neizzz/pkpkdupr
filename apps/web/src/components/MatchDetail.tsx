@@ -48,6 +48,8 @@ interface MatchDetailProps {
 }
 
 const subTextClassName = "text-pkpk-sub-font";
+const matchDetailSectionClassName =
+  "-mx-2 border-t-[6px] border-pkpk-section-border px-2 pt-3";
 
 const formatDateTime = (value: string) =>
   new Intl.DateTimeFormat("ko-KR", {
@@ -151,7 +153,7 @@ export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
           </div>
         </Card>
 
-        <section>
+        <section className={matchDetailSectionClassName}>
           <p
             className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
           >
@@ -173,7 +175,7 @@ export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
           </div>
         </section>
 
-        <section>
+        <section className={matchDetailSectionClassName}>
           <p
             className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
           >
@@ -191,7 +193,7 @@ export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
           </Card>
         </section>
 
-        <section>
+        <section className={matchDetailSectionClassName}>
           <div className="flex items-center justify-between gap-3">
             <p
               className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
@@ -220,7 +222,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <span className="sr-only" role="status">
       매치 상세 정보 로딩 중
     </span>
-    <section>
+    <section className={matchDetailSectionClassName}>
       <p
         className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
       >
@@ -242,7 +244,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
       </div>
     </section>
 
-    <section>
+    <section className={matchDetailSectionClassName}>
       <p
         className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
       >
@@ -260,7 +262,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
       </Card>
     </section>
 
-    <section>
+    <section className={matchDetailSectionClassName}>
       <div className="flex items-center justify-between gap-3">
         <p
           className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
@@ -603,7 +605,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                 : "flex flex-col gap-3"
             }
           >
-            <section>
+            <section className={matchDetailSectionClassName}>
             <p
               className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
             >
@@ -700,7 +702,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             ) : null}
             </section>
 
-            <section>
+            <section className={matchDetailSectionClassName}>
             <p
               className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
             >
@@ -761,7 +763,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             </Card>
             </section>
 
-            <section>
+            <section className={matchDetailSectionClassName}>
             <div className="flex items-center gap-1.5">
               <p
                 className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
