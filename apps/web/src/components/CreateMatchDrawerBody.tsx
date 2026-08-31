@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
 import ActionChipButton from "./ActionChipButton";
 import AppModal from "./AppModal";
+import DraftRestoreModal from "./DraftRestoreModal";
 import CreateMatchModeSelector from "./CreateMatchModeSelector";
 import CreateMatchQrScannerPanel from "./CreateMatchQrScannerPanel";
 import BottomSheet from "./BottomSheet";
@@ -39,8 +40,15 @@ import {
   type MatchTeams,
 } from "./CreateMatchDrawerBody.utils";
 import useCreateMatchQrScanner from "./useCreateMatchQrScanner";
+import {
+  getFormDraftKey,
+  readFormDraft,
+  removeFormDraft,
+  writeFormDraft,
+} from "@/lib/formDraft";
 
 interface CreateMatchDrawerBodyProps {
+  isOpen: boolean;
   onCreateMatch: () => void | Promise<void>;
   onCancel: () => void;
   onQrScannerOpenChange?: (isOpen: boolean) => void;
@@ -48,7 +56,31 @@ interface CreateMatchDrawerBodyProps {
   closeQrScannerRequestKey?: number;
 }
 
+type CreateMatchDraft = {
+  selectedMatchMembers: MatchMember[];
+  teams: MatchTeams;
+  matchNameMode: "auto" | "manual";
+  matchName: string;
+  location: string;
+  selectedMatchMode: MatchMode;
+};
+
+const isCreateMatchDraft = (value: unknown): value is CreateMatchDraft => {
+  if (!value || typeof value !== "object") return false;
+  const draft = value as Partial<CreateMatchDraft>;
+  return (
+    Array.isArray(draft.selectedMatchMembers) &&
+    Array.isArray(draft.teams) &&
+    draft.teams.length === 2 &&
+    (draft.matchNameMode === "auto" || draft.matchNameMode === "manual") &&
+    typeof draft.matchName === "string" &&
+    typeof draft.location === "string" &&
+    typeof draft.selectedMatchMode === "string"
+  );
+};
+
 const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
+  isOpen,
   onCreateMatch,
   onCancel,
   onQrScannerOpenChange,
@@ -70,12 +102,19 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   const [location, setLocation] = useState("");
   const [selectedMatchMode, setSelectedMatchMode] =
     useState<MatchMode>(DEFAULT_MATCH_MODE);
+  const [pendingDraft, setPendingDraft] = useState<CreateMatchDraft | null>(null);
+  const [isDraftResolved, setIsDraftResolved] = useState(false);
   const matchStartsAt = useMemo(() => computeMatchStartsAt(), []);
   const selectedMatchMembersRef = useRef<MatchMember[]>(selectedMatchMembers);
+  const didCheckDraftRef = useRef(false);
 
   const currentPlayerMember = useMemo(
     () => normalizeMatchMember(player),
     [player],
+  );
+  const draftKey = useMemo(
+    () => (player?.id ? getFormDraftKey("match-create", player.id) : null),
+    [player?.id],
   );
   const selectedMatchType = useMemo(
     () => resolveSelectedMatchType(selectedMatchMembers),
@@ -112,6 +151,9 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
   }, []);
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
     if (!currentPlayerMember) {
       return;
     }
@@ -128,7 +170,122 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
     }
 
     applyMembersState(nextMembers);
-  }, [applyMembersState, currentPlayerMember, selectedMatchMembers]);
+  }, [applyMembersState, currentPlayerMember, isOpen, selectedMatchMembers]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      didCheckDraftRef.current = false;
+      setIsDraftResolved(false);
+      setPendingDraft(null);
+      setSelectedMatchMembers([]);
+      setTeams(createEmptyTeams());
+      setSelectedSwapMemberId(null);
+      setMatchNameMode("auto");
+      setMatchName("");
+      setLocation("");
+      setSelectedMatchMode(DEFAULT_MATCH_MODE);
+      setCreateMatchError(null);
+      return;
+    }
+
+    if (didCheckDraftRef.current || !draftKey) return;
+    didCheckDraftRef.current = true;
+    const draft = readFormDraft<unknown>(draftKey);
+    if (isCreateMatchDraft(draft)) {
+      setPendingDraft(draft);
+      return;
+    }
+    setIsDraftResolved(true);
+  }, [draftKey, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !isDraftResolved || !draftKey) return;
+    const hasDraftContent =
+      selectedMatchMembers.some((member) => member.id !== currentPlayerMember?.id) ||
+      matchNameMode === "manual" ||
+      !!matchName ||
+      !!location ||
+      selectedMatchMode !== DEFAULT_MATCH_MODE;
+    if (!hasDraftContent) {
+      removeFormDraft(draftKey);
+      return;
+    }
+    writeFormDraft(draftKey, {
+      selectedMatchMembers,
+      teams,
+      matchNameMode,
+      matchName,
+      location,
+      selectedMatchMode,
+    } satisfies CreateMatchDraft);
+  }, [
+    currentPlayerMember?.id,
+    draftKey,
+    isDraftResolved,
+    isOpen,
+    location,
+    matchName,
+    matchNameMode,
+    selectedMatchMembers,
+    selectedMatchMode,
+    teams,
+  ]);
+
+  const restoreDraft = () => {
+    if (!pendingDraft) return;
+    const restoredMembers = mergeUniqueMembers(
+      pendingDraft.selectedMatchMembers
+        .map(normalizeMatchMember)
+        .filter((member): member is MatchMember => !!member),
+    ).slice(0, 4);
+    const members = currentPlayerMember
+      ? mergeUniqueMembers([
+          currentPlayerMember,
+          ...restoredMembers.filter((member) => member.id !== currentPlayerMember.id),
+        ]).slice(0, 4)
+      : restoredMembers;
+    const memberIds = new Set(members.map((member) => member.id));
+    const restoredTeams = pendingDraft.teams.map((team) =>
+      team
+        .map(normalizeMatchMember)
+        .filter((member): member is MatchMember => !!member)
+        .map((member) =>
+          member.id === currentPlayerMember?.id ? currentPlayerMember : member,
+        )
+        .filter((member) => memberIds.has(member.id)),
+    ) as MatchTeams;
+    const matchType = resolveSelectedMatchType(members);
+    const flatTeamIds = restoredTeams.flat().map((member) => member.id);
+    const hasValidTeams =
+      flatTeamIds.length === members.length &&
+      new Set(flatTeamIds).size === members.length &&
+      members.every((member) => flatTeamIds.includes(member.id)) &&
+      areTeamsValid(restoredTeams, matchType);
+
+    selectedMatchMembersRef.current = members;
+    setSelectedMatchMembers(members);
+    setTeams(hasValidTeams ? restoredTeams : buildInitialTeams(members, matchType));
+    setMatchNameMode(pendingDraft.matchNameMode);
+    setMatchName(pendingDraft.matchName);
+    setLocation(pendingDraft.location);
+    setSelectedMatchMode(pendingDraft.selectedMatchMode);
+    setPendingDraft(null);
+    setIsDraftResolved(true);
+  };
+
+  const discardDraft = () => {
+    if (draftKey) removeFormDraft(draftKey);
+    selectedMatchMembersRef.current = [];
+    setSelectedMatchMembers([]);
+    setTeams(createEmptyTeams());
+    setSelectedSwapMemberId(null);
+    setMatchNameMode("auto");
+    setMatchName("");
+    setLocation("");
+    setSelectedMatchMode(DEFAULT_MATCH_MODE);
+    setPendingDraft(null);
+    setIsDraftResolved(true);
+  };
 
   useEffect(() => {
     selectedMatchMembersRef.current = selectedMatchMembers;
@@ -295,6 +452,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         rememberRecentInputValue("web.match.name", trimmedMatchName);
       }
       rememberRecentInputValue("web.match.location", trimmedLocation);
+      if (draftKey) removeFormDraft(draftKey);
 
       await onCreateMatch();
     } catch (err) {
@@ -538,6 +696,11 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
           />
         ) : null}
       </AppModal>
+      <DraftRestoreModal
+        isOpen={pendingDraft !== null}
+        onRestore={restoreDraft}
+        onDiscard={discardDraft}
+      />
     </>
   );
 };

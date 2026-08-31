@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, useOverlayState } from "@heroui/react";
 import {
   CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH,
@@ -31,6 +31,7 @@ import PlayerQrScannerModal from "@/components/PlayerQrScannerModal";
 import ActionChipButton from "@/components/ActionChipButton";
 import AppModal from "@/components/AppModal";
 import DetailPageHeader from "@/components/DetailPageHeader";
+import DraftRestoreModal from "@/components/DraftRestoreModal";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
 import MatchCard, {
   type MatchInfo,
@@ -48,13 +49,30 @@ import { useAuth } from "@/context/AuthContext";
 import { useTabNavigation } from "@/context/TabNavigationContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { buildApiUrl } from "@/lib/api";
+import {
+  getFormDraftKey,
+  readFormDraft,
+  removeFormDraft,
+  writeFormDraft,
+} from "@/lib/formDraft";
 
 type ClubListItem = { club: Club; membership: ClubMembership };
 type ScannerTarget = "player" | null;
 type RankingCategory = "singles" | "doubles";
+type ClubDraft = { name: string; description: string };
+type AnnouncementDraft = { title: string; body: string };
+type SessionDraft = { name: string; location: string; date: string };
 
 const noop = () => {};
 const CLUB_MATCH_HISTORY_PAGE_SIZE = 20;
+
+const isTextDraft = <T extends Record<string, string>>(
+  value: unknown,
+  keys: (keyof T)[],
+): value is T =>
+  !!value &&
+  typeof value === "object" &&
+  keys.every((key) => typeof (value as T)[key] === "string");
 
 const announcementUrlPattern = /https?:\/\/[^\s<]+/g;
 const trailingUrlPunctuationPattern = /[),.!;]+$/;
@@ -135,6 +153,8 @@ const Affiliations: React.FC = () => {
   const [clubName, setClubName] = useState("");
   const [clubDescription, setClubDescription] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [pendingClubDraft, setPendingClubDraft] = useState<ClubDraft | null>(null);
+  const [isClubDraftResolved, setIsClubDraftResolved] = useState(false);
   const [scannerTarget, setScannerTarget] = useState<ScannerTarget>(null);
   const [isManagementOpen, setIsManagementOpen] = useState(false);
   const [rankingCategory, setRankingCategory] =
@@ -152,9 +172,16 @@ const Affiliations: React.FC = () => {
     useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementBody, setAnnouncementBody] = useState("");
+  const [pendingAnnouncementDraft, setPendingAnnouncementDraft] =
+    useState<AnnouncementDraft | null>(null);
+  const [isAnnouncementDraftResolved, setIsAnnouncementDraftResolved] =
+    useState(false);
   const [sessionName, setSessionName] = useState("");
   const [sessionLocation, setSessionLocation] = useState("");
   const [sessionDate, setSessionDate] = useState("");
+  const [pendingSessionDraft, setPendingSessionDraft] =
+    useState<SessionDraft | null>(null);
+  const [isSessionDraftResolved, setIsSessionDraftResolved] = useState(false);
   const [selectedSession, setSelectedSession] =
     useState<MatchSessionSummaryInfo | null>(null);
   const [selectedSessionMatches, setSelectedSessionMatches] = useState<
@@ -177,6 +204,9 @@ const Affiliations: React.FC = () => {
   const [clubMatchHistoryPage, setClubMatchHistoryPage] = useState(0);
   const [clubMatchHistoryTotal, setClubMatchHistoryTotal] = useState(0);
   const announcementDeleteConfirmation = useOverlayState();
+  const checkedClubDraftKeyRef = useRef<string | null>(null);
+  const checkedAnnouncementDraftKeyRef = useRef<string | null>(null);
+  const checkedSessionDraftKeyRef = useRef<string | null>(null);
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -281,6 +311,148 @@ const Affiliations: React.FC = () => {
     dashboard?.membership.role === "owner" ||
     dashboard?.membership.role === "manager";
   const isOwner = dashboard?.membership.role === "owner";
+  const clubDraftKey = useMemo(
+    () => (player?.id ? getFormDraftKey("club-create", player.id) : null),
+    [player?.id],
+  );
+  const announcementDraftKey = useMemo(
+    () =>
+      player?.id && selectedClubId
+        ? getFormDraftKey("club-announcement-create", player.id, selectedClubId)
+        : null,
+    [player?.id, selectedClubId],
+  );
+  const sessionDraftKey = useMemo(
+    () =>
+      player?.id && selectedClubId
+        ? getFormDraftKey("club-session-create", player.id, selectedClubId)
+        : null,
+    [player?.id, selectedClubId],
+  );
+
+  useEffect(() => {
+    if (!isCreateOpen) {
+      checkedClubDraftKeyRef.current = null;
+      setIsClubDraftResolved(false);
+      return;
+    }
+    if (!clubDraftKey || checkedClubDraftKeyRef.current === clubDraftKey) return;
+    checkedClubDraftKeyRef.current = clubDraftKey;
+    const draft = readFormDraft<unknown>(clubDraftKey);
+    if (isTextDraft<ClubDraft>(draft, ["name", "description"])) {
+      setPendingClubDraft(draft);
+      return;
+    }
+    setIsClubDraftResolved(true);
+  }, [clubDraftKey, isCreateOpen]);
+
+  useEffect(() => {
+    if (!isCreateOpen || !isClubDraftResolved || !clubDraftKey) return;
+    if (!clubName && !clubDescription) {
+      removeFormDraft(clubDraftKey);
+      return;
+    }
+    writeFormDraft(clubDraftKey, { name: clubName, description: clubDescription });
+  }, [clubDescription, clubDraftKey, clubName, isClubDraftResolved, isCreateOpen]);
+
+  useEffect(() => {
+    if (!isAnnouncementCreateOpen) {
+      checkedAnnouncementDraftKeyRef.current = null;
+      setIsAnnouncementDraftResolved(false);
+      return;
+    }
+    if (
+      !announcementDraftKey ||
+      checkedAnnouncementDraftKeyRef.current === announcementDraftKey
+    ) {
+      return;
+    }
+    checkedAnnouncementDraftKeyRef.current = announcementDraftKey;
+    const draft = readFormDraft<unknown>(announcementDraftKey);
+    if (isTextDraft<AnnouncementDraft>(draft, ["title", "body"])) {
+      setPendingAnnouncementDraft(draft);
+      return;
+    }
+    setIsAnnouncementDraftResolved(true);
+  }, [announcementDraftKey, isAnnouncementCreateOpen]);
+
+  useEffect(() => {
+    if (
+      !isAnnouncementCreateOpen ||
+      !isAnnouncementDraftResolved ||
+      !announcementDraftKey
+    ) {
+      return;
+    }
+    if (!announcementTitle && !announcementBody) {
+      removeFormDraft(announcementDraftKey);
+      return;
+    }
+    writeFormDraft(announcementDraftKey, {
+      title: announcementTitle,
+      body: announcementBody,
+    });
+  }, [
+    announcementBody,
+    announcementDraftKey,
+    announcementTitle,
+    isAnnouncementCreateOpen,
+    isAnnouncementDraftResolved,
+  ]);
+
+  useEffect(() => {
+    if (!isManagementOpen || !isManager) {
+      checkedSessionDraftKeyRef.current = null;
+      setIsSessionDraftResolved(false);
+      return;
+    }
+    if (!sessionDraftKey || checkedSessionDraftKeyRef.current === sessionDraftKey) {
+      return;
+    }
+    checkedSessionDraftKeyRef.current = sessionDraftKey;
+    const draft = readFormDraft<unknown>(sessionDraftKey);
+    if (isTextDraft<SessionDraft>(draft, ["name", "location", "date"])) {
+      setPendingSessionDraft(draft);
+      return;
+    }
+    setIsSessionDraftResolved(true);
+  }, [isManagementOpen, isManager, sessionDraftKey]);
+
+  useEffect(() => {
+    if (!isManagementOpen || !isSessionDraftResolved || !sessionDraftKey) return;
+    if (!sessionName && !sessionLocation && !sessionDate) {
+      removeFormDraft(sessionDraftKey);
+      return;
+    }
+    writeFormDraft(sessionDraftKey, {
+      name: sessionName,
+      location: sessionLocation,
+      date: sessionDate,
+    });
+  }, [
+    isManagementOpen,
+    isSessionDraftResolved,
+    sessionDate,
+    sessionDraftKey,
+    sessionLocation,
+    sessionName,
+  ]);
+
+  const closeClubCreateSheet = () => {
+    if (isCreating) return;
+    setIsCreateOpen(false);
+    setClubName("");
+    setClubDescription("");
+    setPendingClubDraft(null);
+  };
+
+  const closeManagement = () => {
+    setIsManagementOpen(false);
+    setSessionName("");
+    setSessionLocation("");
+    setSessionDate("");
+    setPendingSessionDraft(null);
+  };
 
   const createClub = async () => {
     const name = clubName.trim();
@@ -295,6 +467,7 @@ const Affiliations: React.FC = () => {
       });
       setClubName("");
       setClubDescription("");
+      if (clubDraftKey) removeFormDraft(clubDraftKey);
       setIsCreateOpen(false);
       await loadClubs(created.id);
     } catch (createError) {
@@ -346,6 +519,7 @@ const Affiliations: React.FC = () => {
     setIsAnnouncementCreateOpen(false);
     setAnnouncementTitle("");
     setAnnouncementBody("");
+    setPendingAnnouncementDraft(null);
     setAnnouncementError(null);
   };
 
@@ -386,6 +560,7 @@ const Affiliations: React.FC = () => {
         });
       });
       if (isCreated) {
+        if (announcementDraftKey) removeFormDraft(announcementDraftKey);
         closeAnnouncementCreateSheet(true);
       }
     } finally {
@@ -433,6 +608,7 @@ const Affiliations: React.FC = () => {
       setSessionName("");
       setSessionLocation("");
       setSessionDate("");
+      if (sessionDraftKey) removeFormDraft(sessionDraftKey);
     });
   };
 
@@ -992,7 +1168,9 @@ const Affiliations: React.FC = () => {
       <BottomSheet
         isOpen={isCreateOpen}
         isActive={selectedTab === "affiliations"}
-        onOpenChange={setIsCreateOpen}
+        onOpenChange={(open) =>
+          open ? setIsCreateOpen(true) : closeClubCreateSheet()
+        }
         ariaLabel="클럽 만들기"
       >
         <BottomSheet.Body>
@@ -1071,7 +1249,7 @@ const Affiliations: React.FC = () => {
           <DetailPageHeader
             title=""
             tabKey="affiliations"
-            onBack={() => setIsManagementOpen(false)}
+            onBack={closeManagement}
             rightContent={
               <div className="min-w-0 translate-y-2 text-right">
                 <p className="whitespace-nowrap text-lg font-bold text-pkpk-primary-bg">
@@ -1458,6 +1636,59 @@ const Affiliations: React.FC = () => {
           layer={70}
         />
       ) : null}
+      <DraftRestoreModal
+        isOpen={pendingClubDraft !== null}
+        onRestore={() => {
+          if (!pendingClubDraft) return;
+          setClubName(pendingClubDraft.name);
+          setClubDescription(pendingClubDraft.description);
+          setPendingClubDraft(null);
+          setIsClubDraftResolved(true);
+        }}
+        onDiscard={() => {
+          if (clubDraftKey) removeFormDraft(clubDraftKey);
+          setClubName("");
+          setClubDescription("");
+          setPendingClubDraft(null);
+          setIsClubDraftResolved(true);
+        }}
+      />
+      <DraftRestoreModal
+        isOpen={pendingAnnouncementDraft !== null}
+        onRestore={() => {
+          if (!pendingAnnouncementDraft) return;
+          setAnnouncementTitle(pendingAnnouncementDraft.title);
+          setAnnouncementBody(pendingAnnouncementDraft.body);
+          setPendingAnnouncementDraft(null);
+          setIsAnnouncementDraftResolved(true);
+        }}
+        onDiscard={() => {
+          if (announcementDraftKey) removeFormDraft(announcementDraftKey);
+          setAnnouncementTitle("");
+          setAnnouncementBody("");
+          setPendingAnnouncementDraft(null);
+          setIsAnnouncementDraftResolved(true);
+        }}
+      />
+      <DraftRestoreModal
+        isOpen={pendingSessionDraft !== null}
+        onRestore={() => {
+          if (!pendingSessionDraft) return;
+          setSessionName(pendingSessionDraft.name);
+          setSessionLocation(pendingSessionDraft.location);
+          setSessionDate(pendingSessionDraft.date);
+          setPendingSessionDraft(null);
+          setIsSessionDraftResolved(true);
+        }}
+        onDiscard={() => {
+          if (sessionDraftKey) removeFormDraft(sessionDraftKey);
+          setSessionName("");
+          setSessionLocation("");
+          setSessionDate("");
+          setPendingSessionDraft(null);
+          setIsSessionDraftResolved(true);
+        }}
+      />
     </div>
   );
 };

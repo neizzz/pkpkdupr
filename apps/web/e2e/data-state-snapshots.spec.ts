@@ -1275,3 +1275,82 @@ test("공지 추가 바텀시트와 제거 확인 modal", async ({ page }) => {
   ).toBeVisible();
   await capture(page, "club-announcement-delete-modal.png");
 });
+
+test("생성 폼 임시 저장을 복원하거나 새로 작성할 수 있다", async ({ page }) => {
+  await openApp(page);
+  await page.evaluate(() => {
+    const savedAt = Date.now();
+    const save = (key: string, value: unknown) =>
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ version: 1, savedAt, value }),
+      );
+
+    save("pkelo:form-draft:v1:match-create:player-me:global", {
+      selectedMatchMembers: [],
+      teams: [[], []],
+      matchNameMode: "manual",
+      matchName: "임시 매치",
+      location: "임시 매치 장소",
+      selectedMatchMode: "single-game",
+    });
+    save("pkelo:form-draft:v1:club-create:player-me:global", {
+      name: "임시 클럽",
+      description: "임시 클럽 소개",
+    });
+    save("pkelo:form-draft:v1:club-announcement-create:player-me:club-1", {
+      title: "임시 공지",
+      body: "임시 공지 내용",
+    });
+    save("pkelo:form-draft:v1:club-session-create:player-me:club-1", {
+      name: "임시 세션",
+      location: "임시 세션 장소",
+      date: "2026-08-30T10:00",
+    });
+  });
+
+  await page.getByRole("tab", { name: "내 매치" }).click();
+  await page.getByRole("button", { name: "+ 매치 만들기" }).click();
+  await page.getByRole("button", { name: "이어서 작성" }).click();
+  const matchSheet = page.getByRole("dialog", { name: "Create match" });
+  await expect(matchSheet.getByPlaceholder("매치 이름 입력")).toHaveValue("임시 매치");
+  await expect(matchSheet.getByPlaceholder("장소 입력")).toHaveValue("임시 매치 장소");
+  await matchSheet.getByRole("button", { name: "취소" }).click();
+
+  await page.getByRole("tab", { name: "클럽" }).click();
+  await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
+  await page.getByRole("button", { name: "이어서 작성" }).click();
+  const clubSheet = page.getByRole("dialog", { name: "클럽 만들기" });
+  await expect(clubSheet.getByPlaceholder("클럽 이름")).toHaveValue("임시 클럽");
+  await clubSheet.getByPlaceholder("클럽 이름").fill("자동 저장 클럽");
+  await expect.poll(() =>
+    page.evaluate(() =>
+      window.localStorage.getItem("pkelo:form-draft:v1:club-create:player-me:global"),
+    ),
+  ).toContain("자동 저장 클럽");
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "+ 공지 추가" }).click();
+  await page.getByRole("button", { name: "이어서 작성" }).click();
+  const announcementSheet = page.getByRole("dialog", { name: "공지 추가" });
+  await expect(announcementSheet.getByPlaceholder("공지 제목")).toHaveValue("임시 공지");
+  await announcementSheet.getByRole("button", { name: "취소" }).click();
+
+  await page.getByRole("button", { name: "운영진 관리" }).click();
+  await page.getByRole("button", { name: "이어서 작성" }).click();
+  const managementDrawer = page.getByRole("dialog", { name: "클럽 운영진 관리" });
+  await expect(managementDrawer.getByPlaceholder("세션 이름")).toHaveValue("임시 세션");
+  await expect(managementDrawer.getByPlaceholder("장소")).toHaveValue("임시 세션 장소");
+  await managementDrawer.getByRole("button", { name: "뒤로가기" }).click();
+
+  await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
+  await page.getByRole("button", { name: "새로 작성" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "클럽 만들기" }).getByPlaceholder("클럽 이름"),
+  ).toHaveValue("");
+  await expect.poll(() =>
+    page.evaluate(() =>
+      window.localStorage.getItem("pkelo:form-draft:v1:club-create:player-me:global"),
+    ),
+  ).toBeNull();
+});

@@ -1291,6 +1291,7 @@ const BottomNav: React.FC = () => {
         ariaLabel="Create match"
       >
         <CreateMatchDrawerBody
+          isOpen={isCreateMatchOpen}
           onCreateMatch={handleCreateMatch}
           onCancel={handleCancelCreateMatch}
           onQrScannerOpenChange={handleCreateMatchQrScannerOpenChange}
