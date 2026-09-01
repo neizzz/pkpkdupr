@@ -38,7 +38,7 @@ const PkeloLoginLayout: React.FC<PkeloLoginLayoutProps> = ({
         </p>
       </header>
 
-      <div className="min-h-[81px]">{children}</div>
+      <div className="min-h-[109px]">{children}</div>
     </div>
   </div>
 );

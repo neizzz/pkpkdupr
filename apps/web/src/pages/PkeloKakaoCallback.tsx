@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { Spinner } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { buildApiUrl } from "@/lib/api";
@@ -104,7 +105,16 @@ const PkeloKakaoCallback: React.FC = () => {
             </button>
           </div>
         ) : (
-          <p className="text-sm font-medium">로그인 중입니다.</p>
+          <div
+            className="flex h-[109px] items-center justify-center"
+            role="status"
+          >
+            <Spinner
+              aria-label="로그인 중"
+              color="current"
+              className="text-white"
+            />
+          </div>
         )}
       </section>
     </PkeloLoginLayout>

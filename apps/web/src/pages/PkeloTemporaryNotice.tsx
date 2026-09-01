@@ -23,8 +23,15 @@ const PkeloTemporaryNotice: React.FC<PkeloTemporaryNoticeProps> = ({
 
 export const PkeloNoticeLoading: React.FC = () => (
   <PkeloLoginLayout>
-    <div className="flex h-[81px] items-start justify-center pt-3" role="status">
-      <Spinner aria-label="안내 확인 중" color="current" className="text-white" />
+    <div
+      className="flex h-[109px] items-center justify-center"
+      role="status"
+    >
+      <Spinner
+        aria-label="안내 확인 중"
+        color="current"
+        className="text-white"
+      />
     </div>
   </PkeloLoginLayout>
 );

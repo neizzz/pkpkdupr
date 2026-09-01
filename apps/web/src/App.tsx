@@ -14,6 +14,7 @@ import Login from "./pages/Login";
 import PkeloKakaoCallback from "./pages/PkeloKakaoCallback";
 import PkeloKakaoOnboarding from "./pages/PkeloKakaoOnboarding";
 import PkeloLogin from "./pages/PkeloLogin";
+import { PkeloNoticeLoading } from "./pages/PkeloTemporaryNotice";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const isPkeloAppHost = () => {
@@ -91,6 +92,10 @@ function AppRoutes() {
   }
 
   if (isLoading) {
+    if (isPkeloAppHost()) {
+      return <PkeloNoticeLoading />;
+    }
+
     return (
       <div className="flex h-full w-full items-center justify-center overflow-hidden">
         <Spinner

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   Alert,
   CloseButton,
+  Spinner,
   TooltipArrow,
   TooltipContent,
   TooltipRoot,
@@ -95,7 +96,18 @@ const PkeloLogin: React.FC = () => {
         aria-label="카카오 로그인"
         className="mx-auto block h-[45px] w-[183px] rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FEE500] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <img src="/login-button_kakao.png" alt="" className="h-full w-full" />
+        {isStarting ? (
+          <span className="flex h-full w-full items-center justify-center rounded-xl bg-[#FEE500]">
+            <Spinner
+              aria-label="카카오 로그인 준비 중"
+              className="text-[#191919]"
+              color="current"
+              size="sm"
+            />
+          </span>
+        ) : (
+          <img src="/login-button_kakao.png" alt="" className="h-full w-full" />
+        )}
       </button>
       <div className="mx-auto mt-8 flex w-[183px] items-center gap-2 text-base font-semibold text-white">
         <label className="flex cursor-pointer items-center gap-3">
