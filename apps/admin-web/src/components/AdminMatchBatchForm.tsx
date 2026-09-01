@@ -24,6 +24,7 @@ export interface AdminBatchMatchRequest {
     { name: string; playerIds: string[] },
   ];
   location: string;
+  courtName?: string;
   matchStartsAt: string;
   scores: MatchScore[];
 }
@@ -62,6 +63,7 @@ type MatchDraft = {
   name: string;
   type: MatchType;
   location: string;
+  courtName: string;
   matchStartsAt: string;
   teams: [string[], string[]];
   scores: ScoreRowDraft[];
@@ -74,6 +76,7 @@ type ImportedPreviewRow = {
   matchNumber: string;
   dateLabel: string;
   timeLabel: string;
+  courtName: string;
   usernames: [string, string, string, string];
   inferredType: MatchType | null;
   scoreLabel: string;
@@ -92,6 +95,7 @@ const IMPORT_DEFAULT_LOCATION = "Imported Sheet Match";
 const recentInputFieldKeys = {
   matchName: "admin.match.name",
   matchLocation: "admin.match.location",
+  matchCourtName: "admin.match.courtName",
   sessionName: "admin.session.name",
   sessionLocation: "admin.session.location",
 } as const;
@@ -105,7 +109,7 @@ const REQUIRED_IMPORT_HEADERS = [
   "A팀 점수",
   "B팀 점수",
 ] as const;
-const OPTIONAL_IMPORT_HEADERS = ["시간"] as const;
+const OPTIONAL_IMPORT_HEADERS = ["시간", "코트명"] as const;
 type ImportHeader =
   | (typeof REQUIRED_IMPORT_HEADERS)[number]
   | (typeof OPTIONAL_IMPORT_HEADERS)[number];
@@ -177,6 +181,7 @@ const createEmptyDraft = (): MatchDraft => ({
   name: "",
   type: "singles",
   location: "",
+  courtName: "",
   matchStartsAt: toLocalDateTimeValue(),
   teams: createEmptyTeams("singles"),
   scores: [createEmptyScoreRow()],
@@ -313,6 +318,7 @@ const buildImportedPreview = (
     const matchNumber = getCell(columns, "경기번호");
     const dateLabel = getCell(columns, "날짜");
     const timeLabel = getCell(columns, "시간");
+    const courtName = getCell(columns, "코트명");
     const usernames = [
       normalizeImportedUsername(getCell(columns, "A팀 선수1")),
       normalizeImportedUsername(getCell(columns, "A팀 선수2")),
@@ -435,6 +441,7 @@ const buildImportedPreview = (
               { name: string; playerIds: string[] },
             ],
             location: IMPORT_DEFAULT_LOCATION,
+            courtName: normalizeOptionalText(courtName),
             matchStartsAt,
             scores: [{ scoreA, scoreB }],
           }
@@ -445,6 +452,7 @@ const buildImportedPreview = (
       matchNumber,
       dateLabel,
       timeLabel,
+      courtName,
       usernames,
       inferredType,
       scoreLabel: `${Number.isFinite(scoreA) ? scoreA : "-"}:${Number.isFinite(scoreB) ? scoreB : "-"}`,
@@ -710,6 +718,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
             { name: string; playerIds: string[] },
           ],
           location: draft.location.trim(),
+          courtName: normalizeOptionalText(draft.courtName),
           matchStartsAt: matchStartsAtDate.toISOString(),
           scores,
         };
@@ -734,6 +743,10 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
         rememberRecentInputValue(
           recentInputFieldKeys.matchLocation,
           match.location,
+        );
+        rememberRecentInputValue(
+          recentInputFieldKeys.matchCourtName,
+          match.courtName ?? "",
         );
       });
     } catch (submitError) {
@@ -956,7 +969,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-5">
+                <div className="grid gap-4 md:grid-cols-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       매치 이름
@@ -1033,6 +1046,24 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                         }))
                       }
                       placeholder="Court TBD"
+                      className="w-full"
+                      inputClassName="w-full rounded-lg border bg-white px-4 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      코트명
+                    </label>
+                    <RecentValueComboBox
+                      fieldKey={recentInputFieldKeys.matchCourtName}
+                      value={draft.courtName}
+                      onChange={(nextValue) =>
+                        updateDraft(draft.id, (currentDraft) => ({
+                          ...currentDraft,
+                          courtName: nextValue,
+                        }))
+                      }
+                      placeholder="코트 1"
                       className="w-full"
                       inputClassName="w-full rounded-lg border bg-white px-4 py-2"
                     />
@@ -1239,7 +1270,7 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
               필수 헤더: {REQUIRED_IMPORT_HEADERS.join(" / ")}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              선택 헤더: 시간 (HH:mm, 없으면 12:00)
+              선택 헤더: 시간 (HH:mm, 없으면 12:00) / 코트명
             </p>
           </div>
 
@@ -1280,13 +1311,14 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
 
               {importedPreview.rows.length > 0 ? (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[880px] text-sm">
+                  <table className="w-full min-w-[960px] text-sm">
                     <thead className="bg-slate-100">
                       <tr className="text-left text-slate-600">
                         <th className="pb-2 pr-3">행</th>
                         <th className="pb-2 pr-3">경기번호</th>
                         <th className="pb-2 pr-3">날짜</th>
                         <th className="pb-2 pr-3">시간</th>
+                        <th className="pb-2 pr-3">코트명</th>
                         <th className="pb-2 pr-3">참가자</th>
                         <th className="pb-2 pr-3">종목</th>
                         <th className="pb-2 pr-3">점수</th>
@@ -1308,6 +1340,9 @@ const AdminMatchBatchForm: React.FC<AdminMatchBatchFormProps> = ({
                           <td className="py-3 pr-3">{row.dateLabel || "-"}</td>
                           <td className="py-3 pr-3">
                             {row.timeLabel || "12:00"}
+                          </td>
+                          <td className="py-3 pr-3">
+                            {row.courtName || "-"}
                           </td>
                           <td className="py-3 pr-3">
                             <div className="space-y-1">
