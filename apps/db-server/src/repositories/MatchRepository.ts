@@ -702,7 +702,7 @@ export class MatchRepository {
       ) {
         throw new Error("완료 경기만 일괄 생성할 수 있습니다.");
       }
-      if (!match.courtName?.trim()) {
+      if (!options.allowCompleted && !match.courtName?.trim()) {
         throw new Error("코트명이 필요합니다.");
       }
       if (Number.isNaN(new Date(match.matchStartsAt).getTime())) {
@@ -757,7 +757,7 @@ export class MatchRepository {
         if (Number.isNaN(sessionDate.getTime())) {
           throw new Error("유효한 세션 정보가 필요합니다.");
         }
-        if (!courtName) {
+        if (!options.allowCompleted && !courtName) {
           throw new Error("코트명이 필요합니다.");
         }
 
@@ -797,7 +797,7 @@ export class MatchRepository {
             toUnixTimestampSeconds(sessionDate),
             match.status,
             match.location,
-            courtName,
+            courtName || null,
             toUnixTimestampSeconds(matchStartsAt),
             match.completedAt
               ? toUnixTimestampSeconds(new Date(match.completedAt))
