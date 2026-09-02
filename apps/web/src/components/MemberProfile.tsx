@@ -600,7 +600,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
 
           <div className="rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
             <h3
-              className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold text-pkpk-secondary-font ${
+              className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold leading-[1.15] text-pkpk-secondary-font ${
                 showDetailHeader ? "pl-2" : ""
               }`}
             >
@@ -612,7 +612,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
               onSelectionChange={(key) =>
                 handleCardClick(String(key) as MatchTopLevelType)
               }
-              className="mt-1.5"
+              className="mt-2.5"
             >
               <Tabs.List
                 aria-label="Rating type"
@@ -624,7 +624,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                     <Tabs.Tab
                       key={item.type}
                       id={item.type}
-                      className={`relative !h-auto !min-w-0 !w-full !justify-start !rounded-lg px-3 py-3 !text-left transition-colors ${
+                      className={`relative !h-auto !min-w-0 !w-full !justify-start !rounded-lg px-3 pt-4 pb-2 !text-left transition-colors ${
                         expandedType === item.type
                           ? ""
                           : "bg-transparent opacity-80"
@@ -647,7 +647,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </Tabs>
 
             {isProfileStatsLoading ? (
-              <div className="mt-3 space-y-0">
+              <div className="mt-2 space-y-0">
                 <div className="grid grid-cols-2 gap-3 px-4">
                   {Array.from({ length: 2 }, (_, index) => (
                     <SkeletonBlock key={index} className="h-5 rounded" />
@@ -658,7 +658,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                 </div>
               </div>
             ) : expandedItem ? (
-              <div className="mt-3 space-y-0">
+              <div className="mt-2 space-y-0">
                 <div className="grid grid-cols-2 gap-3">
                   <RatingExtremumRow
                     label="최고 평점"
