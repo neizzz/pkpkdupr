@@ -13,6 +13,8 @@ interface RecentValueComboBoxProps {
   required?: boolean;
   disabled?: boolean;
   onFocus?: () => void;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
 }
 
 const RecentValueComboBox: React.FC<RecentValueComboBoxProps> = ({
@@ -26,6 +28,8 @@ const RecentValueComboBox: React.FC<RecentValueComboBoxProps> = ({
   required = false,
   disabled = false,
   onFocus,
+  ariaLabel,
+  ariaLabelledBy,
 }) => {
   const [recentValues, setRecentValues] = useState(() =>
     readRecentInputValues(fieldKey),
@@ -50,6 +54,8 @@ const RecentValueComboBox: React.FC<RecentValueComboBoxProps> = ({
 
   return (
     <ComboBox
+      aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       allowsCustomValue
       inputValue={value}
       isDisabled={disabled}

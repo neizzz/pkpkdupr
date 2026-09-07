@@ -545,7 +545,12 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
         </BottomSheetSection>
 
         <BottomSheetSection>
-              <p className="bs-text-title text-pkpk-sub-font">매치 이름</p>
+              <p
+                id="create-match-name-label"
+                className="bs-text-title text-pkpk-sub-font"
+              >
+                매치 이름
+              </p>
               <div
                 role="radiogroup"
                 aria-label="매치 이름 입력 방식"
@@ -609,6 +614,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                       setCreateMatchError(null);
                     }}
                     placeholder="매치 이름 입력"
+                    ariaLabelledBy="create-match-name-label"
                     className="min-w-0 flex-1"
                     inputClassName="app-mobile-input min-w-0 flex-1 rounded-2xl border border-border px-4 py-2 text-base text-pkpk-sub-font outline-none"
                   />
@@ -618,6 +624,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
 
         <BottomSheetSection>
               <label
+                id="create-match-location-label"
                 htmlFor="create-match-location"
                 className="bs-text-title text-pkpk-sub-font"
               >
@@ -633,6 +640,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 }}
                 required
                 placeholder="장소 입력"
+                ariaLabelledBy="create-match-location-label"
                 className="w-full"
                 inputClassName="app-mobile-input w-full rounded-2xl border border-border bg-white px-4 py-2 text-base text-pkpk-sub-font outline-none"
               />
