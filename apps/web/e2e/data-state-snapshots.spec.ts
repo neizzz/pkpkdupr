@@ -925,6 +925,27 @@ test("좁은 플레이어 헤더에서는 친구 추가 문구를 숨긴다", as
   await expect(
     addFriendButton.getByText("친구 추가", { exact: true }),
   ).toBeHidden();
+  const myProfileButton = page.getByRole("button", { name: "내 프로필" });
+  await expect(myProfileButton).toBeVisible();
+  await page.getByRole("heading", { name: "Players" }).evaluate((heading) => {
+    heading.style.minWidth = "16rem";
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("resize")));
+  await expect(
+    myProfileButton.locator(".members-my-profile-visible-label"),
+  ).toHaveCount(0);
+  const myProfileButtonMetrics = await myProfileButton.evaluate((button) => {
+    const row = button.parentElement?.parentElement;
+    const buttonRect = button.getBoundingClientRect();
+    const rowRect = row?.getBoundingClientRect();
+    return {
+      buttonRight: buttonRect.right,
+      rightLimit: (rowRect?.right ?? window.innerWidth) - 16,
+    };
+  });
+  expect(myProfileButtonMetrics.buttonRight).toBeLessThanOrEqual(
+    myProfileButtonMetrics.rightLimit,
+  );
 });
 
 test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", async ({ page }) => {
@@ -1189,7 +1210,16 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   await capture(page, "club-management--with-data.png");
   await page.getByRole("button", { name: "뒤로가기" }).click();
   await page.getByRole("button", { name: "한강 피클볼의 매치 전체 보기" }).click();
-  await expect(page.getByRole("dialog", { name: "한강 피클볼의 매치 전체" })).toBeVisible();
+  const clubMatchHistoryDrawer = page.getByRole("dialog", {
+    name: "한강 피클볼의 매치 전체",
+  });
+  await expect(clubMatchHistoryDrawer).toBeVisible();
+  await expect(
+    clubMatchHistoryDrawer.getByText("매치 전체", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    clubMatchHistoryDrawer.getByText("한강 피클볼", { exact: true }).first(),
+  ).toBeVisible();
   await capture(page, "club-match-history--with-data.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -1308,7 +1338,22 @@ test("클럽 운영진 관리 drawer를 닫은 뒤 다시 열 수 있다", async
   await expect(clubManagementDrawerElement).toHaveCount(1);
   await expect(
     clubManagementDrawer.getByRole("heading", { name: "세션 만들기" }),
+  ).toHaveCount(0);
+  await expect(
+    clubManagementDrawer.getByRole("img", { name: "박지우" }),
   ).toBeVisible();
+
+  const releaseManagerButton = clubManagementDrawer.getByRole("button", {
+    name: "운영진 해제",
+  });
+  const assignManagerButton = clubManagementDrawer.getByRole("button", {
+    name: "운영진 지정",
+  });
+  await expect(releaseManagerButton).toBeVisible();
+  await expect(assignManagerButton).toBeVisible();
+  await expect(releaseManagerButton).toHaveClass(/!text-orange-600/);
+  await expect(assignManagerButton).toHaveClass(/!text-white/);
+  await expect(assignManagerButton).toHaveClass(/!bg-pkpk-primary-bg/);
 });
 
 test("클럽 운영과 전체 매치의 empty 내부 상태", async ({ page }) => {

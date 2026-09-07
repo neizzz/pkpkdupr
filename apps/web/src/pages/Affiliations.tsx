@@ -30,6 +30,7 @@ import BottomSheet from "@/components/BottomSheet";
 import PlayerQrScannerModal from "@/components/PlayerQrScannerModal";
 import ActionChipButton from "@/components/ActionChipButton";
 import AppModal from "@/components/AppModal";
+import Avatar from "@/components/Avatar";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import DraftRestoreModal from "@/components/DraftRestoreModal";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
@@ -62,7 +63,6 @@ type ScannerTarget = "player" | null;
 type RankingCategory = "singles" | "doubles";
 type ClubDraft = { name: string; description: string };
 type AnnouncementDraft = { title: string; body: string };
-type SessionDraft = { name: string; location: string; date: string };
 
 const noop = () => {};
 const CLUB_MATCH_HISTORY_PAGE_SIZE = 20;
@@ -177,12 +177,6 @@ const Affiliations: React.FC = () => {
     useState<AnnouncementDraft | null>(null);
   const [isAnnouncementDraftResolved, setIsAnnouncementDraftResolved] =
     useState(false);
-  const [sessionName, setSessionName] = useState("");
-  const [sessionLocation, setSessionLocation] = useState("");
-  const [sessionDate, setSessionDate] = useState("");
-  const [pendingSessionDraft, setPendingSessionDraft] =
-    useState<SessionDraft | null>(null);
-  const [isSessionDraftResolved, setIsSessionDraftResolved] = useState(false);
   const [selectedSession, setSelectedSession] =
     useState<MatchSessionSummaryInfo | null>(null);
   const [selectedSessionMatches, setSelectedSessionMatches] = useState<
@@ -207,7 +201,6 @@ const Affiliations: React.FC = () => {
   const announcementDeleteConfirmation = useOverlayState();
   const checkedClubDraftKeyRef = useRef<string | null>(null);
   const checkedAnnouncementDraftKeyRef = useRef<string | null>(null);
-  const checkedSessionDraftKeyRef = useRef<string | null>(null);
 
   const request = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
@@ -323,13 +316,6 @@ const Affiliations: React.FC = () => {
         : null,
     [player?.id, selectedClubId],
   );
-  const sessionDraftKey = useMemo(
-    () =>
-      player?.id && selectedClubId
-        ? getFormDraftKey("club-session-create", player.id, selectedClubId)
-        : null,
-    [player?.id, selectedClubId],
-  );
 
   useEffect(() => {
     if (!isCreateOpen) {
@@ -401,44 +387,6 @@ const Affiliations: React.FC = () => {
     isAnnouncementDraftResolved,
   ]);
 
-  useEffect(() => {
-    if (!isManagementOpen || !isManager) {
-      checkedSessionDraftKeyRef.current = null;
-      setIsSessionDraftResolved(false);
-      return;
-    }
-    if (!sessionDraftKey || checkedSessionDraftKeyRef.current === sessionDraftKey) {
-      return;
-    }
-    checkedSessionDraftKeyRef.current = sessionDraftKey;
-    const draft = readFormDraft<unknown>(sessionDraftKey);
-    if (isTextDraft<SessionDraft>(draft, ["name", "location", "date"])) {
-      setPendingSessionDraft(draft);
-      return;
-    }
-    setIsSessionDraftResolved(true);
-  }, [isManagementOpen, isManager, sessionDraftKey]);
-
-  useEffect(() => {
-    if (!isManagementOpen || !isSessionDraftResolved || !sessionDraftKey) return;
-    if (!sessionName && !sessionLocation && !sessionDate) {
-      removeFormDraft(sessionDraftKey);
-      return;
-    }
-    writeFormDraft(sessionDraftKey, {
-      name: sessionName,
-      location: sessionLocation,
-      date: sessionDate,
-    });
-  }, [
-    isManagementOpen,
-    isSessionDraftResolved,
-    sessionDate,
-    sessionDraftKey,
-    sessionLocation,
-    sessionName,
-  ]);
-
   const closeClubCreateSheet = () => {
     if (isCreating) return;
     setIsCreateOpen(false);
@@ -449,10 +397,6 @@ const Affiliations: React.FC = () => {
 
   const closeManagement = () => {
     setIsManagementOpen(false);
-    setSessionName("");
-    setSessionLocation("");
-    setSessionDate("");
-    setPendingSessionDraft(null);
   };
 
   const createClub = async () => {
@@ -591,26 +535,6 @@ const Affiliations: React.FC = () => {
     } finally {
       setIsDeletingAnnouncement(false);
     }
-  };
-
-  const createSession = async () => {
-    if (!selectedClubId || !sessionName.trim() || !sessionLocation.trim() || !sessionDate) {
-      return;
-    }
-    await runManagementAction(async () => {
-      await request(`/api/clubs/${encodeURIComponent(selectedClubId)}/sessions`, {
-        method: "POST",
-        body: JSON.stringify({
-          name: sessionName,
-          location: sessionLocation,
-          date: new Date(sessionDate).toISOString(),
-        }),
-      });
-      setSessionName("");
-      setSessionLocation("");
-      setSessionDate("");
-      if (sessionDraftKey) removeFormDraft(sessionDraftKey);
-    });
   };
 
   const selectClub = (clubId: string) => {
@@ -1231,7 +1155,7 @@ const Affiliations: React.FC = () => {
                 )
               }
               placeholder="클럽을 소개해 주세요"
-              className="club-description-input min-h-24 w-full resize-none rounded-2xl border border-border bg-white px-4 py-3 text-sm text-pkpk-main-font outline-none focus:border-pkpk-primary-bg"
+              className="club-description-input min-h-48 w-full resize-none rounded-2xl border border-border bg-white px-4 py-3 text-sm text-pkpk-main-font outline-none focus:border-pkpk-primary-bg"
             />
           </div>
           <BottomSheet.Actions>
@@ -1293,26 +1217,16 @@ const Affiliations: React.FC = () => {
             {dashboard ? (
               <div className="divide-y-[6px] divide-pkpk-section-border">
               <section className="space-y-3 px-4 py-4">
-                <SectionTitle icon={<IoCalendarOutline className="size-5" />} title="세션 만들기" />
-                <div className="space-y-2 rounded-2xl border border-border bg-white p-3">
-                  <input value={sessionName} onChange={(event) => setSessionName(event.target.value)} placeholder="세션 이름" className="app-mobile-input w-full rounded-xl border border-border px-3 outline-none focus:border-pkpk-primary-bg" />
-                  <input value={sessionLocation} onChange={(event) => setSessionLocation(event.target.value)} placeholder="장소" className="app-mobile-input w-full rounded-xl border border-border px-3 outline-none focus:border-pkpk-primary-bg" />
-                  <input value={sessionDate} type="datetime-local" onChange={(event) => setSessionDate(event.target.value)} className="app-mobile-input w-full rounded-xl border border-border px-3 outline-none focus:border-pkpk-primary-bg" />
-                  <Button className="w-full rounded-xl bg-pkpk-primary-bg font-semibold text-white" isDisabled={!sessionName.trim() || !sessionLocation.trim() || !sessionDate} onPress={() => void createSession()}>
-                    세션 만들기
-                  </Button>
-                </div>
-              </section>
-
-              <section className="space-y-3 px-4 py-4">
                 <SectionTitle icon={<IoPeopleOutline className="size-5" />} title="멤버 및 권한" />
                 <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-white">
                   {dashboard.members.map((member) => (
                     <div key={member.id} className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <span className="flex size-9 items-center justify-center rounded-full bg-pkpk-session-bg text-sm font-bold text-pkpk-primary-bg">
-                          {member.username.slice(0, 1)}
-                        </span>
+                        <Avatar
+                          size="session"
+                          avatarUrl={member.avatarUrl}
+                          name={member.username}
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-pkpk-main-font">{member.username}</p>
                           <p className="text-xs text-pkpk-sub-font">{member.role === "owner" ? "클럽장" : member.role === "manager" ? "운영진" : "멤버"}</p>
@@ -1323,7 +1237,11 @@ const Affiliations: React.FC = () => {
                           {member.role !== "owner" ? (
                             <Button
                               variant="secondary"
-                              className="rounded-xl text-xs font-semibold text-pkpk-primary-bg"
+                              className={`rounded-xl text-xs font-semibold ${
+                                member.role === "manager"
+                                  ? "!bg-orange-50 !text-orange-600 hover:!bg-orange-100"
+                                  : "!bg-pkpk-primary-bg !text-white hover:!bg-pkpk-primary-hover"
+                              }`}
                               onPress={() =>
                                 void runManagementAction(() =>
                                   request(
@@ -1408,7 +1326,7 @@ const Affiliations: React.FC = () => {
               )
             }
             placeholder="공지 내용"
-            className="min-h-32 w-full resize-none rounded-2xl border border-border p-4 text-sm outline-none focus:border-pkpk-primary-bg"
+            className="min-h-64 w-full resize-none rounded-2xl border border-border p-4 text-sm outline-none focus:border-pkpk-primary-bg"
           />
           <p className="text-right text-xs text-pkpk-sub-font">
             {getUnicodeCodePointLength(announcementBody)}/
@@ -1486,13 +1404,18 @@ const Affiliations: React.FC = () => {
         >
           <div className="min-h-full bg-white">
             <DetailPageHeader
-              title={`${clubMatchHistoryClub.name}의 매치 전체`}
+              title="매치 전체"
               tabKey="affiliations"
               backgroundClassName="bg-white"
               rightContent={
-                <p className="truncate text-lg font-bold text-pkpk-primary-bg">
-                  {clubMatchHistoryClub.name}의 매치 전체
-                </p>
+                <div className="min-w-0 translate-y-2 text-right">
+                  <p className="whitespace-nowrap text-lg font-bold text-pkpk-primary-bg">
+                    매치 전체
+                  </p>
+                  <p className="truncate text-xs text-pkpk-sub-font">
+                    {clubMatchHistoryClub.name}
+                  </p>
+                </div>
               }
             />
             <div className="space-y-3 p-3">
@@ -1691,25 +1614,6 @@ const Affiliations: React.FC = () => {
           setAnnouncementBody("");
           setPendingAnnouncementDraft(null);
           setIsAnnouncementDraftResolved(true);
-        }}
-      />
-      <DraftRestoreModal
-        isOpen={pendingSessionDraft !== null}
-        onRestore={() => {
-          if (!pendingSessionDraft) return;
-          setSessionName(pendingSessionDraft.name);
-          setSessionLocation(pendingSessionDraft.location);
-          setSessionDate(pendingSessionDraft.date);
-          setPendingSessionDraft(null);
-          setIsSessionDraftResolved(true);
-        }}
-        onDiscard={() => {
-          if (sessionDraftKey) removeFormDraft(sessionDraftKey);
-          setSessionName("");
-          setSessionLocation("");
-          setSessionDate("");
-          setPendingSessionDraft(null);
-          setIsSessionDraftResolved(true);
         }}
       />
     </div>

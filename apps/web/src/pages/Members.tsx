@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -20,7 +21,6 @@ import MemberProfile from "@/components/MemberProfile";
 import PlayerProfileMeta from "@/components/PlayerProfileMeta";
 import ProfileMatchDetailDrawer from "@/components/ProfileMatchDetailDrawer";
 import ProfileMatchHistoryDrawer from "@/components/ProfileMatchHistoryDrawer";
-import ProfileIdentityLabel from "@/components/ProfileIdentityLabel";
 import PlayerQrScannerModal from "@/components/PlayerQrScannerModal";
 import RightDrawer from "@/components/RightDrawer";
 import SkeletonBlock from "@/components/SkeletonBlock";
@@ -174,6 +174,7 @@ const Members: React.FC = () => {
   const [headerElement, setHeaderElement] = useState<HTMLDivElement | null>(
     null,
   );
+  const [isMyProfileLabelHidden, setIsMyProfileLabelHidden] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -211,6 +212,9 @@ const Members: React.FC = () => {
   const wasTabActiveRef = useRef(false);
   const selectedMemberProfileRequestIdRef = useRef(0);
   const selectedMemberMatchHistoryRequestIdRef = useRef(0);
+  const memberHeaderActionsRef = useRef<HTMLDivElement | null>(null);
+  const myProfileLabelMeasureRef = useRef<HTMLSpanElement | null>(null);
+  const isMyProfileLabelHiddenRef = useRef(false);
   const memberFilters = useMemo<MemberFilter[]>(() => {
     return [
       { id: FRIENDS_MEMBER_FILTER_ID, label: "친구" },
@@ -231,6 +235,70 @@ const Members: React.FC = () => {
       ? selectedMemberFilter.clubId
       : null;
   const previousSelectedClubIdRef = useRef<string | null>(selectedClubId);
+
+  useLayoutEffect(() => {
+    if (!headerElement) return;
+
+    let animationFrameId: number | null = null;
+
+    const updateMyProfileLabelVisibility = () => {
+      const actions = memberHeaderActionsRef.current;
+      const labelMeasure = myProfileLabelMeasureRef.current;
+      const headerRow = actions?.parentElement;
+      if (!actions || !labelMeasure || !headerRow) return;
+
+      const rowRect = headerRow.getBoundingClientRect();
+      const actionsRect = actions.getBoundingClientRect();
+      const titleRect = headerRow
+        .querySelector("h2")
+        ?.getBoundingClientRect();
+      const labelWidth = labelMeasure.getBoundingClientRect().width;
+      const labelGap = 4;
+      const rightPadding = 16;
+      const titleGap = 8;
+      const rightLimit = rowRect.right - rightPadding;
+      const leftLimit = titleRect ? titleRect.right + titleGap : rowRect.left;
+      const fullActionsWidth =
+        actionsRect.width +
+        (isMyProfileLabelHiddenRef.current ? labelWidth + labelGap : 0);
+      const shouldHideLabel =
+        actionsRect.left + fullActionsWidth > rightLimit ||
+        fullActionsWidth > rightLimit - leftLimit;
+
+      if (isMyProfileLabelHiddenRef.current !== shouldHideLabel) {
+        isMyProfileLabelHiddenRef.current = shouldHideLabel;
+        setIsMyProfileLabelHidden(shouldHideLabel);
+      }
+    };
+
+    const scheduleUpdate = () => {
+      if (animationFrameId !== null) return;
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = null;
+        updateMyProfileLabelVisibility();
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(headerElement);
+    if (memberHeaderActionsRef.current) {
+      resizeObserver.observe(memberHeaderActionsRef.current);
+    }
+    if (myProfileLabelMeasureRef.current) {
+      resizeObserver.observe(myProfileLabelMeasureRef.current);
+    }
+    window.addEventListener("resize", scheduleUpdate);
+    scheduleUpdate();
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", scheduleUpdate);
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    };
+  }, [headerElement]);
 
   const loadMemberClubs = useCallback(async (throwOnError = false) => {
     if (!token) {
@@ -788,7 +856,10 @@ const Members: React.FC = () => {
             />
           }
         >
-          <div className="flex items-center gap-1.5">
+          <div
+            ref={memberHeaderActionsRef}
+            className="absolute right-4 top-6 flex min-w-0 -translate-y-1/2 items-center gap-1.5"
+          >
             <button
               type="button"
               aria-label="친구 추가"
@@ -804,16 +875,30 @@ const Members: React.FC = () => {
             </button>
             <button
               type="button"
-              className="app-pill rounded-full text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font"
+              aria-label="내 프로필"
+              className="app-pill relative inline-flex h-9 max-w-full shrink-0 items-center gap-1 rounded-full pl-1 pr-2 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font"
               onClick={openMyProfile}
             >
-              <ProfileIdentityLabel
+              <Avatar
+                size="xs"
                 avatarUrl={player?.avatarUrl}
                 name={player?.username}
-                label="내 프로필"
-                showChevron
-                chevronClassName="text-pkpk-primary-font/70"
-                className="pl-1 pr-0"
+              />
+              <span
+                ref={myProfileLabelMeasureRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute -z-10 whitespace-nowrap opacity-0"
+              >
+                내 프로필
+              </span>
+              {isMyProfileLabelHidden ? null : (
+                <span className="members-my-profile-visible-label min-w-0 truncate">
+                  내 프로필
+                </span>
+              )}
+              <IoChevronForward
+                aria-hidden="true"
+                className="size-4 shrink-0 text-pkpk-primary-font/70"
               />
             </button>
           </div>
