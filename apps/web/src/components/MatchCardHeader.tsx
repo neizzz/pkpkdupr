@@ -30,13 +30,13 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
 }) => (
   <div className="min-w-0">
     <div className="flex min-h-6 items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold tabular-nums text-pkpk-sub-font">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1 text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.8vw*var(--app-font-scale)),calc(0.75rem*var(--app-font-scale)))] font-semibold tabular-nums text-pkpk-sub-font">
         <IoCalendarClearOutline className="size-3.5 shrink-0 [&_*]:stroke-[40]" />
-        <span className="relative top-px">{date}</span>
-        <span className="-mx-0.5 text-[0.75rem] font-semibold leading-none text-pkpk-sub-font/50">
+        <span className="relative top-px shrink-0 whitespace-nowrap">{date}</span>
+        <span className="-mx-0.5 text-[calc(0.75rem*var(--app-font-scale))] font-semibold leading-none text-pkpk-sub-font/50">
           ·
         </span>
-        <span className="relative top-px">{time}</span>
+        <span className="relative top-px shrink-0 whitespace-nowrap">{time}</span>
         {afterTime ? afterTime : null}
       </div>
       {(rightContent || showChevron) && (
@@ -51,7 +51,7 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
       )}
     </div>
     {location || courtName ? (
-      <div className="mt-0 flex min-w-0 items-center gap-1 text-[clamp(0.625rem,2.8vw,0.75rem)] font-medium tabular-nums text-pkpk-sub-font">
+      <div className="mt-0 flex min-w-0 items-center gap-1 text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.8vw*var(--app-font-scale)),calc(0.75rem*var(--app-font-scale)))] font-medium tabular-nums text-pkpk-sub-font">
         <IoLocationOutline
           aria-hidden="true"
           className="size-3.5 shrink-0 [&_*]:stroke-[40]"
@@ -66,7 +66,7 @@ const MatchCardHeader: React.FC<MatchCardHeaderProps> = ({
       </div>
     ) : null}
     {title ? (
-      <p className="mt-1 truncate text-[clamp(1.3rem,5.75vw,1.4rem)] font-semibold text-pkpk-main-font">
+      <p className="mt-1 truncate text-[clamp(calc(1.3rem*var(--app-font-scale)),calc(5.75vw*var(--app-font-scale)),calc(1.4rem*var(--app-font-scale)))] font-semibold text-pkpk-main-font">
         {title}
       </p>
     ) : null}

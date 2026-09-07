@@ -129,7 +129,7 @@ const HoldToConfirmButton: React.FC<HoldToConfirmButtonProps> = ({
           .join(" ")}
         style={{ transform: `scaleX(${progress})` }}
       />
-      <span className="relative z-10 flex min-w-0 items-center gap-2">
+      <span className="relative z-10 flex min-w-0 items-center gap-2 whitespace-nowrap">
         {children}
       </span>
     </button>

@@ -1119,10 +1119,10 @@ const BottomNav: React.FC = () => {
           >
             <IoQrCodeSharp className="player-qr-trigger-icon" />
           </Button>
-          <Tabs.ListContainer className="min-w-0 w-full border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
+          <Tabs.ListContainer className="min-w-0 w-full !overflow-visible border-0 bg-transparent p-0 shadow-none backdrop-blur-0">
             <Tabs.List
               aria-label="Bottom navigation"
-              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(4.75rem,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
+              className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(4.75rem,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-0.5 rounded-full bg-[#ebeefa] shadow-[0_3px_10px_rgba(15,23,42,0.12)] *:min-w-0"
             >
               <Tabs.Tab
                 id="match"
@@ -1131,11 +1131,11 @@ const BottomNav: React.FC = () => {
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "match" ? (
-                    <IoTrophy className="text-lg" />
+                    <IoTrophy className="size-[1.125rem]" />
                   ) : (
-                    <IoTrophyOutline className="text-lg" />
+                    <IoTrophyOutline className="size-[1.125rem]" />
                   )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">
+                  <span className="whitespace-nowrap text-[calc(11px*var(--app-font-scale))] leading-none sm:text-[calc(13.2px*var(--app-font-scale))]">
                     내 매치
                   </span>
                 </div>
@@ -1150,11 +1150,11 @@ const BottomNav: React.FC = () => {
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "members" ? (
-                    <IoPeople className="text-lg" />
+                    <IoPeople className="size-[1.125rem]" />
                   ) : (
-                    <IoPeopleOutline className="text-lg" />
+                    <IoPeopleOutline className="size-[1.125rem]" />
                   )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">플레이어</span>
+                  <span className="whitespace-nowrap text-[calc(11px*var(--app-font-scale))] leading-none sm:text-[calc(13.2px*var(--app-font-scale))]">플레이어</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1167,11 +1167,11 @@ const BottomNav: React.FC = () => {
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "affiliations" ? (
-                    <TbAffiliateFilled className="text-lg" />
+                    <TbAffiliateFilled className="size-[1.125rem]" />
                   ) : (
-                    <TbAffiliate className="text-lg" />
+                    <TbAffiliate className="size-[1.125rem]" />
                   )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">클럽</span>
+                  <span className="whitespace-nowrap text-[calc(11px*var(--app-font-scale))] leading-none sm:text-[calc(13.2px*var(--app-font-scale))]">클럽</span>
                 </div>
                 <Tabs.Indicator />
               </Tabs.Tab>
@@ -1184,11 +1184,11 @@ const BottomNav: React.FC = () => {
               >
                 <div className="flex flex-col items-center gap-1 py-1.5">
                   {selectedTab === "settings" ? (
-                    <IoSettings className="text-lg" />
+                    <IoSettings className="size-[1.125rem]" />
                   ) : (
-                    <IoSettingsOutline className="text-lg" />
+                    <IoSettingsOutline className="size-[1.125rem]" />
                   )}
-                  <span className="whitespace-nowrap text-[11px] leading-none sm:text-[13.2px]">
+                  <span className="whitespace-nowrap text-[calc(11px*var(--app-font-scale))] leading-none sm:text-[calc(13.2px*var(--app-font-scale))]">
                     설정
                   </span>
                 </div>

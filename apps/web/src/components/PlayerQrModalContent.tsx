@@ -48,44 +48,41 @@ const PlayerQrModalContent: React.FC<PlayerQrModalContentProps> = ({
       <p className="w-full text-pkpk-sub-font">
         매치 참가, 소속 참여, 친구 추가에 사용할 수 있어요.
       </p>
-      {qrToken ? (
-        <>
-          <div className="my-5 flex w-full justify-center">
+      <div className="my-5 flex min-h-[180px] w-full items-center justify-center">
+        {qrToken ? (
             <QrCode
               value={qrToken.payload}
               size={180}
               bgColor="#ffffff"
               fgColor="#000000"
             />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <p
-              className={`bs-text-title ${
-                qrRemainingSeconds > 0 ? "text-pkpk-sub-font" : "text-error"
-              }`}
-            >
-              {qrRemainingSeconds > 0
-                ? `남은 시간 ${formatRemainingTime(qrRemainingSeconds)}`
-                : "QR 코드가 만료되었습니다."}
-            </p>
-            {refreshButton}
-          </div>
-        </>
-      ) : (
-        <div className="flex min-h-[220px] items-center justify-center">
+        ) : (
           <p
             className={`bs-text-body ${isQrLoading ? "text-pkpk-sub-font" : "text-error"}`}
           >
             {isQrLoading ? "QR 코드를 생성 중입니다..." : qrError}
           </p>
-        </div>
-      )}
+        )}
+      </div>
+
+      <div className="flex min-h-8 items-center justify-center gap-1.5">
+        {qrToken ? (
+          <p
+            className={`bs-text-title ${
+              qrRemainingSeconds > 0 ? "text-pkpk-sub-font" : "text-error"
+            }`}
+          >
+            {qrRemainingSeconds > 0
+              ? `남은 시간 ${formatRemainingTime(qrRemainingSeconds)}`
+              : "QR 코드가 만료되었습니다."}
+          </p>
+        ) : null}
+        {refreshButton}
+      </div>
 
       {qrError && qrToken ? (
         <p className="bs-text-caption text-error">{qrError}</p>
       ) : null}
-
-      {!qrToken ? refreshButton : null}
     </>
   );
 };

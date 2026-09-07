@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Tabs } from "@heroui/react";
+import { Spinner, Tabs } from "@heroui/react";
 import {
   measureNaturalWidth,
   prepareWithSegments,
@@ -86,6 +86,11 @@ const formatRatingHistoryDate = (value?: string) => {
     : ratingHistoryDateFormatter.format(date);
 };
 
+const RATING_STATS_CONTENT_CLASS_NAME =
+  "relative mt-2 h-[calc(13.5rem*var(--app-font-scale))] space-y-0";
+const RATING_STATS_CELL_CLASS_NAME =
+  "h-[calc(4.5rem*var(--app-font-scale))] overflow-hidden rounded-xl px-4 py-3";
+
 const getRatingExtremum = (
   history: MemberProfileRatingHistoryPoint[],
   kind: "highest" | "lowest",
@@ -110,16 +115,16 @@ const RatingExtremumRow: React.FC<{
 }> = ({ label, extremum }) => (
   <section
     aria-label={label}
-    className="min-w-0 px-4 py-3"
+    className={`${RATING_STATS_CELL_CLASS_NAME} min-w-0`}
   >
-    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+    <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-semibold text-pkpk-secondary-font/80">
       {label}
     </p>
-    <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
-      <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+    <div className="mt-1 flex min-w-0 items-baseline gap-1.5">
+      <p className="shrink-0 text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.35rem*var(--app-font-scale)))] font-semibold leading-tight text-pkpk-secondary-font">
         {extremum ? formatRating(extremum.rating) : "-"}
       </p>
-      <p className="shrink-0 text-[clamp(0.625rem,2.7cqw,0.8rem)] text-pkpk-secondary-font/70">
+      <p className="min-w-0 truncate text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.7cqw*var(--app-font-scale)),calc(0.8rem*var(--app-font-scale)))] text-pkpk-secondary-font/70">
         {formatRatingHistoryDate(extremum?.createdAt)}
       </p>
     </div>
@@ -270,20 +275,42 @@ interface MemberProfileProps {
   onProfileUpdated?: (player: PlayerInfo) => void;
 }
 
+const RatingStatsGridShell: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => <div className="grid grid-cols-2 gap-3">{children}</div>;
+
+const RatingStatsCellSkeleton: React.FC = () => (
+  <div className={RATING_STATS_CELL_CLASS_NAME}>
+    <SkeletonBlock className="h-[calc(0.9rem*var(--app-font-scale))] w-16 rounded" />
+    <div className="mt-1 flex items-center gap-1.5">
+      <SkeletonBlock className="h-6 w-12 rounded" />
+      <SkeletonBlock className="h-[calc(0.8rem*var(--app-font-scale))] w-14 rounded" />
+    </div>
+  </div>
+);
+
 const ProfileStatsSkeleton: React.FC = () => (
   <div
-    className="grid h-full grid-rows-2"
+    className={RATING_STATS_CONTENT_CLASS_NAME}
     role="status"
     aria-label="프로필 통계 로딩 중"
+    aria-live="polite"
   >
-    <div className="grid h-full grid-cols-2 gap-3">
-      {Array.from({ length: 2 }, (_, index) => (
-        <SkeletonBlock key={index} className="h-full rounded-xl" />
-      ))}
+    <div className="absolute inset-0 z-10 flex items-center justify-center">
+      <Spinner
+        aria-label="프로필 통계 로딩 중"
+        color="current"
+        className="text-pkpk-secondary-font"
+        size="sm"
+      />
     </div>
-    <div className="grid h-full grid-cols-2 gap-3">
-      {Array.from({ length: 2 }, (_, index) => (
-        <SkeletonBlock key={index} className="h-full rounded-xl" />
+    <div className="space-y-0">
+      {Array.from({ length: 3 }, (_, rowIndex) => (
+        <RatingStatsGridShell key={rowIndex}>
+          {Array.from({ length: 2 }, (_, cellIndex) => (
+            <RatingStatsCellSkeleton key={cellIndex} />
+          ))}
+        </RatingStatsGridShell>
       ))}
     </div>
   </div>
@@ -543,7 +570,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
               <div className="flex min-w-0 max-w-full flex-col gap-0">
                 {displayedPlayer?.gender ? (
-                  <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+                  <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] text-pkpk-detail-font">
                     {displayedPlayer.gender === "M" ? "남성" : "여성"}
                     {displayedAge != null
                       ? ` · ${displayedAge}세`
@@ -559,7 +586,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                   <h2
                     ref={nameRef}
                     aria-label={displayName}
-                    className={`min-w-0 truncate whitespace-nowrap text-[clamp(1.5rem,7.2cqw,2.16rem)] font-bold leading-[1] text-pkpk-main-font ${
+                    className={`min-w-0 truncate whitespace-nowrap text-[clamp(calc(1.5rem*var(--app-font-scale)),calc(7.2cqw*var(--app-font-scale)),calc(2.16rem*var(--app-font-scale)))] font-bold leading-[1] text-pkpk-main-font ${
                       truncatedNameWidth == null ? "flex-1" : "shrink-0"
                     }`}
                     style={
@@ -600,7 +627,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
 
           <div className="rounded-2xl bg-gradient-to-br from-pkpk-secondary-bg to-pkpk-primary-bg p-4">
             <h3
-              className={`text-[clamp(1.4rem,6.5cqw,1.95rem)] font-bold leading-[1.15] text-pkpk-secondary-font ${
+              className={`text-[clamp(calc(1.4rem*var(--app-font-scale)),calc(6.5cqw*var(--app-font-scale)),calc(1.95rem*var(--app-font-scale)))] font-bold leading-[1.15] text-pkpk-secondary-font ${
                 showDetailHeader ? "pl-2" : ""
               }`}
             >
@@ -631,10 +658,10 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                       }`}
                     >
                       <div className="relative z-10 w-full">
-                        <p className="text-[clamp(1.3rem,6cqw,1.8rem)] font-bold leading-none text-pkpk-secondary-font">
+                        <p className="text-[clamp(calc(1.3rem*var(--app-font-scale)),calc(6cqw*var(--app-font-scale)),calc(1.8rem*var(--app-font-scale)))] font-bold leading-none text-pkpk-secondary-font">
                           {item.rating}
                         </p>
-                        <p className="mt-1 flex items-center gap-1 text-[clamp(0.6875rem,3cqw,0.9rem)] font-medium text-pkpk-secondary-font/70">
+                        <p className="mt-1 flex items-center gap-1 text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-medium text-pkpk-secondary-font/70">
                           <Icon className="size-3" />
                           {item.label}
                         </p>
@@ -647,19 +674,10 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             </Tabs>
 
             {isProfileStatsLoading ? (
-              <div className="mt-2 space-y-0">
-                <div className="grid grid-cols-2 gap-3 px-4">
-                  {Array.from({ length: 2 }, (_, index) => (
-                    <SkeletonBlock key={index} className="h-5 rounded" />
-                  ))}
-                </div>
-                <div className="h-36">
-                  <ProfileStatsSkeleton />
-                </div>
-              </div>
+              <ProfileStatsSkeleton />
             ) : expandedItem ? (
-              <div className="mt-2 space-y-0">
-                <div className="grid grid-cols-2 gap-3">
+              <div className={RATING_STATS_CONTENT_CLASS_NAME}>
+                <RatingStatsGridShell>
                   <RatingExtremumRow
                     label="최고 평점"
                     extremum={highestRating}
@@ -668,38 +686,38 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                     label="최저 평점"
                     extremum={lowestRating}
                   />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl px-4 py-3">
-                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                </RatingStatsGridShell>
+                <RatingStatsGridShell>
+                  <div className={RATING_STATS_CELL_CLASS_NAME}>
+                    <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-semibold text-pkpk-secondary-font/80">
                       매치 승률
                     </p>
                     <div className="mt-1 flex items-baseline gap-1.5">
-                      <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+                      <p className="text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.35rem*var(--app-font-scale)))] font-semibold leading-tight text-pkpk-secondary-font">
                         {expandedItem.matchWinRate}
                       </p>
-                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
+                      <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] text-pkpk-secondary-font/70">
                         {expandedItem.matchWinLoss}
                       </p>
                     </div>
                   </div>
-                  <div className="rounded-xl px-4 py-3">
-                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                  <div className={RATING_STATS_CELL_CLASS_NAME}>
+                    <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-semibold text-pkpk-secondary-font/80">
                       세트 승률
                     </p>
                     <div className="mt-1 flex items-baseline gap-1.5">
-                      <p className="text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold leading-tight text-pkpk-secondary-font">
+                      <p className="text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.35rem*var(--app-font-scale)))] font-semibold leading-tight text-pkpk-secondary-font">
                         {expandedItem.setWinRate}
                       </p>
-                      <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-secondary-font/70">
+                      <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] text-pkpk-secondary-font/70">
                         {expandedItem.setWinLoss}
                       </p>
                     </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl px-4 py-3">
-                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                </RatingStatsGridShell>
+                <RatingStatsGridShell>
+                  <div className={RATING_STATS_CELL_CLASS_NAME}>
+                    <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-semibold text-pkpk-secondary-font/80">
                       최근 7일 변동
                     </p>
                     <div className="mt-1">
@@ -710,8 +728,8 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="rounded-xl px-4 py-3">
-                    <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-secondary-font/80">
+                  <div className={RATING_STATS_CELL_CLASS_NAME}>
+                    <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-semibold text-pkpk-secondary-font/80">
                       최근 30일 변동
                     </p>
                     <div className="mt-1">
@@ -722,7 +740,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
                       />
                     </div>
                   </div>
-                </div>
+                </RatingStatsGridShell>
               </div>
             ) : null}
           </div>
@@ -734,7 +752,7 @@ const MemberProfile: React.FC<MemberProfileProps> = ({
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
               <h3
                 id="profile-recent-matches-title"
-                className="text-[clamp(1.1rem,5cqw,1.45rem)] font-bold text-pkpk-main-font"
+                className="text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-bold text-pkpk-main-font"
               >
                 최근 매치
               </h3>

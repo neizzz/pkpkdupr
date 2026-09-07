@@ -6,7 +6,7 @@ import MatchCardHeader from "@/components/MatchCardHeader";
 import type { MatchSessionSummaryInfo } from "@/components/Match";
 
 const sessionChipClassName =
-  "inline-flex h-6 items-center rounded-full px-2 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold leading-6";
+  "app-pill inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full px-2 text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.8vw*var(--app-font-scale)),calc(0.75rem*var(--app-font-scale)))] font-semibold leading-6";
 
 const sessionStatusLabelMap = {
   created: "예정",

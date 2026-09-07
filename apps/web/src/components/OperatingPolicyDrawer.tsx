@@ -54,6 +54,17 @@ const OperatingPolicyDrawer: React.FC<OperatingPolicyDrawerProps> = ({
               </dt>
               <dd>163-20-01593</dd>
             </div>
+            <div className="mt-2 flex items-center justify-between gap-4 border-t border-border pt-2">
+              <dt className="font-semibold text-pkpk-main-font">이메일</dt>
+              <dd className="break-all text-right">
+                <a
+                  href="mailto:ch.neizzz@gmail.com"
+                  className="text-pkpk-primary-bg underline-offset-2 hover:underline"
+                >
+                  ch.neizzz@gmail.com
+                </a>
+              </dd>
+            </div>
           </dl>
         </section>
 

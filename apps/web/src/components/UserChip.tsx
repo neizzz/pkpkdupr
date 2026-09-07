@@ -88,7 +88,7 @@ const UserChip: React.FC<UserChipProps> = ({
               }
             : undefined
         }
-        className={`relative ${isMatchSize ? "h-[clamp(2rem,10cqw,2.75rem)]" : "h-6"} min-w-0 max-w-full ${isMe ? "overflow-visible" : "overflow-hidden"} rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? `w-full ${isMirrored ? "pl-2" : "pr-2"}` : `${resolvedChipWidthClass} ${isMirrored ? "pl-3" : "pr-3"}`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
+        className={`app-pill relative ${isMatchSize ? "h-[clamp(2rem,10cqw,2.75rem)]" : "h-6"} min-w-0 max-w-full ${isMe ? "overflow-visible" : "overflow-hidden"} rounded-full px-0 transition-colors ${shouldReserveRemoveSlot ? `w-full ${isMirrored ? "pl-2" : "pr-2"}` : `${resolvedChipWidthClass} ${isMirrored ? "pl-3" : "pr-3"}`} ${isSelected ? "ring-2 ring-[#409eff] ring-offset-2" : ""} ${isPressable ? (isDisabled ? "cursor-not-allowed opacity-35" : "cursor-pointer opacity-100") : "cursor-default opacity-100"} shadow-none ${genderBgClass}`}
       >
         <div
           className={`flex w-full min-w-0 max-w-full items-center gap-1 ${
@@ -102,7 +102,7 @@ const UserChip: React.FC<UserChipProps> = ({
               name={player.username}
               fallbackIconClassName={
                 isMatchSize
-                  ? "text-[clamp(1.25rem,6cqw,1.375rem)]"
+                  ? "text-[clamp(calc(1.25rem*var(--app-font-scale)),calc(6cqw*var(--app-font-scale)),calc(1.375rem*var(--app-font-scale)))]"
                   : undefined
               }
               className={`bg-white/80 ${genderAvatarClass} ${
@@ -132,8 +132,8 @@ const UserChip: React.FC<UserChipProps> = ({
           <span
             className={`min-w-0 truncate ${
               isMatchSize
-                ? "text-[clamp(0.875rem,3.5cqw,1.125rem)]"
-                : "text-[clamp(0.75rem,3vw,0.875rem)]"
+                ? "text-[clamp(calc(0.875rem*var(--app-font-scale)),calc(3.5cqw*var(--app-font-scale)),calc(1.125rem*var(--app-font-scale)))]"
+                : "text-[clamp(calc(0.75rem*var(--app-font-scale)),calc(3vw*var(--app-font-scale)),calc(0.875rem*var(--app-font-scale)))]"
             } text-current ${isMe ? "font-bold" : "font-medium"} ${
               isMirrored ? "text-right" : ""
             }`}

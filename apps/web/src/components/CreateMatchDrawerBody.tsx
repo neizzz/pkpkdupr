@@ -643,7 +643,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
             ) : null}
             <BottomSheet.Actions>
               <Button
-                className="app-action-button w-full rounded-2xl bg-red-50 py-3 text-base font-semibold text-red-500"
+                className="app-action-button app-bottom-sheet-action-secondary w-full rounded-2xl py-3 text-base font-semibold"
                 isDisabled={isCreatingMatch}
                 onPress={onCancel}
               >
@@ -653,7 +653,7 @@ const CreateMatchDrawerBody: React.FC<CreateMatchDrawerBodyProps> = ({
                 ariaLabel="길게 눌러 매치생성"
                 onComplete={handleCreateMatchPress}
                 isDisabled={!canCreateMatch || isCreatingMatch}
-                className="app-action-button w-full justify-center rounded-2xl bg-[#409eff] px-3 py-3 text-base font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+                className="app-action-button app-bottom-sheet-action-primary w-full justify-center rounded-2xl px-3 py-3 text-base font-semibold"
                 progressClassName="bg-white/20"
               >
                 {!isOnline

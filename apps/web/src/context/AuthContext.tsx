@@ -8,9 +8,11 @@ import React, {
 } from "react";
 import type {
   PlayerAffiliation,
+  PlayerFontSizePreference,
   PublicPlayerDupr,
   WithdrawalEligibility,
 } from "@pkpkdupr/shared/player";
+import { isPlayerFontSizePreference } from "@pkpkdupr/shared/player";
 import { buildApiUrl } from "@/lib/api";
 
 export interface PlayerInfo {
@@ -25,6 +27,7 @@ export interface PlayerInfo {
   statusMessageBackgroundColor?: string;
   authProvider?: "password" | "kakao" | "kakao-mock";
   privacyPolicyConsentVersion?: string | null;
+  fontSizePreference?: PlayerFontSizePreference | null;
 }
 
 interface AuthContextType {
@@ -51,6 +54,9 @@ interface AuthContextType {
   }) => Promise<PlayerInfo>;
   uploadAvatar: (imageDataUrl: string) => Promise<PlayerInfo>;
   deleteAvatar: () => Promise<PlayerInfo>;
+  updateFontSizePreference: (
+    preference: PlayerFontSizePreference,
+  ) => Promise<PlayerFontSizePreference>;
   refreshMe: () => Promise<PlayerInfo>;
   getWithdrawalEligibility: () => Promise<WithdrawalEligibility>;
   withdrawAccount: (confirmation: string) => Promise<void>;
@@ -94,10 +100,21 @@ const isOnline = () =>
 const shouldRequirePasswordChange = (isFirstLogin?: boolean) =>
   isFirstLogin === true;
 
+const normalizePlayerInfo = (player: PlayerInfo): PlayerInfo => ({
+  ...player,
+  fontSizePreference:
+    player.fontSizePreference === null ||
+    isPlayerFontSizePreference(player.fontSizePreference)
+      ? player.fontSizePreference
+      : "default",
+});
+
 const readCachedAuthState = (): CachedAuthState | null => {
   try {
     const cachedState = localStorage.getItem(CACHED_AUTH_STATE_KEY);
-    return cachedState ? (JSON.parse(cachedState) as CachedAuthState) : null;
+    if (!cachedState) return null;
+    const parsed = JSON.parse(cachedState) as CachedAuthState;
+    return { ...parsed, player: normalizePlayerInfo(parsed.player) };
   } catch {
     return null;
   }
@@ -194,7 +211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
             return { status: "unavailable" };
           }
 
-          const { isFirstLogin, ...playerInfo } = data;
+          const { isFirstLogin, ...rawPlayerInfo } = data;
+          const playerInfo = normalizePlayerInfo(rawPlayerInfo);
           const nextRequiresPasswordChange =
             shouldRequirePasswordChange(isFirstLogin);
 
@@ -245,7 +263,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      const { isFirstLogin, ...playerInfo } = data.player;
+      const { isFirstLogin, ...rawPlayerInfo } = data.player;
+      const playerInfo = normalizePlayerInfo(rawPlayerInfo);
       if (!playerInfo.id) {
         throw new Error("세션 사용자 정보가 없습니다.");
       }
@@ -409,7 +428,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setRequiresPasswordChange(false);
   };
 
-  const updateProfile = async (input: { avatarUrl?: string | null }) => {
+  const updateProfile = async (input: {
+    avatarUrl?: string | null;
+    affiliations?: PlayerAffiliation[];
+    statusMessage?: string | null;
+    statusMessageBackgroundColor?: string | null;
+  }) => {
     if (!player) {
       throw new Error("로그인이 필요합니다.");
     }
@@ -431,6 +455,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextPlayer = {
       ...data,
       privacyPolicyConsentVersion: player?.privacyPolicyConsentVersion ?? null,
+      fontSizePreference:
+        player.fontSizePreference === undefined
+          ? "default"
+          : player.fontSizePreference,
     };
     setPlayer(nextPlayer);
     persistAuthState(nextPlayer, requiresPasswordChange);
@@ -459,6 +487,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextPlayer = {
       ...data,
       privacyPolicyConsentVersion: player?.privacyPolicyConsentVersion ?? null,
+      fontSizePreference:
+        player.fontSizePreference === undefined
+          ? "default"
+          : player.fontSizePreference,
     };
     setPlayer(nextPlayer);
     persistAuthState(nextPlayer, requiresPasswordChange);
@@ -485,6 +517,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const nextPlayer = {
       ...data,
       privacyPolicyConsentVersion: player?.privacyPolicyConsentVersion ?? null,
+      fontSizePreference:
+        player.fontSizePreference === undefined
+          ? "default"
+          : player.fontSizePreference,
     };
     setPlayer(nextPlayer);
     persistAuthState(nextPlayer, requiresPasswordChange);
@@ -502,6 +538,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     return result.player;
+  };
+
+  const updateFontSizePreference = async (
+    preference: PlayerFontSizePreference,
+  ) => {
+    if (!player) throw new Error("로그인이 필요합니다.");
+    if (!isOnline()) throw new Error(ONLINE_REQUIRED_MESSAGE);
+
+    const res = await fetch(buildApiUrl("/api/me/preferences"), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ fontSizePreference: preference }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      fontSizePreference?: unknown;
+    };
+    if (!res.ok || !isPlayerFontSizePreference(data.fontSizePreference)) {
+      throw new Error(data.error || "글자 크기 설정을 저장하지 못했습니다.");
+    }
+
+    const nextPlayer = {
+      ...player,
+      fontSizePreference: data.fontSizePreference,
+    };
+    setPlayer(nextPlayer);
+    persistAuthState(nextPlayer, requiresPasswordChange);
+    return data.fontSizePreference;
   };
 
   const getWithdrawalEligibility = async (): Promise<WithdrawalEligibility> => {
@@ -569,6 +634,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         updateProfile,
         uploadAvatar,
         deleteAvatar,
+        updateFontSizePreference,
         refreshMe,
         getWithdrawalEligibility,
         withdrawAccount,

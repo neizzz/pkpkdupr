@@ -24,7 +24,7 @@ const spacingClassMap: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
 };
 
 const counterSizeClassMap: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
-    xs: "h-6 w-6 text-[10px]",
+    xs: "h-6 w-6 text-[calc(10px*var(--app-font-scale))]",
     session: "h-9 w-9 text-xs",
     sm: "h-12 w-12 text-sm",
     md: "h-18 w-18 text-base",

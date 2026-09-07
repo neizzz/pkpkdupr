@@ -94,6 +94,7 @@ test("로그인 오류를 화면 상단 prompt로 표시하고 닫을 수 있다
 
 test("신규 카카오 사용자는 PKELO 프로필을 만든 뒤 세션으로 메인에 이동한다", async ({ page }) => {
   let onboardingCompleted = false;
+  let fontSizePreference: "default" | "large" | null = null;
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -107,6 +108,7 @@ test("신규 카카오 사용자는 PKELO 프로필을 만든 뒤 세션으로 �
                 gender: "F",
                 age: 35,
                 isFirstLogin: false,
+                fontSizePreference,
                 privacyPolicyConsentVersion: "2026-08-31",
               },
             }
@@ -129,6 +131,7 @@ test("신규 카카오 사용자는 PKELO 프로필을 만든 뒤 세션으로 �
         gender: "F",
         age: 35,
         isFirstLogin: false,
+        fontSizePreference,
         privacyPolicyConsentVersion: "2026-08-31",
       }),
     }),
@@ -143,6 +146,15 @@ test("신규 카카오 사용자는 PKELO 프로필을 만든 뒤 세션으로 �
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ status: "authenticated", isFirstLogin: false }),
+    });
+  });
+  await page.route("**/api/me/preferences", async (route) => {
+    const body = route.request().postDataJSON();
+    expect(body).toEqual({ fontSizePreference: "large" });
+    fontSizePreference = "large";
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ fontSizePreference }),
     });
   });
 
@@ -160,4 +172,18 @@ test("신규 카카오 사용자는 PKELO 프로필을 만든 뒤 세션으로 �
   await expect(submitButton).toBeEnabled();
   await submitButton.click();
   await expect(page).toHaveURL("http://pkelo.localhost:4173/");
+  const fontSizeDialog = page.getByRole("dialog", { name: "글자 크기 설정" });
+  await expect(fontSizeDialog).toBeVisible();
+  await expect(page.getByRole("button", { name: "글자 크기 설정 닫기" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(fontSizeDialog).toBeVisible();
+
+  await fontSizeDialog.getByText("크게", { exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-font-size", "large");
+  await fontSizeDialog.getByRole("button", { name: "적용하기" }).click();
+  await expect(fontSizeDialog).toBeHidden();
+
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-font-size", "large");
+  await expect(fontSizeDialog).toHaveCount(0);
 });

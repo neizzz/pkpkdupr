@@ -135,7 +135,7 @@ const ProfileMatchList: React.FC<ProfileMatchListProps> = ({
         const content = (
           <>
             <div className="flex w-12 shrink-0 flex-col items-center border-r border-border pr-3 text-center">
-              <span className="text-[0.625rem] font-bold leading-none text-[#1f2f6f]/70">
+              <span className="text-[calc(0.625rem*var(--app-font-scale))] font-bold leading-none text-[#1f2f6f]/70">
                 {month}
               </span>
               <span className="mt-1 text-xl font-bold leading-none tabular-nums text-[#1f2f6f]">

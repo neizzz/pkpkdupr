@@ -13,7 +13,9 @@ const PkeloTemporaryNotice: React.FC<PkeloTemporaryNoticeProps> = ({
 }) => (
   <PkeloLoginLayout>
     <section className="text-center text-white" aria-live="polite">
-      <h2 className="text-[1.2rem] font-extrabold tracking-tight">{title}</h2>
+      <h2 className="text-[calc(1.2rem*var(--app-font-scale))] font-extrabold tracking-tight">
+        {title}
+      </h2>
       <p className="mt-4 whitespace-pre-wrap text-xl font-bold leading-8 text-white">
         {message}
       </p>

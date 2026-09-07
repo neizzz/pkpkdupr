@@ -130,7 +130,7 @@ const PwaUpdatePrompt: React.FC = () => {
         </Alert.Content>
         <Button
           size="sm"
-          className="shrink-0 rounded-full bg-pkpk-primary-bg px-3 text-white"
+          className="app-pill shrink-0 rounded-full bg-pkpk-primary-bg px-3 text-white"
           isDisabled={isCheckingForUpdate || isApplyingUpdate}
           onPress={() => void handleApplyUpdate()}
         >

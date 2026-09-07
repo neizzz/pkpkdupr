@@ -7,6 +7,7 @@ import ProfileMatchList, {
   type ProfileMatchListItem,
 } from "@/components/ProfileMatchList";
 import RightDrawer from "@/components/RightDrawer";
+import TabPanelEmptyState from "@/components/TabPanelEmptyState";
 import type { TabKey } from "@/context/TabNavigationContext";
 
 interface ProfileMatchHistoryDrawerProps {
@@ -54,7 +55,7 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
     layer={layer}
     className="!bg-white"
   >
-    <div className="min-h-full bg-white">
+    <div className="flex min-h-full flex-col bg-white">
       <DetailPageHeader
         title="전체 매치"
         tabKey={tabKey}
@@ -67,18 +68,22 @@ const ProfileMatchHistoryDrawer: React.FC<ProfileMatchHistoryDrawerProps> = ({
           />
         }
       />
-      <div className="p-2">
-        <ProfileMatchList
-          matches={matches}
-          isLoading={isLoading && matches.length === 0}
-          variant="plain"
-          emptyMessage="완료된 매치가 없어요."
-          onPressMatch={onPressMatch}
-        />
-        {hasMore || isLoadingMore ? (
-          <LoadMoreButton isLoading={isLoadingMore} onPress={onLoadMore} />
-        ) : null}
-      </div>
+      {!isLoading && matches.length === 0 ? (
+        <TabPanelEmptyState message="완료된 매치가 없어요." />
+      ) : (
+        <div className="p-2">
+          <ProfileMatchList
+            matches={matches}
+            isLoading={isLoading && matches.length === 0}
+            variant="plain"
+            emptyMessage="완료된 매치가 없어요."
+            onPressMatch={onPressMatch}
+          />
+          {hasMore || isLoadingMore ? (
+            <LoadMoreButton isLoading={isLoadingMore} onPress={onLoadMore} />
+          ) : null}
+        </div>
+      )}
     </div>
   </RightDrawer>
 );

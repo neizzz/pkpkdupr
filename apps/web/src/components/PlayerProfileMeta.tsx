@@ -103,7 +103,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
           className="flex max-w-full min-w-0 items-center gap-1"
         >
           <p
-            className="min-w-0 max-w-full truncate rounded-lg px-1.5 py-1 text-[clamp(0.73125rem,3.15cqw,0.945rem)] leading-tight"
+            className="min-w-0 max-w-full truncate rounded-lg px-1.5 py-1 text-[clamp(calc(0.73125rem*var(--app-font-scale)),calc(3.15cqw*var(--app-font-scale)),calc(0.945rem*var(--app-font-scale)))] leading-tight"
             style={statusMessageColors}
           >
             {statusMessage}
@@ -123,7 +123,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
         <button
           type="button"
           onClick={onEditStatus}
-          className="flex items-center gap-1 text-[clamp(0.8125rem,3.5cqw,1.05rem)] text-pkpk-detail-font"
+          className="flex items-center gap-1 text-[clamp(calc(0.8125rem*var(--app-font-scale)),calc(3.5cqw*var(--app-font-scale)),calc(1.05rem*var(--app-font-scale)))] text-pkpk-detail-font"
           aria-label="상태메시지 추가"
         >
           상태메시지 추가
@@ -132,7 +132,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
       ) : null}
 
       {primaryAffiliation ? (
-        <div className="relative flex items-center gap-1 text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+        <div className="relative flex items-center gap-1 text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] text-pkpk-detail-font">
           <span className="truncate">{primaryAffiliation.name}</span>
           {extraCount > 0 ? (
             <TooltipRoot
@@ -190,7 +190,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
                             setIsAffiliationPopupOpen(false);
                             onSetPrimary(affiliation.name);
                           }}
-                          className="shrink-0 rounded-full bg-pkpk-primary-bg px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                          className="app-pill shrink-0 rounded-full bg-pkpk-primary-bg px-2 py-1 text-xs font-semibold text-white disabled:opacity-50"
                         >
                           대표로 지정
                         </button>
@@ -203,7 +203,7 @@ const PlayerProfileMeta: React.FC<PlayerProfileMetaProps> = ({
           ) : null}
         </div>
       ) : showEmptyAffiliation ? (
-        <p className="text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+        <p className="text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] text-pkpk-detail-font">
           소속 없음
         </p>
       ) : null}

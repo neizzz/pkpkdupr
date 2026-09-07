@@ -97,7 +97,7 @@ interface MatchProps {
 }
 
 const titleChipClassName =
-  "inline-flex h-6 items-center rounded-full px-2 text-[clamp(0.625rem,2.8vw,0.75rem)] font-semibold leading-none";
+  "app-pill inline-flex h-6 items-center rounded-full px-2 text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.8vw*var(--app-font-scale)),calc(0.75rem*var(--app-font-scale)))] font-semibold leading-none";
 const teamChipWidthClass = "w-[clamp(6rem,32cqw,10rem)]";
 const teamSetScoreChipWidthClass = "w-[clamp(6.6rem,35.2cqw,11rem)]";
 
@@ -223,7 +223,7 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamSetScoreChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-dupr-font`}
+                  className={`${teamSetScoreChipWidthClass} text-center text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.8vw*var(--app-font-scale)),calc(0.75rem*var(--app-font-scale)))] font-bold tabular-nums text-pkpk-dupr-font`}
                 >
                   {formatRating(teamAverageDuprs[index])}
                 </p>
@@ -243,17 +243,17 @@ const Match: React.FC<MatchProps> = ({
             ))}
             <div className="col-start-2 row-start-1 flex items-center justify-center gap-1 text-pkpk-main-font">
               <span
-                className={`text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight ${
+                className={`text-[clamp(calc(1.75rem*var(--app-font-scale)),calc(9vw*var(--app-font-scale)),calc(2.25rem*var(--app-font-scale)))] font-black leading-none tracking-tight ${
                   isTeamALosing ? "text-[#888]" : ""
                 }`}
               >
                 {displayedTeamSetScores[0]}
               </span>
-              <span className="text-[clamp(1.25rem,5vw,1.5rem)] font-bold leading-none text-[#888]">
+              <span className="text-[clamp(calc(1.25rem*var(--app-font-scale)),calc(5vw*var(--app-font-scale)),calc(1.5rem*var(--app-font-scale)))] font-bold leading-none text-[#888]">
                 -
               </span>
               <span
-                className={`text-[clamp(1.75rem,9vw,2.25rem)] font-black leading-none tracking-tight ${
+                className={`text-[clamp(calc(1.75rem*var(--app-font-scale)),calc(9vw*var(--app-font-scale)),calc(2.25rem*var(--app-font-scale)))] font-black leading-none tracking-tight ${
                   isTeamBLosing ? "text-[#888]" : ""
                 }`}
               >
@@ -271,7 +271,7 @@ const Match: React.FC<MatchProps> = ({
                 }`}
               >
                 <p
-                  className={`${teamChipWidthClass} text-center text-[clamp(0.625rem,2.8vw,0.75rem)] font-bold tabular-nums text-pkpk-dupr-font`}
+                  className={`${teamChipWidthClass} text-center text-[clamp(calc(0.625rem*var(--app-font-scale)),calc(2.8vw*var(--app-font-scale)),calc(0.75rem*var(--app-font-scale)))] font-bold tabular-nums text-pkpk-dupr-font`}
                 >
                   {formatRating(teamAverageDuprs[index])}
                 </p>

@@ -26,17 +26,17 @@ const DraftRestoreModal: React.FC<DraftRestoreModalProps> = ({
       ariaLabel="임시 저장 복원"
       title="임시 저장된 내용이 있어요"
       footer={
-        <div className="flex w-full gap-2">
+        <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] gap-2">
           <Button
             type="button"
-            className="flex-1 bg-slate-100 font-semibold text-pkpk-sub-font"
+            className="shrink-0 whitespace-nowrap bg-slate-100 font-semibold text-pkpk-sub-font"
             onPress={onDiscard}
           >
             새로 작성
           </Button>
           <Button
             type="button"
-            className="flex-1 bg-pkpk-primary-bg font-semibold text-white"
+            className="min-w-0 w-full whitespace-nowrap bg-pkpk-primary-bg font-semibold text-white"
             onPress={onRestore}
           >
             이어서 작성

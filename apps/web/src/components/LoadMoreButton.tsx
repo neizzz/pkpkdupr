@@ -15,7 +15,7 @@ const LoadMoreButton: React.FC<LoadMoreButtonProps> = ({
       type="button"
       size="sm"
       variant="secondary"
-      className="h-[45px] min-w-0 rounded-full px-5 font-semibold"
+      className="app-pill h-[45px] min-w-0 rounded-full px-5 font-semibold"
       isDisabled={isLoading || !onPress}
       onPress={onPress}
     >

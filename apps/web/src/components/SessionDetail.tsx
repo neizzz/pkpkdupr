@@ -78,22 +78,21 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   );
 
   return (
-    <div className="min-h-full">
+    <div className="flex h-full flex-col">
       <DetailPageHeader title="Session Detail" tabKey={tabKey} />
-      <div className="p-2">
-        <div className="mx-auto flex w-full flex-col gap-3">
+      <div className="flex flex-1 p-2">
+        <div className="mx-auto flex w-full flex-1 flex-col gap-3">
           <SessionCard
             session={session}
             headerRightContent={
-              <div className="flex w-24 items-center gap-1.5">
-                <span className="shrink-0 text-[0.625rem] font-semibold uppercase tracking-wide text-pkpk-sub-font">
+              <div className="flex max-w-24 items-center gap-1.5">
+                <span className="shrink-0 text-[calc(0.625rem*var(--app-font-scale))] font-semibold uppercase tracking-wide text-pkpk-sub-font">
                   ID
                 </span>
                 <CopyableId
                   label="Session ID"
                   value={sessionId}
                   showLabel={false}
-                  truncate={false}
                 />
               </div>
             }
@@ -101,9 +100,15 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
             showChevron={false}
           />
 
-        <section>
+        <section
+          aria-labelledby="session-matches-title"
+          className="-mx-2 flex min-h-0 flex-1 flex-col border-t-[6px] border-pkpk-section-border px-2 pt-3"
+        >
           <div className="flex items-center justify-between gap-3">
-            <p className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-main-font">
+            <p
+              id="session-matches-title"
+              className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-main-font"
+            >
               Matches
             </p>
             <Switch
@@ -132,7 +137,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
               </Switch.Content>
             </Switch>
           </div>
-          <div>
+          <div className="flex min-h-0 flex-1 flex-col">
             {isMatchesLoading ? (
               <SessionMatchListSkeleton />
             ) : error ? (
@@ -147,13 +152,13 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
                 </Button>
               </div>
             ) : displayedMatches.length === 0 ? (
-              <TabPanelStatus
-                message={
-                  isMyMatchOnly
+              <div className="flex flex-1 items-center justify-center px-6 py-12 text-center">
+                <p className="text-sm font-medium text-pkpk-sub-font">
+                  {isMyMatchOnly
                     ? "이 세션에 표시할 내 경기가 없어요."
-                    : "이 세션에 표시할 경기가 없어요."
-                }
-              />
+                    : "이 세션에 표시할 경기가 없어요."}
+                </p>
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {displayedMatches.map((match) => (

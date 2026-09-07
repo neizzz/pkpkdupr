@@ -33,6 +33,7 @@ import AppModal from "@/components/AppModal";
 import DetailPageHeader from "@/components/DetailPageHeader";
 import DraftRestoreModal from "@/components/DraftRestoreModal";
 import HeaderFilterTabs from "@/components/HeaderFilterTabs";
+import HoldToConfirmButton from "@/components/HoldToConfirmButton";
 import MatchCard, {
   type MatchInfo,
   type MatchListResponse,
@@ -109,7 +110,7 @@ const AnnouncementBody: React.FC<{ body: string }> = ({ body }) => {
   nodes.push(body.slice(cursor));
 
   return (
-    <p className="whitespace-pre-wrap break-words text-[1.1rem] leading-7 text-pkpk-sub-font">
+    <p className="whitespace-pre-wrap break-words text-[calc(1.1rem*var(--app-font-scale))] leading-7 text-pkpk-sub-font">
       {nodes}
     </p>
   );
@@ -1217,7 +1218,7 @@ const Affiliations: React.FC = () => {
           </div>
           <BottomSheet.Actions>
             <Button
-              className="app-action-button rounded-2xl bg-pkpk-primary-bg font-bold text-white"
+              className="app-action-button app-bottom-sheet-action-primary rounded-2xl font-bold"
               isDisabled={!clubName.trim() || isCreating || !isOnline}
               onPress={() => void createClub()}
             >
@@ -1398,7 +1399,7 @@ const Affiliations: React.FC = () => {
           <BottomSheet.Actions>
             <Button
               type="button"
-              className="app-action-button rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
+              className="app-action-button app-bottom-sheet-action-secondary rounded-2xl font-semibold"
               isDisabled={isCreatingAnnouncement}
               onPress={() => closeAnnouncementCreateSheet()}
             >
@@ -1406,7 +1407,7 @@ const Affiliations: React.FC = () => {
             </Button>
             <Button
               type="button"
-              className="app-action-button rounded-2xl bg-pkpk-primary-bg font-semibold text-white"
+              className="app-action-button app-bottom-sheet-action-primary rounded-2xl font-semibold"
               isDisabled={
                 !isOnline ||
                 !isManager ||
@@ -1427,14 +1428,16 @@ const Affiliations: React.FC = () => {
         ariaLabel="공지 제거 확인"
         title="공지를 제거할까요?"
         footer={
-          <Button
-            type="button"
-            className="bg-error font-semibold text-white hover:bg-[#e9545e]"
+          <HoldToConfirmButton
+            holdDurationMs={1000}
+            ariaLabel="길게 눌러 공지 제거"
+            className="w-full justify-center whitespace-nowrap bg-error font-semibold text-white hover:bg-[#e9545e]"
+            progressClassName="bg-white/20"
             isDisabled={isDeletingAnnouncement}
-            onPress={() => void removeAnnouncement()}
+            onComplete={() => void removeAnnouncement()}
           >
-            {isDeletingAnnouncement ? "제거 중..." : "제거"}
-          </Button>
+            {isDeletingAnnouncement ? "제거 중..." : "길게 눌러 제거"}
+          </HoldToConfirmButton>
         }
       >
         <p className="text-sm leading-6 text-pkpk-sub-font">
@@ -1553,7 +1556,7 @@ const Affiliations: React.FC = () => {
             />
             <article className="space-y-4 px-4 py-5">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="min-w-0 flex-1 break-words text-[1.5rem] font-bold text-pkpk-main-font">
+                <h2 className="min-w-0 flex-1 break-words text-[calc(1.5rem*var(--app-font-scale))] font-bold text-pkpk-main-font">
                   {selectedAnnouncement.title}
                 </h2>
                 {isManager ? (

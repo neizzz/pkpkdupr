@@ -129,7 +129,7 @@ const TabPanelHeader: React.FC<TabPanelHeaderProps> = ({
     >
       <div className="relative z-10">
         <div className="flex min-h-12 items-center justify-between px-4">
-          <h2 className="text-[28.8px] font-bold text-pkpk-primary-font">
+          <h2 className="text-[calc(28.8px*var(--app-font-scale))] font-bold text-pkpk-primary-font">
             {title}
           </h2>
           {children}

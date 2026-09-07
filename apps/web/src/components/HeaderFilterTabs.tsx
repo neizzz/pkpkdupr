@@ -32,7 +32,7 @@ const HeaderFilterTabs: React.FC<HeaderFilterTabsProps> = ({
             role="tab"
             aria-selected={isSelected}
             onClick={() => onSelect(tab.id)}
-            className={`inline-flex shrink-0 items-center gap-1 rounded-xl border px-2 py-1 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pkpk-accent-bg ${
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-xs font-bold leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pkpk-accent-bg ${
               isSelected
                 ? "border-pkpk-accent-bg bg-pkpk-accent-bg text-pkpk-primary-bg shadow-[0_3px_9px_rgba(13,11,26,0.18)]"
                 : "border-white/50 bg-white/10 text-pkpk-primary-font shadow-[inset_0_1px_0_rgb(255_255_255_/_0.2),0_2px_8px_rgb(13_11_26_/_0.12)] backdrop-blur-sm hover:bg-pkpk-hover-inverse active:bg-pkpk-pressed-inverse"

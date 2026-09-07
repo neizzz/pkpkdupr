@@ -53,12 +53,12 @@ const DevQrCard: React.FC<{ token: DevPlayerQrToken }> = ({ token }) => (
         <p className="truncate text-sm font-bold text-pkpk-sub-font">
           {token.player.username}
         </p>
-        <p className="mt-0.5 truncate text-[11px] text-pkpk-sub-font">
+        <p className="mt-0.5 truncate text-[calc(11px*var(--app-font-scale))] text-pkpk-sub-font">
           {token.player.id}
         </p>
       </div>
       <span
-        className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${getGenderClassName(
+        className={`app-pill shrink-0 rounded-full px-2 py-1 text-[calc(11px*var(--app-font-scale))] font-semibold ${getGenderClassName(
           token.player.gender,
         )}`}
       >
@@ -107,7 +107,7 @@ const DevUserChipPreview: React.FC = () => (
           크기, 좌우 배치, 긴 이름과 ‘나’ 배지 위치를 비교합니다.
         </p>
       </div>
-      <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
+      <span className="app-pill rounded-full bg-amber-100 px-2 py-1 text-[calc(11px*var(--app-font-scale))] font-semibold text-amber-800">
         Dev Only
       </span>
     </div>
@@ -117,7 +117,7 @@ const DevUserChipPreview: React.FC = () => (
         <p className="text-xs font-semibold text-pkpk-sub-font">
           default · 왼쪽
         </p>
-        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+        <p className="mt-0.5 text-[calc(11px*var(--app-font-scale))] text-pkpk-sub-font">
           높이 24px · 너비 72–120px · ‘나’ x축 40% / y축 -20.5%
         </p>
         <div className="mt-2">
@@ -128,7 +128,7 @@ const DevUserChipPreview: React.FC = () => (
         <p className="text-xs font-semibold text-pkpk-sub-font">
           default · 오른쪽
         </p>
-        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+        <p className="mt-0.5 text-[calc(11px*var(--app-font-scale))] text-pkpk-sub-font">
           높이 24px · 너비 72–120px · ‘나’ x축 40% / y축 -20.5%
         </p>
         <div className="mt-2 flex justify-end">
@@ -143,7 +143,7 @@ const DevUserChipPreview: React.FC = () => (
         <p className="text-xs font-semibold text-pkpk-sub-font">
           match · 왼쪽
         </p>
-        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+        <p className="mt-0.5 text-[calc(11px*var(--app-font-scale))] text-pkpk-sub-font">
           높이 32–44px · 너비 96–160px · ‘나’ 120%
         </p>
         <div className="mt-2">
@@ -158,7 +158,7 @@ const DevUserChipPreview: React.FC = () => (
         <p className="text-xs font-semibold text-pkpk-sub-font">
           match · 오른쪽
         </p>
-        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+        <p className="mt-0.5 text-[calc(11px*var(--app-font-scale))] text-pkpk-sub-font">
           높이 32–44px · 너비 96–160px · ‘나’ 120%
         </p>
         <div className="mt-2 flex justify-end">
@@ -174,7 +174,7 @@ const DevUserChipPreview: React.FC = () => (
         <p className="text-xs font-semibold text-pkpk-sub-font">
           매치 생성 · default · ‘나’ 배지 x축 40% / y축 -20.5%
         </p>
-        <p className="mt-0.5 text-[11px] text-pkpk-sub-font">
+        <p className="mt-0.5 text-[calc(11px*var(--app-font-scale))] text-pkpk-sub-font">
           실제 CreateMatchTeamGrid · 높이 24px · 너비 72–120px
         </p>
         <div className="mt-2 flex justify-center">

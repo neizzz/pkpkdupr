@@ -138,7 +138,7 @@ const PlayerQrScannerModalContent: React.FC<
               aria-hidden="true"
               className="pointer-events-none absolute inset-8 rounded-3xl border-2 border-white/80 shadow-[0_0_0_999px_rgba(0,0,0,0.22)]"
             />
-            <p className="bs-text-caption absolute inset-x-0 bottom-4 mx-auto w-fit rounded-full bg-black/55 px-3 py-1 font-semibold text-white">
+            <p className="app-pill bs-text-caption absolute inset-x-0 bottom-4 mx-auto w-fit rounded-full bg-black/55 px-3 py-1 font-semibold text-white">
               QR 코드를 스캔 중입니다.
             </p>
           </div>
@@ -155,7 +155,7 @@ const PlayerQrScannerModalContent: React.FC<
 
         {scannerStatus === "success" ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white px-5 text-center">
-            <div className="bs-text-caption rounded-full bg-[#409eff]/10 px-3 py-1 font-bold text-[#409eff]">
+            <div className="app-pill bs-text-caption rounded-full bg-[#409eff]/10 px-3 py-1 font-bold text-[#409eff]">
               처리 완료
             </div>
             <p className="bs-text-title text-pkpk-main-font">
@@ -166,7 +166,7 @@ const PlayerQrScannerModalContent: React.FC<
 
         {scannerStatus === "error" ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white px-5 text-center">
-            <div className="bs-text-caption rounded-full bg-error/10 px-3 py-1 font-bold text-error">
+            <div className="app-pill bs-text-caption rounded-full bg-error/10 px-3 py-1 font-bold text-error">
               스캔 실패
             </div>
             <p className="bs-text-title text-error">{scannerError}</p>
@@ -178,13 +178,13 @@ const PlayerQrScannerModalContent: React.FC<
         {scannerStatus === "error" ? (
           <>
             <Button
-              className="app-action-button flex-1 rounded-2xl bg-slate-100 text-slate-700"
+              className="app-action-button app-bottom-sheet-action-secondary flex-1 rounded-2xl font-semibold"
               onPress={closeScanner}
             >
               닫기
             </Button>
             <Button
-              className="app-action-button flex-1 rounded-2xl bg-[#409eff] font-semibold text-white"
+              className="app-action-button app-bottom-sheet-action-secondary flex-1 rounded-2xl font-semibold"
               onPress={retryScan}
             >
               다시 스캔
@@ -194,7 +194,7 @@ const PlayerQrScannerModalContent: React.FC<
 
         {scannerStatus === "scanning" || scannerStatus === "verifying" ? (
           <Button
-            className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white"
+            className="app-action-button app-bottom-sheet-action-secondary w-full rounded-2xl font-semibold"
             onPress={closeScanner}
           >
             완료
@@ -203,7 +203,7 @@ const PlayerQrScannerModalContent: React.FC<
 
         {scannerStatus === "success" ? (
           <Button
-            className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white"
+            className="app-action-button app-bottom-sheet-action-secondary w-full rounded-2xl font-semibold"
             onPress={closeScanner}
           >
             닫기

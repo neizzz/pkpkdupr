@@ -84,14 +84,14 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
         <div className="flex h-8 items-start">
           {hasStatusMessage ? (
             <p
-              className="flex h-8 min-w-0 max-w-full items-center truncate rounded-lg px-1.5 py-1 text-[clamp(0.875rem,3.75cqw,1rem)] leading-tight"
+              className="flex h-8 min-w-0 max-w-full items-center truncate rounded-lg px-1.5 py-1 text-[clamp(calc(0.875rem*var(--app-font-scale)),calc(3.75cqw*var(--app-font-scale)),calc(1rem*var(--app-font-scale)))] leading-tight"
               style={getStatusMessageColors(backgroundColor)}
             >
               {statusMessage.trim()}
             </p>
           ) : (
             <div className="flex h-8 items-center rounded-lg border border-dashed border-pkpk-detail-font/70 px-1.5 py-1">
-              <p className="text-[clamp(0.875rem,3.75cqw,1rem)] leading-tight text-pkpk-detail-font">
+              <p className="text-[clamp(calc(0.875rem*var(--app-font-scale)),calc(3.75cqw*var(--app-font-scale)),calc(1rem*var(--app-font-scale)))] leading-tight text-pkpk-detail-font">
                 표시할 상태메시지가 없습니다.
               </p>
             </div>
@@ -155,7 +155,7 @@ const StatusMessageEditSheetBody: React.FC<StatusMessageEditSheetBodyProps> = ({
           type="button"
           disabled={isSaving}
           onClick={() => void save()}
-          className="app-action-button rounded-2xl bg-pkpk-primary-bg text-base font-semibold text-white disabled:opacity-50"
+          className="app-action-button app-bottom-sheet-action-primary rounded-2xl text-base font-semibold"
         >
           {isSaving ? "저장 중..." : "저장"}
         </button>

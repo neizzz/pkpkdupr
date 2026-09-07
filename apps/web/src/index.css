@@ -33,6 +33,7 @@
 }
 
 :root {
+  --app-font-scale: 1.1;
   --app-shell-height: 100vh;
   --app-keyboard-offset: 0px;
   --safe-bottom: max(12px, env(safe-area-inset-bottom));
@@ -41,6 +42,10 @@
     calc(4.70448vw + 3.293136rem),
     4.70448rem
   );
+}
+
+html[data-font-size="large"] {
+  --app-font-scale: 1.43;
 }
 
 @supports (height: 100svh) {
@@ -142,6 +147,73 @@
   }
 }
 
+/*
+ * 기본 글자는 기존보다 10% 키우고, 큰 글자는 그 기본값보다 30% 키운다.
+ * root rem과 spacing은 유지해 여백, 아이콘, 컨트롤은 함께 커지지 않는다.
+ */
+html[data-font-size] body {
+  font-size: calc(1rem * var(--app-font-scale));
+  line-height: calc(1.5rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-xs {
+  font-size: calc(0.75rem * var(--app-font-scale));
+  line-height: calc(1rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-sm {
+  font-size: calc(0.875rem * var(--app-font-scale));
+  line-height: calc(1.25rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-base {
+  font-size: calc(1rem * var(--app-font-scale));
+  line-height: calc(1.5rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-lg {
+  font-size: calc(1.125rem * var(--app-font-scale));
+  line-height: calc(1.75rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-xl {
+  font-size: calc(1.25rem * var(--app-font-scale));
+  line-height: calc(1.75rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-2xl {
+  font-size: calc(1.5rem * var(--app-font-scale));
+  line-height: calc(2rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-3xl {
+  font-size: calc(1.875rem * var(--app-font-scale));
+  line-height: calc(2.25rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-4xl {
+  font-size: calc(2.25rem * var(--app-font-scale));
+  line-height: calc(2.5rem * var(--app-font-scale));
+}
+
+html[data-font-size] .text-5xl {
+  font-size: calc(3rem * var(--app-font-scale));
+  line-height: 1;
+}
+
+html[data-font-size] .font-scalable-login-title {
+  font-size: calc(1.2rem * var(--app-font-scale));
+}
+
+html[data-font-size] .leading-3 { line-height: calc(0.75rem * var(--app-font-scale)); }
+html[data-font-size] .leading-4 { line-height: calc(1rem * var(--app-font-scale)); }
+html[data-font-size] .leading-5 { line-height: calc(1.25rem * var(--app-font-scale)); }
+html[data-font-size] .leading-6 { line-height: calc(1.5rem * var(--app-font-scale)); }
+html[data-font-size] .leading-7 { line-height: calc(1.75rem * var(--app-font-scale)); }
+html[data-font-size] .leading-8 { line-height: calc(2rem * var(--app-font-scale)); }
+html[data-font-size] .leading-9 { line-height: calc(2.25rem * var(--app-font-scale)); }
+html[data-font-size] .leading-10 { line-height: calc(2.5rem * var(--app-font-scale)); }
+
 @supports (overflow: clip) {
   @layer base {
     html,
@@ -214,6 +286,19 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  @media (hover: hover) and (pointer: fine) {
+    * {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    *::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+  }
+
   @media (max-width: 480px) {
     .app-tab-panel-scroll-area,
     .app-bottom-sheet-body,
@@ -230,8 +315,8 @@
 
   .app-mobile-input {
     min-height: 2.75rem;
-    font-size: 16px;
-    line-height: 1.5;
+    font-size: calc(16px * var(--app-font-scale));
+    line-height: calc(24px * var(--app-font-scale));
     appearance: none;
     -webkit-appearance: none;
     transition:
@@ -250,6 +335,46 @@
   .app-action-button {
     min-height: 3rem;
     height: 3rem;
+  }
+
+  /*
+   * Bottom sheet actions share one hierarchy regardless of the feature that
+   * renders them. Keep a common disabled appearance so a pending action does
+   * not accidentally inherit a feature-specific color.
+   */
+  .app-bottom-sheet-action-primary {
+    background-color: var(--color-pkpk-primary-bg) !important;
+    color: var(--color-pkpk-primary-font) !important;
+  }
+
+  .app-bottom-sheet-action-primary:hover:not(:disabled) {
+    background-color: var(--color-pkpk-primary-hover) !important;
+  }
+
+  .app-bottom-sheet-action-secondary {
+    background-color: #f1f5f9 !important;
+    color: var(--color-pkpk-sub-font) !important;
+  }
+
+  .app-bottom-sheet-action-secondary:hover:not(:disabled) {
+    background-color: #e2e8f0 !important;
+  }
+
+  .app-bottom-sheet-action-primary:is(:disabled, [data-disabled="true"]),
+  .app-bottom-sheet-action-secondary:is(:disabled, [data-disabled="true"]) {
+    background-color: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+  }
+
+  /*
+   * Text pills grow with the selected font size.  A fixed height combined
+   * with a larger line-height makes HeroUI chips look like rounded rectangles
+   * rather than capsules, so the radius and minimum height are explicit.
+   */
+  .app-pill {
+    min-height: calc(1.5rem * var(--app-font-scale));
+    border-radius: 9999px !important;
   }
 
   .bs-text-head {

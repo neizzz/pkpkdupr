@@ -2,11 +2,13 @@ import { Spinner } from "@heroui/react";
 import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import BottomNav from "./components/BottomNav";
+import FontSizePreferenceGate from "./components/FontSizePreferenceGate";
 import OfflineBanner from "./components/OfflineBanner";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import PwaUpdatePrompt from "./components/PwaUpdatePrompt";
 import { AppUpdateProvider } from "./context/AppUpdateContext";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { FontSizePreferenceProvider } from "./context/FontSizePreferenceContext";
 import { PkeloNoticeProvider } from "./context/PkeloNoticeContext";
 import DevQrs from "./pages/DevQrs";
 import ForceChangePassword from "./pages/ForceChangePassword";
@@ -134,7 +136,9 @@ function AppRoutes() {
           ) : requiresPasswordChange ? (
             <Navigate to="/force-change-password" replace />
           ) : (
-            <BottomNav />
+            <FontSizePreferenceGate>
+              <BottomNav />
+            </FontSizePreferenceGate>
           )
         }
       />
@@ -340,10 +344,12 @@ function App() {
         <PkeloNoticeProvider>
           <AppUpdateProvider>
             <AuthProvider>
-              <OfflineBanner />
-              <PwaInstallPrompt />
-              <PwaUpdatePrompt />
-              <AppRoutes />
+              <FontSizePreferenceProvider>
+                <OfflineBanner />
+                <PwaInstallPrompt />
+                <PwaUpdatePrompt />
+                <AppRoutes />
+              </FontSizePreferenceProvider>
             </AuthProvider>
           </AppUpdateProvider>
         </PkeloNoticeProvider>

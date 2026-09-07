@@ -792,7 +792,7 @@ const Members: React.FC = () => {
             <button
               type="button"
               aria-label="친구 추가"
-              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font disabled:cursor-not-allowed disabled:opacity-40"
+              className="app-pill inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-sm font-semibold text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font disabled:cursor-not-allowed disabled:opacity-40"
               disabled={!isOnline}
               onClick={() => setIsFriendQrScannerOpen(true)}
             >
@@ -804,7 +804,7 @@ const Members: React.FC = () => {
             </button>
             <button
               type="button"
-              className="rounded-full text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font"
+              className="app-pill rounded-full text-pkpk-primary-font transition-colors hover:text-pkpk-accent-font"
               onClick={openMyProfile}
             >
               <ProfileIdentityLabel
@@ -826,7 +826,7 @@ const Members: React.FC = () => {
         <div className="relative z-30 mx-auto flex min-h-full w-full flex-1 flex-col">
             <div>
               {notice ? (
-                <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(0.6875rem,3cqw,0.9rem)] font-semibold text-pkpk-sub-font">
+                <p className="mx-2 mt-2 rounded-2xl bg-amber-50 px-3 py-2 text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] font-semibold text-pkpk-sub-font">
                   {notice}
                 </p>
               ) : null}
@@ -873,7 +873,7 @@ const Members: React.FC = () => {
                             name={member.username}
                           />
                           <div className="flex min-w-0 flex-1 flex-col gap-1 self-start pt-1">
-                            <p className="truncate text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold text-pkpk-main-font">
+                            <p className="truncate text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.35rem*var(--app-font-scale)))] font-semibold text-pkpk-main-font">
                               {member.username}
                             </p>
                             {member.statusMessage ||
@@ -895,14 +895,14 @@ const Members: React.FC = () => {
                                 />
                               </div>
                             ) : null}
-                            <p className="truncate text-[clamp(0.6875rem,3cqw,0.9rem)] text-pkpk-detail-font">
+                            <p className="truncate text-[clamp(calc(0.6875rem*var(--app-font-scale)),calc(3cqw*var(--app-font-scale)),calc(0.9rem*var(--app-font-scale)))] text-pkpk-detail-font">
                               {formatLastPlayedAt(member.lastPlayedAt)}
                             </p>
                           </div>
                         </div>
                         <div className="relative z-0 ml-auto flex shrink-0 items-center gap-2 pointer-events-none">
                           <span
-                            className={`text-[clamp(1rem,4.5cqw,1.35rem)] font-semibold tabular-nums ${
+                            className={`text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.35rem*var(--app-font-scale)))] font-semibold tabular-nums ${
                               doublesRating == null
                                 ? "text-pkpk-detail-font"
                                 : "text-pkpk-dupr-font"

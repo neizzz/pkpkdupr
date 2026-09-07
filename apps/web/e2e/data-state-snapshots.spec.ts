@@ -1,6 +1,12 @@
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 const privacyPolicyVersion = "2026-08-31";
+type VisualFontSizePreference = "default" | "large";
+const visualFontSizePreferences: VisualFontSizePreference[] = [
+  "default",
+  "large",
+];
+let activeVisualFontSizePreference: VisualFontSizePreference = "default";
 
 type FixtureOptions = {
   authenticated?: boolean;
@@ -18,6 +24,7 @@ type FixtureOptions = {
   sessionEmpty?: boolean;
   useFixedClock?: boolean;
   withdrawalBlocked?: boolean;
+  withdrawalBlockerCopies?: number;
   withdrawalEligibilityGate?: Promise<void>;
   withdrawalTracker?: { confirmations: string[] };
 };
@@ -55,6 +62,7 @@ const jiwoo = {
   username: "박지우",
   gender: "F",
   birthDate: "1994-08-20",
+  age: 31,
   status: "active",
   duprRating: { singles: 3.64, doubles: 3.92 },
   avatarUrl: avatar("지", "#db2777"),
@@ -227,6 +235,7 @@ const profileSummary = (empty = false) => ({
         ],
   },
   recentMatches: empty ? [] : [primaryMatch, secondaryMatch],
+  recentMatchTotal: empty ? 0 : 4,
 });
 
 const club = {
@@ -359,6 +368,7 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
             ? "김하늘🎾Alice피클볼이름이길어도아이디옆에서최대한길게표시합니다"
             : me.username,
           isFirstLogin: false,
+          fontSizePreference: activeVisualFontSizePreference,
           privacyPolicyConsentVersion,
         },
       });
@@ -370,17 +380,29 @@ const installFixture = async (page: Page, options: FixtureOptions = {}) => {
           ? "김하늘🎾Alice피클볼이름이길어도아이디옆에서최대한길게표시합니다"
           : me.username,
         isFirstLogin: false,
+        fontSizePreference: activeVisualFontSizePreference,
         privacyPolicyConsentVersion,
       });
     }
     if (path === "/api/me/withdrawal-eligibility") {
       await options.withdrawalEligibilityGate;
+      const blockerCopies = Math.max(1, options.withdrawalBlockerCopies ?? 1);
       return fulfillJson(route, options.withdrawalBlocked
         ? {
             eligible: false,
             blockers: {
               ownedClubs: [{ id: club.id, name: club.name }],
-              activeMatches: [{ id: primaryMatch.id, name: primaryMatch.name, status: "evaluating" }],
+              activeMatches: Array.from({ length: blockerCopies }, (_, index) => ({
+                id:
+                  blockerCopies === 1
+                    ? primaryMatch.id
+                    : `${primaryMatch.id}-${index}`,
+                name:
+                  blockerCopies === 1
+                    ? primaryMatch.name
+                    : `${primaryMatch.name} ${index + 1}`,
+                status: "evaluating",
+              })),
               upcomingSessions: [{ id: session.id, name: session.name, date: session.date }],
             },
           }
@@ -476,14 +498,81 @@ const openApp = async (page: Page, options: FixtureOptions = {}) => {
   await installFixture(page, options);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Players" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-font-size",
+    activeVisualFontSizePreference,
+  );
 };
 
-const capture = (page: Page, name: string) =>
-  expect(page).toHaveScreenshot(name, {
-    animations: "disabled",
-    caret: "hide",
-    fullPage: true,
+const capture = async (page: Page, name: string) => {
+  await page.locator("html").evaluate((html, preference) => {
+    html.dataset.fontSize = preference;
+  }, activeVisualFontSizePreference);
+  await expect(page).toHaveScreenshot(
+    activeVisualFontSizePreference === "default"
+      ? name
+      : `large--${name}`,
+    {
+      animations: "disabled",
+      caret: "hide",
+      fullPage: true,
+    },
+  );
+};
+
+const expectVisiblePillsToBeFullyRounded = async (locator: Locator) => {
+  const pillMetrics = await locator.evaluateAll((elements) =>
+    elements
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          height: rect.height,
+          radius: Number.parseFloat(
+            window.getComputedStyle(element).borderTopLeftRadius,
+          ),
+        };
+      })
+      .filter((metric) => metric.height > 0),
+  );
+
+  expect(pillMetrics.length).toBeGreaterThan(0);
+  pillMetrics.forEach(({ height, radius }) => {
+    expect(radius).toBeGreaterThanOrEqual(height / 2);
   });
+};
+
+const expectModalButtonTextToFit = async (locator: Locator) => {
+  await expect(locator).toHaveCSS("white-space", "nowrap");
+  await expect
+    .poll(() =>
+      locator.evaluate((element) => element.scrollWidth <= element.clientWidth),
+    )
+    .toBe(true);
+};
+
+const expectBottomSheetActionTone = async (
+  locator: Locator,
+  tone: "primary" | "secondary",
+) => {
+  await expect(locator).toHaveClass(
+    new RegExp(`app-bottom-sheet-action-${tone}`),
+  );
+
+  if (await locator.isDisabled()) {
+    await expect(locator).toHaveCSS("background-color", "rgb(226, 232, 240)");
+    await expect(locator).toHaveCSS("color", "rgb(148, 163, 184)");
+    return;
+  }
+
+  await expect(locator).toHaveCSS(
+    "background-color",
+    tone === "primary" ? "rgb(59, 82, 204)" : "rgb(241, 245, 249)",
+  );
+  await expect(locator).toHaveCSS(
+    "color",
+    tone === "primary" ? "rgb(255, 255, 255)" : "rgb(92, 104, 128)",
+  );
+};
 
 const expectPressedBackground = async (
   page: Page,
@@ -537,6 +626,12 @@ const openMyProfile = async (page: Page, options: FixtureOptions = {}) => {
   await expect(page.getByRole("dialog", { name: "내 프로필" })).toBeVisible();
 };
 
+for (const fontSizePreference of visualFontSizePreferences) {
+  test.describe(`글자 크기 ${fontSizePreference}`, () => {
+    test.beforeEach(() => {
+      activeVisualFontSizePreference = fontSizePreference;
+    });
+
 test("카카오 로그인 화면", async ({ page }) => {
   await installFixture(page, { authenticated: false });
   await page.goto("http://pkelo.localhost:4173/login");
@@ -580,21 +675,50 @@ test("매치 탭의 with-data와 empty 상태", async ({ page }) => {
 test("매치와 세션 상세의 data 상태", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "내 매치" }).click();
+  await expect(page.locator(".app-pill").first()).toBeVisible();
+  await expectVisiblePillsToBeFullyRounded(page.locator(".app-pill"));
   await page.getByRole("button", { name: "테스트 복식 매치 상세 보기" }).click();
-  await expect(page.getByRole("dialog", { name: "매치 상세" })).toBeVisible();
+  const matchDetail = page.getByRole("dialog", { name: "매치 상세" });
+  await expect(matchDetail).toBeVisible();
+  await expect(matchDetail.getByText("스코어", { exact: true })).toBeVisible();
   await capture(page, "match-detail--with-data.png");
   await page.getByRole("button", { name: "뒤로가기" }).click();
   await expect(page.getByRole("dialog", { name: "매치 상세" })).toBeHidden();
   await page.getByRole("button", { name: "토요 오픈플레이 세션 상세 보기" }).click();
-  await expect(page.getByRole("dialog", { name: "세션 상세" })).toBeVisible();
+  const sessionDetail = page.getByRole("dialog", { name: "세션 상세" });
+  await expect(sessionDetail).toBeVisible();
+  await expect(
+    sessionDetail.getByRole("button", {
+      name: "테스트 복식 매치 상세 보기",
+    }),
+  ).toBeVisible();
   await capture(page, "session-detail--with-data.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openApp(page, { sessionEmpty: true });
   await page.getByRole("tab", { name: "내 매치" }).click();
   await page.getByRole("button", { name: "토요 오픈플레이 세션 상세 보기" }).click();
-  await expect(page.getByRole("dialog", { name: "세션 상세" })).toBeVisible();
-  await expect(page.getByText("이 세션에 표시할 내 경기가 없어요.")).toBeVisible();
+  const emptySessionDetail = page.getByRole("dialog", { name: "세션 상세" });
+  await expect(emptySessionDetail).toBeVisible();
+  const emptySessionMessage = page.getByText(
+    "이 세션에 표시할 내 경기가 없어요.",
+  );
+  await expect(emptySessionMessage).toBeVisible();
+  const [sessionMatchesBox, emptySessionMessageBox] = await Promise.all([
+    emptySessionDetail.getByRole("region", { name: "Matches" }).boundingBox(),
+    emptySessionMessage.boundingBox(),
+  ]);
+  expect(sessionMatchesBox).not.toBeNull();
+  expect(emptySessionMessageBox).not.toBeNull();
+  const emptySessionMessageCenterY =
+    (emptySessionMessageBox?.y ?? 0) +
+    (emptySessionMessageBox?.height ?? 0) / 2;
+  expect(emptySessionMessageCenterY).toBeGreaterThan(
+    (sessionMatchesBox?.y ?? 0) + (sessionMatchesBox?.height ?? 0) * 0.35,
+  );
+  expect(emptySessionMessageCenterY).toBeLessThan(
+    (sessionMatchesBox?.y ?? 0) + (sessionMatchesBox?.height ?? 0) * 0.75,
+  );
   await capture(page, "session-detail--empty.png");
 });
 
@@ -696,19 +820,37 @@ test.describe("마우스 hover 피드백", () => {
 test("매치 생성 바텀시트와 내 QR modal", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "내 매치" }).click();
+  await expect(page.getByText("토요 오픈플레이", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "+ 매치 만들기" }).click();
-  await expect(page.getByRole("dialog", { name: "Create match" })).toBeVisible();
+  const createMatchSheet = page.getByRole("dialog", { name: "Create match" });
+  await expect(createMatchSheet).toBeVisible();
+  await expectBottomSheetActionTone(
+    createMatchSheet.getByRole("button", { name: "취소" }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    createMatchSheet.getByRole("button", { name: "길게 눌러 매치생성" }),
+    "primary",
+  );
   await capture(page, "create-match-sheet.png");
 
   await page.getByRole("button", { name: "취소" }).click();
   await page.getByRole("button", { name: "내 QR 코드 열기" }).click();
-  await expect(page.getByRole("dialog", { name: "내 QR 코드" })).toBeVisible();
+  const playerQrModal = page.getByRole("dialog", { name: "내 QR 코드" });
+  await expect(playerQrModal).toBeVisible();
+  const qrWithDataBox = await playerQrModal.boundingBox();
   await capture(page, "player-qr-modal--with-data.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
   await openApp(page, { qrError: true });
   await page.getByRole("button", { name: "내 QR 코드 열기" }).click();
   await expect(page.getByText("QR 코드를 생성하지 못했어요.")).toBeVisible();
+  const qrEmptyBox = await page
+    .getByRole("dialog", { name: "내 QR 코드" })
+    .boundingBox();
+  expect(qrWithDataBox).not.toBeNull();
+  expect(qrEmptyBox).not.toBeNull();
+  expect(qrEmptyBox?.height).toBeCloseTo(qrWithDataBox?.height ?? 0, 3);
   await capture(page, "player-qr-modal--empty.png");
 });
 
@@ -819,16 +961,25 @@ test("멤버 프로필과 전체 매치 drawer의 with-data와 empty 상태", as
   const emptyProfileMatchHistoryDrawer = page.getByRole("dialog", {
     name: "전체 매치",
   });
-  await expect(page.getByText("완료된 매치가 없어요.", { exact: true })).toBeVisible();
-  await emptyProfileMatchHistoryDrawer.evaluate((element) => {
-    const spacer = document.createElement("div");
-    spacer.style.height = "1000px";
-    element.append(spacer);
-    element.scrollTo({ top: 120 });
-  });
-  await expect
-    .poll(() => emptyProfileMatchHistoryDrawer.evaluate((element) => element.scrollTop))
-    .toBeGreaterThan(0);
+  const emptyMatchMessage = emptyProfileMatchHistoryDrawer.getByText(
+    "완료된 매치가 없어요.",
+    { exact: true },
+  );
+  await expect(emptyMatchMessage).toBeVisible();
+  const [emptyDrawerBox, emptyMessageBox] = await Promise.all([
+    emptyProfileMatchHistoryDrawer.boundingBox(),
+    emptyMatchMessage.boundingBox(),
+  ]);
+  expect(emptyDrawerBox).not.toBeNull();
+  expect(emptyMessageBox).not.toBeNull();
+  const emptyMessageCenterY =
+    (emptyMessageBox?.y ?? 0) + (emptyMessageBox?.height ?? 0) / 2;
+  expect(emptyMessageCenterY).toBeGreaterThan(
+    (emptyDrawerBox?.y ?? 0) + (emptyDrawerBox?.height ?? 0) * 0.35,
+  );
+  expect(emptyMessageCenterY).toBeLessThan(
+    (emptyDrawerBox?.y ?? 0) + (emptyDrawerBox?.height ?? 0) * 0.75,
+  );
   await capture(page, "profile-match-history--empty.png");
 });
 
@@ -941,7 +1092,12 @@ test("내 프로필과 데이터 독립 바텀시트", async ({ page }) => {
   ).toContainText("3.720");
   await myProfile.getByRole("tab", { name: "Doubles" }).click();
   await page.getByRole("button", { name: "상태메시지 수정" }).click();
-  await expect(page.getByRole("dialog", { name: "상태메시지 수정" })).toBeVisible();
+  const statusMessageSheet = page.getByRole("dialog", { name: "상태메시지 수정" });
+  await expect(statusMessageSheet).toBeVisible();
+  await expectBottomSheetActionTone(
+    statusMessageSheet.getByRole("button", { name: "저장" }),
+    "primary",
+  );
   await capture(page, "status-message-sheet--with-data.png");
 
   await page.getByRole("button", { name: "Close" }).click();
@@ -988,7 +1144,7 @@ test("내 프로필 긴 이름은 Rating 카드 경계 안에서 ID와 함께 �
   await expect(profileDialog.getByText("70%")).toBeVisible();
   await expect
     .poll(() => profileName.textContent())
-    .toMatch(/^김하늘🎾.*…$/);
+    .toMatch(/^김.+…$/);
   const [nameBox, playerIdBox, ratingCardBox] = await Promise.all([
     profileName.boundingBox(),
     playerIdButton.boundingBox(),
@@ -1044,7 +1200,12 @@ test("클럽 탭과 클럽 내부 surface의 with-data와 empty 상태", async (
   ).toBeVisible();
   await capture(page, "affiliations--empty.png");
   await page.getByRole("button", { name: "+ 클럽 만들기" }).click();
-  await expect(page.getByRole("dialog", { name: "클럽 만들기" })).toBeVisible();
+  const clubCreateSheet = page.getByRole("dialog", { name: "클럽 만들기" });
+  await expect(clubCreateSheet).toBeVisible();
+  await expectBottomSheetActionTone(
+    clubCreateSheet.getByRole("button", { name: "클럽 만들기" }),
+    "primary",
+  );
   await capture(page, "club-create-sheet.png");
 });
 
@@ -1187,7 +1348,11 @@ test("설정 탭 운영방침 drawer와 로그아웃 확인 modal", async ({ pag
   await expect(operatingPolicyDrawer).toHaveCount(0);
 
   await page.getByRole("button", { name: "로그아웃" }).click();
-  await expect(page.getByRole("dialog", { name: "로그아웃 확인" })).toBeVisible();
+  const logoutDialog = page.getByRole("dialog", { name: "로그아웃 확인" });
+  await expect(logoutDialog).toBeVisible();
+  await expectModalButtonTextToFit(
+    logoutDialog.getByRole("button", { name: "로그아웃", exact: true }),
+  );
   await capture(page, "logout-modal.png");
 });
 
@@ -1197,12 +1362,12 @@ test("회원 탈퇴 가능 상태와 차단 항목 modal", async ({ page }) => {
   await page.getByRole("button", { name: "회원탈퇴" }).click();
   const eligibleModal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
   await expect(eligibleModal.getByLabel("탈퇴 확인 문구")).toBeVisible();
-  await expect(
-    eligibleModal.getByRole("button", {
-      name: "길게 눌러 회원탈퇴",
-      exact: true,
-    }),
-  ).toBeDisabled();
+  const withdrawalButton = eligibleModal.getByRole("button", {
+    name: "길게 눌러 회원탈퇴",
+    exact: true,
+  });
+  await expect(withdrawalButton).toBeDisabled();
+  await expectModalButtonTextToFit(withdrawalButton);
   await capture(page, "settings-withdrawal--eligible.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -1213,7 +1378,79 @@ test("회원 탈퇴 가능 상태와 차단 항목 modal", async ({ page }) => {
   await expect(blockedModal.getByText("소유 클럽")).toBeVisible();
   await expect(blockedModal.getByText("진행 중인 경기")).toBeVisible();
   await expect(blockedModal.getByText("예정 세션")).toBeVisible();
+  const blockedItemsScrollArea = blockedModal.getByRole("region", {
+    name: "탈퇴 전 정리 항목",
+  });
+  await expect(blockedItemsScrollArea).toBeVisible();
+  await expect(blockedItemsScrollArea).toHaveCSS("border-top-style", "solid");
+  const blockedModalConfirmButton = blockedModal.getByRole("button", {
+    name: "확인",
+    exact: true,
+  });
+  await expect(blockedModalConfirmButton).toBeVisible();
+  await expect(blockedModalConfirmButton).toBeEnabled();
   await capture(page, "settings-withdrawal--blocked.png");
+  await blockedModalConfirmButton.click();
+  await expect(blockedModal).toBeHidden();
+});
+
+test("회원 탈퇴 모달은 최대 높이를 넘지 않는다", async ({ page }) => {
+  let resolveEligibility!: () => void;
+  const withdrawalEligibilityGate = new Promise<void>((resolve) => {
+    resolveEligibility = resolve;
+  });
+  await openApp(page, {
+    withdrawalBlocked: true,
+    withdrawalEligibilityGate,
+  });
+  await page.getByRole("tab", { name: "설정" }).click();
+  await page.getByRole("button", { name: "회원탈퇴" }).click();
+
+  const modal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
+  await expect(modal.getByText("탈퇴 가능 여부를 확인하고 있습니다...")).toBeVisible();
+  const loadingBox = await modal.boundingBox();
+  expect(loadingBox).not.toBeNull();
+
+  resolveEligibility();
+  await expect(modal.getByRole("region", { name: "탈퇴 전 정리 항목" })).toBeVisible();
+  const loadedBox = await modal.boundingBox();
+  expect(loadedBox).not.toBeNull();
+  expect(loadedBox?.width).toBeCloseTo(loadingBox?.width ?? 0, 1);
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  expect(loadedBox?.height ?? 0).toBeLessThanOrEqual(viewportHeight - 32);
+});
+
+test("회원 탈퇴 차단 항목이 많으면 modal 본문을 스크롤한다", async ({ page }) => {
+  await openApp(page, {
+    withdrawalBlocked: true,
+    withdrawalBlockerCopies: 12,
+  });
+  await page.getByRole("tab", { name: "설정" }).click();
+  await page.getByRole("button", { name: "회원탈퇴" }).click();
+
+  const modal = page.getByRole("dialog", { name: "회원 탈퇴 확인" });
+  await expect(modal.getByText("진행 중인 경기")).toBeVisible();
+  const scrollArea = modal.getByRole("region", { name: "탈퇴 전 정리 항목" });
+  await expect(scrollArea).toHaveCSS("overflow-y", "auto");
+  await expect
+    .poll(() =>
+      scrollArea.evaluate((element) => element.scrollHeight > element.clientHeight),
+    )
+    .toBe(true);
+  await expect(page.getByTestId("withdrawal-blockers-scrollbar")).toBeVisible();
+  const [scrollAreaBox, confirmButtonBox] = await Promise.all([
+    scrollArea.boundingBox(),
+    modal.getByRole("button", { name: "확인", exact: true }).boundingBox(),
+  ]);
+  expect(scrollAreaBox).not.toBeNull();
+  expect(confirmButtonBox).not.toBeNull();
+  expect((scrollAreaBox?.y ?? 0) + (scrollAreaBox?.height ?? 0)).toBeLessThan(
+    (confirmButtonBox?.y ?? 0) - 8,
+  );
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  expect(
+    (confirmButtonBox?.y ?? 0) + (confirmButtonBox?.height ?? 0),
+  ).toBeLessThanOrEqual(viewportHeight);
 });
 
 test("탈퇴 확인 문구가 일치할 때 한 번만 요청하고 로그인 화면으로 이동한다", async ({ page }) => {
@@ -1282,6 +1519,14 @@ test("QR 스캔 modal의 모든 진입점", async ({ page }) => {
   await expect(friendScanner).toContainText(
     "이 브라우저에서는 카메라 스캔을 사용할 수 없어요.",
   );
+  await expectBottomSheetActionTone(
+    friendScanner.getByRole("button", { name: "닫기", exact: true }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    friendScanner.getByRole("button", { name: "다시 스캔" }),
+    "secondary",
+  );
   await capture(page, "friend-qr-scanner-modal--camera-unavailable.png");
   await page.getByRole("button", { name: "친구 QR 스캔 닫기" }).click();
 
@@ -1295,6 +1540,14 @@ test("QR 스캔 modal의 모든 진입점", async ({ page }) => {
   await expect(matchScanner).toContainText(
     "이 브라우저에서는 카메라 스캔을 사용할 수 없어요.",
   );
+  await expectBottomSheetActionTone(
+    matchScanner.getByRole("button", { name: "닫기", exact: true }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    matchScanner.getByRole("button", { name: "다시 스캔" }),
+    "secondary",
+  );
   await capture(page, "match-member-qr-scanner-modal--camera-unavailable.png");
   await page
     .getByRole("button", { name: "매치 멤버 QR 스캔 닫기" })
@@ -1307,6 +1560,14 @@ test("QR 스캔 modal의 모든 진입점", async ({ page }) => {
   await expect(clubScanner).toContainText(
     "이 브라우저에서는 카메라 스캔을 사용할 수 없어요.",
   );
+  await expectBottomSheetActionTone(
+    clubScanner.getByRole("button", { name: "닫기", exact: true }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    clubScanner.getByRole("button", { name: "다시 스캔" }),
+    "secondary",
+  );
   await capture(page, "club-member-qr-scanner-modal--camera-unavailable.png");
 });
 
@@ -1317,9 +1578,16 @@ test("결과 입력 바텀시트와 결과 거부 확인 dialog", async ({ page 
     .getByRole("button", { name: "테스트 복식 매치 상세 보기" })
     .click();
   await page.getByRole("button", { name: "결과 입력" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "경기 결과 입력" }),
-  ).toBeVisible();
+  const resultSheet = page.getByRole("dialog", { name: "경기 결과 입력" });
+  await expect(resultSheet).toBeVisible();
+  await expectBottomSheetActionTone(
+    resultSheet.getByRole("button", { name: "취소" }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    resultSheet.getByRole("button", { name: "결과 입력" }),
+    "primary",
+  );
   await capture(page, "match-result-entry-sheet.png");
 
   await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -1329,9 +1597,13 @@ test("결과 입력 바텀시트와 결과 거부 확인 dialog", async ({ page 
     .getByRole("button", { name: "테스트 복식 매치 상세 보기" })
     .click();
   await page.getByText("결과 거부", { exact: true }).last().click();
-  await expect(
-    page.getByRole("alertdialog", { name: "정말 거부하시겠습니까?" }),
-  ).toBeVisible();
+  const rejectionDialog = page.getByRole("alertdialog", {
+    name: "정말 거부하시겠습니까?",
+  });
+  await expect(rejectionDialog).toBeVisible();
+  await expectModalButtonTextToFit(
+    rejectionDialog.getByRole("button", { name: "길게 눌러 결과 거부" }),
+  );
   await capture(page, "match-result-rejection-dialog.png");
 });
 
@@ -1345,17 +1617,65 @@ test("프로필 사진 확인 바텀시트", async ({ page }) => {
       "base64",
     ),
   });
-  await expect(
-    page.getByRole("dialog", { name: "프로필 사진 확인" }),
-  ).toBeVisible();
+  const avatarConfirmSheet = page.getByRole("dialog", { name: "프로필 사진 확인" });
+  await expect(avatarConfirmSheet).toBeVisible();
+  await expectBottomSheetActionTone(
+    avatarConfirmSheet.getByRole("button", { name: "취소" }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    avatarConfirmSheet.getByRole("button", { name: "적용" }),
+    "primary",
+  );
   await capture(page, "avatar-confirm-sheet.png");
+});
+
+test("상태메시지와 프로필 사진 바텀시트는 공통 액션 색상을 사용한다", async ({ page }) => {
+  await openMyProfile(page);
+  await page.getByRole("button", { name: "상태메시지 수정" }).click();
+  const statusMessageSheet = page.getByRole("dialog", { name: "상태메시지 수정" });
+  await expectBottomSheetActionTone(
+    statusMessageSheet.getByRole("button", { name: "저장" }),
+    "primary",
+  );
+  await page.getByRole("button", { name: "Close" }).last().click();
+  await expect(statusMessageSheet).toBeHidden();
+
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Jf7sAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
+  const avatarConfirmSheet = page.getByRole("dialog", {
+    name: "프로필 사진 확인",
+  });
+  await expectBottomSheetActionTone(
+    avatarConfirmSheet.getByRole("button", { name: "취소" }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    avatarConfirmSheet.getByRole("button", { name: "적용" }),
+    "primary",
+  );
 });
 
 test("공지 추가 바텀시트와 제거 확인 modal", async ({ page }) => {
   await openApp(page);
   await page.getByRole("tab", { name: "클럽" }).click();
   await page.getByRole("button", { name: "+ 공지 추가" }).click();
-  await expect(page.getByRole("dialog", { name: "공지 추가" })).toBeVisible();
+  const announcementCreateSheet = page.getByRole("dialog", { name: "공지 추가" });
+  await expect(announcementCreateSheet).toBeVisible();
+  await expectBottomSheetActionTone(
+    announcementCreateSheet.getByRole("button", { name: "취소" }),
+    "secondary",
+  );
+  await expectBottomSheetActionTone(
+    announcementCreateSheet.getByRole("button", { name: "공지 등록" }),
+    "primary",
+  );
   await capture(page, "club-announcement-create-sheet.png");
   await page.getByRole("button", { name: "취소" }).click();
 
@@ -1364,9 +1684,15 @@ test("공지 추가 바텀시트와 제거 확인 modal", async ({ page }) => {
     .click();
   await page.getByRole("button", { name: "공지 메뉴" }).click();
   await page.getByRole("menuitem", { name: "제거" }).click();
-  await expect(
-    page.getByRole("dialog", { name: "공지 제거 확인" }),
-  ).toBeVisible();
+  const announcementDeleteDialog = page.getByRole("dialog", {
+    name: "공지 제거 확인",
+  });
+  await expect(announcementDeleteDialog).toBeVisible();
+  await expectModalButtonTextToFit(
+    announcementDeleteDialog.getByRole("button", {
+      name: "길게 눌러 공지 제거",
+    }),
+  );
   await capture(page, "club-announcement-delete-modal.png");
 });
 
@@ -1405,7 +1731,17 @@ test("생성 폼 임시 저장을 복원하거나 새로 작성할 수 있다", 
 
   await page.getByRole("tab", { name: "내 매치" }).click();
   await page.getByRole("button", { name: "+ 매치 만들기" }).click();
-  await page.getByRole("button", { name: "이어서 작성" }).click();
+  const draftRestoreDialog = page.getByRole("dialog", {
+    name: "임시 저장 복원",
+  });
+  await expect(draftRestoreDialog).toBeVisible();
+  await expectModalButtonTextToFit(
+    draftRestoreDialog.getByRole("button", { name: "새로 작성" }),
+  );
+  await expectModalButtonTextToFit(
+    draftRestoreDialog.getByRole("button", { name: "이어서 작성" }),
+  );
+  await draftRestoreDialog.getByRole("button", { name: "이어서 작성" }).click();
   const matchSheet = page.getByRole("dialog", { name: "Create match" });
   await expect(matchSheet.getByPlaceholder("매치 이름 입력")).toHaveValue("임시 매치");
   await expect(matchSheet.getByPlaceholder("장소 입력")).toHaveValue("임시 매치 장소");
@@ -1448,3 +1784,5 @@ test("생성 폼 임시 저장을 복원하거나 새로 작성할 수 있다", 
     ),
   ).toBeNull();
 });
+  });
+}

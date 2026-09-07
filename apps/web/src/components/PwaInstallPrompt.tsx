@@ -179,7 +179,7 @@ const PwaInstallPrompt: React.FC = () => {
                   role="img"
                 >
                   <IoShareOutline className="size-3.5" />
-                  <span className="text-[10px] font-bold">공유</span>
+                  <span className="text-[calc(10px*var(--app-font-scale))] font-bold">공유</span>
                 </span>{" "}
                 버튼을 누른 뒤,
                 <br />
@@ -195,7 +195,7 @@ const PwaInstallPrompt: React.FC = () => {
         {installPrompt.kind === "installable" && deferredPrompt ? (
           <Button
             size="sm"
-            className="shrink-0 rounded-full bg-pkpk-primary-bg px-3 text-white"
+            className="app-pill shrink-0 rounded-full bg-pkpk-primary-bg px-3 text-white"
             onPress={() => void handleInstall()}
           >
             앱 설치

@@ -17,8 +17,8 @@ const RatingDeltaChip: React.FC<RatingDeltaChipProps> = ({
 }) => {
   const chipClassName =
     appearance === "rating"
-      ? "!h-6 !min-h-6 px-1.5 opacity-90 shadow-none"
-      : "h-6 px-1.5";
+      ? "app-pill !h-6 px-1.5 opacity-90 shadow-none"
+      : "app-pill h-6 px-1.5";
   const ratingBackgroundClassName =
     appearance === "rating"
       ? delta > 0
@@ -29,8 +29,8 @@ const RatingDeltaChip: React.FC<RatingDeltaChipProps> = ({
       : "";
   const textSizeClassName =
     appearance === "rating"
-      ? "text-[clamp(0.72rem,3.2cqw,0.96rem)] leading-none"
-      : "text-[11px]";
+      ? "text-[clamp(calc(0.72rem*var(--app-font-scale)),calc(3.2cqw*var(--app-font-scale)),calc(0.96rem*var(--app-font-scale)))] leading-none"
+      : "text-[calc(11px*var(--app-font-scale))]";
   const ratingTextClassName =
     appearance === "rating"
       ? delta > 0

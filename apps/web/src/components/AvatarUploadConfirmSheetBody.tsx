@@ -32,7 +32,7 @@ const AvatarUploadConfirmSheetBody: React.FC<
         type="button"
         onClick={onCancel}
         disabled={isSaving}
-        className="app-action-button rounded-2xl bg-slate-100 text-base font-semibold text-pkpk-sub-font disabled:opacity-50"
+        className="app-action-button app-bottom-sheet-action-secondary rounded-2xl text-base font-semibold"
       >
         취소
       </button>
@@ -40,7 +40,7 @@ const AvatarUploadConfirmSheetBody: React.FC<
         type="button"
         onClick={onConfirm}
         disabled={isSaving}
-        className="app-action-button rounded-2xl bg-pkpk-primary-bg text-base font-semibold text-white disabled:opacity-50"
+        className="app-action-button app-bottom-sheet-action-primary rounded-2xl text-base font-semibold"
       >
         {isSaving ? "적용 중..." : "적용"}
       </button>

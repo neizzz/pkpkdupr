@@ -7,6 +7,7 @@ interface AppModalProps {
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  dialogClassName?: string;
   bodyClassName?: string;
 }
 
@@ -16,6 +17,7 @@ const AppModal: React.FC<AppModalProps> = ({
   title,
   children,
   footer,
+  dialogClassName,
   bodyClassName,
 }) => (
   <Modal.Backdrop
@@ -24,7 +26,7 @@ const AppModal: React.FC<AppModalProps> = ({
     variant="blur"
   >
     <Modal.Container placement="center" size="sm">
-      <Modal.Dialog aria-label={ariaLabel}>
+      <Modal.Dialog aria-label={ariaLabel} className={dialogClassName}>
         <Modal.CloseTrigger
           aria-label={`${ariaLabel} 닫기`}
           className="!top-[1.375rem] !size-8 !rounded-full !bg-slate-100 !text-pkpk-dark hover:!bg-slate-200"

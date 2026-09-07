@@ -155,7 +155,7 @@ export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
 
         <section className={matchDetailSectionClassName}>
           <p
-            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
+            className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-sub-title"
           >
             Score
           </p>
@@ -177,7 +177,7 @@ export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
 
         <section className={matchDetailSectionClassName}>
           <p
-            className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
+            className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-sub-title"
           >
             Rating Change
           </p>
@@ -196,7 +196,7 @@ export const MatchDetailSkeleton: React.FC<MatchDetailSkeletonProps> = ({
         <section className={matchDetailSectionClassName}>
           <div className="flex items-center justify-between gap-3">
             <p
-              className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
+              className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-sub-title"
             >
               Approval
             </p>
@@ -224,7 +224,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     </span>
     <section className={matchDetailSectionClassName}>
       <p
-        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
+        className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-sub-title"
       >
         Score
       </p>
@@ -246,7 +246,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
 
     <section className={matchDetailSectionClassName}>
       <p
-        className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
+        className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-sub-title"
       >
         Rating Change
       </p>
@@ -265,7 +265,7 @@ const MatchDetailSectionsSkeleton: React.FC = () => (
     <section className={matchDetailSectionClassName}>
       <div className="flex items-center justify-between gap-3">
         <p
-          className="px-1 text-[clamp(1.1rem,5cqw,1.45rem)] font-semibold uppercase tracking-wide text-pkpk-sub-title"
+          className="px-1 text-[clamp(calc(1.1rem*var(--app-font-scale)),calc(5cqw*var(--app-font-scale)),calc(1.45rem*var(--app-font-scale)))] font-semibold uppercase tracking-wide text-pkpk-sub-title"
         >
           Approval
         </p>
@@ -583,7 +583,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             headerRightContent={
               <div className="flex max-w-24 items-center gap-1.5">
                 <span
-                  className={`shrink-0 text-[0.625rem] font-semibold uppercase tracking-wide ${subTextClassName}`}
+                  className={`shrink-0 text-[calc(0.625rem*var(--app-font-scale))] font-semibold uppercase tracking-wide ${subTextClassName}`}
                 >
                   ID
                 </span>
@@ -607,7 +607,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           >
             <section className={matchDetailSectionClassName}>
             <p
-              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
+              className="px-1 text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.25rem*var(--app-font-scale)))] font-semibold tracking-wide text-pkpk-sub-title"
             >
               스코어
             </p>
@@ -704,7 +704,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
 
             <section className={matchDetailSectionClassName}>
             <p
-              className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
+              className="px-1 text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.25rem*var(--app-font-scale)))] font-semibold tracking-wide text-pkpk-sub-title"
             >
               평점 변동
             </p>
@@ -766,12 +766,12 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
             <section className={matchDetailSectionClassName}>
             <div className="flex items-center gap-1.5">
               <p
-                className="px-1 text-[clamp(1rem,4.5cqw,1.25rem)] font-semibold tracking-wide text-pkpk-sub-title"
+                className="px-1 text-[clamp(calc(1rem*var(--app-font-scale)),calc(4.5cqw*var(--app-font-scale)),calc(1.25rem*var(--app-font-scale)))] font-semibold tracking-wide text-pkpk-sub-title"
               >
                 합의
               </p>
               {hasAutoApprovalTimer ? (
-                <div className="flex shrink-0 items-center gap-1 rounded-full bg-pkpk-secondary-bg/8 px-2 py-1 text-xs font-semibold tabular-nums text-pkpk-secondary-bg">
+                <div className="app-pill flex shrink-0 items-center gap-1 rounded-full bg-pkpk-secondary-bg/8 px-2 py-1 text-xs font-semibold tabular-nums text-pkpk-secondary-bg">
                   <span>
                     {autoApprovalRemainingMs > 0
                       ? `자동 합의까지 ${formatAutoApprovalRemaining(autoApprovalRemainingMs)}`
@@ -929,9 +929,10 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                               </p>
                             ) : null}
                           </AlertDialog.Body>
-                          <AlertDialog.Footer>
+                          <AlertDialog.Footer className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
                             <AlertDialog.CloseTrigger
                               isDisabled={isRejectingResult}
+                              className="shrink-0 whitespace-nowrap"
                             >
                               취소
                             </AlertDialog.CloseTrigger>
@@ -940,7 +941,7 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
                               ariaLabel="길게 눌러 결과 거부"
                               onComplete={() => void handleRejectResult()}
                               isDisabled={isRejectingResult}
-                              className="justify-center bg-red-600 font-semibold text-white hover:bg-red-700"
+                              className="min-w-0 justify-center whitespace-nowrap bg-red-600 font-semibold text-white hover:bg-red-700"
                               progressClassName="bg-white/20"
                             >
                               {isRejectingResult
@@ -1079,14 +1080,14 @@ const MatchDetail: React.FC<MatchDetailProps> = ({
           ) : null}
           <BottomSheet.Actions className="mt-2">
             <Button
-              className="app-action-button w-full rounded-2xl bg-slate-100 font-semibold text-pkpk-sub-font"
+              className="app-action-button app-bottom-sheet-action-secondary w-full rounded-2xl font-semibold"
               onPress={closeResultSheet}
               isDisabled={isSubmittingResult}
             >
               취소
             </Button>
             <Button
-              className="app-action-button w-full rounded-2xl bg-[#409eff] font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400"
+              className="app-action-button app-bottom-sheet-action-primary w-full rounded-2xl font-semibold"
               onPress={() => void handleSubmitResult()}
               isDisabled={isSubmittingResult || !isResultScoreValid}
             >
