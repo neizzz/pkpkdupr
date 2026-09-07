@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, useOverlayState } from "@heroui/react";
+import { Button, Tabs, useOverlayState } from "@heroui/react";
 import {
   CLUB_ANNOUNCEMENT_BODY_MAX_LENGTH,
   CLUB_ANNOUNCEMENT_MAX_COUNT,
@@ -1093,32 +1093,50 @@ const Affiliations: React.FC = () => {
                         icon={<PiRankingLight className="size-5" />}
                         title="랭킹"
                       />
-                      <div className="grid grid-cols-2 rounded-xl bg-pkpk-session-bg p-1">
-                        {(["doubles", "singles"] as RankingCategory[]).map((category) => {
-                          const Icon =
-                            category === "doubles" ? IoPeople : IoPerson;
-                          return (
-                            <button
-                              key={category}
-                              type="button"
-                              onClick={() => setRankingCategory(category)}
-                              className={`flex items-center justify-center gap-1 rounded-lg py-2 text-sm font-bold transition-colors ${
-                                rankingCategory === category
-                                  ? "bg-white text-pkpk-primary-bg shadow-sm"
-                                  : "text-pkpk-sub-font"
-                              }`}
-                            >
-                              <Icon
-                                aria-hidden="true"
-                                className={
-                                  category === "singles" ? "size-3" : "size-3.5"
-                                }
-                              />
-                              {category === "singles" ? "Singles" : "Doubles"}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <Tabs
+                        selectedKey={rankingCategory}
+                        onSelectionChange={(key) =>
+                          setRankingCategory(String(key) as RankingCategory)
+                        }
+                      >
+                        <Tabs.List
+                          aria-label="랭킹 타입"
+                          className="grid grid-cols-2 gap-1 !rounded-xl !bg-pkpk-session-bg !p-1"
+                        >
+                          {(["doubles", "singles"] as RankingCategory[]).map(
+                            (category) => {
+                              const Icon =
+                                category === "doubles" ? IoPeople : IoPerson;
+                              return (
+                                <Tabs.Tab
+                                  key={category}
+                                  id={category}
+                                  className={`relative !h-auto !min-w-0 !w-full !justify-center !rounded-lg py-2 text-sm font-bold transition-colors ${
+                                    rankingCategory === category
+                                      ? "text-pkpk-primary-bg"
+                                      : "bg-transparent text-pkpk-sub-font"
+                                  }`}
+                                >
+                                  <span className="relative z-10 flex items-center justify-center gap-1">
+                                    <Icon
+                                      aria-hidden="true"
+                                      className={
+                                        category === "singles"
+                                          ? "size-3"
+                                          : "size-3.5"
+                                      }
+                                    />
+                                    {category === "singles"
+                                      ? "Singles"
+                                      : "Doubles"}
+                                  </span>
+                                  <Tabs.Indicator className="pointer-events-none !z-0 !rounded-lg !bg-white !shadow-sm" />
+                                </Tabs.Tab>
+                              );
+                            },
+                          )}
+                        </Tabs.List>
+                      </Tabs>
                       {renderRankings(dashboard.rankings[rankingCategory])}
                     </section>
 
@@ -1471,11 +1489,13 @@ const Affiliations: React.FC = () => {
               title={`${clubMatchHistoryClub.name}의 매치 전체`}
               tabKey="affiliations"
               backgroundClassName="bg-white"
+              rightContent={
+                <p className="truncate text-lg font-bold text-pkpk-primary-bg">
+                  {clubMatchHistoryClub.name}의 매치 전체
+                </p>
+              }
             />
             <div className="space-y-3 p-3">
-              <h2 className="px-1 text-xl font-bold text-pkpk-secondary-bg">
-                {clubMatchHistoryClub.name}의 매치 전체
-              </h2>
               {isClubMatchHistoryLoading && !clubMatchHistoryMatches.length ? (
                 <TabPanelStatus
                   isLoading
