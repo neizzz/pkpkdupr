@@ -1,6 +1,7 @@
 import express from "express";
 import { matchTypeValues, type MatchType, type Session } from "@pkpkdupr/shared/match";
 import { isEntityId } from "@pkpkdupr/shared/entityId";
+import { isPlayerFontSizePreference } from "@pkpkdupr/shared/player";
 import { getDb, getDbClient } from "./db/client";
 import { runMigrations } from "./db/migrate";
 import {
@@ -512,6 +513,24 @@ app.patch("/internal/players/:id/profile", async (req, res) => {
       return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
     }
     res.json(player);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch("/internal/players/:id/preferences", async (req, res) => {
+  try {
+    if (!isPlayerFontSizePreference(req.body.fontSizePreference)) {
+      return res.status(400).json({ error: "지원하지 않는 글자 크기입니다." });
+    }
+    const player = await playerRepository.updateFontSizePreference(
+      req.params.id,
+      req.body.fontSizePreference,
+    );
+    if (!player) {
+      return res.status(404).json({ error: "사용자를 찾을 수 없습니다." });
+    }
+    res.json({ fontSizePreference: player.fontSizePreference });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

@@ -22,6 +22,7 @@ const session: AuthenticatedSession = {
   payload: { playerId: player.id, authProvider: "kakao" },
   player,
   isFirstLogin: false,
+  fontSizePreference: "large",
 };
 
 describe("GET /api/me session contract", () => {
@@ -49,6 +50,7 @@ describe("GET /api/me session contract", () => {
     expect(response.body).toMatchObject({
       id: player.id,
       authProvider: "kakao",
+      fontSizePreference: "large",
       privacyPolicyConsentVersion: "2026-08-18",
     });
   });
@@ -123,8 +125,26 @@ describe("GET /api/auth/session", () => {
       authenticated: true,
       player: {
         id: player.id,
+        fontSizePreference: "large",
         privacyPolicyConsentVersion: "2026-08-26",
       },
     });
+  });
+
+  it("신규 프로필의 미설정 글자 크기는 null로 유지한다", async () => {
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockResolvedValue({
+      ...session,
+      fontSizePreference: null,
+    });
+    vi.spyOn(AuthService.prototype, "getCurrentPrivacyPolicyConsent").mockResolvedValue(
+      null,
+    );
+
+    const response = await request(app)
+      .get("/api/auth/session")
+      .set("Cookie", "pkelo_session=new-profile-session");
+
+    expect(response.status).toBe(200);
+    expect(response.body.player.fontSizePreference).toBeNull();
   });
 });

@@ -47,6 +47,7 @@ export const players = mysqlTable("players", {
   statusMessageBackgroundColor: varchar("status_message_background_color", {
     length: 32,
   }),
+  fontSizePreference: varchar("font_size_preference", { length: 16 }),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   isFirstLogin: boolean("is_first_login").notNull(),
   createdAt: unixTimestamp("created_at").notNull(),

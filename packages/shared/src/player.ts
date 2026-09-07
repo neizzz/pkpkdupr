@@ -1,6 +1,17 @@
 export type PlayerStatus = "active" | "inactive";
 export const WITHDRAWN_PLAYER_DISPLAY_NAME = "탈퇴한 사용자";
 
+export const PLAYER_FONT_SIZE_PREFERENCES = ["default", "large"] as const;
+export type PlayerFontSizePreference =
+  (typeof PLAYER_FONT_SIZE_PREFERENCES)[number];
+
+export const isPlayerFontSizePreference = (
+  value: unknown,
+): value is PlayerFontSizePreference =>
+  PLAYER_FONT_SIZE_PREFERENCES.includes(
+    value as PlayerFontSizePreference,
+  );
+
 export interface WithdrawalEligibility {
   eligible: boolean;
   blockers: {

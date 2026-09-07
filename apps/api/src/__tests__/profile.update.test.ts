@@ -25,7 +25,7 @@ const session: AuthenticatedSession = {
 
 describe("PATCH /api/me/profile", () => {
   beforeEach(() => {
-    vi.spyOn(AuthService.prototype, "authenticateAccessToken").mockResolvedValue(
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockResolvedValue(
       session,
     );
     vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
@@ -51,7 +51,8 @@ describe("PATCH /api/me/profile", () => {
 
     const response = await request(app)
       .patch("/api/me/profile")
-      .set("Authorization", "Bearer test-token")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
       .send({
         affiliations: updatedPlayer.affiliations,
         statusMessage: "  즐겁게 플레이해요  ",
@@ -76,7 +77,8 @@ describe("PATCH /api/me/profile", () => {
 
     const response = await request(app)
       .patch("/api/me/profile")
-      .set("Authorization", "Bearer test-token")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
       .send({
         affiliations: [
           { name: "PKELO Gangnam", isPrimary: true },
@@ -97,7 +99,8 @@ describe("PATCH /api/me/profile", () => {
 
     const saved = await request(app)
       .patch("/api/me/profile")
-      .set("Authorization", "Bearer test-token")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
       .send({ birthDate: "1990-08-25" });
 
     expect(saved.status).toBe(200);
@@ -107,10 +110,78 @@ describe("PATCH /api/me/profile", () => {
 
     const rejected = await request(app)
       .patch("/api/me/profile")
-      .set("Authorization", "Bearer test-token")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
       .send({ birthDate: "2999-01-01" });
 
     expect(rejected.status).toBe(400);
     expect(rejected.body.error).toBe("생년월일은 오늘 이후일 수 없습니다.");
+  });
+});
+
+describe("PATCH /api/me/preferences", () => {
+  beforeEach(() => {
+    vi.spyOn(AuthService.prototype, "authenticateDeviceSession").mockResolvedValue(
+      session,
+    );
+    vi.spyOn(AuthService.prototype, "initAdmin").mockResolvedValue(player);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("지원하는 글자 크기를 계정에 저장한다", async () => {
+    const updatePreference = vi
+      .spyOn(AuthService.prototype, "updatePlayerFontSizePreference")
+      .mockResolvedValue("large");
+
+    const response = await request(app)
+      .patch("/api/me/preferences")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
+      .send({ fontSizePreference: "large" });
+
+    expect(response.status).toBe(200);
+    expect(updatePreference).toHaveBeenCalledWith(player.id, "large");
+    expect(response.body).toEqual({ fontSizePreference: "large" });
+  });
+
+  it("지원하지 않는 글자 크기를 거부한다", async () => {
+    const updatePreference = vi.spyOn(
+      AuthService.prototype,
+      "updatePlayerFontSizePreference",
+    );
+
+    const response = await request(app)
+      .patch("/api/me/preferences")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
+      .send({ fontSizePreference: "extra-large" });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("지원하지 않는 글자 크기입니다.");
+    expect(updatePreference).not.toHaveBeenCalled();
+  });
+
+  it("저장소 장애 시 재시도 가능한 오류를 반환한다", async () => {
+    vi.spyOn(
+      AuthService.prototype,
+      "updatePlayerFontSizePreference",
+    ).mockRejectedValue(new Error("DB unavailable"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await request(app)
+      .patch("/api/me/preferences")
+      .set("Cookie", "pkelo_session=test-session")
+      .set("Origin", "http://localhost:8080")
+      .send({ fontSizePreference: "default" });
+
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      error: "글자 크기 설정을 저장하지 못했습니다.",
+      code: "FONT_SIZE_PREFERENCE_UNAVAILABLE",
+    });
+    expect(errorSpy).toHaveBeenCalled();
   });
 });

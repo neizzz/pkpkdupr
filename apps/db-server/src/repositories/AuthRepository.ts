@@ -738,9 +738,10 @@ export class AuthRepository {
       await transaction.execute({
         sql: `INSERT INTO players
                 (id, username, dupr_rating, gender, birth_date, status, avatar_url, affiliations_json,
-                 status_message, status_message_background_color, password_hash, is_first_login, identity_verified_at,
+                 status_message, status_message_background_color, font_size_preference,
+                 password_hash, is_first_login, identity_verified_at,
                  created_at, updated_at)
-              VALUES (?, ?, NULL, ?, ?, ?, NULL, '[]', NULL, NULL, ?, ?, ?, ?, ?)`,
+              VALUES (?, ?, NULL, ?, ?, ?, NULL, '[]', NULL, NULL, NULL, ?, ?, ?, ?, ?)`,
         args: [
           input.player.id,
           input.player.username,

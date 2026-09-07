@@ -1,10 +1,12 @@
 import {
+  isPlayerFontSizePreference,
   normalizeStoredPlayerDupr,
   serializeStoredPlayerDupr,
   shouldStorePlayerDuprAsNull,
   type Player,
   type PlayerAffiliation,
   type PlayerDupr,
+  type PlayerFontSizePreference,
   type PlayerStatus,
   type StoredPlayerDupr,
 } from "@pkpkdupr/shared/player";
@@ -13,6 +15,7 @@ import { isEntityId } from "@pkpkdupr/shared/entityId";
 import { players } from "../db/schema";
 
 export interface StoredPlayerRecord extends Player {
+  fontSizePreference: PlayerFontSizePreference | null;
   passwordHash: string;
   isFirstLogin: boolean;
 }
@@ -28,6 +31,7 @@ export interface CreateStoredPlayerInput {
   affiliations?: PlayerAffiliation[];
   statusMessage?: string | null;
   statusMessageBackgroundColor?: string | null;
+  fontSizePreference?: PlayerFontSizePreference | null;
   passwordHash: string;
   isFirstLogin: boolean;
   createdAt: Date;
@@ -88,6 +92,7 @@ export class PlayerRepository {
       withdrawnAt,
       statusMessage,
       statusMessageBackgroundColor,
+      fontSizePreference,
       ...player
     } = record;
     return {
@@ -97,6 +102,9 @@ export class PlayerRepository {
       affiliations,
       ...(statusMessage ? { statusMessage } : {}),
       ...(statusMessageBackgroundColor ? { statusMessageBackgroundColor } : {}),
+      fontSizePreference: isPlayerFontSizePreference(fontSizePreference)
+        ? fontSizePreference
+        : null,
     } as StoredPlayerRecord;
   }
 
@@ -104,7 +112,14 @@ export class PlayerRepository {
     if (!isEntityId(data.id, "player")) {
       throw new Error("유효한 플레이어 ID가 필요합니다.");
     }
-    const { duprState, affiliations, statusMessage, statusMessageBackgroundColor, ...storedData } = data;
+    const {
+      duprState,
+      affiliations,
+      statusMessage,
+      statusMessageBackgroundColor,
+      fontSizePreference = "default",
+      ...storedData
+    } = data;
     const duprRating = duprState
       ? serializeStoredPlayerDupr(duprState)
       : shouldStorePlayerDuprAsNull(storedData.duprRating)
@@ -120,6 +135,7 @@ export class PlayerRepository {
       affiliationsJson: JSON.stringify(affiliations ?? []),
       statusMessage: statusMessage ?? null,
       statusMessageBackgroundColor: statusMessageBackgroundColor ?? null,
+      fontSizePreference,
       duprRating,
       createdAt: new Date(storedData.createdAt),
       updatedAt: new Date(storedData.updatedAt),
@@ -191,6 +207,17 @@ export class PlayerRepository {
     await this.db
       .update(players)
       .set(update)
+      .where(eq(players.id, id));
+    return await this.findById(id);
+  }
+
+  async updateFontSizePreference(
+    id: string,
+    fontSizePreference: PlayerFontSizePreference,
+  ): Promise<StoredPlayerRecord | undefined> {
+    await this.db
+      .update(players)
+      .set({ fontSizePreference, updatedAt: new Date() })
       .where(eq(players.id, id));
     return await this.findById(id);
   }

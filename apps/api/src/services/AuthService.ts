@@ -9,6 +9,7 @@ import {
   PlayerDupr,
   PlayerDuprCategory,
   PlayerDuprMetrics,
+  PlayerFontSizePreference,
   PlayerRatingChangeLog,
   PlayerRatingChangeSource,
   PlayerStatus,
@@ -29,6 +30,7 @@ import {
   toPublicPlayerDupr,
   getPlayerFullAge,
   WITHDRAWN_PLAYER_DISPLAY_NAME,
+  isPlayerFontSizePreference,
   type WithdrawalEligibility,
 } from "@pkpkdupr/shared/player";
 import type {
@@ -77,6 +79,7 @@ const hashDeviceSessionToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 
 interface StoredPlayerRecord extends Player {
+  fontSizePreference: PlayerFontSizePreference | null;
   passwordHash: string;
   isFirstLogin: boolean;
   duprMetrics: PlayerDuprMetrics;
@@ -96,6 +99,7 @@ export interface AuthenticatedSession {
   payload: JwtPayload;
   player: Player;
   isFirstLogin: boolean;
+  fontSizePreference?: PlayerFontSizePreference | null;
   refreshedAccessToken?: string;
 }
 
@@ -171,6 +175,9 @@ const hydratePlayer = (record: any): StoredPlayerRecord => {
   const duprState = normalizeStoredPlayerDupr(record.duprRating);
   return {
     ...record,
+    fontSizePreference: isPlayerFontSizePreference(record.fontSizePreference)
+      ? record.fontSizePreference
+      : null,
     avatarUrl: record.avatarUrl ?? undefined,
     duprRating: normalizeNullablePlayerDupr(record.duprRating),
     duprMetrics: duprState.metrics,
@@ -363,6 +370,7 @@ const toPublicPlayer = (stored: StoredPlayerRecord): Player => {
     isFirstLogin: _isFirstLogin,
     duprMetrics: _duprMetrics,
     duprState: _duprState,
+    fontSizePreference: _fontSizePreference,
     ...player
   } = stored;
   if (stored.withdrawnAt) {
@@ -808,6 +816,7 @@ export class AuthService {
       },
       player: toPublicPlayer(stored),
       isFirstLogin: this.shouldRequirePasswordChange(stored),
+      fontSizePreference: stored.fontSizePreference,
       refreshedAccessToken: rememberMe
         ? this.createAccessTokenForPlayer(stored, true, authProvider)
         : undefined,
@@ -1070,7 +1079,25 @@ export class AuthService {
       payload: { playerId: stored.id, isAdmin: false, authProvider: session.provider },
       player: toPublicPlayer(stored),
       isFirstLogin: this.shouldRequirePasswordChange(stored),
+      fontSizePreference: stored.fontSizePreference,
     };
+  }
+
+  async updatePlayerFontSizePreference(
+    playerId: string,
+    fontSizePreference: PlayerFontSizePreference,
+  ): Promise<PlayerFontSizePreference> {
+    const result = await this.dbRequest<{ fontSizePreference?: unknown }>(
+      `/internal/players/${playerId}/preferences`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ fontSizePreference }),
+      },
+    );
+    if (!isPlayerFontSizePreference(result.fontSizePreference)) {
+      throw new Error("글자 크기 설정 응답이 올바르지 않습니다.");
+    }
+    return result.fontSizePreference;
   }
 
   async revokeDeviceSession(token: string): Promise<void> {

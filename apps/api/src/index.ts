@@ -24,6 +24,7 @@ import {
   getCommonAffiliationNames,
   getPlayerFullAge,
   isValidPlayerBirthDate,
+  isPlayerFontSizePreference,
   normalizeAffiliationNames,
   PLAYER_AFFILIATION_MAX_COUNT,
   PLAYER_AFFILIATION_NAME_MAX_LENGTH,
@@ -1274,6 +1275,10 @@ app.get("/api/auth/session", async (req, res) => {
         isFirstLogin: session.isFirstLogin,
         isAdmin: false,
         authProvider: session.payload.authProvider ?? "password",
+        fontSizePreference:
+          session.fontSizePreference === undefined
+            ? "default"
+            : session.fontSizePreference,
         privacyPolicyConsentVersion: privacyPolicyConsent?.policyVersion ?? null,
       },
     });
@@ -1307,6 +1312,10 @@ app.get("/api/me", async (req, res) => {
       isFirstLogin: session.isFirstLogin,
       isAdmin: session.payload.isAdmin === true,
       authProvider: session.payload.authProvider ?? "password",
+      fontSizePreference:
+        session.fontSizePreference === undefined
+          ? "default"
+          : session.fontSizePreference,
       privacyPolicyConsentVersion: privacyPolicyConsent?.policyVersion ?? null,
     });
   } catch (error) {
@@ -2701,6 +2710,31 @@ app.patch("/api/me/profile", async (req, res) => {
     res.json(player);
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+app.patch("/api/me/preferences", async (req, res) => {
+  try {
+    const decoded = await getAuthPayload(req, res);
+    if (!decoded) {
+      return;
+    }
+    if (!isPlayerFontSizePreference(req.body?.fontSizePreference)) {
+      return res.status(400).json({ error: "지원하지 않는 글자 크기입니다." });
+    }
+
+    const fontSizePreference =
+      await authService.updatePlayerFontSizePreference(
+        decoded.playerId,
+        req.body.fontSizePreference,
+      );
+    res.json({ fontSizePreference });
+  } catch (err) {
+    console.error("[AUTH] Failed to update font size preference", err);
+    res.status(503).json({
+      error: "글자 크기 설정을 저장하지 못했습니다.",
+      code: "FONT_SIZE_PREFERENCE_UNAVAILABLE",
+    });
   }
 });
 

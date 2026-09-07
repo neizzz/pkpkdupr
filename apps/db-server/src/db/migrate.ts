@@ -352,6 +352,13 @@ const migrations: Migration[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
     ],
   },
+  {
+    id: "0015_player_font_size_preference",
+    statements: [
+      "ALTER TABLE players ADD COLUMN font_size_preference VARCHAR(16) NULL AFTER status_message_background_color",
+      "UPDATE players SET font_size_preference = 'default' WHERE font_size_preference IS NULL",
+    ],
+  },
 ];
 
 export const runMigrations = async () => {
