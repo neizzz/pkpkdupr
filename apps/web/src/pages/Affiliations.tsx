@@ -124,7 +124,7 @@ const SectionTitle: React.FC<{
   <div className="flex items-center justify-between gap-3">
     <div className="flex min-w-0 items-center gap-2">
       {icon ? <span className="text-pkpk-primary-bg">{icon}</span> : null}
-      <h3 className="text-base font-bold text-pkpk-main-font">{title}</h3>
+      <h3 className="text-base font-bold !leading-normal text-pkpk-main-font">{title}</h3>
     </div>
     {action}
   </div>
@@ -1074,7 +1074,7 @@ const Affiliations: React.FC = () => {
                         <IoPersonAddOutline className="size-6" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-bold text-pkpk-main-font">멤버 초대</span>
+                        <span className="block text-sm font-bold !leading-normal text-pkpk-main-font">멤버 초대</span>
                         <span className="mt-0.5 block text-xs text-pkpk-sub-font">
                           초대할 사람의 QR을 스캔하면 바로 멤버로 추가돼요.
                         </span>
@@ -1092,7 +1092,7 @@ const Affiliations: React.FC = () => {
                           <IoShieldCheckmarkOutline className="size-6" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-bold text-pkpk-main-font">운영진 관리</span>
+                          <span className="block text-sm font-bold !leading-normal text-pkpk-main-font">운영진 관리</span>
                           <span className="mt-0.5 block text-xs text-pkpk-sub-font">
                             공지, 세션, 멤버 권한을 관리해요.
                           </span>
@@ -1118,7 +1118,7 @@ const Affiliations: React.FC = () => {
       >
         <BottomSheet.Body>
           <div>
-            <h2 className="bs-text-head text-pkpk-main-font">클럽 만들기</h2>
+            <h2 className="bs-text-head !leading-normal text-pkpk-main-font">클럽 만들기</h2>
             <p className="mt-1 text-sm text-pkpk-sub-font">
               만든 분은 바로 클럽장이 됩니다.
             </p>
@@ -1195,7 +1195,7 @@ const Affiliations: React.FC = () => {
             onBack={closeManagement}
             rightContent={
               <div className="min-w-0 translate-y-2 text-right">
-                <p className="whitespace-nowrap text-lg font-bold text-pkpk-primary-bg">
+                <p className="whitespace-nowrap text-lg font-bold !leading-normal text-pkpk-primary-bg">
                   운영진 관리
                 </p>
                 <p className="truncate text-xs text-pkpk-sub-font">
@@ -1205,7 +1205,7 @@ const Affiliations: React.FC = () => {
             }
           />
 
-          <div className="pt-6">
+          <div>
             {managementError ? (
               <div className="px-4 py-4">
                 <p className="rounded-xl border border-error/20 bg-white px-3 py-2 text-sm text-error">
@@ -1297,7 +1297,7 @@ const Affiliations: React.FC = () => {
         ariaLabel="공지 추가"
       >
         <BottomSheet.Header>
-          <h2 className="bs-text-head text-pkpk-main-font">공지 추가</h2>
+          <h2 className="bs-text-head !leading-normal text-pkpk-main-font">공지 추가</h2>
           <p className="mt-1 text-sm text-pkpk-sub-font">
             클럽 공지는 최대 {CLUB_ANNOUNCEMENT_MAX_COUNT}개까지 등록할 수 있어요.
           </p>
@@ -1409,7 +1409,7 @@ const Affiliations: React.FC = () => {
               backgroundClassName="bg-white"
               rightContent={
                 <div className="min-w-0 translate-y-2 text-right">
-                  <p className="whitespace-nowrap text-lg font-bold text-pkpk-primary-bg">
+                  <p className="whitespace-nowrap text-lg font-bold !leading-normal text-pkpk-primary-bg">
                     매치 전체
                   </p>
                   <p className="truncate text-xs text-pkpk-sub-font">
@@ -1418,7 +1418,7 @@ const Affiliations: React.FC = () => {
                 </div>
               }
             />
-            <div className="space-y-3 p-3">
+            <div className="space-y-3 px-4 pt-4 pb-3">
               {isClubMatchHistoryLoading && !clubMatchHistoryMatches.length ? (
                 <TabPanelStatus
                   isLoading
@@ -1492,14 +1492,14 @@ const Affiliations: React.FC = () => {
               tabKey="affiliations"
               backgroundClassName="bg-white"
               rightContent={
-                <p className="text-lg font-bold text-pkpk-primary-bg">
+                <p className="text-lg font-bold !leading-normal text-pkpk-primary-bg">
                   공지 상세
                 </p>
               }
             />
-            <article className="space-y-4 px-4 py-5">
+            <article className="space-y-4 px-4 pt-4 pb-5">
               <div className="flex items-start justify-between gap-3">
-                <h2 className="min-w-0 flex-1 break-words text-[calc(1.5rem*var(--app-font-scale))] font-bold text-pkpk-main-font">
+                <h2 className="min-w-0 flex-1 break-words text-[calc(1.5rem*var(--app-font-scale))] font-bold !leading-normal text-pkpk-main-font">
                   {selectedAnnouncement.title}
                 </h2>
                 {isManager ? (
