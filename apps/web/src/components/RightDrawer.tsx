@@ -176,7 +176,7 @@ const RightDrawer: React.FC<RightDrawerProps> = ({
 
   return createPortal(
     <div
-      aria-hidden={!isActive || !isOpen}
+      inert={!isActive || !isOpen ? true : undefined}
       className={`fixed inset-0 ${
         isActive ? "pointer-events-auto" : "pointer-events-none invisible"
       }`}
