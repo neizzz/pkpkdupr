@@ -21,6 +21,33 @@ NEW_RELIC_LICENSE_KEY=<new-relic-license-key>
 
 배포 후 각 서비스에 트래픽을 발생시키고 New Relic APM에서 두 엔티티의 transaction과 외부 요청이 수집되는지 확인합니다. 키가 없거나 `NEW_RELIC_ENABLED=false`이면 에이전트는 비활성화되므로 개발 환경으로 데이터를 전송하지 않습니다.
 
+## 활성 회원 수 스냅샷
+
+`pkelo-db-server`는 New Relic이 활성화된 경우 시작 직후와 이후 매시간 활성 일반회원 수를 `PkeloMemberSnapshot` 커스텀 이벤트로 전송합니다. 활성 일반회원은 `players.status = "active"`이면서 시스템 `admin` 계정을 제외한 회원입니다. 이벤트에는 아래 집계값만 포함하며 회원 ID, 사용자명 등 개인정보는 전송하지 않습니다.
+
+| 이벤트 | 속성 | 값 |
+| --- | --- | --- |
+| `PkeloMemberSnapshot` | `activeMemberCount` | 활성 일반회원 수 (number) |
+| `PkeloMemberSnapshot` | `source` | `db-server` |
+
+현재 수치는 New Relic Query builder에서 다음 NRQL로 확인합니다. 전송 주기 때문에 마지막 수치는 최대 1시간 전 값일 수 있으며, 2시간 동안 이벤트가 없으면 DB 서버 또는 New Relic 전송 상태를 확인합니다.
+
+```sql
+FROM PkeloMemberSnapshot
+SELECT latest(activeMemberCount)
+WHERE source = 'db-server'
+SINCE 2 hours ago
+```
+
+시간별 추이는 아래 쿼리를 사용합니다.
+
+```sql
+FROM PkeloMemberSnapshot
+SELECT latest(activeMemberCount)
+WHERE source = 'db-server'
+TIMESERIES 1 hour
+```
+
 ## Synthetic monitor
 
 New Relic UI에서 아래 monitor를 생성합니다.

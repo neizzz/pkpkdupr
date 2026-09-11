@@ -1,4 +1,5 @@
 import express from "express";
+import { createRequire } from "node:module";
 import { matchTypeValues, type MatchType, type Session } from "@pkpkdupr/shared/match";
 import { isEntityId } from "@pkpkdupr/shared/entityId";
 import { isPlayerFontSizePreference } from "@pkpkdupr/shared/player";
@@ -51,8 +52,14 @@ import {
   isDevMockDataEnabled,
   TestDataRepository,
 } from "./repositories/TestDataRepository";
+import {
+  createMemberSnapshotReporter,
+  isNewRelicEnabled,
+  type MemberSnapshotReporter,
+} from "./telemetry/memberSnapshotReporter";
 
 const app = express();
+const require = createRequire(`${process.cwd()}/package.json`);
 const port = Number(process.env.PORT || 5001);
 const db = getDb();
 const client = getDbClient();
@@ -76,6 +83,7 @@ const testDataRepository = new TestDataRepository(
   playerCreationLogRepository,
   playerStatusChangeLogRepository,
 );
+let memberSnapshotReporter: MemberSnapshotReporter | undefined;
 
 app.use(express.json());
 
@@ -246,6 +254,29 @@ const seedDevClubData = async () => {
     .addFriendship("Pdev0001", "Pdev0002")
     .catch(() => undefined);
 
+};
+
+const startMemberSnapshotReporter = () => {
+  if (!isNewRelicEnabled() || memberSnapshotReporter) {
+    return;
+  }
+
+  memberSnapshotReporter = createMemberSnapshotReporter({
+    isEnabled: isNewRelicEnabled,
+    getActiveMemberCount: () => playerRepository.countActiveNonAdmin(),
+    recordCustomEvent: (eventType, attributes) => {
+      const newrelic = require("newrelic") as {
+        recordCustomEvent: (type: string, eventAttributes: object) => void;
+      };
+      newrelic.recordCustomEvent(eventType, attributes);
+    },
+    onError: (error) => {
+      console.error("[NEW_RELIC] 회원 수 스냅샷 전송 실패", {
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+    },
+  });
+  memberSnapshotReporter.start();
 };
 
 app.get("/health", (_req, res) => {
@@ -1250,6 +1281,7 @@ const start = async () => {
         .join(", "),
     );
   }
+  startMemberSnapshotReporter();
   app.listen(port, () => {
     console.log(`[DB-SERVER] Listening at http://localhost:${port}`);
   });

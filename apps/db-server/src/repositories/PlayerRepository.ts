@@ -10,7 +10,7 @@ import {
   type PlayerStatus,
   type StoredPlayerDupr,
 } from "@pkpkdupr/shared/player";
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, ne } from "drizzle-orm";
 import { isEntityId } from "@pkpkdupr/shared/entityId";
 import { players } from "../db/schema";
 
@@ -67,6 +67,16 @@ export class PlayerRepository {
       .orderBy(desc(players.createdAt))
       .all();
     return records.map((record: any) => this.hydrate(record));
+  }
+
+  async countActiveNonAdmin(): Promise<number> {
+    const result = await this.db
+      .select({ count: count() })
+      .from(players)
+      .where(and(eq(players.status, "active"), ne(players.username, "admin")))
+      .get();
+
+    return Number(result?.count ?? 0);
   }
 
   private hydrate(record: any): StoredPlayerRecord {
