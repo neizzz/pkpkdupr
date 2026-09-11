@@ -42,7 +42,6 @@ const PwaUpdatePrompt: React.FC = () => {
       if (
         !isStandalone ||
         isLoading ||
-        !isAuthenticated ||
         requiresPasswordChange ||
         isFullWidthDevPage ||
         isForcedPasswordChangePage ||
@@ -80,7 +79,6 @@ const PwaUpdatePrompt: React.FC = () => {
     };
   }, [
     checkForUpdate,
-    isAuthenticated,
     isForcedPasswordChangePage,
     isFullWidthDevPage,
     isLoading,
@@ -92,7 +90,6 @@ const PwaUpdatePrompt: React.FC = () => {
   if (
     !isStandalone ||
     isLoading ||
-    !isAuthenticated ||
     requiresPasswordChange ||
     isFullWidthDevPage ||
     isForcedPasswordChangePage ||
@@ -114,7 +111,13 @@ const PwaUpdatePrompt: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-[calc(5.47rem+var(--safe-bottom)+var(--app-keyboard-offset))] left-1/2 z-30 app-shell-width -translate-x-1/2 px-3">
+    <div
+      className={`fixed left-1/2 z-30 app-shell-width -translate-x-1/2 px-3 ${
+        isAuthenticated
+          ? "bottom-[calc(5.47rem+var(--safe-bottom)+var(--app-keyboard-offset))]"
+          : "bottom-[calc(1rem+var(--safe-bottom)+var(--app-keyboard-offset))]"
+      }`}
+    >
       <Alert
         status="accent"
         className="items-center rounded-2xl border border-pkpk-primary-bg/20 bg-white/95 px-3 py-2 shadow-lg backdrop-blur"

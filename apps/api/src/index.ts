@@ -1165,13 +1165,51 @@ app.post("/api/admin/login", async (req, res) => {
   }
 });
 
-app.get("/auth/kakao/login", async (req, res) => {
-  if (!kakaoAuthService) {
-    return res.status(404).json({ error: "Kakao 로그인이 설정되지 않았습니다." });
-  }
-  res.status(410).json({
-    error: "로그인 전 개인정보 동의 후 /api/auth/kakao/start를 사용해주세요.",
-  });
+app.get("/auth/kakao/login", (_req, res) => {
+  // 이전 PWA 번들은 이 URL로 직접 이동한다. OAuth를 GET으로 재개하지 않고,
+  // 해당 PWA가 최신 로그인 번들을 다시 받도록 서비스 워커와 Cache Storage만 정리한다.
+  res
+    .status(410)
+    .set({
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      "Clear-Site-Data": '"cache"',
+      Expires: "0",
+      Pragma: "no-cache",
+    })
+    .type("html")
+    .send(`<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>PKELO 업데이트 중</title>
+  </head>
+  <body>
+    <p>최신 버전으로 업데이트하고 있습니다. 잠시만 기다려주세요.</p>
+    <script>
+      (async () => {
+        const tasks = [];
+        if ("serviceWorker" in navigator) {
+          tasks.push(
+            navigator.serviceWorker
+              .getRegistrations()
+              .then((registrations) =>
+                Promise.all(registrations.map((registration) => registration.unregister())),
+              ),
+          );
+        }
+        if ("caches" in window) {
+          tasks.push(
+            caches.keys().then((keys) => Promise.all(keys.map((key) => caches.delete(key)))),
+          );
+        }
+        await Promise.allSettled(tasks);
+        window.location.replace("/login?recovery=legacy-pwa");
+      })();
+    </script>
+  </body>
+</html>`);
 });
 
 app.post("/api/auth/kakao/start", async (req, res) => {

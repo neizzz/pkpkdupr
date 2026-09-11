@@ -28,6 +28,66 @@ test("익명 부트스트랩은 /api/me 호출 없이 로그인 화면을 표시
   expect(meRequested).toBe(false);
 });
 
+test("로그인 전 standalone PWA에서도 대기 중인 업데이트를 안내한다", async ({ page }) => {
+  await page.addInitScript(() => {
+    const controllerChangeListeners = new Set<() => void>();
+    const registration = {
+      installing: null,
+      waiting: {
+        postMessage: () => {
+          queueMicrotask(() => {
+            controllerChangeListeners.forEach((listener) => listener());
+          });
+        },
+      },
+      unregister: async () => true,
+      update: async () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    };
+    const serviceWorker = {
+      controller: {},
+      ready: Promise.resolve(registration),
+      register: async () => registration,
+      getRegistration: async () => registration,
+      getRegistrations: async () => [registration],
+      addEventListener: (type: string, listener: () => void) => {
+        if (type === "controllerchange") controllerChangeListeners.add(listener);
+      },
+      removeEventListener: (type: string, listener: () => void) => {
+        if (type === "controllerchange") controllerChangeListeners.delete(listener);
+      },
+    };
+
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: serviceWorker,
+    });
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: (query: string) => ({
+        matches: query === "(display-mode: standalone)",
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+  });
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ contentType: "application/json", body: JSON.stringify({ authenticated: false }) }),
+  );
+
+  await page.goto("http://pkelo.localhost:4173/login");
+
+  await expect(page.getByRole("button", { name: "카카오 로그인" })).toBeVisible();
+  await expect(page.getByText("새 버전이 있어요.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "업데이트" })).toBeVisible();
+});
+
 test("카카오 로그인 시작 요청에 자동 로그인 유지 여부를 보낸다", async ({ page }) => {
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({ contentType: "application/json", body: JSON.stringify({ authenticated: false }) }),
