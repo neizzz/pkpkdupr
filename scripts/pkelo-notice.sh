@@ -173,6 +173,29 @@ is_notice_enabled() {
   [[ -f "${NOTICE_STATE_FILE}" ]] && [[ "$(read_env_value "${NOTICE_STATE_FILE}" PKELO_NOTICE_ENABLED)" == "true" ]]
 }
 
+# Bash builtins only: the deployment host does not need Node, Python or jq.
+json_escape() {
+  local LC_ALL=C
+  local value="$1" character code i
+  # Work bytewise to preserve UTF-8, escaping all JSON control bytes.
+  # NUL cannot occur in Bash arguments or environment variables.
+  for ((i = 0; i < ${#value}; i++)); do
+    character="${value:i:1}"
+    case "${character}" in
+      '"') printf '\\"' ;;
+      '\') printf '\\\\' ;;
+      *)
+        printf -v code '%d' "'${character}"
+        if ((code > 0 && code < 32)); then
+          printf '\\u%04x' "${code}"
+        else
+          printf '%s' "${character}"
+        fi
+        ;;
+    esac
+  done
+}
+
 write_notice_json() {
   if [[ "${DRY_RUN}" == true ]]; then
     echo "[dry-run] ${NOTICE_JSON_FILE}에 활성 안내 JSON을 원자적으로 생성합니다."
@@ -182,12 +205,9 @@ write_notice_json() {
   mkdir -p "${NOTICE_PUBLIC_DIR}"
   local temp_file
   temp_file="$(mktemp "${NOTICE_PUBLIC_DIR}/notice.json.XXXXXX")"
-  PKELO_NOTICE_TITLE="${NOTICE_TITLE}" PKELO_NOTICE_MESSAGE="${NOTICE_MESSAGE}" \
-    node --input-type=module -e '
-      const title = process.env.PKELO_NOTICE_TITLE;
-      const message = process.env.PKELO_NOTICE_MESSAGE;
-      process.stdout.write(`${JSON.stringify({ enabled: true, title, message })}\n`);
-    ' > "${temp_file}"
+  printf '{"enabled":true,"title":"%s","message":"%s"}\n' \
+    "$(json_escape "${NOTICE_TITLE}")" \
+    "$(json_escape "${NOTICE_MESSAGE}")" > "${temp_file}"
   chmod 644 "${temp_file}"
   mv -f "${temp_file}" "${NOTICE_JSON_FILE}"
 }
